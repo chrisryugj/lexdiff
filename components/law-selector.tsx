@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface LawSearchResult {
-  lawId: string
+  lawId?: string
+  mst?: string
   lawName: string
   lawType: string
   promulgationDate?: string
@@ -36,7 +37,7 @@ export function LawSelector({ results, query, onSelect, onCancel }: LawSelectorP
             <div className="space-y-3">
               {results.map((law) => (
                 <Card
-                  key={law.lawId}
+                  key={law.lawId || law.mst || law.lawName}
                   className="cursor-pointer hover:bg-accent transition-colors"
                   onClick={() => onSelect(law)}
                 >
