@@ -52,7 +52,7 @@ function sanitizeKeepAnchors(html: string): string {
       ]),
     ),
     allowedAttributes: {
-      a: ["href", "title", "target", "rel", "class", "data-law-id", "data-jo", "data-efyd"],
+      a: ["href", "title", "target", "rel", "class", "data-law-id", "data-jo", "data-efyd", "data-mst", "data-href"],
       '*': ["class", "id"],
     },
   })
@@ -85,12 +85,18 @@ function rewriteAnchors($: cheerio.CheerioAPI) {
         try { joCode = buildJO(joMatch[0]) } catch {}
       }
       if (id || mst) {
-        a.attr("href", "#").addClass("law-drf-link")
+        const drfSp = new URLSearchParams({ target: "eflaw", type: "HTML" })
+        if (id) drfSp.set("ID", id)
+        if (mst) drfSp.set("MST", mst)
+        if (joCode) drfSp.set("JO", joCode)
+        if (efMatch?.[1]) drfSp.set("efYd", efMatch[1])
+        const abs = `${DRF_BASE}?${drfSp.toString()}`
+        a.attr("href", abs).addClass("law-drf-link law-html-link").attr("data-href", abs)
         if (id) a.attr("data-law-id", id)
         if (mst) a.attr("data-mst", mst)
         if (joCode) a.attr("data-jo", joCode)
         if (efMatch?.[1]) a.attr("data-efyd", efMatch[1])
-        a.removeAttr("target").attr("rel", "noopener")
+        a.attr("target", "_blank").attr("rel", "noopener")
         return
       }
     }
@@ -104,12 +110,18 @@ function rewriteAnchors($: cheerio.CheerioAPI) {
         const jo = u.searchParams.get("JO") || ""
         const efyd = u.searchParams.get("efYd") || ""
         if (id || mst) {
-          a.attr("href", "#").addClass("law-drf-link")
+          const drfSp = new URLSearchParams({ target: "eflaw", type: "HTML" })
+          if (id) drfSp.set("ID", id)
+          if (mst) drfSp.set("MST", mst)
+          if (jo) drfSp.set("JO", jo)
+          if (efyd) drfSp.set("efYd", efyd)
+          const abs = `${DRF_BASE}?${drfSp.toString()}`
+          a.attr("href", abs).addClass("law-drf-link law-html-link").attr("data-href", abs)
           if (id) a.attr("data-law-id", id)
           if (mst) a.attr("data-mst", mst)
           if (jo) a.attr("data-jo", jo)
           if (efyd) a.attr("data-efyd", efyd)
-          a.removeAttr("target").attr("rel", "noopener")
+          a.attr("target", "_blank").attr("rel", "noopener")
           return
         }
       }
@@ -118,7 +130,7 @@ function rewriteAnchors($: cheerio.CheerioAPI) {
     // 3) Fallback: keep external link but route through law-html proxy for modal
     const abs = absUrl(href)
     if (abs) {
-      a.attr("href", "#").addClass("law-html-link").attr("data-href", abs).attr("title", a.attr("title") || "연결된 본문 열기")
+      a.attr("href", abs).addClass("law-html-link").attr("data-href", abs).attr("title", a.attr("title") || "연결된 본문 열기").attr("target", "_blank").attr("rel", "noopener noreferrer")
       return
     }
   })
