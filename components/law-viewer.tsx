@@ -1,6 +1,5 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,8 +21,7 @@ import {
 } from "lucide-react"
 import type { LawArticle, LawMeta } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
-import { buildJO, formatJO } from "@/lib/law-parser"
-import { ReferenceModal } from "@/components/reference-modal"
+import { formatJO } from "@/lib/law-parser"
 import { RevisionHistory } from "@/components/revision-history"
 
 interface LawViewerProps {
@@ -60,8 +58,6 @@ export function LawViewer({
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
-  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
-  const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
 
   const activeArticle = articles.find((a) => a.jo === activeJo)
 
@@ -153,126 +149,6 @@ export function LawViewer({
 
     console.log("[v0] formatSimpleJo 결과 (변환 없음):", jo)
     return jo
-  }
-
-  // Handle clicks on linkified references inside article content
-  const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
-    const target = e.target as HTMLElement
-    if (target && target.tagName === "A") {
-      e.preventDefault()
-      const refType = target.getAttribute("data-ref")
-      if (refType === "article") {
-        const articleLabel = target.getAttribute("data-article") || ""
-        // If immediately preceded by external law anchor, treat as external
-        const prev = target.previousElementSibling as HTMLElement | null
-        if (prev && prev.tagName === "A" && prev.classList.contains("law-ref") && prev.getAttribute("data-ref") === "law") {
-          const lawName = prev.getAttribute("data-law") || ""
-          await openExternalLawArticleModal(lawName, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-          return
-        }
-        try {
-          const joCode = buildJO(articleLabel)
-          const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-          if (found) {
-            setRefModal({
-              open: true,
-              title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-              html: extractArticleText(found),
-            })
-            return
-          }
-        } catch {}
-      } else if (refType === "law") {
-        const lawName = target.getAttribute("data-law") || ""
-        // Try to pair with next article anchor on the same line
-        let articleLabel = ""
-        const next = target.nextElementSibling as HTMLElement | null
-        if (next && next.tagName === "A" && next.classList.contains("law-ref") && next.getAttribute("data-ref") === "article") {
-          articleLabel = next.getAttribute("data-article") || ""
-        }
-        if (articleLabel) {
-          await openExternalLawArticleModal(lawName, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-        } else {
-          // Fallback: show minimal modal with a link
-          setRefModal({ open: true, title: lawName, html: `<a href=\"https://www.law.go.kr/법령/${encodeURIComponent(lawName)}\" target=\"_blank\" rel=\"noopener\">법령 페이지 열기</a>` })
-          setLastExternalRef({ lawName })
-        }
-      } else if (refType === "law-article") {
-        const lawName = target.getAttribute("data-law") || ""
-        const articleLabel = target.getAttribute("data-article") || ""
-        await openExternalLawArticleModal(lawName, articleLabel)
-        setLastExternalRef({ lawName, joLabel: articleLabel })
-      } else if (refType === "same") {
-        // Use last external reference law + current article, change to requested part
-        if (lastExternalRef && lastExternalRef.joLabel) {
-          const part = target.getAttribute("data-part") || ""
-          const base = lastExternalRef.joLabel.replace(/제\d+항(제\d+호)?/, "").trim()
-          const articleLabel = `${base}${part}`
-          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
-          setLastExternalRef({ lawName: lastExternalRef.lawName, joLabel: articleLabel })
-        }
-      } else if (refType === "related") {
-        if (!activeArticle) return
-        const kind = target.getAttribute("data-kind") || "decree"
-        const joLabel = formatJO(activeArticle.jo)
-        try {
-          const qs = new URLSearchParams({ baseLaw: meta.lawTitle, joLabel, kind })
-          const res = await fetch(`/api/related?${qs.toString()}`)
-          const data = await res.json()
-          if (data?.candidates?.length > 0) {
-            const best = data.candidates[0]
-            setRefModal({
-              open: true,
-              title: `${data.lawName} ${best.joNum}${best.title ? ` (${best.title})` : ""}`,
-              html: best.html,
-            })
-          } else {
-            // fallback: 안내 모달
-            const suffix = kind === "rule" ? "시행규칙" : "시행령"
-            setRefModal({ open: true, title: `${meta.lawTitle} ${suffix}`, html: "관련 조문을 찾지 못했습니다." })
-          }
-        } catch (err) {
-          console.error("related lookup failed", err)
-        }
-      }
-    }
-  }
-
-  // Helper: fetch external law article and show in modal
-  async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
-    try {
-      const qs = new URLSearchParams({ query: lawName })
-      const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
-      const searchXml = await searchRes.text()
-      const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
-      const lawId = lawIdMatch?.[1]
-      if (!lawId) {
-        setRefModal({ open: true, title: lawName, html: "법령을 찾지 못했습니다." })
-        return
-      }
-      const eflawRes = await fetch(`/api/eflaw?lawId=${encodeURIComponent(lawId)}`)
-      const eflawXml = await eflawRes.text()
-      // Parse to find the target article
-      const { parseLawXML } = await import("@/lib/law-xml-parser")
-      const parsed = parseLawXML(eflawXml)
-      let joCode = ""
-      try { joCode = buildJO(articleLabel) } catch {}
-      const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-      if (found) {
-        setRefModal({
-          open: true,
-          title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-          html: extractArticleText(found),
-        })
-      } else {
-        setRefModal({ open: true, title: lawName, html: "해당 조문을 찾지 못했습니다." })
-      }
-    } catch (err) {
-      console.error("openExternalLawArticleModal error", err)
-      setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
-    }
   }
 
   console.log("[v0] LawViewer 렌더링 완료:", {
@@ -455,7 +331,6 @@ export function LawViewer({
                           overflowWrap: "break-word",
                           wordBreak: "break-word",
                         }}
-                        onClick={handleContentClick}
                         dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
                       />
                       <Separator className="my-6" />
@@ -493,14 +368,13 @@ export function LawViewer({
                   </div>
 
                   <div
-                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                    className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
                     style={{
                       fontSize: `${fontSize}px`,
                       lineHeight: "1.8",
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
                     }}
-                    onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
                   />
 
@@ -538,12 +412,6 @@ export function LawViewer({
           </ScrollArea>
         </div>
       </Card>
-      <ReferenceModal
-        isOpen={refModal.open}
-        onClose={() => setRefModal({ open: false })}
-        title={refModal.title || "연결된 본문"}
-        html={refModal.html}
-      />
     </div>
   )
 }

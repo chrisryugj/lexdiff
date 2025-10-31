@@ -166,37 +166,6 @@
     font-weight: 600 !important;
     font-size: 0.875rem !important;
   }
-
-  /* Linkified references inside law content */
-  a.law-ref {
-    color: oklch(0.7 0.18 240);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-  .prose a.law-ref {
-    color: oklch(0.7 0.18 240);
-    text-decoration: underline;
-  }
-
-  /* HTML-mode anchors from law.go.kr */
-  a.law-html-link,
-  .prose a.law-html-link {
-    color: oklch(0.7 0.18 240);
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  a.law-drf-link,
-  .prose a.law-drf-link {
-    color: oklch(0.7 0.18 240);
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  /* Tighten vertical rhythm for HTML-rendered law text */
-  .law-html-viewer p { margin: 0.5rem 0; }
-  .law-html-viewer li { margin: 0.25rem 0; }
-  .law-html-viewer h1, .law-html-viewer h2, .law-html-viewer h3 { margin: 0.75rem 0; }
-  .law-html-viewer br + br { display: none; }
 }
 
 ::-webkit-scrollbar {
