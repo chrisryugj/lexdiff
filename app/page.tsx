@@ -26,7 +26,8 @@ import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
 
 interface LawSearchResult {
-  lawId: string
+  lawId?: string
+  mst?: string
   lawName: string
   lawType: string
   promulgationDate?: string
@@ -109,9 +110,15 @@ export default function Home() {
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
     try {
-      const params = new URLSearchParams({
-        lawId: selectedLaw.lawId,
-      })
+      const params = new URLSearchParams()
+
+      if (selectedLaw.lawId) {
+        params.append("lawId", selectedLaw.lawId)
+      } else if (selectedLaw.mst) {
+        params.append("mst", selectedLaw.mst)
+      } else {
+        throw new Error("선택한 법령에 대한 식별자를 찾을 수 없습니다")
+      }
 
       if (query.jo) {
         params.append("jo", query.jo)
@@ -143,10 +150,20 @@ export default function Home() {
       const { meta, articles } = parseLawXML(xmlText)
       console.log("[v0] Parsed law data:", { meta, articleCount: articles.length })
 
-      if (query.jo && selectedLaw.lawId) {
-        console.log("[v0] [개정이력] 조문별 개정이력 조회 시작:", { lawId: selectedLaw.lawId, jo: query.jo })
+      if (query.jo && (selectedLaw.lawId || selectedLaw.mst)) {
+        console.log("[v0] [개정이력] 조문별 개정이력 조회 시작:", {
+          lawId: selectedLaw.lawId,
+          mst: selectedLaw.mst,
+          jo: query.jo,
+        })
         try {
-          const historyUrl = `/api/article-history?lawId=${selectedLaw.lawId}&jo=${query.jo}`
+          const historyParams = new URLSearchParams({ jo: query.jo })
+          if (selectedLaw.lawId) {
+            historyParams.append("lawId", selectedLaw.lawId)
+          } else if (selectedLaw.mst) {
+            historyParams.append("mst", selectedLaw.mst)
+          }
+          const historyUrl = `/api/article-history?${historyParams.toString()}`
           const historyResponse = await fetch(historyUrl)
 
           apiLogs.push({

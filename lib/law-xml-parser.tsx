@@ -31,7 +31,8 @@ export function parseLawXML(xmlText: string): {
 
 function extractMetadata(xmlDoc: Document): LawMeta {
   const lawId = xmlDoc.querySelector("기본정보 법령ID")?.textContent || undefined
-  const mst = xmlDoc.querySelector("기본정보 법령명_한글")?.textContent || ""
+  const mst = xmlDoc.querySelector("기본정보 법령일련번호")?.textContent || undefined
+  const lawTitle = xmlDoc.querySelector("기본정보 법령명_한글")?.textContent || "알 수 없는 법령"
   const efYd = xmlDoc.querySelector("기본정보 시행일자")?.textContent || undefined
   const promDate = xmlDoc.querySelector("기본정보 공포일자")?.textContent || undefined
   const promNum = xmlDoc.querySelector("기본정보 공포번호")?.textContent || undefined
@@ -39,8 +40,8 @@ function extractMetadata(xmlDoc: Document): LawMeta {
 
   return {
     lawId,
-    mst: mst || "알 수 없는 법령",
-    lawTitle: mst || "알 수 없는 법령",
+    mst,
+    lawTitle,
     latestEffectiveDate: efYd,
     promulgation: promDate || promNum ? { date: promDate, number: promNum } : undefined,
     revisionType: revType,

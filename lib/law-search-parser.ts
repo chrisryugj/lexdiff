@@ -1,7 +1,8 @@
 import { debugLogger } from "./debug-logger"
 
 export interface LawSearchResult {
-  lawId: string
+  lawId?: string
+  mst?: string
   lawName: string
   lawType: string
   promulgationDate?: string
@@ -44,7 +45,8 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
     const results: LawSearchResult[] = []
 
     laws.forEach((law) => {
-      const lawId = law.querySelector("법령ID")?.textContent || ""
+      const rawLawId = law.querySelector("법령ID")?.textContent?.trim()
+      const mst = law.querySelector("법령일련번호")?.textContent?.trim()
       const lawName = law.querySelector("법령명한글")?.textContent || ""
       const lawType = law.querySelector("법령구분명")?.textContent || ""
       const rawPromulgationDate = law.querySelector("공포일자")?.textContent || ""
@@ -53,15 +55,24 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
       const promulgationDate = normalizeDateFormat(rawPromulgationDate)
       const effectiveDate = normalizeDateFormat(rawEffectiveDate)
 
-      if (lawId && lawName) {
+      if ((rawLawId || mst) && lawName) {
+        const normalizedLawId = rawLawId || undefined
         results.push({
-          lawId,
+          lawId: normalizedLawId,
+          mst,
           lawName,
           lawType,
           promulgationDate,
           effectiveDate,
         })
-        console.log("[v0] Parsed law:", { lawId, lawName, lawType, promulgationDate, effectiveDate })
+        console.log("[v0] Parsed law:", {
+          lawId: normalizedLawId,
+          mst,
+          lawName,
+          lawType,
+          promulgationDate,
+          effectiveDate,
+        })
       }
     })
 

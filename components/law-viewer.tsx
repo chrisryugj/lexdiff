@@ -247,12 +247,20 @@ export function LawViewer({
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
       const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
+      const mstMatch = searchXml.match(/<법령일련번호>([^<]+)<\/법령일련번호>/)
       const lawId = lawIdMatch?.[1]
-      if (!lawId) {
+      const mst = mstMatch?.[1]
+      if (!lawId && !mst) {
         setRefModal({ open: true, title: lawName, html: "법령을 찾지 못했습니다." })
         return
       }
-      const eflawRes = await fetch(`/api/eflaw?lawId=${encodeURIComponent(lawId)}`)
+      const identifierParams = new URLSearchParams()
+      if (lawId) {
+        identifierParams.append("lawId", lawId)
+      } else if (mst) {
+        identifierParams.append("mst", mst)
+      }
+      const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
       const eflawXml = await eflawRes.text()
       // Parse to find the target article
       const { parseLawXML } = await import("@/lib/law-xml-parser")
