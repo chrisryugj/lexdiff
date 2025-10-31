@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { load } from "cheerio"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
+import { buildJO } from "@/lib/law-parser"
 
 const DRF_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -90,7 +91,15 @@ export async function GET(req: Request) {
   if (!lawId) return NextResponse.json({ error: "lawId (or mst) is required" }, { status: 400 })
 
   try {
-    const sp = buildParams({ target: "eflaw", type: "HTML", OC, ID: lawId, JO: jo || undefined, efYd: efYd || undefined })
+    // Normalize JO to 6-digit code if given as '제N조(의M)'
+    let joParam: string | undefined = undefined
+    if (jo) {
+      if (/^\d{6}$/.test(jo)) joParam = jo
+      else {
+        try { joParam = buildJO(jo) } catch { joParam = undefined }
+      }
+    }
+    const sp = buildParams({ target: "eflaw", type: "HTML", OC, ID: lawId, JO: joParam, efYd: efYd || undefined })
     const url = `${DRF_BASE}?${sp.toString()}`
     const res = await fetch(url, { next: { revalidate: 1800 } })
     const ctype = res.headers.get("content-type") || ""

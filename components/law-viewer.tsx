@@ -66,6 +66,7 @@ export function LawViewer({
   const [activeHtml, setActiveHtml] = useState<string>("")
   const [htmlLoading, setHtmlLoading] = useState<boolean>(false)
   const [htmlLinks, setHtmlLinks] = useState<Array<{ text: string; href: string }>>([])
+  const [lawIdForHtml, setLawIdForHtml] = useState<string | undefined>(undefined)
 
   const activeArticle = articles.find((a) => a.jo === activeJo)
 
@@ -106,11 +107,23 @@ export function LawViewer({
   // Load official HTML for active article (Option A)
   useEffect(() => {
     const load = async () => {
-      if (!activeArticle || !meta.lawId) return
+      if (!activeArticle) return
+      // Resolve lawId (prefer meta.lawId, fallback via search)
+      let lawId = meta.lawId
+      if (!lawId) {
+        try {
+          const r = await fetch(`/api/law-search?query=${encodeURIComponent(meta.lawTitle)}`)
+          const txt = await r.text()
+          lawId = txt.match(/<법령ID>([^<]+)<\/법령ID>/)?.[1] || undefined
+          if (lawId) setLawIdForHtml(lawId)
+        } catch {}
+      } else {
+        setLawIdForHtml(lawId)
+      }
+      if (!lawId) return
       setHtmlLoading(true)
       try {
-        const joLabel = formatJO(activeArticle.jo)
-        const res = await fetch(`/api/drf-html?lawId=${encodeURIComponent(meta.lawId)}&jo=${encodeURIComponent(joLabel)}`)
+        const res = await fetch(`/api/drf-html?lawId=${encodeURIComponent(lawId)}&jo=${encodeURIComponent(activeArticle.jo)}`)
         const data = await res.json()
         setActiveHtml(data.html || "")
       } catch (e) {
