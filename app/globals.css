@@ -177,6 +177,14 @@
     color: oklch(0.7 0.18 240);
     text-decoration: underline;
   }
+
+  /* HTML-mode anchors from law.go.kr */
+  a.law-html-link,
+  .prose a.law-html-link {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+    cursor: pointer;
+  }
 }
 
 ::-webkit-scrollbar {
