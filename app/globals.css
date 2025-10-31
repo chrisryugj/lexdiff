@@ -166,6 +166,17 @@
     font-weight: 600 !important;
     font-size: 0.875rem !important;
   }
+
+  /* Linkified references inside law content */
+  a.law-ref {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose a.law-ref {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+  }
 }
 
 ::-webkit-scrollbar {

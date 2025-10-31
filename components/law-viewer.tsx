@@ -60,6 +60,7 @@ export function LawViewer({
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
   const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
+  const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
 
   const activeArticle = articles.find((a) => a.jo === activeJo)
 
@@ -161,6 +162,14 @@ export function LawViewer({
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
         const articleLabel = target.getAttribute("data-article") || ""
+        // If immediately preceded by external law anchor, treat as external
+        const prev = target.previousElementSibling as HTMLElement | null
+        if (prev && prev.tagName === "A" && prev.classList.contains("law-ref") && prev.getAttribute("data-ref") === "law") {
+          const lawName = prev.getAttribute("data-law") || ""
+          await openExternalLawArticleModal(lawName, articleLabel)
+          setLastExternalRef({ lawName, joLabel: articleLabel })
+          return
+        }
         try {
           const joCode = buildJO(articleLabel)
           const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
@@ -173,13 +182,31 @@ export function LawViewer({
             return
           }
         } catch {}
-        // Fallback: open law.go.kr in new tab
-        const url = `https://www.law.go.kr/법령/${meta.lawTitle}/${articleLabel}`
-        window.open(url, "_blank", "noopener,noreferrer")
       } else if (refType === "law") {
         const lawName = target.getAttribute("data-law") || ""
-        const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
-        window.open(url, "_blank", "noopener,noreferrer")
+        // Try to pair with next article anchor on the same line
+        let articleLabel = ""
+        const next = target.nextElementSibling as HTMLElement | null
+        if (next && next.tagName === "A" && next.classList.contains("law-ref") && next.getAttribute("data-ref") === "article") {
+          articleLabel = next.getAttribute("data-article") || ""
+        }
+        if (articleLabel) {
+          await openExternalLawArticleModal(lawName, articleLabel)
+          setLastExternalRef({ lawName, joLabel: articleLabel })
+        } else {
+          // Fallback: show minimal modal with a link
+          setRefModal({ open: true, title: lawName, html: `<a href=\"https://www.law.go.kr/법령/${encodeURIComponent(lawName)}\" target=\"_blank\" rel=\"noopener\">법령 페이지 열기</a>` })
+          setLastExternalRef({ lawName })
+        }
+      } else if (refType === "same") {
+        // Use last external reference law + current article, change to requested part
+        if (lastExternalRef && lastExternalRef.joLabel) {
+          const part = target.getAttribute("data-part") || ""
+          const base = lastExternalRef.joLabel.replace(/제\d+항(제\d+호)?/, "").trim()
+          const articleLabel = `${base}${part}`
+          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
+          setLastExternalRef({ lawName: lastExternalRef.lawName, joLabel: articleLabel })
+        }
       } else if (refType === "related") {
         if (!activeArticle) return
         const kind = target.getAttribute("data-kind") || "decree"
@@ -196,15 +223,49 @@ export function LawViewer({
               html: best.html,
             })
           } else {
-            // fallback: open decree/rule search page
+            // fallback: 안내 모달
             const suffix = kind === "rule" ? "시행규칙" : "시행령"
-            const url = `https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + suffix)}`
-            window.open(url, "_blank", "noopener,noreferrer")
+            setRefModal({ open: true, title: `${meta.lawTitle} ${suffix}`, html: "관련 조문을 찾지 못했습니다." })
           }
         } catch (err) {
           console.error("related lookup failed", err)
         }
       }
+    }
+  }
+
+  // Helper: fetch external law article and show in modal
+  async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
+    try {
+      const qs = new URLSearchParams({ query: lawName })
+      const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
+      const searchXml = await searchRes.text()
+      const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
+      const lawId = lawIdMatch?.[1]
+      if (!lawId) {
+        setRefModal({ open: true, title: lawName, html: "법령을 찾지 못했습니다." })
+        return
+      }
+      const eflawRes = await fetch(`/api/eflaw?lawId=${encodeURIComponent(lawId)}`)
+      const eflawXml = await eflawRes.text()
+      // Parse to find the target article
+      const { parseLawXML } = await import("@/lib/law-xml-parser")
+      const parsed = parseLawXML(eflawXml)
+      let joCode = ""
+      try { joCode = buildJO(articleLabel) } catch {}
+      const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
+      if (found) {
+        setRefModal({
+          open: true,
+          title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
+          html: extractArticleText(found),
+        })
+      } else {
+        setRefModal({ open: true, title: lawName, html: "해당 조문을 찾지 못했습니다." })
+      }
+    } catch (err) {
+      console.error("openExternalLawArticleModal error", err)
+      setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
     }
   }
 
