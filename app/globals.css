@@ -185,6 +185,12 @@
     text-decoration: underline;
     cursor: pointer;
   }
+  a.law-drf-link,
+  .prose a.law-drf-link {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+    cursor: pointer;
+  }
 }
 
 ::-webkit-scrollbar {

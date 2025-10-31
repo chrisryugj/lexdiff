@@ -61,8 +61,8 @@ export function LawViewer({
   const contentRef = useRef<HTMLDivElement>(null)
   const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
-  // Option A (HTML mode) is disabled; keep states for potential reuse
-  const USE_LAW_HTML = false
+  // DRF-HTML mode enabled to preserve anchor positions
+  const USE_LAW_HTML = true
   const [activeHtml, setActiveHtml] = useState<string>("")
   const [htmlLoading, setHtmlLoading] = useState<boolean>(false)
   const [htmlLinks, setHtmlLinks] = useState<Array<{ text: string; href: string }>>([])
@@ -105,10 +105,22 @@ export function LawViewer({
 
   // Load official HTML for active article (Option A)
   useEffect(() => {
-    // HTML mode disabled
-    setActiveHtml("")
-    setHtmlLoading(false)
-  }, [activeArticle, isOrdinance, meta.lawTitle])
+    const load = async () => {
+      if (!activeArticle || !meta.lawId) return
+      setHtmlLoading(true)
+      try {
+        const joLabel = formatJO(activeArticle.jo)
+        const res = await fetch(`/api/drf-html?lawId=${encodeURIComponent(meta.lawId)}&jo=${encodeURIComponent(joLabel)}`)
+        const data = await res.json()
+        setActiveHtml(data.html || "")
+      } catch (e) {
+        setActiveHtml("")
+      } finally {
+        setHtmlLoading(false)
+      }
+    }
+    if (!isOrdinance && USE_LAW_HTML) load(); else { setActiveHtml(""); setHtmlLoading(false) }
+  }, [activeArticle, isOrdinance, meta.lawTitle, meta.lawId])
 
   // Fetch anchor list from law.go.kr and later inject into XML content
   useEffect(() => {
@@ -199,12 +211,29 @@ export function LawViewer({
     const target = e.target as HTMLElement
     if (target && target.tagName === "A") {
       e.preventDefault()
-      // Handle modal for injected HTML anchors
+      // Handle modal for injected HTML anchors (from law-links) and DRF anchors
       if (target.classList.contains("law-html-link")) {
         const raw = target.getAttribute("data-href") || ""
         if (!raw) return
         try {
           const res = await fetch(`/api/law-html?url=${encodeURIComponent(raw)}`)
+          const data = await res.json()
+          setRefModal({ open: true, title: target.textContent || "연결된 본문", html: data.html })
+        } catch {
+          setRefModal({ open: true, title: target.textContent || "연결된 본문", html: "불러오지 못했습니다." })
+        }
+        return
+      }
+      if (target.classList.contains("law-drf-link")) {
+        const lawId = target.getAttribute("data-law-id") || meta.lawId || ""
+        const jo = target.getAttribute("data-jo") || ""
+        const efyd = target.getAttribute("data-efyd") || ""
+        try {
+          const qs = new URLSearchParams()
+          if (lawId) qs.set("lawId", lawId)
+          if (jo) qs.set("jo", jo)
+          if (efyd) qs.set("efYd", efyd)
+          const res = await fetch(`/api/drf-html?${qs.toString()}`)
           const data = await res.json()
           setRefModal({ open: true, title: target.textContent || "연결된 본문", html: data.html })
         } catch {
@@ -554,7 +583,7 @@ export function LawViewer({
                       wordBreak: "break-word",
                     }}
                     onClick={handleContentClick}
-                    dangerouslySetInnerHTML={{ __html: injectHtmlLinksToContent(extractArticleText(activeArticle)) }}
+                    dangerouslySetInnerHTML={{ __html: (USE_LAW_HTML && activeHtml) ? activeHtml : injectHtmlLinksToContent(extractArticleText(activeArticle)) }}
                   />
 
                   {activeArticle.revisionHistory && activeArticle.revisionHistory.length > 0 && (
