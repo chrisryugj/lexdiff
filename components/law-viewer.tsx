@@ -65,6 +65,7 @@ export function LawViewer({
   const USE_LAW_HTML = false
   const [activeHtml, setActiveHtml] = useState<string>("")
   const [htmlLoading, setHtmlLoading] = useState<boolean>(false)
+  const [htmlLinks, setHtmlLinks] = useState<Array<{ text: string; href: string }>>([])
 
   const activeArticle = articles.find((a) => a.jo === activeJo)
 
@@ -108,6 +109,34 @@ export function LawViewer({
     setActiveHtml("")
     setHtmlLoading(false)
   }, [activeArticle, isOrdinance, meta.lawTitle])
+
+  // Fetch anchor list from law.go.kr and later inject into XML content
+  useEffect(() => {
+    const loadLinks = async () => {
+      if (!activeArticle) return
+      try {
+        const joLabel = formatJO(activeArticle.jo)
+        const res = await fetch(`/api/law-links?lawName=${encodeURIComponent(meta.lawTitle)}&joLabel=${encodeURIComponent(joLabel)}`)
+        const data = await res.json()
+        setHtmlLinks(Array.isArray(data?.links) ? data.links : [])
+      } catch {
+        setHtmlLinks([])
+      }
+    }
+    if (!isOrdinance) loadLinks()
+  }, [activeArticle, isOrdinance, meta.lawTitle])
+
+  function injectHtmlLinksToContent(html: string): string {
+    if (!htmlLinks.length) return html
+    let result = html
+    // Replace plain occurrences with modal-enabled anchors
+    for (const link of htmlLinks) {
+      const pattern = link.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const re = new RegExp(pattern, 'g')
+      result = result.replace(re, `<a href="#" class="law-html-link" data-href="${link.href}">${link.text}</a>`)
+    }
+    return result
+  }
 
   const handleArticleClick = (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance })
@@ -170,7 +199,19 @@ export function LawViewer({
     const target = e.target as HTMLElement
     if (target && target.tagName === "A") {
       e.preventDefault()
-      // HTML-mode anchors removed (A안 비활성화)
+      // Handle modal for injected HTML anchors
+      if (target.classList.contains("law-html-link")) {
+        const raw = target.getAttribute("data-href") || ""
+        if (!raw) return
+        try {
+          const res = await fetch(`/api/law-html?url=${encodeURIComponent(raw)}`)
+          const data = await res.json()
+          setRefModal({ open: true, title: target.textContent || "연결된 본문", html: data.html })
+        } catch {
+          setRefModal({ open: true, title: target.textContent || "연결된 본문", html: "불러오지 못했습니다." })
+        }
+        return
+      }
 
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
@@ -513,7 +554,7 @@ export function LawViewer({
                       wordBreak: "break-word",
                     }}
                     onClick={handleContentClick}
-                    dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                    dangerouslySetInnerHTML={{ __html: injectHtmlLinksToContent(extractArticleText(activeArticle)) }}
                   />
 
                   {activeArticle.revisionHistory && activeArticle.revisionHistory.length > 0 && (
