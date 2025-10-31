@@ -191,6 +191,12 @@
     text-decoration: underline;
     cursor: pointer;
   }
+
+  /* Tighten vertical rhythm for HTML-rendered law text */
+  .law-html-viewer p { margin: 0.5rem 0; }
+  .law-html-viewer li { margin: 0.25rem 0; }
+  .law-html-viewer h1, .law-html-viewer h2, .law-html-viewer h3 { margin: 0.75rem 0; }
+  .law-html-viewer br + br { display: none; }
 }
 
 ::-webkit-scrollbar {

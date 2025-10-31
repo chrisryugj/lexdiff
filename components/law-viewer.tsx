@@ -590,7 +590,7 @@ export function LawViewer({
                   </div>
 
                   <div
-                    className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
+                    className={`text-foreground leading-relaxed break-words ${USE_LAW_HTML ? 'law-html-viewer' : 'whitespace-pre-wrap'}`}
                     style={{
                       fontSize: `${fontSize}px`,
                       lineHeight: "1.8",
@@ -598,8 +598,11 @@ export function LawViewer({
                       wordBreak: "break-word",
                     }}
                     onClick={handleContentClick}
-                    dangerouslySetInnerHTML={{ __html: (USE_LAW_HTML && activeHtml) ? activeHtml : injectHtmlLinksToContent(extractArticleText(activeArticle)) }}
+                    dangerouslySetInnerHTML={{ __html: (USE_LAW_HTML ? (activeHtml || (htmlLoading ? "" : "")) : injectHtmlLinksToContent(extractArticleText(activeArticle))) }}
                   />
+                  {USE_LAW_HTML && htmlLoading && !activeHtml && (
+                    <div className="text-sm text-muted-foreground">로딩 중…</div>
+                  )}
 
                   {activeArticle.revisionHistory && activeArticle.revisionHistory.length > 0 && (
                     <div className="mt-8 pt-6 border-t border-border">

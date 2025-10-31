@@ -58,6 +58,61 @@ function sanitizeKeepAnchors(html: string): string {
   })
 }
 
+// Build readable 조문 라벨 from 6-digit JO (e.g., 003900 -> 제39조)
+function joLabelFromJoCode(jo?: string) {
+  if (!jo) return undefined
+  if (!/^\d{6}$/.test(jo)) return jo
+  const a = parseInt(jo.slice(0, 4), 10)
+  const b = parseInt(jo.slice(4, 6), 10)
+  return b === 0 ? `제${a}조` : `제${a}조의${b}`
+}
+
+// Extract region starting at '제n조(조문제목)' and ending right AFTER the first bracketed amendment mark like [개정 2024.12.31]
+function extractArticleRegionAfterAmend($: cheerio.CheerioAPI, jo?: string) {
+  const label = joLabelFromJoCode(jo)
+  const root = $("body")
+  if (!label) return root
+  const needle = label.replace(/\s+/g, "")
+
+  // 1) find start node
+  let start: cheerio.Cheerio | null = null
+  const sels = "h1,h2,h3,h4,dt,p,div,li,span"
+  root.find(sels).each((_, el) => {
+    const txt = $(el).text().replace(/\s+/g, "")
+    if (!start && txt.startsWith(needle)) {
+      start = $(el)
+      return false
+    }
+  })
+  if (!start) return root
+
+  // 2) choose container
+  let container = start.closest("li")
+  if (!container.length) container = start.closest("dd")
+  if (!container.length) container = start.closest("div")
+  if (!container.length) container = start
+
+  // 3) collect until AFTER first bracketed amendment mark
+  const out = $("<div></div>")
+  let cur: cheerio.Cheerio | null = container
+  let steps = 0
+  // handles [개정 2024.12.31], [전문개정 2024.12.31], ＜개정 2024.12.31＞ 등
+  const amendBracket = /\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]|＜\s*(?:개정|전문개정|전부개정|신설|삭제)[^＞]*＞/;
+  while (cur && cur.length && steps < 200) {
+    out.append($.html(cur) || "")
+    // if current node contains bracketed amend mark, stop AFTER including it
+    if (amendBracket.test(cur.text())) break
+    const next = cur.next()
+    if (!next.length) break
+    // stop at next article start to avoid leaking to next 조문
+    const t = next.text().trim()
+    if (/^제\s*\d+\s*조/.test(t)) break
+    cur = next
+    steps++
+  }
+  return out
+}
+
 function rewriteAnchors($: cheerio.CheerioAPI) {
   $("a[href]").each((_, el) => {
     const a = $(el)
@@ -180,16 +235,25 @@ export async function GET(req: Request) {
           try { fhtml = iconv.decode(fbuf, "euc-kr") } catch {}
         }
         const _$ = load(fhtml)
+        // First rewrite anchors on the whole doc, then slice the region so links persist
         rewriteAnchors(_$)
-        bodyHtml = _$("body").html() || _$.root().html() || fhtml
+        const region = extractArticleRegionAfterAmend(_$, joParam)
+        bodyHtml = region.html() || _$("body").html() || _$.root().html() || fhtml
         console.log("[drf-html] frame content-type:", fctype, "len:", bodyHtml.length)
       } catch (frameErr) {
         console.log("[drf-html] frame fetch failed", frameErr)
       }
     } else {
+      // Rewrite first, then extract region
       rewriteAnchors($)
+      const region = extractArticleRegionAfterAmend($, joParam)
+      bodyHtml = region.html() || bodyHtml
     }
-    const safe = sanitizeKeepAnchors(bodyHtml)
+    // Normalize excessive line breaks
+    let collapsed = (bodyHtml || "").replace(/(?:<br\s*\/?>\s*){2,}/gi, '<br/>')
+    collapsed = collapsed.replace(/^\s*(<br\s*\/?>\s*)+/i, '')
+    collapsed = collapsed.replace(/(<br\s*\/?>\s*)+$/i, '')
+    const safe = sanitizeKeepAnchors(collapsed)
     console.log("[drf-html] content-type:", ctype, "len:", bodyHtml.length, "sanitized:", safe.length)
     return NextResponse.json({ html: safe })
   } catch (e) {
