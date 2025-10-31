@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { load } from "cheerio"
 import sanitizeHtml from "sanitize-html"
+import iconv from "iconv-lite"
 
 const DRF_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -92,7 +93,12 @@ export async function GET(req: Request) {
     const sp = buildParams({ target: "eflaw", type: "HTML", OC, ID: lawId, JO: jo || undefined, efYd: efYd || undefined })
     const url = `${DRF_BASE}?${sp.toString()}`
     const res = await fetch(url, { next: { revalidate: 1800 } })
-    const html = await res.text()
+    const ctype = res.headers.get("content-type") || ""
+    const buf = Buffer.from(await res.arrayBuffer())
+    let html = buf.toString("utf8")
+    if (/euc-kr|ks_c_5601|ms949/i.test(ctype) || /charset=(euc-kr|ks_c_5601|ms949)/i.test(html)) {
+      try { html = iconv.decode(buf, "euc-kr") } catch {}
+    }
     const $ = load(html)
     rewriteAnchors($)
     const bodyHtml = $("body").html() || $.root().html() || html
@@ -103,4 +109,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "unknown" }, { status: 500 })
   }
 }
-

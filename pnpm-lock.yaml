@@ -125,6 +125,9 @@ importers:
       embla-carousel-react:
         specifier: 8.5.1
         version: 8.5.1(react@19.2.0)
+      iconv-lite:
+        specifier: ^0.7.0
+        version: 0.7.0
       immer:
         specifier: latest
         version: 10.2.0

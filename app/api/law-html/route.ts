@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { load } from "cheerio"
 import sanitizeHtml from "sanitize-html"
+import iconv from "iconv-lite"
 
 function absUrl(href: string): string {
   try {
@@ -135,7 +136,12 @@ export async function GET(req: Request) {
       },
       next: { revalidate: 3600 },
     })
-    const html = await res.text()
+    const ctype = res.headers.get("content-type") || ""
+    const buf = Buffer.from(await res.arrayBuffer())
+    let html = buf.toString("utf8")
+    if (/euc-kr|ks_c_5601|ms949/i.test(ctype) || /charset=(euc-kr|ks_c_5601|ms949)/i.test(html)) {
+      try { html = iconv.decode(buf, "euc-kr") } catch {}
+    }
     const $ = load(html)
     const raw = extractArticleHtml($, joLabel || undefined)
     let sanitized = sanitizeKeepAnchors(raw)
