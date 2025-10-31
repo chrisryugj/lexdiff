@@ -21,7 +21,8 @@ import {
 } from "lucide-react"
 import type { LawArticle, LawMeta } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
-import { formatJO } from "@/lib/law-parser"
+import { buildJO, formatJO } from "@/lib/law-parser"
+import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 
 interface LawViewerProps {
@@ -58,6 +59,7 @@ export function LawViewer({
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
+  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
 
   const activeArticle = articles.find((a) => a.jo === activeJo)
 
@@ -149,6 +151,61 @@ export function LawViewer({
 
     console.log("[v0] formatSimpleJo 결과 (변환 없음):", jo)
     return jo
+  }
+
+  // Handle clicks on linkified references inside article content
+  const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
+    const target = e.target as HTMLElement
+    if (target && target.tagName === "A" && target.classList.contains("law-ref")) {
+      e.preventDefault()
+      const refType = target.getAttribute("data-ref")
+      if (refType === "article") {
+        const articleLabel = target.getAttribute("data-article") || ""
+        try {
+          const joCode = buildJO(articleLabel)
+          const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
+          if (found) {
+            setRefModal({
+              open: true,
+              title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
+              html: extractArticleText(found),
+            })
+            return
+          }
+        } catch {}
+        // Fallback: open law.go.kr in new tab
+        const url = `https://www.law.go.kr/법령/${meta.lawTitle}/${articleLabel}`
+        window.open(url, "_blank", "noopener,noreferrer")
+      } else if (refType === "law") {
+        const lawName = target.getAttribute("data-law") || ""
+        const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+        window.open(url, "_blank", "noopener,noreferrer")
+      } else if (refType === "related") {
+        if (!activeArticle) return
+        const kind = target.getAttribute("data-kind") || "decree"
+        const joLabel = formatJO(activeArticle.jo)
+        try {
+          const qs = new URLSearchParams({ baseLaw: meta.lawTitle, joLabel, kind })
+          const res = await fetch(`/api/related?${qs.toString()}`)
+          const data = await res.json()
+          if (data?.candidates?.length > 0) {
+            const best = data.candidates[0]
+            setRefModal({
+              open: true,
+              title: `${data.lawName} ${best.joNum}${best.title ? ` (${best.title})` : ""}`,
+              html: best.html,
+            })
+          } else {
+            // fallback: open decree/rule search page
+            const suffix = kind === "rule" ? "시행규칙" : "시행령"
+            const url = `https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + suffix)}`
+            window.open(url, "_blank", "noopener,noreferrer")
+          }
+        } catch (err) {
+          console.error("related lookup failed", err)
+        }
+      }
+    }
   }
 
   console.log("[v0] LawViewer 렌더링 완료:", {
@@ -331,6 +388,7 @@ export function LawViewer({
                           overflowWrap: "break-word",
                           wordBreak: "break-word",
                         }}
+                        onClick={handleContentClick}
                         dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
                       />
                       <Separator className="my-6" />
@@ -375,6 +433,7 @@ export function LawViewer({
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
                     }}
+                    onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
                   />
 
@@ -412,6 +471,12 @@ export function LawViewer({
           </ScrollArea>
         </div>
       </Card>
+      <ReferenceModal
+        isOpen={refModal.open}
+        onClose={() => setRefModal({ open: false })}
+        title={refModal.title || "연결된 본문"}
+        html={refModal.html}
+      />
     </div>
   )
 }
