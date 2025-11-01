@@ -427,8 +427,14 @@ export default function Home() {
 
     setIsSearching(true)
     try {
-      await fetchLawContent(law, lawSelectionState.query)
+      const query = {
+        ...lawSelectionState.query,
+        lawName: law.lawName,
+      }
+
+      await fetchLawContent(law, query)
       setLawSelectionState(null)
+      setMobileView("content")
     } catch (error) {
       console.log("[v0] Law fetch error:", error)
       debugLogger.error("법령 조회 실패", error)
@@ -698,26 +704,31 @@ export default function Home() {
                     </div>
                   )}
 
-                {lawSelectionState.results.map((law) => (
-                  <button
-                    key={law.lawId}
-                    onClick={() => handleLawSelect(law)}
-                    className="w-full p-3 md:p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-base md:text-lg">{law.lawName}</h4>
-                          <Badge variant="secondary">{law.lawType}</Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
-                          {law.promulgationDate && <span>공포: {law.promulgationDate}</span>}
-                          {law.effectiveDate && <span>시행: {law.effectiveDate}</span>}
+                {lawSelectionState.results.map((law) => {
+                  const lawKey = law.lawId || law.mst || law.lawName
+
+                  return (
+                    <button
+                      key={lawKey}
+                      type="button"
+                      onClick={() => handleLawSelect(law)}
+                      className="w-full p-3 md:p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-base md:text-lg">{law.lawName}</h4>
+                            <Badge variant="secondary">{law.lawType}</Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
+                            {law.promulgationDate && <span>공포: {law.promulgationDate}</span>}
+                            {law.effectiveDate && <span>시행: {law.effectiveDate}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ) : ordinanceSelectionState ? (
