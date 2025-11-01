@@ -15,7 +15,12 @@ import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
-import { parseArticleHistory } from "@/lib/law-parser"
+import {
+  parseArticleHistory,
+  parseSearchQuery,
+  buildJO,
+  type ParsedSearchQuery,
+} from "@/lib/law-parser"
 import { favoritesStore } from "@/lib/favorites-store"
 import { useErrorReportStore } from "@/lib/error-report-store" // 에러 리포트 스토어 추가
 import { useToast } from "@/hooks/use-toast"
@@ -23,7 +28,6 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
-import { buildJO } from "@/lib/law-parser"
 
 interface LawSearchResult {
   lawId?: string
@@ -54,7 +58,9 @@ export default function Home() {
   } | null>(null)
   const [lawSelectionState, setLawSelectionState] = useState<{
     results: LawSearchResult[]
-    query: { lawName: string; article?: string; jo?: string }
+    query: Pick<ParsedSearchQuery, "lawName" | "article" | "jo">
+    matchedAlias?: string
+    aliasAlternatives?: string[]
   } | null>(null)
   const [ordinanceSelectionState, setOrdinanceSelectionState] = useState<{
     results: OrdinanceSearchResult[]
@@ -223,7 +229,7 @@ export default function Home() {
     }
   }
 
-  const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
+  const handleSearch = async (query: ParsedSearchQuery) => {
     console.log("[v0] ========== 검색 시작 ==========")
 
     setIsSearching(true)
@@ -234,10 +240,15 @@ export default function Home() {
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
-    const isOrdinanceQuery = /조례|규칙|특별시|광역시|도|시|군|구/.test(query.lawName)
-    const lawName = query.lawName
-    const articleNumber = query.article
-    const jo = query.jo
+    const {
+      lawName,
+      article: articleNumber,
+      jo,
+      matchedAlias,
+      aliasAlternatives = [],
+    } = query
+
+    const isOrdinanceQuery = /조례|규칙|특별시|광역시|도|시|군|구/.test(lawName)
 
     debugLogger.info(isOrdinanceQuery ? "조례 검색 시작" : "법령 검색 시작", { lawName, articleNumber, jo })
 
@@ -337,12 +348,24 @@ export default function Home() {
           return
         }
 
-        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === lawName.replace(/\s+/g, ""))
+        const normalizeName = (value: string) => value.replace(/\s+/g, "")
+        const normalizedLawName = normalizeName(lawName)
+        const exactMatch = results.find((r) => normalizeName(r.lawName) === normalizedLawName)
+        const hasSingleExactMatch = !!exactMatch && results.length === 1
 
-        if (!exactMatch) {
-          exactMatch = results.find(
-            (r) => r.lawName.startsWith(lawName) && !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙"),
-          )
+        if (!jo && exactMatch && hasSingleExactMatch) {
+          try {
+            await fetchLawContent(exactMatch, { lawName, article: articleNumber, jo })
+            setMobileView("content")
+            return
+          } catch (error) {
+            console.error("[v0] 법령 조회 오류:", error)
+            toast({
+              title: "법령 조회 실패",
+              description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
+              variant: "destructive",
+            })
+          }
         }
 
         if (exactMatch && jo) {
@@ -362,9 +385,16 @@ export default function Home() {
           return
         }
 
+        const alternativeNames = Array.from(
+          new Set(aliasAlternatives.filter((name) => name && name !== lawName)),
+        )
+
         setLawSelectionState({
           results,
           query: { lawName, article: articleNumber, jo },
+          matchedAlias,
+          aliasAlternatives:
+            alternativeNames.length > 0 ? alternativeNames : undefined,
         })
         setMobileView("list")
       }
@@ -512,6 +542,8 @@ export default function Home() {
       lawName: search.lawName,
       article: search.article,
       jo,
+      matchedAlias: search.matchedAlias,
+      aliasAlternatives: search.aliasAlternatives,
     })
   }
 
@@ -520,7 +552,14 @@ export default function Home() {
     handleSearch({
       lawName: favorite.lawTitle,
       jo: favorite.jo,
+      aliasAlternatives: [],
     })
+  }
+
+  const handleAliasAlternativeSelect = (name: string) => {
+    debugLogger.info("약칭 대안 선택", { name })
+    const parsed = parseSearchQuery(name)
+    handleSearch(parsed)
   }
 
   const handleCompare = (jo: string) => {
@@ -632,6 +671,32 @@ export default function Home() {
                     취소
                   </Button>
                 </div>
+
+                {lawSelectionState.matchedAlias && (
+                  <p className="text-sm text-muted-foreground">
+                    "{lawSelectionState.matchedAlias}" 검색어를 "{lawSelectionState.query.lawName}"으로 해석했습니다.
+                  </p>
+                )}
+
+                {lawSelectionState.aliasAlternatives &&
+                  lawSelectionState.aliasAlternatives.length > 0 && (
+                    <div className="bg-muted/40 border border-border rounded-lg p-3 md:p-4 space-y-2">
+                      <p className="text-sm font-medium text-foreground">연관 법령 바로가기</p>
+                      <div className="flex flex-wrap gap-2">
+                        {lawSelectionState.aliasAlternatives.map((name) => (
+                          <Button
+                            key={name}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAliasAlternativeSelect(name)}
+                          >
+                            {name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 {lawSelectionState.results.map((law) => (
                   <button

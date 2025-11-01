@@ -6,11 +6,11 @@ import { useState, useRef, useEffect } from "react"
 import { Search, Loader2, Clock, Scale, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { parseSearchQuery } from "@/lib/law-parser"
+import { parseSearchQuery, type ParsedSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 
 interface SearchBarProps {
-  onSearch: (query: { lawName: string; article?: string; jo?: string }) => void
+  onSearch: (query: ParsedSearchQuery) => void
   isLoading?: boolean
 }
 
