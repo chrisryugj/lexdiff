@@ -6,13 +6,22 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { debugLogger, type LogEntry, type LogLevel } from "@/lib/debug-logger"
-import { Terminal, Trash2, ChevronDown, ChevronUp, Filter } from "lucide-react"
+import {
+  Terminal,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  Copy,
+  Check,
+} from "lucide-react"
 
 export function DebugConsole() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
   const [isMinimized, setIsMinimized] = useState(false)
   const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all")
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe(setLogs)
@@ -49,6 +58,20 @@ export function DebugConsole() {
         return "✕"
       case "debug":
         return "◆"
+    }
+  }
+
+  const copyLog = async (entry: LogEntry) => {
+    try {
+      const header = `[#${entry.level.toUpperCase()}] ${entry.timestamp.toISOString()} - ${entry.message}`
+      const details = entry.details ? `\n${JSON.stringify(entry.details, null, 2)}` : ""
+      await navigator.clipboard.writeText(`${header}${details}`)
+      setCopiedLogId(entry.id)
+      setTimeout(() => {
+        setCopiedLogId((current) => (current === entry.id ? null : current))
+      }, 2000)
+    } catch (error) {
+      debugLogger.error("로그 복사에 실패했습니다", { error: (error as Error)?.message })
     }
   }
 
@@ -128,6 +151,15 @@ export function DebugConsole() {
                       </pre>
                     </details>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => copyLog(log)}
+                    title="로그 복사"
+                  >
+                    {copiedLogId === log.id ? <Check className="h-3 w-3 text-[var(--color-success)]" /> : <Copy className="h-3 w-3" />}
+                  </Button>
                 </div>
               ))
             )}

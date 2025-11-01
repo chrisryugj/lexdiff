@@ -237,39 +237,6 @@ export function LawViewer({
     return article.title ? `${label} (${article.title})` : label
   }
 
-  const renderArticleHeading = (
-    article: LawArticle,
-    fallbackIndex?: number,
-    headingLevel: "h3" | "h4" = "h3",
-  ) => {
-    const label = formatSimpleJo(article, fallbackIndex)
-    const idSource =
-      article.jo ||
-      article.joNum ||
-      (typeof fallbackIndex === "number" ? String(fallbackIndex + 1) : undefined)
-    const id = idSource ? `article-${idSource}` : undefined
-    const content = (
-      <>
-        <span>{label}</span>
-        {article.title && <span className="text-sm text-muted-foreground ml-2">({article.title})</span>}
-      </>
-    )
-
-    if (headingLevel === "h4") {
-      return (
-        <h4 className="text-base font-semibold text-foreground mb-3" id={id}>
-          {content}
-        </h4>
-      )
-    }
-
-    return (
-      <h3 className="text-lg font-semibold text-foreground mb-3" id={id}>
-        {content}
-      </h3>
-    )
-  }
-
   // Handle clicks on linkified references inside article content
   const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
     const target = e.target as HTMLElement
@@ -592,7 +559,6 @@ export function LawViewer({
                         }}
                         className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
                       >
-                        {renderArticleHeading(article, index)}
                         <div
                           className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
                           style={{
@@ -603,7 +569,10 @@ export function LawViewer({
                           }}
                           onClick={handleContentClick}
                           dangerouslySetInnerHTML={{
-                            __html: extractArticleText(article),
+                            __html: extractArticleText(article, {
+                              includeHeading: true,
+                              headingLevel: "h3",
+                            }),
                           }}
                         />
                         <Separator className="my-6" />
@@ -638,10 +607,6 @@ export function LawViewer({
               ) : activeArticle ? (
                 /* 법령: 조문 번호와 제목을 명확히 표시하고 본문 표시 */
                 <div className="prose prose-sm max-w-none dark:prose-invert">
-                  {renderArticleHeading(
-                    activeArticle,
-                    activeArticleIndex >= 0 ? activeArticleIndex : undefined,
-                  )}
                   <div
                     className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
                     style={{
@@ -652,7 +617,10 @@ export function LawViewer({
                     }}
                     onClick={handleContentClick}
                     dangerouslySetInnerHTML={{
-                      __html: extractArticleText(activeArticle),
+                      __html: extractArticleText(activeArticle, {
+                        includeHeading: true,
+                        headingLevel: "h3",
+                      }),
                     }}
                   />
 

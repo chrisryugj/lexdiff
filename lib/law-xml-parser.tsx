@@ -63,32 +63,16 @@ function normalizeText(text: string): string {
 function extractTitleFromContent(content: string): string | undefined {
   const normalized = normalizeText(content)
 
-  console.log(`[v0] [DEBUG] Normalized content (first 100 chars): ${normalized.slice(0, 100)}`)
-  console.log(`[v0] [DEBUG] Has full-width parens: ${/[（）]/.test(normalized)}`)
-  console.log(`[v0] [DEBUG] Has half-width parens: ${/[()]/.test(normalized)}`)
-
-  // Pattern 1: 제38조(신고납부) - half-width parentheses
-  let match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*$$([^)]+)$$/)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (half-width): "${match[1].trim()}"`)
-    return match[1].trim()
+  const bracketMatch = normalized.match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*[（(]\s*([^）)]+)\s*[）)]/u)
+  if (bracketMatch) {
+    return bracketMatch[1].trim()
   }
 
-  // Pattern 2: 제38조（신고납부） - full-width parentheses
-  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*（([^）]+)）/)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (full-width): "${match[1].trim()}"`)
-    return match[1].trim()
+  const colonMatch = normalized.match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*[:：]\s*([^:：]+?)(?:\s{2,}|$)/u)
+  if (colonMatch) {
+    return colonMatch[1].trim()
   }
 
-  // Pattern 3: Mixed brackets with DOTALL flag
-  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?[^(（]*[（(]\s*([^)）]+?)\s*[）)]/s)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (mixed): "${match[1].trim()}"`)
-    return match[1].trim()
-  }
-
-  console.log(`[v0] ✗ No title found in content`)
   return undefined
 }
 
@@ -136,35 +120,65 @@ function normalizeCandidateLabel(candidate?: string): string | null {
   return normalized
 }
 
+function parseArticleHeading(rawHeading?: string): { label?: string; title?: string } {
+  if (!rawHeading) return {}
+
+  const trimmed = rawHeading.trim()
+  if (!trimmed) return {}
+
+  const bracketTitleMatch = trimmed.match(/[（(]\s*([^）)]+)\s*[）)]/u)
+  let title = bracketTitleMatch ? bracketTitleMatch[1].trim() : undefined
+
+  const labelMatch = trimmed.match(/제?\s*\d+(?:\s*조)?(?:\s*(?:의|-)+\s*\d+)?/u)
+  const labelCandidate = labelMatch ? labelMatch[0] : trimmed
+  const label = normalizeCandidateLabel(labelCandidate) ?? undefined
+
+  if (!title && label) {
+    const labelNormalized = labelMatch ? labelMatch[0] : label
+    const remainder = trimmed.replace(labelNormalized, "").trim()
+    if (remainder) {
+      title = remainder.replace(/^[\s:：\-–—]+/, "").trim() || undefined
+    }
+  }
+
+  return { label, title }
+}
+
 function deriveArticleIdentifiers(
-  rawLabel: string | undefined,
+  rawLabels: Array<string | undefined>,
   content: string,
   fallbackIndex: number,
 ): { displayLabel: string; joCode: string } {
-  const candidates: string[] = []
+  const candidates = new Set<string>()
 
-  if (rawLabel) {
-    candidates.push(rawLabel)
-  }
+  rawLabels.forEach((candidate) => {
+    const normalized = normalizeCandidateLabel(candidate)
+    if (normalized) {
+      candidates.add(normalized)
+    }
+  })
 
   if (content) {
-    const primaryMatch = content.match(/제\s*\d+\s*조(?:\s*의\s*\d+)?/)
-    if (primaryMatch) {
-      candidates.push(primaryMatch[0])
+    const primaryMatches = content.matchAll(/제\s*\d+\s*조(?:\s*의\s*\d+)?/g)
+    for (const match of primaryMatches) {
+      const normalized = normalizeCandidateLabel(match[0])
+      if (normalized) {
+        candidates.add(normalized)
+      }
     }
 
-    const hyphenMatch = content.match(/\d+\s*-\s*\d+/)
-    if (hyphenMatch) {
-      candidates.push(hyphenMatch[0].replace(/\s+/g, ""))
+    const hyphenMatches = content.matchAll(/(\d+)\s*-\s*(\d+)/g)
+    for (const match of hyphenMatches) {
+      const normalized = normalizeCandidateLabel(`${match[1]}-${match[2]}`)
+      if (normalized) {
+        candidates.add(normalized)
+      }
     }
   }
 
   for (const candidate of candidates) {
-    const normalizedLabel = normalizeCandidateLabel(candidate)
-    if (!normalizedLabel) continue
-
     try {
-      const joCode = buildJO(normalizedLabel)
+      const joCode = buildJO(candidate)
       const displayLabel = formatJO(joCode)
       if (displayLabel) {
         return { displayLabel, joCode }
@@ -187,17 +201,27 @@ function extractArticles(xmlDoc: Document): LawArticle[] {
 
   joElements.forEach((joElement, index) => {
     const rawJoNum = joElement.querySelector("조문번호")?.textContent || ""
-    let joTitle = joElement.querySelector("조문제목")?.textContent?.trim() || undefined
+    const rawHeading = joElement.querySelector("조문제목")?.textContent || ""
+    const headingParts = parseArticleHeading(rawHeading)
+    let joTitle = headingParts.title
     const joContent = joElement.querySelector("조문내용")?.textContent || ""
     const hasChanges = joElement.querySelector("조문변경여부")?.textContent === "Y"
 
     const revisionHistory = extractRevisionMarks(joContent, joElement)
 
-    const { displayLabel, joCode } = deriveArticleIdentifiers(rawJoNum, joContent, index)
+    const { displayLabel, joCode } = deriveArticleIdentifiers(
+      [rawJoNum, headingParts.label, rawHeading],
+      joContent,
+      index,
+    )
 
     if (!joTitle && joContent) {
       console.log(`[v0] Extracting title for ${displayLabel} from content`)
       joTitle = extractTitleFromContent(joContent)
+    }
+
+    if (!joTitle && rawHeading && rawHeading.trim()) {
+      joTitle = rawHeading.trim()
     }
 
     const paragraphs: LawParagraph[] = []
@@ -444,7 +468,13 @@ export function extractArticleText(
         const safeHeadingTag: "h2" | "h3" | "h4" | "h5" = ["h2", "h3", "h4", "h5"].includes(headingTag)
           ? headingTag
           : "h2"
-        const heading = `<${safeHeadingTag}>${escapeHtml(label)}${
+        const headingIdSource = article.jo || article.joNum || ""
+        const sanitizedId = headingIdSource
+          .toString()
+          .replace(/\s+/g, "")
+          .replace(/[^0-9A-Za-z_-]/g, "-")
+        const headingIdAttr = sanitizedId ? ` id="article-${sanitizedId}"` : ""
+        const heading = `<${safeHeadingTag}${headingIdAttr}>${escapeHtml(label)}${
           article.title ? ` (${escapeHtml(article.title)})` : ""
         }</${safeHeadingTag}>`
         result = `${heading}\n${result}`.trim()
