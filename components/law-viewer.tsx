@@ -106,6 +106,9 @@ export function LawViewer({
   useEffect(() => {
     console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance })
 
+    const firstArticle = articles[0]
+    const firstArticleJo = firstArticle ? getArticleJo(firstArticle, 0) : ""
+
     if (selectedJo) {
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
@@ -116,16 +119,30 @@ export function LawViewer({
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
       }
-    } else if (articles.length === 1 && articles[0]) {
-      const joValue = getArticleJo(articles[0], 0)
-      console.log("[v0] 조문 1개 - 자동 선택:", joValue)
-      setActiveJo(joValue)
-    } else if (articles.length > 0 && !activeJo) {
-      const joValue = getArticleJo(articles[0], 0)
-      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", joValue)
-      setActiveJo(joValue)
+      return
     }
-  }, [selectedJo, articles, isOrdinance, activeJo])
+
+    if (!activeArticle && firstArticleJo && activeJo !== firstArticleJo) {
+      console.log("[v0] 현재 activeArticle 없음 - 첫 번째 조문으로 초기화:", firstArticleJo)
+      setActiveJo(firstArticleJo)
+
+      if (!isOrdinance && contentRef.current) {
+        console.log("[v0] 조문 초기화 - 스크롤 최상단 이동")
+        setTimeout(() => {
+          contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+        }, 100)
+      }
+      return
+    }
+
+    if (articles.length === 1 && firstArticleJo && activeJo !== firstArticleJo) {
+      console.log("[v0] 조문 1개 - 자동 선택:", firstArticleJo)
+      setActiveJo(firstArticleJo)
+    } else if (articles.length > 0 && !activeJo && firstArticleJo) {
+      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", firstArticleJo)
+      setActiveJo(firstArticleJo)
+    }
+  }, [selectedJo, articles, isOrdinance, activeJo, activeArticle])
 
   const handleArticleClick = (article: LawArticle, index: number) => {
     const joValue = getArticleJo(article, index)

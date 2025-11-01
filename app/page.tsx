@@ -204,8 +204,14 @@ export default function Home() {
         if (targetArticle) {
           selectedJo = targetArticle.jo
         }
-      } else if (articles.length === 1) {
-        selectedJo = articles[0].jo
+      }
+
+      if (!selectedJo && articles.length > 0) {
+        const fallbackArticle = articles[0]
+        if (fallbackArticle?.jo) {
+          selectedJo = fallbackArticle.jo
+          console.log("[v0] No specific JO requested - defaulting to first article:", fallbackArticle.jo)
+        }
       }
 
       setLawData({
