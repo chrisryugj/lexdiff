@@ -337,12 +337,36 @@ export default function Home() {
           return
         }
 
-        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === lawName.replace(/\s+/g, ""))
+        const normalizedLawName = lawName.replace(/\s+/g, "")
+        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
 
         if (!exactMatch) {
           exactMatch = results.find(
-            (r) => r.lawName.startsWith(lawName) && !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙"),
+            (r) =>
+              r.lawName.replace(/\s+/g, "").startsWith(normalizedLawName) &&
+              !r.lawName.includes("시행령") &&
+              !r.lawName.includes("시행규칙"),
           )
+        }
+
+        if (!jo) {
+          const preferred =
+            exactMatch || results.find((r) => !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙")) || results[0]
+
+          if (preferred) {
+            try {
+              await fetchLawContent(preferred, { lawName, article: articleNumber, jo })
+              setMobileView("content")
+              return
+            } catch (error) {
+              console.error("[v0] 법령 조회 오류:", error)
+              toast({
+                title: "법령 조회 실패",
+                description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
+                variant: "destructive",
+              })
+            }
+          }
         }
 
         if (exactMatch && jo) {

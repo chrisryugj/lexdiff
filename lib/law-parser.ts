@@ -1,5 +1,69 @@
 import { debugLogger } from "./debug-logger"
 import type { RevisionHistoryItem } from "./law-types"
+import { normalizeLawSearchText, resolveLawAlias } from "./search-normalizer"
+
+interface ArticleComponents {
+  articleNumber: number
+  branchNumber: number
+}
+
+interface ParsedSearchQuery {
+  lawName: string
+  article?: string
+  jo?: string
+  clause?: string
+  item?: string
+  subItem?: string
+}
+
+function stripClauseAndItem(raw: string): string {
+  return raw
+    .replace(/제?\d+항.*$/u, "")
+    .replace(/제?\d+호.*$/u, "")
+    .replace(/제?\d+목.*$/u, "")
+}
+
+function normalizeSeparators(raw: string): string {
+  return raw
+    .replace(/[‐‑‒–—―﹘﹣－]/gu, "-")
+    .replace(/[·•]/gu, " ")
+}
+
+function parseArticleComponents(input: string): ArticleComponents {
+  debugLogger.debug("조문 컴포넌트 파싱", { input })
+
+  const sanitized = stripClauseAndItem(
+    normalizeSeparators(input)
+      .replace(/제|第/gu, "")
+      .replace(/조문|條/gu, "조")
+      .replace(/之/gu, "의")
+      .replace(/[()]/gu, "")
+      .replace(/\s+/gu, "")
+      .trim(),
+  )
+
+  const match = sanitized.match(/(\d+)(?:조)?(?:(?:의|-)\s*(\d+))?/u)
+
+  if (!match) {
+    debugLogger.error("조문 숫자 추출 실패", { input, sanitized })
+    throw new Error(`조문 패턴을 인식할 수 없습니다: ${input}`)
+  }
+
+  const articleNumber = Number.parseInt(match[1], 10)
+  const branchNumber = match[2] ? Number.parseInt(match[2], 10) : 0
+
+  if (Number.isNaN(articleNumber) || Number.isNaN(branchNumber)) {
+    debugLogger.error("조문 숫자 변환 실패", { input, match })
+    throw new Error(`조문 번호를 해석할 수 없습니다: ${input}`)
+  }
+
+  return { articleNumber, branchNumber }
+}
+
+function formatArticleLabel({ articleNumber, branchNumber }: ArticleComponents): string {
+  const base = `제${articleNumber}조`
+  return branchNumber > 0 ? `${base}의${branchNumber}` : base
+}
 
 /**
  * Converts Korean law article notation to 6-digit JO code
@@ -11,19 +75,10 @@ import type { RevisionHistoryItem } from "./law-types"
 export function buildJO(input: string): string {
   debugLogger.debug("JO 파싱 시작", { input })
 
-  // Remove "제" prefix if present
-  const cleaned = input.replace(/제/g, "").trim()
+  const components = parseArticleComponents(input)
 
-  // Match patterns: "38조", "38조의2", "38"
-  const match = cleaned.match(/(\d+)(?:조)?(?:의(\d+))?/)
-
-  if (!match) {
-    debugLogger.error("조문 패턴 불일치", { input, cleaned })
-    throw new Error(`조문 패턴을 인식할 수 없습니다: ${input}`)
-  }
-
-  const articleNum = match[1].padStart(4, "0")
-  const branchNum = (match[2] ?? "0").padStart(2, "0")
+  const articleNum = components.articleNumber.toString().padStart(4, "0")
+  const branchNum = components.branchNumber.toString().padStart(2, "0")
   const jo = `${articleNum}${branchNum}`
 
   debugLogger.success("JO 파싱 완료", { input, jo })
@@ -36,30 +91,58 @@ export function buildJO(input: string): string {
  *   "관세법 38조" → { lawName: "관세법", article: "38조" }
  *   "관세법 제38조" → { lawName: "관세법", article: "제38조" }
  */
-export function parseSearchQuery(query: string): {
-  lawName: string
-  article?: string
-  jo?: string
-} {
+export function parseSearchQuery(query: string): ParsedSearchQuery {
   debugLogger.debug("검색어 파싱 시작", { query })
 
-  const trimmed = query.trim()
+  const normalizedQuery = normalizeLawSearchText(query)
+  const articlePattern =
+    /(?:\s|^)(제?\d+(?:조)?(?:[-의]\d+)?)(?:\s*제?\d+항)?(?:\s*제?\d+호)?(?:\s*제?\d+목)?$/u
+  const match = articlePattern.exec(normalizedQuery)
 
-  // Pattern: "법령명 [제]N조[의N]"
-  const match = trimmed.match(/^(.+?)\s+(제?\d+조(?:의\d+)?)$/)
+  if (match && match.index !== undefined) {
+    const rawLawName = normalizedQuery.slice(0, match.index).trim()
+    const lawNameResolution = resolveLawAlias(rawLawName || normalizedQuery.trim())
+    const lawName = lawNameResolution.canonical
 
-  if (match) {
-    const lawName = match[1].trim()
-    const article = match[2].trim()
-    const jo = buildJO(article)
+    const fullArticleSegment = normalizedQuery.slice(match.index).trim()
+    const articleLabel = normalizeArticle(match[1].trim())
+    const jo = buildJO(articleLabel)
 
-    debugLogger.success("검색어 파싱 완료 (조문 포함)", { lawName, article, jo })
-    return { lawName, article, jo }
+    const clauseMatch = fullArticleSegment.match(/제?\s*(\d+)\s*항/u)
+    const itemMatch = fullArticleSegment.match(/제?\s*(\d+)\s*호/u)
+    const subItemMatch = fullArticleSegment.match(/제?\s*(\d+)\s*목/u)
+
+    const parsed: ParsedSearchQuery = {
+      lawName,
+      article: articleLabel,
+      jo,
+    }
+
+    if (clauseMatch) {
+      parsed.clause = clauseMatch[1]
+    }
+
+    if (itemMatch) {
+      parsed.item = itemMatch[1]
+    }
+
+    if (subItemMatch) {
+      parsed.subItem = subItemMatch[1]
+    }
+
+    debugLogger.success("검색어 파싱 완료 (조문 포함)", parsed)
+    return parsed
   }
 
-  // No article specified, just law name
-  debugLogger.info("검색어 파싱 완료 (법령명만)", { lawName: trimmed })
-  return { lawName: trimmed }
+  const trimmedLawName = normalizedQuery.trim()
+  const lawNameResolution = resolveLawAlias(trimmedLawName)
+
+  debugLogger.info("검색어 파싱 완료 (법령명만)", {
+    lawName: lawNameResolution.canonical,
+    matchedAlias: lawNameResolution.matchedAlias,
+  })
+
+  return { lawName: lawNameResolution.canonical }
 }
 
 /**
@@ -69,8 +152,8 @@ export function parseSearchQuery(query: string): {
  *   "10조의2" → "제10조의2"
  */
 export function normalizeArticle(article: string): string {
-  const cleaned = article.replace(/제/g, "").trim()
-  return `제${cleaned}`
+  const components = parseArticleComponents(article)
+  return formatArticleLabel(components)
 }
 
 /**
