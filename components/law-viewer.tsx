@@ -26,6 +26,8 @@ import { buildJO, formatJO } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 
+type ViewerMode = "single" | "full"
+
 interface LawViewerProps {
   meta: LawMeta
   articles: LawArticle[]
@@ -35,6 +37,7 @@ interface LawViewerProps {
   onToggleFavorite?: (jo: string) => void
   favorites?: Set<string>
   isOrdinance?: boolean
+  viewMode?: ViewerMode
 }
 
 const getArticleJo = (article: LawArticle, fallbackIndex?: number): string => {
@@ -69,6 +72,7 @@ export function LawViewer({
   onToggleFavorite,
   favorites = new Set(),
   isOrdinance = false,
+  viewMode,
 }: LawViewerProps) {
   console.log("[v0] LawViewer 렌더링:", {
     lawTitle: meta.lawTitle,
@@ -77,6 +81,9 @@ export function LawViewer({
     isOrdinance,
     firstArticle: articles[0] ? { jo: articles[0].jo, title: articles[0].title } : null,
   })
+
+  const resolvedMode: ViewerMode = viewMode ?? (isOrdinance ? "full" : "single")
+  const isFullDocument = resolvedMode === "full"
 
   const [activeJo, setActiveJo] = useState<string>(
     selectedJo || (articles[0] ? getArticleJo(articles[0], 0) : ""),
@@ -104,6 +111,10 @@ export function LawViewer({
   }, [activeArticle])
 
   useEffect(() => {
+    articleRefs.current = {}
+  }, [articles])
+
+  useEffect(() => {
     console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance })
 
     const firstArticle = articles[0]
@@ -113,7 +124,15 @@ export function LawViewer({
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
 
-      if (!isOrdinance && contentRef.current) {
+      if (isFullDocument) {
+        const target = articleRefs.current[selectedJo]
+        if (target) {
+          console.log("[v0] 전체 문서 모드 - 선택된 조문으로 스크롤")
+          setTimeout(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" })
+          }, 100)
+        }
+      } else if (contentRef.current) {
         console.log("[v0] 법령 모드 - 스크롤 최상단 이동")
         setTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
@@ -126,7 +145,7 @@ export function LawViewer({
       console.log("[v0] 현재 activeArticle 없음 - 첫 번째 조문으로 초기화:", firstArticleJo)
       setActiveJo(firstArticleJo)
 
-      if (!isOrdinance && contentRef.current) {
+      if (!isFullDocument && contentRef.current) {
         console.log("[v0] 조문 초기화 - 스크롤 최상단 이동")
         setTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
@@ -142,7 +161,17 @@ export function LawViewer({
       console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", firstArticleJo)
       setActiveJo(firstArticleJo)
     }
-  }, [selectedJo, articles, isOrdinance, activeJo, activeArticle])
+  }, [selectedJo, articles, isOrdinance, activeJo, activeArticle, isFullDocument])
+
+  useEffect(() => {
+    if (!isFullDocument || !activeJo) return
+
+    const target = articleRefs.current[activeJo]
+    if (target) {
+      console.log("[v0] 전체 문서 모드 - activeJo 변화 감지, 스크롤 이동", { activeJo })
+      target.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [activeJo, isFullDocument])
 
   const handleArticleClick = (article: LawArticle, index: number) => {
     const joValue = getArticleJo(article, index)
@@ -155,8 +184,8 @@ export function LawViewer({
 
     setActiveJo(joValue)
 
-    if (isOrdinance) {
-      console.log("[v0] 조례 모드 - 스크롤 이동")
+    if (isFullDocument) {
+      console.log("[v0] 전체 문서 모드 - 스크롤 이동")
       const element = articleRefs.current[joValue]
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -372,7 +401,11 @@ export function LawViewer({
   console.log("[v0] LawViewer 렌더링 완료:", {
     activeJo,
     activeArticle: activeArticle ? { jo: activeArticle.jo, title: activeArticle.title } : null,
-    displayMode: isOrdinance ? "조례 (전체 조문)" : "법령 (선택 조문)",
+    displayMode: isFullDocument
+      ? isOrdinance
+        ? "조례 (전체 조문)"
+        : "법령 (전체 조문)"
+      : "법령 (선택 조문)",
   })
 
   return (
@@ -543,11 +576,11 @@ export function LawViewer({
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full" ref={contentRef}>
             <div className="p-6">
-              {isOrdinance ? (
+              {isFullDocument ? (
                 <div className="space-y-8">
                   {articles.map((article, index) => {
                     const joValue = getArticleJo(article, index)
-                    const key = joValue || article.joNum || `ordinance-article-${index}`
+                    const key = joValue || article.joNum || `article-${index}`
 
                     return (
                       <div
@@ -594,7 +627,7 @@ export function LawViewer({
                           )
 
                           return (
-                            <div key={joValue || `ordinance-revision-${idx}`} className="mb-6">
+                            <div key={joValue || `revision-${idx}`} className="mb-6">
                               <RevisionHistory history={article.revisionHistory!} articleTitle={heading} />
                             </div>
                           )

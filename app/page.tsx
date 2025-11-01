@@ -56,6 +56,7 @@ export default function Home() {
     articles: LawArticle[]
     selectedJo?: string
     isOrdinance?: boolean
+    viewMode?: "single" | "full"
   } | null>(null)
   const [lawSelectionState, setLawSelectionState] = useState<{
     results: LawSearchResult[]
@@ -229,10 +230,13 @@ export default function Home() {
         }
       }
 
+      const viewMode: "single" | "full" = query.jo ? "single" : "full"
+
       setLawData({
         meta,
         articles,
         selectedJo,
+        viewMode,
       })
 
       debugLogger.success("검색 완료", { lawTitle: meta.lawTitle, articleCount: articles.length })
@@ -562,6 +566,7 @@ export default function Home() {
         articles,
         selectedJo: undefined,
         isOrdinance: true,
+        viewMode: "full",
       })
 
       setOrdinanceSelectionState(null)
@@ -873,6 +878,7 @@ export default function Home() {
                     onToggleFavorite={handleToggleFavorite}
                     favorites={favorites}
                     isOrdinance={lawData.isOrdinance}
+                    viewMode={lawData.viewMode}
                   />
                 )}
               </div>
@@ -888,6 +894,7 @@ export default function Home() {
                   onToggleFavorite={handleToggleFavorite}
                   favorites={favorites}
                   isOrdinance={lawData.isOrdinance}
+                  viewMode={lawData.viewMode}
                 />
               </div>
             </div>

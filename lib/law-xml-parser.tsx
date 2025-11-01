@@ -369,12 +369,19 @@ function extractRevisionMarks(
 
 export function extractArticleText(
   article: LawArticle,
-  options?: { includeHeading?: boolean; headingLevel?: "h2" | "h3" | "h4" | "h5" },
+  options?: {
+    includeHeading?: boolean
+    headingLevel?: "h2" | "h3" | "h4" | "h5"
+    preserveLeadingHeading?: boolean
+  },
 ): string {
   let text = ""
 
   if (article.content) {
-    let content = escapeHtml(article.content)
+    const baseContent = options?.preserveLeadingHeading
+      ? article.content
+      : stripLeadingArticleHeading(article.content, article)
+    let content = escapeHtml(baseContent)
     content = applyRevisionStyling(content)
     content = linkifyRefsB(content)
     text += `${content}\n`
@@ -446,6 +453,32 @@ export function extractArticleText(
   }
 
   return result
+}
+
+function stripLeadingArticleHeading(raw: string, article: LawArticle): string {
+  if (!raw) return raw
+
+  const normalizedLabel = (formatJO(article.jo) || article.joNum || "").replace(/\s+/g, "")
+  if (!normalizedLabel) {
+    return raw
+  }
+
+  const escapedLabel = normalizedLabel
+    .replace(/^제/, "제\\s*")
+    .replace(/조의/, "조(?:\\s*의|\\s*-\\s*)")
+    .replace(/조$/, "조")
+
+  const headingPattern = new RegExp(
+    `^\\s*${escapedLabel}(?:\\s*[（(][^）)]+[）)])?(?:\\s*[:：])?`,
+    "u",
+  )
+
+  if (!headingPattern.test(raw)) {
+    return raw
+  }
+
+  const stripped = raw.replace(headingPattern, "")
+  return stripped.replace(/^\s+/, "")
 }
 
 function escapeHtml(text: string): string {
