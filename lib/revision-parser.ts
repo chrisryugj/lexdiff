@@ -11,6 +11,7 @@ export interface RevisionInfo {
 
 export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
   debugLogger.info("조문 개정이력 XML 파싱 시작", { xmlLength: xmlText.length })
+  console.log("[v0] Received revision history XML, length:", xmlText.length)
 
   try {
     const parser = new DOMParser()
@@ -18,33 +19,77 @@ export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
 
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
+      console.log("[v0] XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
+    console.log("[v0] XML root element:", xmlDoc.documentElement.tagName)
+    console.log("[v0] XML sample (first 1000 chars):", xmlText.substring(0, 1000))
+
     const history: RevisionHistoryItem[] = []
 
-    // Try to find revision history elements
-    const revisionElements = xmlDoc.querySelectorAll("연혁, 개정이력, Revision")
+    const lawElements = xmlDoc.querySelectorAll("law")
+    console.log("[v0] Found law elements:", lawElements.length)
 
-    revisionElements.forEach((element) => {
-      const date = element.querySelector("공포일자, 공포일, PromulgationDate")?.textContent || ""
-      const type = element.querySelector("제개정구분, 제개정구분명, RevisionType")?.textContent || ""
-      const description = element.querySelector("개정사유, 개정내용, Description")?.textContent
-      const articleLink = element.querySelector("조문링크, ArticleLink")?.textContent
+    if (lawElements.length === 0) {
+      console.log("[v0] No <law> elements found, trying alternative selectors")
+      return []
+    }
 
-      if (date || type) {
+    lawElements.forEach((law, index) => {
+      const lawInfo = law.querySelector("법령정보")
+      if (!lawInfo) {
+        console.log(`[v0] No 법령정보 found in law element ${index}`)
+        return
+      }
+
+      const promulgationDate = lawInfo.querySelector("공포일자")?.textContent?.trim() || ""
+      const promulgationNumber = lawInfo.querySelector("공포번호")?.textContent?.trim() || ""
+      const revisionType = lawInfo.querySelector("제개정구분명")?.textContent?.trim() || ""
+      const effectiveDate = lawInfo.querySelector("시행일자")?.textContent?.trim() || ""
+
+      const articleInfo = law.querySelector("조문정보")
+      const changeReason = articleInfo?.querySelector("변경사유")?.textContent?.trim() || ""
+      const articleLinkRaw = articleInfo?.querySelector("조문링크")?.textContent?.trim() || ""
+      const articleLink = articleLinkRaw ? `https://www.law.go.kr${articleLinkRaw}` : ""
+
+      if (index < 3) {
+        console.log(`[v0] Parsed revision ${index + 1}:`, {
+          promulgationDate,
+          promulgationNumber,
+          revisionType,
+          changeReason,
+          effectiveDate,
+          hasArticleLink: !!articleLink,
+        })
+      }
+
+      if (promulgationDate) {
+        const formattedDate = formatDate(promulgationDate)
+
+        let description = revisionType
+        if (changeReason && changeReason !== revisionType) {
+          description += ` (${changeReason})`
+        }
+
         history.push({
-          date: formatDate(date),
-          type: type || "개정",
-          description,
-          articleLink,
+          date: formattedDate,
+          type: changeReason || revisionType || "개정",
+          description: revisionType,
+          articleLink: articleLink || undefined,
         })
       }
     })
 
+    console.log("[v0] Parsed revision history:", history.length, "items")
+    if (history.length > 0) {
+      console.log("[v0] First 3 revisions:", history.slice(0, 3))
+    }
+
     debugLogger.success("조문 개정이력 파싱 완료", { count: history.length })
     return history
   } catch (error) {
+    console.log("[v0] Revision parsing error:", error)
     debugLogger.error("조문 개정이력 파싱 실패", error)
     return []
   }
@@ -110,7 +155,6 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
     console.log(`[v0] [개정이력] Using selector "${usedSelector}" - found ${lawElements.length} entries`)
 
     lawElements.forEach((law, index) => {
-      // Log the element structure for debugging
       if (index < 3) {
         console.log(
           `[v0] [개정이력] Element ${index + 1} children:`,
@@ -204,7 +248,7 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
 
 export function formatDate(dateStr: string): string {
   if (!dateStr || dateStr.length !== 8) return dateStr
-  return `${dateStr.substring(0, 4)}.${dateStr.substring(4, 6)}.${dateStr.substring(6, 8)}`
+  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
 }
 
 export function extractArticleRevisions(
