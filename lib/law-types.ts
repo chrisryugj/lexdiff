@@ -59,6 +59,7 @@ export interface LawArticle {
   hasChanges?: boolean
   paragraphs?: LawParagraph[]
   revisionHistory?: RevisionHistoryItem[]
+  isPreamble?: boolean // Add flag for chapter headings/preambles
 }
 
 export interface LawParagraph {

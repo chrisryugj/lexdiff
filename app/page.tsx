@@ -10,7 +10,6 @@ import { FavoritesPanel } from "@/components/favorites-panel"
 import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog" // 에러 리포트 다이얼로그 추가
 import { debugLogger } from "@/lib/debug-logger"
-import { parseLawXML } from "@/lib/law-xml-parser"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
@@ -22,8 +21,154 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
+import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
+
+function convertArticleNumberToCode(
+  articleNum: string | number,
+  branchNum?: string | number,
+): { code: string; display: string } {
+  const mainNum = typeof articleNum === "string" ? Number.parseInt(articleNum) : articleNum
+  const branch = branchNum ? (typeof branchNum === "string" ? Number.parseInt(branchNum) : branchNum) : 0
+
+  if (isNaN(mainNum)) {
+    return { code: "000000", display: "제0조" }
+  }
+
+  const code = mainNum.toString().padStart(4, "0") + branch.toString().padStart(2, "0")
+  const display = branch > 0 ? "제" + mainNum + "조의" + branch : "제" + mainNum + "조"
+
+  return { code, display }
+}
+
+function extractContentFromHangHo(hangHoData: any): string {
+  let content = ""
+
+  if (!hangHoData || typeof hangHoData !== "object") {
+    return content
+  }
+
+  if (hangHoData.호 && Array.isArray(hangHoData.호)) {
+    for (const ho of hangHoData.호) {
+      if (ho.호번호 && ho.호내용) {
+        content += "\n" + ho.호번호 + " " + ho.호내용
+      } else if (ho.호내용) {
+        content += "\n" + ho.호내용
+      }
+
+      if (ho.목 && Array.isArray(ho.목)) {
+        for (const mok of ho.목) {
+          if (mok.목번호 && mok.목내용) {
+            content += "\n  " + mok.목번호 + " " + mok.목내용
+          } else if (mok.목내용) {
+            content += "\n  " + mok.목내용
+          }
+        }
+      }
+    }
+  }
+
+  return content
+}
+
+function removeArticleHeaderFromContent(content: string, display: string, title?: string): string {
+  if (!content) return content
+
+  const pattern1 = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
+  content = content.replace(pattern1, "")
+
+  const pattern2 = /^제\d+조(?:의\d+)?\s*$$[^)]+$$\s*/
+  content = content.replace(pattern2, "")
+
+  if (title) {
+    const escapedDisplay = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const exactPattern = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
+    content = content.replace(exactPattern, "")
+  }
+
+  return content.trim()
+}
+
+function parseLawJSON(jsonData: any): LawData {
+  debugLogger.info("JSON 파싱 시작")
+
+  try {
+    const lawData = jsonData.법령
+
+    if (!lawData) {
+      throw new Error("법령 데이터가 없습니다")
+    }
+
+    const basicInfo = lawData.기본정보 || {}
+    const meta = {
+      lawId: basicInfo.법령ID || "unknown",
+      lawTitle: basicInfo.법령명한글 || "제목 없음",
+      latestEffectiveDate: basicInfo.최종시행일자 || "",
+      promulgation: {
+        date: basicInfo.공포일자 || "",
+        number: basicInfo.공포번호 || "",
+      },
+      revisionType: basicInfo.제개정구분명 || "",
+      fetchedAt: new Date().toISOString(),
+    }
+
+    const articles: LawArticle[] = []
+    const articleUnits = lawData.조문?.조문단위 || []
+
+    debugLogger.info("전체 조문 단위: " + articleUnits.length + "개")
+
+    for (let i = 0; i < articleUnits.length; i++) {
+      const unit = articleUnits[i]
+
+      if (unit.조문여부 !== "조문") {
+        continue
+      }
+
+      const articleNum = unit.조문번호
+      const branchNum = unit.조문가지번호
+      const title = unit.조문제목 || ""
+
+      const result = convertArticleNumberToCode(articleNum, branchNum)
+      const code = result.code
+      const display = result.display
+
+      let content = ""
+
+      if (unit.조문내용 && typeof unit.조문내용 === "string") {
+        content = unit.조문내용.trim()
+      }
+
+      if (unit.항) {
+        const hangContent = extractContentFromHangHo(unit.항)
+        if (hangContent) {
+          content += (content ? "\n" : "") + hangContent
+        }
+      }
+
+      content = removeArticleHeaderFromContent(content, display, title)
+
+      articles.push({
+        jo: code,
+        joNum: display,
+        title: title,
+        content: content.trim(),
+        isPreamble: false,
+      })
+    }
+
+    debugLogger.success("JSON 파싱 완료: " + articles.length + "개 조문")
+
+    return {
+      meta: meta,
+      articles: articles,
+      articleCount: articles.length,
+    }
+  } catch (error) {
+    debugLogger.error("JSON 파싱 오류", error)
+    throw error
+  }
+}
 
 interface LawSearchResult {
   lawId?: string
@@ -124,6 +269,8 @@ export default function Home() {
       if (query.jo) {
         params.append("jo", query.jo)
         console.log("[v0] ✓ Adding JO parameter to fetch specific article:", query.jo)
+      } else {
+        console.log("[v0] ✓ No JO parameter - fetching all articles")
       }
 
       const apiUrl = `/api/eflaw?${params.toString()}`
@@ -144,11 +291,12 @@ export default function Home() {
         throw new Error("법령 조회 실패")
       }
 
-      const xmlText = await response.text()
-      apiLogs[apiLogs.length - 1].response = xmlText.substring(0, 500) + "..."
-      console.log("[v0] Eflaw XML received, length:", xmlText.length)
+      const jsonText = await response.text()
+      apiLogs[apiLogs.length - 1].response = jsonText.substring(0, 500) + "..."
+      console.log("[v0] Eflaw JSON received, length:", jsonText.length)
 
-      const { meta, articles } = parseLawXML(xmlText)
+      const jsonData = JSON.parse(jsonText)
+      const { meta, articles } = parseLawJSON(jsonData)
       console.log("[v0] Parsed law data:", { meta, articleCount: articles.length })
 
       if (query.jo && (selectedLaw.lawId || selectedLaw.mst)) {
@@ -195,12 +343,13 @@ export default function Home() {
 
       let selectedJo: string | undefined
       const viewMode: "single" | "full" = query.jo ? "single" : "full"
+
       if (query.jo) {
         const targetArticle = articles.find((a) => a.jo === query.jo)
         if (targetArticle) {
           selectedJo = targetArticle.jo
         }
-      } else if (articles.length === 1) {
+      } else if (articles.length > 0) {
         selectedJo = articles[0].jo
       }
 
@@ -280,16 +429,6 @@ export default function Home() {
           return
         }
 
-        if (results.length === 0) {
-          toast({
-            title: "검색 결과 없음",
-            description: `"${query.lawName}" 조례를 찾을 수 없습니다.`,
-            variant: "destructive",
-          })
-          setIsSearching(false)
-          return
-        }
-
         setOrdinanceSelectionState({
           results,
           query: { lawName },
@@ -330,16 +469,6 @@ export default function Home() {
           return
         }
 
-        if (results.length === 0) {
-          toast({
-            title: "검색 결과 없음",
-            description: `"${query.lawName}" 법령을 찾을 수 없습니다.`,
-            variant: "destructive",
-          })
-          setIsSearching(false)
-          return
-        }
-
         const normalizedLawName = lawName.replace(/\s+/g, "")
         let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
 
@@ -352,23 +481,18 @@ export default function Home() {
           )
         }
 
-        if (!jo) {
-          const preferred =
-            exactMatch || results.find((r) => !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙")) || results[0]
-
-          if (preferred) {
-            try {
-              await fetchLawContent(preferred, { lawName, article: articleNumber, jo })
-              setMobileView("content")
-              return
-            } catch (error) {
-              console.error("[v0] 법령 조회 오류:", error)
-              toast({
-                title: "법령 조회 실패",
-                description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
-                variant: "destructive",
-              })
-            }
+        if (exactMatch && !jo) {
+          try {
+            await fetchLawContent(exactMatch, { lawName, article: articleNumber, jo: undefined })
+            setMobileView("content")
+            return
+          } catch (error) {
+            console.error("[v0] 법령 조회 오류:", error)
+            toast({
+              title: "법령 조회 실패",
+              description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
+              variant: "destructive",
+            })
           }
         }
 
@@ -424,8 +548,13 @@ export default function Home() {
 
     setIsSearching(true)
     try {
-      await fetchLawContent(law, lawSelectionState.query)
+      await fetchLawContent(law, {
+        lawName: lawSelectionState.query.lawName,
+        article: lawSelectionState.query.article,
+        jo: undefined, // 전체 조문 보기
+      })
       setLawSelectionState(null)
+      setMobileView("content")
     } catch (error) {
       console.log("[v0] Law fetch error:", error)
       debugLogger.error("법령 조회 실패", error)
@@ -663,19 +792,19 @@ export default function Home() {
 
                 {lawSelectionState.results.map((law) => (
                   <button
-                    key={law.lawId}
+                    key={law.lawId || law.mst}
                     onClick={() => handleLawSelect(law)}
                     className="w-full p-3 md:p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-base md:text-lg">{law.lawName}</h4>
-                          <Badge variant="secondary">{law.lawType}</Badge>
+                          <h4 className="font-semibold text-base md:text-lg">{String(law.lawName)}</h4>
+                          <Badge variant="secondary">{String(law.lawType)}</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
-                          {law.promulgationDate && <span>공포: {law.promulgationDate}</span>}
-                          {law.effectiveDate && <span>시행: {law.effectiveDate}</span>}
+                          {law.promulgationDate && <span>공포: {String(law.promulgationDate)}</span>}
+                          {law.effectiveDate && <span>시행: {String(law.effectiveDate)}</span>}
                         </div>
                       </div>
                     </div>
@@ -703,15 +832,15 @@ export default function Home() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-base md:text-lg mb-1">{ordinance.ordinName}</h4>
+                        <h4 className="font-semibold text-base md:text-lg mb-1">{String(ordinance.ordinName)}</h4>
                         <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
-                          {ordinance.orgName && <span>{ordinance.orgName}</span>}
+                          {ordinance.orgName && <span>{String(ordinance.orgName)}</span>}
                           {ordinance.ordinKind && (
                             <Badge variant="secondary" className="text-xs">
-                              {ordinance.ordinKind}
+                              {String(ordinance.ordinKind)}
                             </Badge>
                           )}
-                          {ordinance.effectiveDate && <span>시행: {ordinance.effectiveDate}</span>}
+                          {ordinance.effectiveDate && <span>시행: {String(ordinance.effectiveDate)}</span>}
                         </div>
                       </div>
                     </div>

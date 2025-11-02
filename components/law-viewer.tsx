@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,8 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react"
 import type { LawArticle, LawMeta } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
@@ -61,7 +63,10 @@ export function LawViewer({
     firstArticle: articles[0] ? { jo: articles[0].jo, title: articles[0].title } : null,
   })
 
-  const [activeJo, setActiveJo] = useState<string>(selectedJo || articles[0]?.jo || "")
+  const actualArticles = articles.filter((a) => !a.isPreamble)
+  const preambles = articles.filter((a) => a.isPreamble)
+
+  const [activeJo, setActiveJo] = useState<string>(selectedJo || actualArticles[0]?.jo || "")
   const [fontSize, setFontSize] = useState<number>(14)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
@@ -69,18 +74,16 @@ export function LawViewer({
   const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
 
-  const activeArticle = articles.find((a) => a.jo === activeJo)
+  const activeArticle = actualArticles.find((a) => a.jo === activeJo)
 
   useEffect(() => {
-    if (activeArticle) {
-      console.log(`[v0] [개정이력] Active article revision history:`, {
-        jo: activeArticle.jo,
-        title: activeArticle.title,
-        hasRevisionHistory: !!activeArticle.revisionHistory,
-        revisionCount: activeArticle.revisionHistory?.length || 0,
-        revisions: activeArticle.revisionHistory,
-      })
-    }
+    console.log("[v0] [개정이력] Active article revision history:", {
+      jo: activeArticle?.jo,
+      title: activeArticle?.title,
+      hasRevisionHistory: !!activeArticle?.revisionHistory,
+      revisionCount: activeArticle?.revisionHistory?.length || 0,
+      revisions: activeArticle?.revisionHistory,
+    })
   }, [activeArticle])
 
   useEffect(() => {
@@ -96,14 +99,14 @@ export function LawViewer({
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
       }
-    } else if (articles.length === 1 && articles[0]) {
-      console.log("[v0] 조문 1개 - 자동 선택:", articles[0].jo)
-      setActiveJo(articles[0].jo)
-    } else if (articles.length > 0 && !activeJo) {
-      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", articles[0].jo)
-      setActiveJo(articles[0].jo)
+    } else if (actualArticles.length === 1 && actualArticles[0]) {
+      console.log("[v0] 조문 1개 - 자동 선택:", actualArticles[0].jo)
+      setActiveJo(actualArticles[0].jo)
+    } else if (actualArticles.length > 0 && !activeJo) {
+      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", actualArticles[0].jo)
+      setActiveJo(actualArticles[0].jo)
     }
-  }, [selectedJo, articles, isOrdinance, viewMode, isFullView, activeJo])
+  }, [selectedJo, actualArticles, isOrdinance, viewMode, isFullView, activeJo])
 
   useEffect(() => {
     articleRefs.current = {}
@@ -130,41 +133,38 @@ export function LawViewer({
   const resetFontSize = () => setFontSize(14)
 
   const openLawCenter = () => {
-    if (!activeArticle) return
     const lawTitle = meta.lawTitle
-    const articleNum = formatJO(activeArticle.jo)
-    const url = `https://www.law.go.kr/법령/${lawTitle}/${articleNum}`
-    window.open(url, "_blank", "noopener,noreferrer")
+
+    if (isFullView || !activeArticle) {
+      const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawTitle)}`
+      window.open(url, "_blank", "noopener,noreferrer")
+    } else {
+      const articleNum = formatJO(activeArticle.jo)
+      const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawTitle)}/${articleNum}`
+      window.open(url, "_blank", "noopener,noreferrer")
+    }
   }
 
-  const formatSimpleJo = (jo: string): string => {
-    console.log("[v0] formatSimpleJo 호출:", jo)
+  const formatSimpleJo = useMemo(() => {
+    return (jo: string): string => {
+      if (jo.length === 6) {
+        const articleNum = Number.parseInt(jo.substring(0, 4), 10)
+        const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+        return branchNum === 0 ? `제${articleNum}조` : `제${articleNum}조의${branchNum}`
+      }
 
-    if (jo.length === 6) {
-      const articleNum = Number.parseInt(jo.substring(0, 4), 10)
-      const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+      if (jo.length === 8) {
+        const articleNum = Number.parseInt(jo.substring(0, 4), 10)
+        return `제${articleNum}조`
+      }
 
-      const result = branchNum === 0 ? `${articleNum}조` : `${articleNum}조의${branchNum}`
-      console.log("[v0] formatSimpleJo 결과 (6자리):", result)
-      return result
+      if (jo.startsWith("제") && jo.includes("조")) {
+        return jo
+      }
+
+      return jo
     }
-
-    if (jo.length === 8) {
-      const articleNum = Number.parseInt(jo.substring(0, 4), 10)
-      const result = `${articleNum}조`
-      console.log("[v0] formatSimpleJo 결과 (8자리):", result)
-      return result
-    }
-
-    if (jo.startsWith("제") && jo.includes("조")) {
-      const result = jo.replace(/^제(\d+)조/, "$1조")
-      console.log("[v0] formatSimpleJo 결과 (제N조):", result)
-      return result
-    }
-
-    console.log("[v0] formatSimpleJo 결과 (변환 없음):", jo)
-    return jo
-  }
+  }, [])
 
   // Handle clicks on linkified references inside article content
   const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
@@ -176,7 +176,12 @@ export function LawViewer({
         const articleLabel = target.getAttribute("data-article") || ""
         // If immediately preceded by external law anchor, treat as external
         const prev = target.previousElementSibling as HTMLElement | null
-        if (prev && prev.tagName === "A" && prev.classList.contains("law-ref") && prev.getAttribute("data-ref") === "law") {
+        if (
+          prev &&
+          prev.tagName === "A" &&
+          prev.classList.contains("law-ref") &&
+          prev.getAttribute("data-ref") === "law"
+        ) {
           const lawName = prev.getAttribute("data-law") || ""
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
@@ -199,7 +204,12 @@ export function LawViewer({
         // Try to pair with next article anchor on the same line
         let articleLabel = ""
         const next = target.nextElementSibling as HTMLElement | null
-        if (next && next.tagName === "A" && next.classList.contains("law-ref") && next.getAttribute("data-ref") === "article") {
+        if (
+          next &&
+          next.tagName === "A" &&
+          next.classList.contains("law-ref") &&
+          next.getAttribute("data-ref") === "article"
+        ) {
           articleLabel = next.getAttribute("data-article") || ""
         }
         if (articleLabel) {
@@ -207,7 +217,11 @@ export function LawViewer({
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
           // Fallback: show minimal modal with a link
-          setRefModal({ open: true, title: lawName, html: `<a href=\"https://www.law.go.kr/법령/${encodeURIComponent(lawName)}\" target=\"_blank\" rel=\"noopener\">법령 페이지 열기</a>` })
+          setRefModal({
+            open: true,
+            title: lawName,
+            html: `<a href=\"https://www.law.go.kr/법령/${encodeURIComponent(lawName)}\" target=\"_blank\" rel=\"noopener\">법령 페이지 열기</a>`,
+          })
           setLastExternalRef({ lawName })
         }
       } else if (refType === "law-article") {
@@ -277,7 +291,9 @@ export function LawViewer({
       const { parseLawXML } = await import("@/lib/law-xml-parser")
       const parsed = parseLawXML(eflawXml)
       let joCode = ""
-      try { joCode = buildJO(articleLabel) } catch {}
+      try {
+        joCode = buildJO(articleLabel)
+      } catch {}
       const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
       if (found) {
         setRefModal({
@@ -298,11 +314,9 @@ export function LawViewer({
     activeJo,
     activeArticle: activeArticle ? { jo: activeArticle.jo, title: activeArticle.title } : null,
     viewMode,
-    displayMode: isOrdinance
-      ? "조례 (전체 조문)"
-      : viewMode === "full"
-        ? "법령 (전체 조문)"
-        : "법령 (선택 조문)",
+    displayMode: isOrdinance ? "조례 (전체 조문)" : viewMode === "full" ? "법령 (전체 조문)" : "법령 (선택 조문)",
+    preambleCount: preambles.length,
+    actualArticleCount: actualArticles.length,
   })
 
   return (
@@ -314,7 +328,7 @@ export function LawViewer({
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
               <Badge variant="secondary" className="text-xs">
-                {articles.length}개 조문
+                {actualArticles.length}개 조문
               </Badge>
             </div>
             <Button
@@ -340,9 +354,9 @@ export function LawViewer({
         <Separator className="mb-4" />
         <ScrollArea className={`flex-1 ${isArticleListExpanded ? "" : "max-h-[100px] md:max-h-none"}`}>
           <div className="space-y-1 pr-4">
-            {articles.map((article) => (
+            {actualArticles.map((article, index) => (
               <button
-                key={article.jo}
+                key={`${article.jo}-${index}`}
                 onClick={() => handleArticleClick(article.jo)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                   activeJo === article.jo
@@ -351,11 +365,16 @@ export function LawViewer({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span>
+                  <span className="flex-1">
                     {formatSimpleJo(article.jo)}
-                    {article.title && <span className="text-xs ml-1">({article.title})</span>}
+                    {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
+                    {activeJo === article.jo ? (
+                      <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                    ) : (
+                      <Bookmark className="h-3.5 w-3.5 opacity-40" />
+                    )}
                     {article.hasChanges && (
                       <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
                     )}
@@ -377,20 +396,7 @@ export function LawViewer({
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <BookOpen className="h-5 w-5 text-primary" />
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-bold text-foreground">
-                    {isOrdinance || viewMode === "full" ? (
-                      meta.lawTitle
-                    ) : activeArticle ? (
-                      <>
-                        {meta.lawTitle} {formatJO(activeArticle.jo)}
-                        {activeArticle.title && (
-                          <span className="text-muted-foreground"> ({activeArticle.title})</span>
-                        )}
-                      </>
-                    ) : (
-                      meta.lawTitle
-                    )}
-                  </h2>
+                  <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
                   {!isOrdinance && viewMode === "full" && (
                     <Badge variant="outline" className="text-xs">
                       전체 조문
@@ -401,8 +407,8 @@ export function LawViewer({
 
               {!isOrdinance && viewMode === "full" && activeArticle && (
                 <p className="text-sm text-muted-foreground">
-                  현재 선택된 조문: {formatJO(activeArticle.jo)}
-                  {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                  현재 선택: {formatSimpleJo(activeArticle.jo)}
+                  {activeArticle.title && <span> ({activeArticle.title})</span>}
                 </p>
               )}
             </div>
@@ -442,24 +448,15 @@ export function LawViewer({
                 <ExternalLink className="h-4 w-4 mr-2" />
                 원문 보기
               </Button>
-
-              <div className="flex items-center gap-1 ml-auto border-l border-border pl-2">
-                <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-              </div>
             </div>
           )}
 
           {isOrdinance && (
             <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                원문 보기
+              </Button>
               <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
                 <ZoomOut className="h-4 w-4" />
               </Button>
@@ -479,15 +476,33 @@ export function LawViewer({
             <div className="p-6">
               {isOrdinance ? (
                 <div className="space-y-8">
-                  {articles.map((article) => (
+                  {preambles.map((preamble, index) => (
                     <div
-                      key={article.jo}
+                      key={`preamble-${index}`}
+                      className="mb-6"
+                      dangerouslySetInnerHTML={{ __html: preamble.content }}
+                    />
+                  ))}
+
+                  {actualArticles.map((article, index) => (
+                    <div
+                      key={`${article.jo}-${index}`}
                       id={`article-${article.jo}`}
                       ref={(el) => {
                         articleRefs.current[article.jo] = el
                       }}
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
                     >
+                      <div className="mb-4 pb-3 border-b border-border">
+                        <h3 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+                          {formatSimpleJo(article.jo)}
+                          {article.title && <span className="text-muted-foreground"> ({article.title})</span>}
+                          {activeJo === article.jo && (
+                            <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
+                          )}
+                        </h3>
+                      </div>
+
                       <div
                         className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
                         style={{
@@ -503,10 +518,10 @@ export function LawViewer({
                     </div>
                   ))}
 
-                  {articles.some((a) => a.revisionHistory && a.revisionHistory.length > 0) && (
+                  {actualArticles.some((a) => a.revisionHistory && a.revisionHistory.length > 0) && (
                     <div className="mt-8 pt-8 border-t border-border">
                       <h3 className="text-lg font-semibold mb-4">개정 이력</h3>
-                      {articles
+                      {actualArticles
                         .filter((a) => a.revisionHistory && a.revisionHistory.length > 0)
                         .map((article) => (
                           <div key={article.jo} className="mb-6">
@@ -525,9 +540,17 @@ export function LawViewer({
                 </div>
               ) : viewMode === "full" ? (
                 <div className="space-y-10">
-                  {articles.map((article, index) => (
+                  {preambles.map((preamble, index) => (
                     <div
-                      key={article.jo}
+                      key={`preamble-${index}`}
+                      className="mb-8 text-xl font-bold text-center"
+                      dangerouslySetInnerHTML={{ __html: preamble.content }}
+                    />
+                  ))}
+
+                  {actualArticles.map((article, index) => (
+                    <div
+                      key={`${article.jo}-${index}`}
                       id={`article-${article.jo}`}
                       ref={(el) => {
                         articleRefs.current[article.jo] = el
@@ -535,9 +558,12 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
                     >
                       <div className="mb-6 pb-4 border-b border-border">
-                        <h3 className="text-2xl font-bold text-foreground mb-2">
-                          {formatJO(article.jo)}
-                          {article.title && <span className="text-muted-foreground"> ({article.title})</span>}
+                        <h3 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                          {formatSimpleJo(article.jo)}
+                          {article.title && <span className="text-muted-foreground">({article.title})</span>}
+                          {activeJo === article.jo && (
+                            <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
+                          )}
                         </h3>
                       </div>
 
@@ -559,8 +585,8 @@ export function LawViewer({
                             history={article.revisionHistory}
                             articleTitle={
                               article.title
-                                ? `${formatJO(article.jo)} (${article.title})`
-                                : formatJO(article.jo)
+                                ? `${formatSimpleJo(article.jo)} (${article.title})`
+                                : formatSimpleJo(article.jo)
                             }
                           />
                         </div>
@@ -580,16 +606,15 @@ export function LawViewer({
                         </div>
                       )}
 
-                      {index < articles.length - 1 && <Separator className="my-8" />}
+                      {index < actualArticles.length - 1 && <Separator className="my-8" />}
                     </div>
                   ))}
                 </div>
               ) : activeArticle ? (
-                /* 법령: 조문 번호와 제목을 명확히 표시하고 본문 표시 */
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="mb-6 pb-4 border-b border-border">
                     <h3 className="text-2xl font-bold text-foreground mb-2">
-                      {formatJO(activeArticle.jo)}
+                      {formatSimpleJo(activeArticle.jo)}
                       {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
                     </h3>
                   </div>
@@ -611,7 +636,9 @@ export function LawViewer({
                       <RevisionHistory
                         history={activeArticle.revisionHistory}
                         articleTitle={
-                          activeArticle.title ? `${formatJO(activeArticle.jo)} (${activeArticle.title})` : undefined
+                          activeArticle.title
+                            ? `${formatSimpleJo(activeArticle.jo)} (${activeArticle.title})`
+                            : undefined
                         }
                       />
                     </div>

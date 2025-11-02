@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { debugLogger, type LogEntry, type LogLevel } from "@/lib/debug-logger"
-import { Terminal, Trash2, ChevronDown, ChevronUp, Filter } from "lucide-react"
+import { Terminal, Trash2, ChevronDown, ChevronUp, Filter, Copy, Check } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export function DebugConsole() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
   const [isMinimized, setIsMinimized] = useState(false)
   const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all")
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe(setLogs)
@@ -49,6 +53,39 @@ export function DebugConsole() {
         return "✕"
       case "debug":
         return "◆"
+    }
+  }
+
+  const toggleLogExpand = (logId: string) => {
+    setExpandedLogs((prev) => {
+      const next = new Set(prev)
+      if (next.has(logId)) {
+        next.delete(logId)
+      } else {
+        next.add(logId)
+      }
+      return next
+    })
+  }
+
+  const copyLog = async (log: LogEntry) => {
+    const logText = `[${log.level.toUpperCase()}] ${log.timestamp.toLocaleString("ko-KR")}
+${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details, null, 2)}` : ""}`
+
+    try {
+      await navigator.clipboard.writeText(logText)
+      setCopiedId(log.id)
+      setTimeout(() => setCopiedId(null), 2000)
+      toast({
+        title: "복사 완료",
+        description: "로그가 클립보드에 복사되었습니다.",
+      })
+    } catch (error) {
+      toast({
+        title: "복사 실패",
+        description: "로그 복사 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -110,26 +147,62 @@ export function DebugConsole() {
             {filteredLogs.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">로그가 없습니다</div>
             ) : (
-              filteredLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-2 rounded border border-border/50 bg-card/50 p-2 font-mono text-xs hover:bg-card/80"
-                >
-                  <Badge className={`${getLevelColor(log.level)} shrink-0 px-1.5 py-0 text-[10px]`}>
-                    {getLevelIcon(log.level)} {log.level.toUpperCase()}
-                  </Badge>
-                  <span className="text-muted-foreground shrink-0">{log.timestamp.toLocaleTimeString("ko-KR")}</span>
-                  <span className="flex-1 text-foreground break-words whitespace-pre-wrap">{log.message}</span>
-                  {log.details && (
-                    <details className="text-muted-foreground shrink-0">
-                      <summary className="cursor-pointer text-[10px]">상세</summary>
-                      <pre className="mt-1 text-[10px] whitespace-pre-wrap break-words max-w-md">
-                        {JSON.stringify(log.details, null, 2)}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ))
+              filteredLogs.map((log) => {
+                const isExpanded = expandedLogs.has(log.id)
+                const hasDetails = !!log.details
+
+                return (
+                  <div
+                    key={log.id}
+                    className="rounded border border-border/50 bg-card/50 p-2 font-mono text-xs hover:bg-card/80 transition-colors"
+                  >
+                    <div
+                      className={`flex items-start gap-2 ${hasDetails ? "cursor-pointer" : ""}`}
+                      onClick={() => hasDetails && toggleLogExpand(log.id)}
+                    >
+                      <Badge className={`${getLevelColor(log.level)} shrink-0 px-1.5 py-0 text-[10px]`}>
+                        {getLevelIcon(log.level)}
+                      </Badge>
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        {log.timestamp.toLocaleTimeString("ko-KR")}
+                      </span>
+                      <span className="flex-1 text-foreground break-words">{log.message}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            copyLog(log)
+                          }}
+                          className="h-5 w-5 p-0"
+                          title="로그 복사"
+                        >
+                          {copiedId === log.id ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                        {hasDetails && (
+                          <div className="text-muted-foreground">
+                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {hasDetails && isExpanded && (
+                      <div className="mt-2 pt-2 border-t border-border/30">
+                        <div className="text-[10px] text-muted-foreground mb-1">상세 정보:</div>
+                        <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words bg-muted/30 p-2 rounded">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </ScrollArea>
