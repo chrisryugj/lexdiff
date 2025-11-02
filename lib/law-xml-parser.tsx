@@ -269,21 +269,6 @@ function extractRevisionMarks(
 export function extractArticleText(article: LawArticle): string {
   let text = ""
 
-  const contentStartsWithHeader =
-    article.content &&
-    (article.content.trim().match(/^제\d+조(?:의\d+)?\s*$$[^)]+$$/) ||
-      article.content.trim().match(/^제\d+조(?:의\d+)?\s*（[^）]+）/))
-
-  if (!contentStartsWithHeader && (article.joNum || article.title)) {
-    const joDisplay = article.joNum || article.jo
-    const titleDisplay = article.title ? " (" + article.title + ")" : ""
-    text +=
-      '<div class="article-header" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--foreground);">' +
-      joDisplay +
-      titleDisplay +
-      "</div>\n"
-  }
-
   if (article.content) {
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
