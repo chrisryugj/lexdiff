@@ -26,10 +26,18 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
   const hasMoreHistory = sortedHistory.length > 10
 
   const getReasonBadgeVariant = (reason: string) => {
-    if (reason === "조문변경") return "default"
-    if (reason === "전부개정") return "destructive"
-    if (reason === "제정") return "secondary"
-    return "outline"
+    if (reason.includes("전부개정") || reason.includes("전문개정")) return "destructive"
+    if (reason.includes("제정")) return "secondary"
+    return "default" // 조문변경 and others get blue
+  }
+
+  const getIconColor = (type: string, description?: string) => {
+    // Red for complete revisions or new enactments
+    if (description?.includes("전부개정") || description?.includes("전문개정") || type.includes("제정")) {
+      return "text-red-500"
+    }
+    // Blue for all other types (partial revisions, etc.)
+    return "text-blue-500"
   }
 
   return (
@@ -41,7 +49,7 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-primary" />
+            <History className="h-4 w-4 text-blue-500" />
             <span className="font-semibold text-sm">개정 이력</span>
             <Badge variant="secondary" className="text-xs">
               {history.length}건
@@ -51,63 +59,66 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
         </Button>
 
         {isExpanded && (
-          <div className="p-4 pt-0 bg-secondary/20">
-            {articleTitle && <div className="font-semibold text-sm mb-3 text-foreground">{articleTitle}</div>}
-            <div className="space-y-1 font-mono text-sm">
-              {displayedHistory.map((item, index) => {
-                const isLast = index === displayedHistory.length - 1 && !hasMoreHistory
-                const prefix = isLast ? "└─" : "├─"
+          <div className="p-4 pt-2 bg-secondary/20">
+            {articleTitle && <div className="font-semibold text-base mb-3 text-foreground">{articleTitle}</div>}
+            <div className="space-y-0 relative">
+              {/* Vertical line for tree structure */}
+              <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
 
-                return (
-                  <div key={index} className="flex items-start gap-2 text-muted-foreground">
-                    <span className="text-border select-none">{prefix}</span>
-                    <div className="flex-1">
-                      <button
-                        onClick={() => setSelectedRevision(item)}
-                        className="text-left hover:bg-secondary/50 rounded px-1 -mx-1 transition-colors w-full"
-                        disabled={!item.articleLink}
-                      >
-                        <span className="text-foreground font-medium">{item.date}</span>
-                        <span className="mx-2 text-foreground">{item.type}</span>
-                        {item.description && (
-                          <Badge variant={getReasonBadgeVariant(item.description)} className="text-xs ml-1">
-                            {item.description}
-                          </Badge>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-              {hasMoreHistory && !showAllHistory && (
-                <div className="flex items-start gap-2 text-muted-foreground pt-2">
-                  <span className="text-border select-none">└─</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllHistory(true)}
-                    className="h-auto py-1 px-2 text-xs text-primary hover:text-primary"
-                  >
-                    <ChevronDown className="h-3 w-3 mr-1" />
-                    {sortedHistory.length - 10}개 더보기
-                  </Button>
-                </div>
-              )}
-              {showAllHistory && (
-                <div className="flex items-start gap-2 text-muted-foreground pt-2">
-                  <span className="text-border select-none">└─</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllHistory(false)}
-                    className="h-auto py-1 px-2 text-xs text-primary hover:text-primary"
-                  >
-                    <ChevronUp className="h-3 w-3 mr-1" />
-                    접기
-                  </Button>
-                </div>
-              )}
+              {displayedHistory.map((item, index) => (
+                <button
+                  key={index}
+                  onClick={() => item.articleLink && setSelectedRevision(item)}
+                  className="w-full text-left hover:bg-secondary/50 rounded px-2 py-1 transition-colors flex items-center gap-2 relative"
+                  disabled={!item.articleLink}
+                >
+                  {/* Tree node dot with color */}
+                  <div
+                    className={`w-2 h-2 rounded-full flex-shrink-0 z-10 ${getIconColor(item.type, item.description)}`}
+                    style={{ backgroundColor: "currentColor" }}
+                  />
+
+                  {/* Date - smaller font */}
+                  <span className="text-foreground font-normal text-xs min-w-[85px]">{item.date}</span>
+
+                  {/* Type - smaller font, reduced spacing */}
+                  <span className="text-foreground font-normal text-xs min-w-[70px]">{item.type}</span>
+
+                  {/* Badge - reduced spacing */}
+                  {item.description && (
+                    <Badge variant={getReasonBadgeVariant(item.description)} className="text-xs font-normal">
+                      {item.description}
+                    </Badge>
+                  )}
+                </button>
+              ))}
             </div>
+            {hasMoreHistory && !showAllHistory && (
+              <div className="pt-2 pl-5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllHistory(true)}
+                  className="h-auto py-1 px-2 text-xs text-blue-500 hover:text-blue-600"
+                >
+                  <ChevronDown className="h-3 w-3 mr-1" />
+                  10개 더보기
+                </Button>
+              </div>
+            )}
+            {showAllHistory && (
+              <div className="pt-2 pl-5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllHistory(false)}
+                  className="h-auto py-1 px-2 text-xs text-blue-500 hover:text-blue-600"
+                >
+                  <ChevronUp className="h-3 w-3 mr-1" />
+                  접기
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

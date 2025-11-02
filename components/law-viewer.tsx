@@ -109,38 +109,65 @@ export function LawViewer({
     articleRefs.current = {}
   }, [articles])
 
-  const fetchRevisionHistory = async () => {
+  const fetchRevisionHistory = async (jo: string) => {
+    if (!meta.lawId || !jo) return
+
     setIsLoadingHistory(true)
     try {
-      const params = new URLSearchParams()
-      if (meta.lawId) {
-        params.append("lawId", meta.lawId)
-      } else if (meta.mst) {
-        params.append("mst", meta.mst)
-      }
+      const params = new URLSearchParams({
+        lawId: meta.lawId,
+        jo: jo,
+      })
 
+      console.log("[v0] Fetching revision history for article:", { lawId: meta.lawId, jo })
       const response = await fetch(`/api/article-history?${params.toString()}`)
+
       if (!response.ok) {
-        console.error("[v0] Failed to fetch revision history")
+        console.error("[v0] Failed to fetch revision history:", response.status)
+        setRevisionHistory([])
         return
       }
 
       const xmlText = await response.text()
+      console.log("[v0] Received revision history XML, length:", xmlText.length)
+
       const history = parseArticleHistoryXML(xmlText)
+      console.log("[v0] Parsed revision history:", history.length, "items")
+
       setRevisionHistory(history)
     } catch (error) {
       console.error("[v0] Error fetching revision history:", error)
+      setRevisionHistory([])
     } finally {
       setIsLoadingHistory(false)
     }
   }
 
   useEffect(() => {
-    if (!meta.lawId && !meta.mst) return
-    if (isOrdinance) return // Don't fetch for ordinances
+    console.log("[v0] [개정이력 useEffect] 실행", {
+      hasLawId: !!meta.lawId,
+      lawId: meta.lawId,
+      isOrdinance,
+      hasActiveJo: !!activeJo,
+      activeJo,
+    })
 
-    fetchRevisionHistory()
-  }, [meta.lawId, meta.mst, isOrdinance])
+    if (!meta.lawId) {
+      console.log("[v0] [개정이력 useEffect] lawId 없음 - 종료")
+      return
+    }
+    if (isOrdinance) {
+      console.log("[v0] [개정이력 useEffect] 조례 - 종료")
+      return
+    }
+    if (!activeJo) {
+      console.log("[v0] [개정이력 useEffect] activeJo 없음 - 종료")
+      return
+    }
+
+    console.log("[v0] [개정이력 useEffect] 개정이력 조회 시작:", activeJo)
+    fetchRevisionHistory(activeJo)
+  }, [meta.lawId, activeJo, isOrdinance])
 
   const handleArticleClick = (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
@@ -647,9 +674,12 @@ export function LawViewer({
                   <p>조문을 선택하세요</p>
                 </div>
               )}
-              {!isOrdinance && viewMode === "full" && revisionHistory.length > 0 && (
+              {!isOrdinance && revisionHistory.length > 0 && activeArticle && (
                 <div className="mt-12">
-                  <RevisionHistory history={revisionHistory} articleTitle={meta.lawTitle} />
+                  <RevisionHistory
+                    history={revisionHistory}
+                    articleTitle={`${formatSimpleJo(activeArticle.jo)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
+                  />
                 </div>
               )}
             </div>
