@@ -104,6 +104,7 @@
 }
 
 @theme inline {
+  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -167,7 +168,6 @@
     font-size: 0.875rem !important;
   }
 
-  /* Linkified references inside law content */
   a.law-ref {
     color: oklch(0.7 0.18 240);
     text-decoration: underline;
@@ -178,7 +178,6 @@
     text-decoration: underline;
   }
 
-  /* HTML-mode anchors from law.go.kr */
   a.law-html-link,
   .prose a.law-html-link {
     color: oklch(0.7 0.18 240);
@@ -192,11 +191,20 @@
     cursor: pointer;
   }
 
-  /* Tighten vertical rhythm for HTML-rendered law text */
-  .law-html-viewer p { margin: 0.5rem 0; }
-  .law-html-viewer li { margin: 0.25rem 0; }
-  .law-html-viewer h1, .law-html-viewer h2, .law-html-viewer h3 { margin: 0.75rem 0; }
-  .law-html-viewer br + br { display: none; }
+  .law-html-viewer p {
+    margin: 0.5rem 0;
+  }
+  .law-html-viewer li {
+    margin: 0.25rem 0;
+  }
+  .law-html-viewer h1,
+  .law-html-viewer h2,
+  .law-html-viewer h3 {
+    margin: 0.75rem 0;
+  }
+  .law-html-viewer br + br {
+    display: none;
+  }
 }
 
 ::-webkit-scrollbar {
