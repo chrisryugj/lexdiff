@@ -524,7 +524,7 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
                     >
                       <div className="mb-4 pb-3 border-b border-border">
-                        <h3 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
                           {formatSimpleJo(article.jo)}
                           {article.title && <span className="text-muted-foreground"> ({article.title})</span>}
                           {activeJo === article.jo && (
@@ -568,7 +568,7 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
                     >
                       <div className="mb-6 pb-4 border-b border-border">
-                        <h3 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-foreground mb-2 flex items-center gap-2">
                           {formatSimpleJo(article.jo)}
                           {article.title && <span className="text-muted-foreground">({article.title})</span>}
                           {activeJo === article.jo && (
@@ -610,7 +610,7 @@ export function LawViewer({
               ) : activeArticle ? (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="mb-6 pb-4 border-b border-border">
-                    <h3 className="text-2xl font-bold text-foreground mb-2">
+                    <h3 className="text-lg font-bold text-foreground mb-2">
                       {formatSimpleJo(activeArticle.jo)}
                       {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
                     </h3>
