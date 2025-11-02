@@ -74,17 +74,26 @@ function extractContentFromHangHo(hangHoData: any): string {
 function removeArticleHeaderFromContent(content: string, display: string, title?: string): string {
   if (!content) return content
 
+  // 제N조(제목) 형식 제거
   const pattern1 = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
   content = content.replace(pattern1, "")
 
+  // 제N조 (제목) 형식 제거 (공백 있음)
   const pattern2 = /^제\d+조(?:의\d+)?\s*$$[^)]+$$\s*/
   content = content.replace(pattern2, "")
 
+  // 정확한 매칭으로 제거
   if (title) {
     const escapedDisplay = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const exactPattern = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
-    content = content.replace(exactPattern, "")
+
+    // 제N조(제목) 형식
+    const exactPattern1 = new RegExp("^" + escapedDisplay + "$$" + escapedTitle + "$$\\s*", "")
+    content = content.replace(exactPattern1, "")
+
+    // 제N조 (제목) 형식 (공백 있음)
+    const exactPattern2 = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
+    content = content.replace(exactPattern2, "")
   }
 
   return content.trim()
@@ -100,18 +109,20 @@ function parseLawJSON(jsonData: any): LawData {
       throw new Error("법령 데이터가 없습니다")
     }
 
-    const basicInfo = lawData.기본정보 || {}
+    const basicInfo = lawData.기본정보 || lawData
     const meta = {
-      lawId: basicInfo.법령ID || "unknown",
-      lawTitle: basicInfo.법령명한글 || "제목 없음",
-      latestEffectiveDate: basicInfo.최종시행일자 || "",
+      lawId: basicInfo.법령ID || basicInfo.법령키 || "unknown",
+      lawTitle: basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
+      latestEffectiveDate: basicInfo.최종시행일자 || basicInfo.시행일자 || "",
       promulgation: {
         date: basicInfo.공포일자 || "",
         number: basicInfo.공포번호 || "",
       },
-      revisionType: basicInfo.제개정구분명 || "",
+      revisionType: basicInfo.제개정구분명 || basicInfo.제개정구분 || "",
       fetchedAt: new Date().toISOString(),
     }
+
+    console.log("[v0] [JSON 파싱] 법령 제목:", meta.lawTitle)
 
     const articles: LawArticle[] = []
     const articleUnits = lawData.조문?.조문단위 || []
@@ -137,6 +148,8 @@ function parseLawJSON(jsonData: any): LawData {
 
       if (unit.조문내용 && typeof unit.조문내용 === "string") {
         content = unit.조문내용.trim()
+        // 조문내용이 헤더만 있는 경우 제거
+        content = removeArticleHeaderFromContent(content, display, title)
       }
 
       if (unit.항) {
@@ -146,7 +159,21 @@ function parseLawJSON(jsonData: any): LawData {
         }
       }
 
-      content = removeArticleHeaderFromContent(content, display, title)
+      const revisionHistory: Array<{ date: string; type: string; description?: string }> = []
+      if (content) {
+        // <개정 2010.1.1> 형식 추출
+        const revPattern = /<(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)>/g
+        let match: RegExpExecArray | null
+        while ((match = revPattern.exec(content)) !== null) {
+          const dateStr = match[2].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
+          if (dateStr.length === 8) {
+            revisionHistory.push({
+              type: match[1],
+              date: dateStr,
+            })
+          }
+        }
+      }
 
       articles.push({
         jo: code,
@@ -154,6 +181,7 @@ function parseLawJSON(jsonData: any): LawData {
         title: title,
         content: content.trim(),
         isPreamble: false,
+        revisionHistory: revisionHistory.length > 0 ? revisionHistory : undefined,
       })
     }
 
