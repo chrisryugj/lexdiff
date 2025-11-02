@@ -159,6 +159,15 @@ function parseLawJSON(jsonData: any): LawData {
             }
           }
         }
+      } else if (unit.조문내용 && typeof unit.조문내용 === "string") {
+        let rawContent = unit.조문내용.trim()
+
+        // Remove the article header (e.g., "제28조(개별소비세의 사무 관할)")
+        // Pattern: 제N조(제목) or 제N조의M(제목)
+        const headerPattern = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
+        rawContent = rawContent.replace(headerPattern, "")
+
+        content = rawContent
       }
 
       articles.push({
