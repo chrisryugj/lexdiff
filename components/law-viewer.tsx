@@ -35,6 +35,7 @@ interface LawViewerProps {
   onToggleFavorite?: (jo: string) => void
   favorites?: Set<string>
   isOrdinance?: boolean
+  viewMode?: "single" | "full"
 }
 
 export function LawViewer({
@@ -46,12 +47,17 @@ export function LawViewer({
   onToggleFavorite,
   favorites = new Set(),
   isOrdinance = false,
+  viewMode = "single",
 }: LawViewerProps) {
+  const isFullView = isOrdinance || viewMode === "full"
+
   console.log("[v0] LawViewer 렌더링:", {
     lawTitle: meta.lawTitle,
     articleCount: articles.length,
     selectedJo,
     isOrdinance,
+    viewMode,
+    isFullView,
     firstArticle: articles[0] ? { jo: articles[0].jo, title: articles[0].title } : null,
   })
 
@@ -78,14 +84,14 @@ export function LawViewer({
   }, [activeArticle])
 
   useEffect(() => {
-    console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance })
+    console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance, viewMode, isFullView })
 
     if (selectedJo) {
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
 
-      if (!isOrdinance && contentRef.current) {
-        console.log("[v0] 법령 모드 - 스크롤 최상단 이동")
+      if (!isFullView && contentRef.current) {
+        console.log("[v0] 단일 조문 모드 - 스크롤 최상단 이동")
         setTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
@@ -97,20 +103,25 @@ export function LawViewer({
       console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", articles[0].jo)
       setActiveJo(articles[0].jo)
     }
-  }, [selectedJo, articles, isOrdinance, activeJo])
+  }, [selectedJo, articles, isOrdinance, viewMode, isFullView, activeJo])
+
+  useEffect(() => {
+    articleRefs.current = {}
+  }, [articles])
 
   const handleArticleClick = (jo: string) => {
-    console.log("[v0] 조문 클릭:", { jo, isOrdinance })
+    console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
 
-    if (isOrdinance) {
-      console.log("[v0] 조례 모드 - 스크롤 이동")
+    setActiveJo(jo)
+
+    if (isFullView) {
+      console.log("[v0] 전체 조문 뷰 - 스크롤 이동")
       const element = articleRefs.current[jo]
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" })
       }
     } else {
-      console.log("[v0] 법령 모드 - activeJo 변경")
-      setActiveJo(jo)
+      console.log("[v0] 단일 조문 뷰 - activeJo 설정 완료")
     }
   }
 
@@ -286,7 +297,12 @@ export function LawViewer({
   console.log("[v0] LawViewer 렌더링 완료:", {
     activeJo,
     activeArticle: activeArticle ? { jo: activeArticle.jo, title: activeArticle.title } : null,
-    displayMode: isOrdinance ? "조례 (전체 조문)" : "법령 (선택 조문)",
+    viewMode,
+    displayMode: isOrdinance
+      ? "조례 (전체 조문)"
+      : viewMode === "full"
+        ? "법령 (전체 조문)"
+        : "법령 (선택 조문)",
   })
 
   return (
@@ -358,21 +374,37 @@ export function LawViewer({
         <div className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">
-                  {isOrdinance ? (
-                    meta.lawTitle
-                  ) : activeArticle ? (
-                    <>
-                      {meta.lawTitle} {formatJO(activeArticle.jo)}
-                      {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
-                    </>
-                  ) : (
-                    meta.lawTitle
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold text-foreground">
+                    {isOrdinance || viewMode === "full" ? (
+                      meta.lawTitle
+                    ) : activeArticle ? (
+                      <>
+                        {meta.lawTitle} {formatJO(activeArticle.jo)}
+                        {activeArticle.title && (
+                          <span className="text-muted-foreground"> ({activeArticle.title})</span>
+                        )}
+                      </>
+                    ) : (
+                      meta.lawTitle
+                    )}
+                  </h2>
+                  {!isOrdinance && viewMode === "full" && (
+                    <Badge variant="outline" className="text-xs">
+                      전체 조문
+                    </Badge>
                   )}
-                </h2>
+                </div>
               </div>
+
+              {!isOrdinance && viewMode === "full" && activeArticle && (
+                <p className="text-sm text-muted-foreground">
+                  현재 선택된 조문: {formatJO(activeArticle.jo)}
+                  {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               {meta.latestEffectiveDate && (
@@ -450,6 +482,7 @@ export function LawViewer({
                   {articles.map((article) => (
                     <div
                       key={article.jo}
+                      id={`article-${article.jo}`}
                       ref={(el) => {
                         articleRefs.current[article.jo] = el
                       }}
@@ -489,6 +522,67 @@ export function LawViewer({
                         ))}
                     </div>
                   )}
+                </div>
+              ) : viewMode === "full" ? (
+                <div className="space-y-10">
+                  {articles.map((article, index) => (
+                    <div
+                      key={article.jo}
+                      id={`article-${article.jo}`}
+                      ref={(el) => {
+                        articleRefs.current[article.jo] = el
+                      }}
+                      className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
+                    >
+                      <div className="mb-6 pb-4 border-b border-border">
+                        <h3 className="text-2xl font-bold text-foreground mb-2">
+                          {formatJO(article.jo)}
+                          {article.title && <span className="text-muted-foreground"> ({article.title})</span>}
+                        </h3>
+                      </div>
+
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                      />
+
+                      {article.revisionHistory && article.revisionHistory.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-border">
+                          <RevisionHistory
+                            history={article.revisionHistory}
+                            articleTitle={
+                              article.title
+                                ? `${formatJO(article.jo)} (${article.title})`
+                                : formatJO(article.jo)
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {article.hasChanges && (
+                        <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold text-foreground">변경된 조문</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                이 조문은 최근 개정되었습니다. 신·구법 비교를 통해 변경 내용을 확인하세요.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {index < articles.length - 1 && <Separator className="my-8" />}
+                    </div>
+                  ))}
                 </div>
               ) : activeArticle ? (
                 /* 법령: 조문 번호와 제목을 명확히 표시하고 본문 표시 */
