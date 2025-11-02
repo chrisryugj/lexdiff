@@ -2,10 +2,12 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "_comment": "Added test and lint tooling to keep 법령 파서 회귀 테스트 및 기본 린트 규칙을 강제합니다.",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "test": "vitest run",
     "start": "next start",
     "restart": "scripts\\restart-dev.cmd"
   },
@@ -71,13 +73,18 @@
     "zustand": "latest"
   },
   "devDependencies": {
+    "@eslint/js": "^9.20.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.20.0",
     "postcss": "^8.5",
+    "prettier": "^3.4.2",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^2.1.8"
   }
 }

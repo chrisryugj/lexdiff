@@ -2,6 +2,19 @@ import type { LawArticle, LawParagraph, LawItem, LawMeta } from "./law-types"
 import { debugLogger } from "./debug-logger"
 import { buildJO } from "./law-parser"
 
+/**
+ * 법령 XML 원문을 파싱하여 메타 정보와 조문 배열을 반환한다.
+ *
+ * @param xmlText - 현행법령 API에서 내려온 XML 문자열
+ * @returns 파싱된 법령 메타데이터와 조문 목록
+ * @throws XML 파싱 오류가 발생한 경우 Error
+ *
+ * @example
+ * ```ts
+ * const { meta, articles } = parseLawXML(xmlText)
+ * console.log(meta.lawTitle, articles.length)
+ * ```
+ */
 export function parseLawXML(xmlText: string): {
   meta: LawMeta
   articles: LawArticle[]
@@ -63,84 +76,189 @@ function normalizeText(text: string): string {
 function extractTitleFromContent(content: string): string | undefined {
   const normalized = normalizeText(content)
 
-  console.log(`[v0] [DEBUG] Normalized content (first 100 chars): ${normalized.slice(0, 100)}`)
-  console.log(`[v0] [DEBUG] Has full-width parens: ${/[（）]/.test(normalized)}`)
-  console.log(`[v0] [DEBUG] Has half-width parens: ${/[()]/.test(normalized)}`)
+  debugLogger.debug("조문 제목 추출용 본문 정규화", {
+    preview: normalized.slice(0, 100),
+    hasFullWidthParens: /[（）]/.test(normalized),
+    hasHalfWidthParens: /[()]/.test(normalized),
+  })
 
   // Pattern 1: 제38조(신고납부) - half-width parentheses
-  let match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*$$([^)]+)$$/)
+  let match = normalized.match(/제\s*\d+\s*조(?:의\s*\d+)?\s*\(([^)]+)\)/)
   if (match) {
-    console.log(`[v0] ✓ Extracted title (half-width): "${match[1].trim()}"`)
-    return match[1].trim()
+    const title = match[1].trim()
+    debugLogger.success("조문 제목 추출 성공", { variant: "half-width", title })
+    return title
   }
 
   // Pattern 2: 제38조（신고납부） - full-width parentheses
   match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*（([^）]+)）/)
   if (match) {
-    console.log(`[v0] ✓ Extracted title (full-width): "${match[1].trim()}"`)
-    return match[1].trim()
+    const title = match[1].trim()
+    debugLogger.success("조문 제목 추출 성공", { variant: "full-width", title })
+    return title
   }
 
   // Pattern 3: Mixed brackets with DOTALL flag
   match = normalized.match(/제\s*\d+\s*조(?:의\d+)?[^(（]*[（(]\s*([^)）]+?)\s*[）)]/s)
   if (match) {
-    console.log(`[v0] ✓ Extracted title (mixed): "${match[1].trim()}"`)
-    return match[1].trim()
+    const title = match[1].trim()
+    debugLogger.success("조문 제목 추출 성공", { variant: "mixed", title })
+    return title
   }
 
-  console.log(`[v0] ✗ No title found in content`)
+  debugLogger.warning("본문에서 조문 제목을 찾지 못했습니다", {
+    contentPreview: normalized.slice(0, 100),
+  })
   return undefined
+}
+
+/**
+ * 조문 번호 문자열을 통일된 형태(제N조, 제N조의M 등)로 정규화한다.
+ *
+ * @param rawLabel - XML에서 추출한 원본 조문 번호 문자열
+ * @returns 정규화된 조문 번호 또는 undefined
+ */
+function normalizeJoLabel(rawLabel?: string | null): string | undefined {
+  if (!rawLabel) {
+    return undefined
+  }
+
+  const compact = rawLabel.replace(/\s+/g, "").trim()
+  if (!compact) {
+    return undefined
+  }
+
+  const match = compact.match(/^제?(\d+)조(?:의(\d+))?$/)
+  if (match) {
+    const main = match[1]
+    const branch = match[2]
+    return branch ? `제${main}조의${branch}` : `제${main}조`
+  }
+
+  return rawLabel.trim()
+}
+
+/**
+ * 조문 본문에서 조문 번호를 추출한다.
+ *
+ * @param content - 조문 본문 문자열
+ * @returns 본문에서 감지한 조문 번호 (정규화된 형태) 또는 undefined
+ */
+function inferJoLabelFromContent(content: string): string | undefined {
+  const match = content.match(/제\s*(\d+)\s*조(?:\s*의\s*(\d+))?/)
+  if (!match) {
+    return undefined
+  }
+
+  const main = match[1]
+  const branch = match[2]
+  return branch ? `제${main}조의${branch}` : `제${main}조`
 }
 
 function extractArticles(xmlDoc: Document): LawArticle[] {
   const articles: LawArticle[] = []
   const joElements = xmlDoc.querySelectorAll("조문")
+  const usedCodes = new Set<string>()
 
-  joElements.forEach((joElement) => {
-    let joNum = joElement.querySelector("조문번호")?.textContent || ""
+  joElements.forEach((joElement, index) => {
+    const rawJoLabel = joElement.querySelector("조문번호")?.textContent
+    let joNum = normalizeJoLabel(rawJoLabel) || ""
     let joTitle = joElement.querySelector("조문제목")?.textContent?.trim() || undefined
     const joContent = joElement.querySelector("조문내용")?.textContent || ""
     const hasChanges = joElement.querySelector("조문변경여부")?.textContent === "Y"
 
     const revisionHistory = extractRevisionMarks(joContent, joElement)
 
-    if (joContent && (!joNum.includes("조") || !joNum.includes("의"))) {
-      const joMatch = joContent.match(/제(\d+)조(?:의(\d+))?/)
-      if (joMatch) {
-        const mainNum = joMatch[1]
-        const subNum = joMatch[2]
-        if (subNum) {
-          joNum = `${mainNum}조의${subNum}`
-          console.log(`[v0] Extracted full article number from content: "${joNum}"`)
-        } else if (!joNum.includes("조")) {
-          joNum = `${mainNum}조`
-          console.log(`[v0] Extracted article number from content: "${joNum}"`)
+    if (joContent) {
+      const inferred = inferJoLabelFromContent(joContent)
+      if (inferred) {
+        if (!joNum) {
+          joNum = inferred
+          debugLogger.info("본문에서 조문 번호 추론 성공", {
+            index,
+            inferredJo: inferred,
+          })
+        } else {
+          try {
+            const normalizedExisting = buildJO(joNum)
+            const normalizedInferred = buildJO(inferred)
+            if (normalizedExisting !== normalizedInferred) {
+              joNum = inferred
+              debugLogger.warning("본문과 XML의 조문 번호가 달라 본문 기준으로 보정했습니다", {
+                index,
+                originalLabel: rawJoLabel,
+                inferredLabel: inferred,
+              })
+            }
+          } catch (error) {
+            joNum = inferred
+            debugLogger.warning("조문 번호 정규화 중 오류가 발생하여 본문 기반 번호를 사용합니다", {
+              index,
+              rawLabel: rawJoLabel,
+              error,
+            })
+          }
         }
       }
     }
 
     if (!joTitle && joContent) {
-      console.log(`[v0] Extracting title for ${joNum} from content`)
+      debugLogger.debug("본문에서 조문 제목을 추출합니다", { index, joNum })
       joTitle = extractTitleFromContent(joContent)
     }
 
-    let normalizedJo = joNum
+    const fallbackLabel = joNum || `제${index + 1}조`
+    let normalizedJo = ""
+
     if (joNum) {
       try {
-        // buildJO handles "38조", "38조의5", "38", etc. and converts to 6-digit format
         normalizedJo = buildJO(joNum)
-        console.log(`[v0] Normalized jo: "${joNum}" → "${normalizedJo}"`)
+        debugLogger.debug("조문 번호 정규화", {
+          index,
+          label: joNum,
+          normalized: normalizedJo,
+        })
       } catch (error) {
-        // Fallback to old logic if buildJO fails
-        console.log(`[v0] buildJO failed for "${joNum}", using fallback`)
-        if (joNum.length < 6) {
-          const articleNum = Number.parseInt(joNum, 10)
-          if (!isNaN(articleNum)) {
-            normalizedJo = articleNum.toString().padStart(4, "0") + "00"
-          }
-        }
+        debugLogger.error("조문 번호 정규화 실패", {
+          index,
+          label: joNum,
+          error,
+        })
       }
     }
+
+    if (!normalizedJo) {
+      try {
+        normalizedJo = buildJO(fallbackLabel)
+        debugLogger.debug("조문 번호 정규화 (대체 라벨)", {
+          index,
+          fallbackLabel,
+          normalized: normalizedJo,
+        })
+      } catch (fallbackError) {
+        const sequentialCode = `${(index + 1).toString().padStart(4, "0")}${"00"}`
+        normalizedJo = sequentialCode
+        debugLogger.warning("조문 번호 정규화 실패로 순차 코드 대체", {
+          index,
+          sequentialCode,
+        })
+      }
+    }
+
+    let branchCounter = 1
+    while (usedCodes.has(normalizedJo)) {
+      const deduped = `${normalizedJo.slice(0, 4)}${branchCounter.toString().padStart(2, "0")}`
+      debugLogger.warning("중복된 조문 번호 감지, 분기 코드 부여", {
+        index,
+        original: normalizedJo,
+        deduped,
+      })
+      normalizedJo = deduped
+      branchCounter += 1
+    }
+
+    usedCodes.add(normalizedJo)
+    joNum = fallbackLabel
 
     const paragraphs: LawParagraph[] = []
     const hangElements = joElement.querySelectorAll("항")
@@ -189,7 +307,7 @@ function extractRevisionMarks(
 ): Array<{ date: string; type: string; description?: string }> {
   const revisions: Array<{ date: string; type: string; description?: string }> = []
 
-  console.log(`[v0] [개정이력] Extracting revision marks from content (length: ${content.length})`)
+  debugLogger.debug("개정 이력 추출 시작", { contentLength: content.length })
 
   // Strategy 1: Extract from content text patterns
   // Pattern 1: <개정 2023.12.31> or <개정 2023. 12. 31>
@@ -204,7 +322,11 @@ function extractRevisionMarks(
         type: match[1],
         date: dateStr,
       })
-      console.log(`[v0] [개정이력] Found half-width mark: ${match[1]} ${dateStr}`)
+      debugLogger.debug("개정 이력 패턴 감지", {
+        pattern: "half-width",
+        type: match[1],
+        date: dateStr,
+      })
     }
   }
 
@@ -218,7 +340,11 @@ function extractRevisionMarks(
         type: match[1],
         date: dateStr,
       })
-      console.log(`[v0] [개정이력] Found full-width mark: ${match[1]} ${dateStr}`)
+      debugLogger.debug("개정 이력 패턴 감지", {
+        pattern: "full-width",
+        type: match[1],
+        date: dateStr,
+      })
     }
   }
 
@@ -232,17 +358,23 @@ function extractRevisionMarks(
         type: match[1],
         date: dateStr,
       })
-      console.log(`[v0] [개정이력] Found square bracket mark: ${match[1]} ${dateStr}`)
+      debugLogger.debug("개정 이력 패턴 감지", {
+        pattern: "square-bracket",
+        type: match[1],
+        date: dateStr,
+      })
     }
   }
 
   // Strategy 2: Extract from XML structure if joElement is provided
   if (joElement) {
-    console.log(`[v0] [개정이력] Checking XML structure for revision elements`)
+    debugLogger.debug("개정 이력 XML 구조 검사 시작")
 
     // Check for 개정이력 or 연혁 elements
     const revisionElements = joElement.querySelectorAll("개정이력, 연혁, 개정, revision")
-    console.log(`[v0] [개정이력] Found ${revisionElements.length} revision elements in XML`)
+    debugLogger.debug("개정 이력 XML 요소 수집", {
+      revisionElementCount: revisionElements.length,
+    })
 
     revisionElements.forEach((revEl) => {
       const dateEl =
@@ -270,7 +402,11 @@ function extractRevisionMarks(
             date: cleanDate,
             description: descText,
           })
-          console.log(`[v0] [개정이력] Found XML revision: ${typeText} ${cleanDate} ${descText || ""}`)
+          debugLogger.debug("개정 이력 XML 요소 감지", {
+            type: typeText,
+            date: cleanDate,
+            description: descText,
+          })
         }
       }
     })
@@ -291,7 +427,10 @@ function extractRevisionMarks(
             type: hangMatch[1],
             date: dateStr,
           })
-          console.log(`[v0] [개정이력] Found revision in 항/호: ${hangMatch[1]} ${dateStr}`)
+          debugLogger.debug("항/호 단위 개정 이력 감지", {
+            type: hangMatch[1],
+            date: dateStr,
+          })
         }
       }
     })
@@ -301,14 +440,26 @@ function extractRevisionMarks(
     b.date.localeCompare(a.date),
   )
 
-  console.log(`[v0] [개정이력] Total unique revisions extracted: ${uniqueRevisions.length}`)
-  if (uniqueRevisions.length > 0) {
-    console.log(`[v0] [개정이력] Revisions:`, uniqueRevisions.map((r) => `${r.type} ${r.date}`).join(", "))
-  }
+  debugLogger.debug("개정 이력 추출 완료", {
+    total: uniqueRevisions.length,
+    revisions: uniqueRevisions.map((r) => ({ type: r.type, date: r.date })),
+  })
 
   return uniqueRevisions
 }
 
+/**
+ * 조문 객체를 사람이 읽을 수 있는 문자열로 변환한다.
+ *
+ * @param article - 본문과 단락 정보를 포함한 조문 데이터
+ * @returns 정리된 조문 본문 문자열
+ *
+ * @example
+ * ```ts
+ * const text = extractArticleText(article)
+ * console.log(text.split("\n")[0])
+ * ```
+ */
 export function extractArticleText(article: LawArticle): string {
   let text = ""
 

@@ -24,6 +24,7 @@ import { ChevronLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
+import { DebugConsole } from "@/components/debug-console"
 
 interface LawSearchResult {
   lawId?: string
@@ -51,6 +52,7 @@ export default function Home() {
     articles: LawArticle[]
     selectedJo?: string
     isOrdinance?: boolean
+    viewMode?: "single" | "full"
   } | null>(null)
   const [lawSelectionState, setLawSelectionState] = useState<{
     results: LawSearchResult[]
@@ -102,9 +104,7 @@ export default function Home() {
     selectedLaw: LawSearchResult,
     query: { lawName: string; article?: string; jo?: string },
   ) => {
-    console.log("[v0] ========== FETCHING LAW CONTENT ==========")
-    console.log("[v0] Selected law:", selectedLaw)
-    console.log("[v0] Query:", query)
+    debugLogger.info("법령 본문 조회 시작", { selectedLaw, query })
     debugLogger.info("법령 ID 확인", { lawId: selectedLaw.lawId, lawName: selectedLaw.lawName })
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
@@ -122,11 +122,11 @@ export default function Home() {
 
       if (query.jo) {
         params.append("jo", query.jo)
-        console.log("[v0] ✓ Adding JO parameter to fetch specific article:", query.jo)
+        debugLogger.debug("단일 조문 조회 파라미터 추가", { jo: query.jo })
       }
 
       const apiUrl = `/api/eflaw?${params.toString()}`
-      console.log("[v0] Final API params:", params.toString())
+      debugLogger.debug("법령 본문 API 요청", { params: params.toString() })
 
       const response = await fetch(apiUrl)
 
@@ -139,19 +139,22 @@ export default function Home() {
       if (!response.ok) {
         const errorText = await response.text()
         apiLogs[apiLogs.length - 1].response = errorText
-        console.log("[v0] Eflaw error response:", errorText)
+        debugLogger.error("법령 본문 API 오류 응답", { apiUrl, errorText })
         throw new Error("법령 조회 실패")
       }
 
       const xmlText = await response.text()
       apiLogs[apiLogs.length - 1].response = xmlText.substring(0, 500) + "..."
-      console.log("[v0] Eflaw XML received, length:", xmlText.length)
+      debugLogger.debug("법령 본문 XML 수신", { length: xmlText.length })
 
       const { meta, articles } = parseLawXML(xmlText)
-      console.log("[v0] Parsed law data:", { meta, articleCount: articles.length })
+      debugLogger.success("법령 본문 파싱 성공", {
+        lawTitle: meta.lawTitle,
+        articleCount: articles.length,
+      })
 
       if (query.jo && (selectedLaw.lawId || selectedLaw.mst)) {
-        console.log("[v0] [개정이력] 조문별 개정이력 조회 시작:", {
+        debugLogger.info("조문별 개정이력 조회 시작", {
           lawId: selectedLaw.lawId,
           mst: selectedLaw.mst,
           jo: query.jo,
@@ -181,18 +184,22 @@ export default function Home() {
 
             if (targetArticle && revisionHistory.length > 0) {
               targetArticle.revisionHistory = revisionHistory
-              console.log("[v0] [개정이력] ✓ 조문에 개정이력 병합 완료")
+              debugLogger.success("조문 개정이력 병합 완료", {
+                jo: targetArticle.jo,
+                revisionCount: revisionHistory.length,
+              })
             }
           } else {
             const errorText = await historyResponse.text()
             apiLogs[apiLogs.length - 1].response = errorText
           }
         } catch (error) {
-          console.log("[v0] [개정이력] 조회 중 오류:", error)
+          debugLogger.error("조문별 개정이력 조회 실패", error)
         }
       }
 
       let selectedJo: string | undefined
+      const viewMode: "single" | "full" = query.jo ? "single" : "full"
       if (query.jo) {
         const targetArticle = articles.find((a) => a.jo === query.jo)
         if (targetArticle) {
@@ -206,6 +213,7 @@ export default function Home() {
         meta,
         articles,
         selectedJo,
+        viewMode,
       })
 
       debugLogger.success("검색 완료", { lawTitle: meta.lawTitle, articleCount: articles.length })
@@ -224,7 +232,7 @@ export default function Home() {
   }
 
   const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
-    console.log("[v0] ========== 검색 시작 ==========")
+    debugLogger.info("법령/조례 검색 시작", query)
 
     setIsSearching(true)
     setLawData(null)
@@ -263,9 +271,10 @@ export default function Home() {
         const results = parseOrdinanceSearchXML(xmlText)
 
         if (results.length === 0) {
+          const noResultError = new Error("검색 결과를 찾을 수 없습니다")
           reportError(
             "조례 검색",
-            new Error("검색 결과를 찾을 수 없습니다"),
+            noResultError,
             {
               query: query.lawName,
               searchType: "조례",
@@ -273,11 +282,6 @@ export default function Home() {
             },
             apiLogs,
           )
-          setIsSearching(false)
-          return
-        }
-
-        if (results.length === 0) {
           toast({
             title: "검색 결과 없음",
             description: `"${query.lawName}" 조례를 찾을 수 없습니다.`,
@@ -313,9 +317,10 @@ export default function Home() {
         const results = parseLawSearchXML(xmlText)
 
         if (results.length === 0) {
+          const noResultError = new Error("검색 결과를 찾을 수 없습니다")
           reportError(
             "법령 검색",
-            new Error("검색 결과를 찾을 수 없습니다"),
+            noResultError,
             {
               query: query.lawName,
               searchType: "법령",
@@ -323,11 +328,6 @@ export default function Home() {
             },
             apiLogs,
           )
-          setIsSearching(false)
-          return
-        }
-
-        if (results.length === 0) {
           toast({
             title: "검색 결과 없음",
             description: `"${query.lawName}" 법령을 찾을 수 없습니다.`,
@@ -359,7 +359,7 @@ export default function Home() {
               setMobileView("content")
               return
             } catch (error) {
-              console.error("[v0] 법령 조회 오류:", error)
+              debugLogger.error("법령 본문 조회 실패", error)
               toast({
                 title: "법령 조회 실패",
                 description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
@@ -374,7 +374,7 @@ export default function Home() {
             await fetchLawContent(exactMatch, { lawName, article: articleNumber, jo })
             setMobileView("content")
           } catch (error) {
-            console.error("[v0] 법령 조회 오류:", error)
+            debugLogger.error("법령 본문 조회 실패", error)
             toast({
               title: "법령 조회 실패",
               description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.",
@@ -393,7 +393,7 @@ export default function Home() {
         setMobileView("list")
       }
     } catch (error) {
-      console.error("[v0] 검색 오류:", error)
+      debugLogger.error("검색 처리 중 오류", error)
 
       reportError(
         isOrdinanceQuery ? "조례 검색" : "법령 검색",
@@ -424,7 +424,6 @@ export default function Home() {
       await fetchLawContent(law, lawSelectionState.query)
       setLawSelectionState(null)
     } catch (error) {
-      console.log("[v0] Law fetch error:", error)
       debugLogger.error("법령 조회 실패", error)
 
       toast({
@@ -492,13 +491,13 @@ export default function Home() {
         articles,
         selectedJo: undefined,
         isOrdinance: true,
+        viewMode: "full",
       })
 
       setOrdinanceSelectionState(null)
       setMobileView("content")
       debugLogger.success("자치법규 조회 완료", { ordinName: meta.lawTitle, articleCount: articles.length })
     } catch (error) {
-      console.log("[v0] Ordinance fetch error:", error)
       debugLogger.error("자치법규 조회 실패", error)
 
       reportError(
@@ -528,7 +527,7 @@ export default function Home() {
       try {
         jo = buildJO(search.article)
       } catch (error) {
-        console.error("[v0] Failed to convert article to jo:", error)
+        debugLogger.error("조문 문자열을 JO 코드로 변환하지 못했습니다", error)
       }
     }
 
@@ -627,7 +626,7 @@ export default function Home() {
   }
 
   const handleReset = () => {
-    console.log("[v0] 홈으로 이동 - 모든 상태 초기화")
+    debugLogger.info("홈으로 이동: 상태 초기화")
     setLawData(null)
     setLawSelectionState(null)
     setOrdinanceSelectionState(null)
@@ -636,7 +635,7 @@ export default function Home() {
   }
 
   const handleFavoritesClick = () => {
-    console.log("[v0] 즐겨찾기 버튼 클릭")
+    debugLogger.info("즐겨찾기 패널 열기 요청")
     setFavoritesDialogOpen(true) // handleFavoritesClick에서 모달 열기로 변경
   }
 
@@ -759,6 +758,7 @@ export default function Home() {
                     meta={lawData.meta}
                     articles={lawData.articles}
                     selectedJo={lawData.selectedJo}
+                    viewMode={lawData.viewMode}
                     onCompare={handleCompare}
                     onSummarize={handleSummarize}
                     onToggleFavorite={handleToggleFavorite}
@@ -774,6 +774,7 @@ export default function Home() {
                   meta={lawData.meta}
                   articles={lawData.articles}
                   selectedJo={lawData.selectedJo}
+                  viewMode={lawData.viewMode}
                   onCompare={handleCompare}
                   onSummarize={handleSummarize}
                   onToggleFavorite={handleToggleFavorite}
@@ -813,9 +814,10 @@ export default function Home() {
         isOpen={favoritesDialogOpen}
         onClose={() => setFavoritesDialogOpen(false)}
         onSelect={handleFavoriteSelect}
-      />{" "}
+      />
       {/* 즐겨찾기 모달 추가 */}
       <ErrorReportDialog /> {/* 에러 리포트 다이얼로그 추가 */}
+      <DebugConsole />
       {!lawData && !lawSelectionState && !ordinanceSelectionState && (
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-6">

@@ -25,6 +25,7 @@ import { extractArticleText } from "@/lib/law-xml-parser"
 import { buildJO, formatJO } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
+import { debugLogger } from "@/lib/debug-logger"
 
 interface LawViewerProps {
   meta: LawMeta
@@ -35,8 +36,27 @@ interface LawViewerProps {
   onToggleFavorite?: (jo: string) => void
   favorites?: Set<string>
   isOrdinance?: boolean
+  viewMode?: "single" | "full"
 }
 
+/**
+ * 법령 및 자치법규 본문을 표시하고 조문 탐색, 비교, 즐겨찾기 등 상호작용을 제공하는 뷰어 컴포넌트.
+ *
+ * @param meta - 법령 메타 정보
+ * @param articles - 표시할 조문 목록
+ * @param selectedJo - 외부에서 선택한 조문 코드
+ * @param onCompare - 신·구 대비를 요청하는 콜백
+ * @param onSummarize - AI 요약을 요청하는 콜백
+ * @param onToggleFavorite - 즐겨찾기 토글 콜백
+ * @param favorites - 즐겨찾기된 조문 코드 집합
+ * @param isOrdinance - 자치법규 여부
+ * @param viewMode - 표시 모드 (단일 조문 or 전체 조문)
+ *
+ * @example
+ * ```tsx
+ * <LawViewer meta={meta} articles={articles} viewMode="full" />
+ * ```
+ */
 export function LawViewer({
   meta,
   articles,
@@ -46,12 +66,17 @@ export function LawViewer({
   onToggleFavorite,
   favorites = new Set(),
   isOrdinance = false,
+  viewMode = "single",
 }: LawViewerProps) {
-  console.log("[v0] LawViewer 렌더링:", {
+  const isFullView = isOrdinance || viewMode === "full"
+
+  debugLogger.debug("LawViewer 렌더링", {
     lawTitle: meta.lawTitle,
     articleCount: articles.length,
     selectedJo,
     isOrdinance,
+    viewMode,
+    isFullView,
     firstArticle: articles[0] ? { jo: articles[0].jo, title: articles[0].title } : null,
   })
 
@@ -67,7 +92,7 @@ export function LawViewer({
 
   useEffect(() => {
     if (activeArticle) {
-      console.log(`[v0] [개정이력] Active article revision history:`, {
+      debugLogger.debug("LawViewer 활성 조문 개정이력", {
         jo: activeArticle.jo,
         title: activeArticle.title,
         hasRevisionHistory: !!activeArticle.revisionHistory,
@@ -78,39 +103,54 @@ export function LawViewer({
   }, [activeArticle])
 
   useEffect(() => {
-    console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance })
+    debugLogger.debug("LawViewer 선택 상태 갱신", {
+      selectedJo,
+      activeJo,
+      isOrdinance,
+      viewMode,
+      isFullView,
+    })
 
     if (selectedJo) {
-      console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
+      debugLogger.debug("외부 선택 조문 반영", { selectedJo })
       setActiveJo(selectedJo)
 
-      if (!isOrdinance && contentRef.current) {
-        console.log("[v0] 법령 모드 - 스크롤 최상단 이동")
+      if (!isFullView && contentRef.current) {
+        debugLogger.debug("단일 조문 모드에서 스크롤 초기화")
         setTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
       }
     } else if (articles.length === 1 && articles[0]) {
-      console.log("[v0] 조문 1개 - 자동 선택:", articles[0].jo)
+      debugLogger.debug("조문이 하나뿐이어서 자동 선택", { jo: articles[0].jo })
       setActiveJo(articles[0].jo)
     } else if (articles.length > 0 && !activeJo) {
-      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", articles[0].jo)
+      debugLogger.debug("선택된 조문이 없어 첫 번째 조문을 선택", { jo: articles[0].jo })
       setActiveJo(articles[0].jo)
     }
-  }, [selectedJo, articles, isOrdinance, activeJo])
+  }, [selectedJo, articles, isOrdinance, viewMode, isFullView, activeJo])
+
+  useEffect(() => {
+    articleRefs.current = {}
+  }, [articles])
 
   const handleArticleClick = (jo: string) => {
-    console.log("[v0] 조문 클릭:", { jo, isOrdinance })
+    if (!jo) {
+      debugLogger.warning("유효하지 않은 조문 클릭 무시", { jo })
+      return
+    }
+    debugLogger.debug("조문 클릭", { jo, isOrdinance, viewMode, isFullView })
 
-    if (isOrdinance) {
-      console.log("[v0] 조례 모드 - 스크롤 이동")
+    setActiveJo(jo)
+
+    if (isFullView) {
+      debugLogger.debug("전체 조문 뷰에서 해당 조문 위치로 스크롤")
       const element = articleRefs.current[jo]
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" })
       }
     } else {
-      console.log("[v0] 법령 모드 - activeJo 변경")
-      setActiveJo(jo)
+      debugLogger.debug("단일 조문 뷰에서 조문 전환 완료")
     }
   }
 
@@ -127,31 +167,31 @@ export function LawViewer({
   }
 
   const formatSimpleJo = (jo: string): string => {
-    console.log("[v0] formatSimpleJo 호출:", jo)
+    debugLogger.debug("formatSimpleJo 호출", { jo })
 
     if (jo.length === 6) {
       const articleNum = Number.parseInt(jo.substring(0, 4), 10)
       const branchNum = Number.parseInt(jo.substring(4, 6), 10)
 
       const result = branchNum === 0 ? `${articleNum}조` : `${articleNum}조의${branchNum}`
-      console.log("[v0] formatSimpleJo 결과 (6자리):", result)
+      debugLogger.debug("formatSimpleJo 결과 (6자리)", { result })
       return result
     }
 
     if (jo.length === 8) {
       const articleNum = Number.parseInt(jo.substring(0, 4), 10)
       const result = `${articleNum}조`
-      console.log("[v0] formatSimpleJo 결과 (8자리):", result)
+      debugLogger.debug("formatSimpleJo 결과 (8자리)", { result })
       return result
     }
 
     if (jo.startsWith("제") && jo.includes("조")) {
       const result = jo.replace(/^제(\d+)조/, "$1조")
-      console.log("[v0] formatSimpleJo 결과 (제N조):", result)
+      debugLogger.debug("formatSimpleJo 결과 (제N조)", { result })
       return result
     }
 
-    console.log("[v0] formatSimpleJo 결과 (변환 없음):", jo)
+    debugLogger.debug("formatSimpleJo 결과 (변환 없음)", { jo })
     return jo
   }
 
@@ -234,7 +274,7 @@ export function LawViewer({
             setRefModal({ open: true, title: `${meta.lawTitle} ${suffix}`, html: "관련 조문을 찾지 못했습니다." })
           }
         } catch (err) {
-          console.error("related lookup failed", err)
+          debugLogger.error("연관 법령 탐색 실패", err)
         }
       }
     }
@@ -278,15 +318,20 @@ export function LawViewer({
         setRefModal({ open: true, title: lawName, html: "해당 조문을 찾지 못했습니다." })
       }
     } catch (err) {
-      console.error("openExternalLawArticleModal error", err)
+      debugLogger.error("외부 법령 모달 열기 실패", err)
       setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
     }
   }
 
-  console.log("[v0] LawViewer 렌더링 완료:", {
+  debugLogger.debug("LawViewer 렌더링 완료", {
     activeJo,
     activeArticle: activeArticle ? { jo: activeArticle.jo, title: activeArticle.title } : null,
-    displayMode: isOrdinance ? "조례 (전체 조문)" : "법령 (선택 조문)",
+    viewMode,
+    displayMode: isOrdinance
+      ? "조례 (전체 조문)"
+      : viewMode === "full"
+        ? "법령 (전체 조문)"
+        : "법령 (선택 조문)",
   })
 
   return (
@@ -324,30 +369,35 @@ export function LawViewer({
         <Separator className="mb-4" />
         <ScrollArea className={`flex-1 ${isArticleListExpanded ? "" : "max-h-[100px] md:max-h-none"}`}>
           <div className="space-y-1 pr-4">
-            {articles.map((article) => (
-              <button
-                key={article.jo}
-                onClick={() => handleArticleClick(article.jo)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                  activeJo === article.jo
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "hover:bg-secondary text-foreground"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span>
-                    {formatSimpleJo(article.jo)}
-                    {article.title && <span className="text-xs ml-1">({article.title})</span>}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {article.hasChanges && (
-                      <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
-                    )}
-                    {favorites.has(article.jo) && <Star className="h-3 w-3 fill-[var(--color-warning)]" />}
+            {articles.map((article, index) => {
+              const listLabel = article.joNum || formatJO(article.jo) || formatSimpleJo(article.jo)
+              const articleKey = article.jo || `${article.joNum}-${index}`
+
+              return (
+                <button
+                  key={articleKey}
+                  onClick={() => handleArticleClick(article.jo)}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    activeJo === article.jo
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "hover:bg-secondary text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      {listLabel}
+                      {article.title && <span className="text-xs ml-1">({article.title})</span>}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {article.hasChanges && (
+                        <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
+                      )}
+                      {favorites.has(article.jo) && <Star className="h-3 w-3 fill-[var(--color-warning)]" />}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </ScrollArea>
       </Card>
@@ -358,21 +408,37 @@ export function LawViewer({
         <div className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">
-                  {isOrdinance ? (
-                    meta.lawTitle
-                  ) : activeArticle ? (
-                    <>
-                      {meta.lawTitle} {formatJO(activeArticle.jo)}
-                      {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
-                    </>
-                  ) : (
-                    meta.lawTitle
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold text-foreground">
+                    {isOrdinance || viewMode === "full" ? (
+                      meta.lawTitle
+                    ) : activeArticle ? (
+                      <>
+                        {meta.lawTitle} {formatJO(activeArticle.jo)}
+                        {activeArticle.title && (
+                          <span className="text-muted-foreground"> ({activeArticle.title})</span>
+                        )}
+                      </>
+                    ) : (
+                      meta.lawTitle
+                    )}
+                  </h2>
+                  {!isOrdinance && viewMode === "full" && (
+                    <Badge variant="outline" className="text-xs">
+                      전체 조문
+                    </Badge>
                   )}
-                </h2>
+                </div>
               </div>
+
+              {!isOrdinance && viewMode === "full" && activeArticle && (
+                <p className="text-sm text-muted-foreground">
+                  현재 선택된 조문: {formatJO(activeArticle.jo)}
+                  {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               {meta.latestEffectiveDate && (
@@ -450,8 +516,11 @@ export function LawViewer({
                   {articles.map((article) => (
                     <div
                       key={article.jo}
+                      id={`article-${article.jo}`}
                       ref={(el) => {
-                        articleRefs.current[article.jo] = el
+                        if (article.jo) {
+                          articleRefs.current[article.jo] = el
+                        }
                       }}
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
                     >
@@ -477,12 +546,12 @@ export function LawViewer({
                         .filter((a) => a.revisionHistory && a.revisionHistory.length > 0)
                         .map((article) => (
                           <div key={article.jo} className="mb-6">
-                            <RevisionHistory
-                              history={article.revisionHistory!}
-                              articleTitle={
+                          <RevisionHistory
+                            history={article.revisionHistory!}
+                            articleTitle={
                                 article.title
-                                  ? `${formatSimpleJo(article.jo)} (${article.title})`
-                                  : formatSimpleJo(article.jo)
+                                  ? `${article.joNum || formatSimpleJo(article.jo)} (${article.title})`
+                                  : article.joNum || formatSimpleJo(article.jo)
                               }
                             />
                           </div>
@@ -490,12 +559,82 @@ export function LawViewer({
                     </div>
                   )}
                 </div>
+              ) : viewMode === "full" ? (
+                <div className="space-y-10">
+                  {articles.map((article, index) => {
+                    const headingLabel =
+                      article.joNum || formatJO(article.jo) || formatSimpleJo(article.jo)
+                    const articleKey = article.jo || `${article.joNum}-${index}`
+                    const articleAnchor = article.jo || articleKey
+
+                    return (
+                      <div
+                        key={articleKey}
+                        id={`article-${articleAnchor}`}
+                        ref={(el) => {
+                          if (article.jo) {
+                            articleRefs.current[article.jo] = el
+                          }
+                        }}
+                        className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
+                      >
+                        <div className="mb-6 pb-4 border-b border-border">
+                          <h3 className="text-2xl font-bold text-foreground mb-2">
+                            {headingLabel}
+                            {article.title && (
+                              <span className="text-muted-foreground"> ({article.title})</span>
+                            )}
+                          </h3>
+                        </div>
+
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                        />
+
+                        {article.revisionHistory && article.revisionHistory.length > 0 && (
+                          <div className="mt-8 pt-6 border-t border-border">
+                            <RevisionHistory
+                              history={article.revisionHistory}
+                              articleTitle={
+                                article.title ? `${headingLabel} (${article.title})` : headingLabel
+                              }
+                            />
+                          </div>
+                        )}
+
+                        {article.hasChanges && (
+                          <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-semibold text-foreground">변경된 조문</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  이 조문은 최근 개정되었습니다. 신·구법 비교를 통해 변경 내용을 확인하세요.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {index < articles.length - 1 && <Separator className="my-8" />}
+                      </div>
+                    )
+                  })}
+                </div>
               ) : activeArticle ? (
                 /* 법령: 조문 번호와 제목을 명확히 표시하고 본문 표시 */
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="mb-6 pb-4 border-b border-border">
                     <h3 className="text-2xl font-bold text-foreground mb-2">
-                      {formatJO(activeArticle.jo)}
+                      {activeArticle.joNum || formatJO(activeArticle.jo)}
                       {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
                     </h3>
                   </div>
@@ -517,7 +656,9 @@ export function LawViewer({
                       <RevisionHistory
                         history={activeArticle.revisionHistory}
                         articleTitle={
-                          activeArticle.title ? `${formatJO(activeArticle.jo)} (${activeArticle.title})` : undefined
+                          activeArticle.title
+                            ? `${activeArticle.joNum || formatJO(activeArticle.jo)} (${activeArticle.title})`
+                            : activeArticle.joNum || formatJO(activeArticle.jo)
                         }
                       />
                     </div>
