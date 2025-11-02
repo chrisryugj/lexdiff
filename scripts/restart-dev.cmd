@@ -12,4 +12,3 @@ start "" /B cmd /c "npm run dev"
 
 echo Done. Visit: http://localhost:3000
 endlocal
-
