@@ -1,6 +1,6 @@
 import type { LawArticle, LawParagraph, LawItem, LawMeta } from "./law-types"
 import { debugLogger } from "./debug-logger"
-import { buildJO } from "./law-parser"
+import { buildJO, formatJO } from "./law-parser"
 
 export function parseLawXML(xmlText: string): {
   meta: LawMeta
@@ -63,83 +63,180 @@ function normalizeText(text: string): string {
 function extractTitleFromContent(content: string): string | undefined {
   const normalized = normalizeText(content)
 
-  console.log(`[v0] [DEBUG] Normalized content (first 100 chars): ${normalized.slice(0, 100)}`)
-  console.log(`[v0] [DEBUG] Has full-width parens: ${/[（）]/.test(normalized)}`)
-  console.log(`[v0] [DEBUG] Has half-width parens: ${/[()]/.test(normalized)}`)
-
-  // Pattern 1: 제38조(신고납부) - half-width parentheses
-  let match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*$$([^)]+)$$/)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (half-width): "${match[1].trim()}"`)
-    return match[1].trim()
+  const bracketMatch = normalized.match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*[（(]\s*([^）)]+)\s*[）)]/u)
+  if (bracketMatch) {
+    return bracketMatch[1].trim()
   }
 
-  // Pattern 2: 제38조（신고납부） - full-width parentheses
-  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?\s*（([^）]+)）/)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (full-width): "${match[1].trim()}"`)
-    return match[1].trim()
+  const colonMatch = normalized.match(/제\s*\d+\s*조(?:\s*의\s*\d+)?\s*[:：]\s*([^:：]+?)(?:\s{2,}|$)/u)
+  if (colonMatch) {
+    return colonMatch[1].trim()
   }
 
-  // Pattern 3: Mixed brackets with DOTALL flag
-  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?[^(（]*[（(]\s*([^)）]+?)\s*[）)]/s)
-  if (match) {
-    console.log(`[v0] ✓ Extracted title (mixed): "${match[1].trim()}"`)
-    return match[1].trim()
-  }
-
-  console.log(`[v0] ✗ No title found in content`)
   return undefined
+}
+
+function normalizeCandidateLabel(candidate?: string): string | null {
+  if (!candidate) return null
+
+  const cleaned = candidate
+    .replace(/[\u00A0\s]/g, "")
+    .replace(/[（）()\[\]]/g, "")
+    .replace(/조문/g, "조")
+    .replace(/條/g, "조")
+    .replace(/第/gu, "")
+    .replace(/之/gu, "의")
+    .replace(/--+/g, "-")
+
+  if (!cleaned) {
+    return null
+  }
+
+  if (/^\d{4,6}$/.test(cleaned)) {
+    const padded = cleaned.padStart(6, "0")
+    const articleSlice = padded.slice(0, 4)
+    const branchSlice = padded.slice(4, 6)
+    const articleNumber = Number.parseInt(articleSlice, 10)
+    const branchNumber = Number.parseInt(branchSlice, 10)
+
+    if (!Number.isNaN(articleNumber) && articleNumber > 0) {
+      if (!Number.isNaN(branchNumber) && branchNumber > 0) {
+        return `제${articleNumber}조의${branchNumber}`
+      }
+      return `제${articleNumber}조`
+    }
+  }
+
+  const match = cleaned.match(/제?\d+(?:조)?(?:[-의]\d+)?/)
+  if (!match) {
+    return null
+  }
+
+  let normalized = match[0]
+
+  if (!normalized.startsWith("제")) {
+    if (normalized.includes("조")) {
+      normalized = `제${normalized}`
+    } else if (normalized.includes("-")) {
+      const [main, branch] = normalized.split("-")
+      normalized = `제${main}조의${branch}`
+    } else if (normalized.includes("의")) {
+      const [main, branch] = normalized.split("의")
+      normalized = `제${main.replace(/조$/, "")}조의${branch}`
+    } else {
+      normalized = `제${normalized.replace(/조$/, "")}조`
+    }
+  }
+
+  if (!normalized.includes("조")) {
+    normalized = normalized.replace(/제(\d+)/, "제$1조")
+  }
+
+  return normalized
+}
+
+function parseArticleHeading(rawHeading?: string): { label?: string; title?: string } {
+  if (!rawHeading) return {}
+
+  const trimmed = rawHeading.trim()
+  if (!trimmed) return {}
+
+  const bracketTitleMatch = trimmed.match(/[（(]\s*([^）)]+)\s*[）)]/u)
+  let title = bracketTitleMatch ? bracketTitleMatch[1].trim() : undefined
+
+  const labelMatch = trimmed.match(/제?\s*\d+(?:\s*조)?(?:\s*(?:의|-)+\s*\d+)?/u)
+  const labelCandidate = labelMatch ? labelMatch[0] : trimmed
+  const label = normalizeCandidateLabel(labelCandidate) ?? undefined
+
+  if (!title && label) {
+    const labelNormalized = labelMatch ? labelMatch[0] : label
+    const remainder = trimmed.replace(labelNormalized, "").trim()
+    if (remainder) {
+      title = remainder.replace(/^[\s:：\-–—]+/, "").trim() || undefined
+    }
+  }
+
+  return { label, title }
+}
+
+function deriveArticleIdentifiers(
+  rawLabels: Array<string | undefined>,
+  content: string,
+  fallbackIndex: number,
+): { displayLabel: string; joCode: string } {
+  const candidates = new Set<string>()
+
+  rawLabels.forEach((candidate) => {
+    const normalized = normalizeCandidateLabel(candidate)
+    if (normalized) {
+      candidates.add(normalized)
+    }
+  })
+
+  if (content) {
+    const primaryMatches = content.matchAll(/제\s*\d+\s*조(?:\s*의\s*\d+)?/g)
+    for (const match of primaryMatches) {
+      const normalized = normalizeCandidateLabel(match[0])
+      if (normalized) {
+        candidates.add(normalized)
+      }
+    }
+
+    const hyphenMatches = content.matchAll(/(\d+)\s*-\s*(\d+)/g)
+    for (const match of hyphenMatches) {
+      const normalized = normalizeCandidateLabel(`${match[1]}-${match[2]}`)
+      if (normalized) {
+        candidates.add(normalized)
+      }
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const joCode = buildJO(candidate)
+      const displayLabel = formatJO(joCode)
+      if (displayLabel) {
+        return { displayLabel, joCode }
+      }
+    } catch (error) {
+      debugLogger.warning("조문 번호 정규화 실패", { candidate, error })
+    }
+  }
+
+  const fallbackNumber = fallbackIndex + 1
+  const fallbackDisplay = `제${fallbackNumber}조`
+  const fallbackCode = fallbackNumber.toString().padStart(4, "0") + "00"
+
+  return { displayLabel: fallbackDisplay, joCode: fallbackCode }
 }
 
 function extractArticles(xmlDoc: Document): LawArticle[] {
   const articles: LawArticle[] = []
   const joElements = xmlDoc.querySelectorAll("조문")
 
-  joElements.forEach((joElement) => {
-    let joNum = joElement.querySelector("조문번호")?.textContent || ""
-    let joTitle = joElement.querySelector("조문제목")?.textContent?.trim() || undefined
+  joElements.forEach((joElement, index) => {
+    const rawJoNum = joElement.querySelector("조문번호")?.textContent || ""
+    const rawHeading = joElement.querySelector("조문제목")?.textContent || ""
+    const headingParts = parseArticleHeading(rawHeading)
+    let joTitle = headingParts.title
     const joContent = joElement.querySelector("조문내용")?.textContent || ""
     const hasChanges = joElement.querySelector("조문변경여부")?.textContent === "Y"
 
     const revisionHistory = extractRevisionMarks(joContent, joElement)
 
-    if (joContent && (!joNum.includes("조") || !joNum.includes("의"))) {
-      const joMatch = joContent.match(/제(\d+)조(?:의(\d+))?/)
-      if (joMatch) {
-        const mainNum = joMatch[1]
-        const subNum = joMatch[2]
-        if (subNum) {
-          joNum = `${mainNum}조의${subNum}`
-          console.log(`[v0] Extracted full article number from content: "${joNum}"`)
-        } else if (!joNum.includes("조")) {
-          joNum = `${mainNum}조`
-          console.log(`[v0] Extracted article number from content: "${joNum}"`)
-        }
-      }
-    }
+    const { displayLabel, joCode } = deriveArticleIdentifiers(
+      [rawJoNum, headingParts.label, rawHeading],
+      joContent,
+      index,
+    )
 
     if (!joTitle && joContent) {
-      console.log(`[v0] Extracting title for ${joNum} from content`)
+      console.log(`[v0] Extracting title for ${displayLabel} from content`)
       joTitle = extractTitleFromContent(joContent)
     }
 
-    let normalizedJo = joNum
-    if (joNum) {
-      try {
-        // buildJO handles "38조", "38조의5", "38", etc. and converts to 6-digit format
-        normalizedJo = buildJO(joNum)
-        console.log(`[v0] Normalized jo: "${joNum}" → "${normalizedJo}"`)
-      } catch (error) {
-        // Fallback to old logic if buildJO fails
-        console.log(`[v0] buildJO failed for "${joNum}", using fallback`)
-        if (joNum.length < 6) {
-          const articleNum = Number.parseInt(joNum, 10)
-          if (!isNaN(articleNum)) {
-            normalizedJo = articleNum.toString().padStart(4, "0") + "00"
-          }
-        }
-      }
+    if (!joTitle && rawHeading && rawHeading.trim()) {
+      joTitle = rawHeading.trim()
     }
 
     const paragraphs: LawParagraph[] = []
@@ -170,8 +267,8 @@ function extractArticles(xmlDoc: Document): LawArticle[] {
     })
 
     articles.push({
-      jo: normalizedJo,
-      joNum,
+      jo: joCode,
+      joNum: displayLabel,
       title: joTitle,
       content: joContent,
       hasChanges,
@@ -309,11 +406,21 @@ function extractRevisionMarks(
   return uniqueRevisions
 }
 
-export function extractArticleText(article: LawArticle): string {
+export function extractArticleText(
+  article: LawArticle,
+  options?: {
+    includeHeading?: boolean
+    headingLevel?: "h2" | "h3" | "h4" | "h5"
+    preserveLeadingHeading?: boolean
+  },
+): string {
   let text = ""
 
   if (article.content) {
-    let content = escapeHtml(article.content)
+    const baseContent = options?.preserveLeadingHeading
+      ? article.content
+      : stripLeadingArticleHeading(article.content, article)
+    let content = escapeHtml(baseContent)
     content = applyRevisionStyling(content)
     content = linkifyRefsB(content)
     text += `${content}\n`
@@ -357,7 +464,66 @@ export function extractArticleText(article: LawArticle): string {
     })
   }
 
-  return text.trim()
+  let result = text.trim()
+
+  if (options?.includeHeading) {
+    const label = formatJO(article.jo) || article.joNum || ""
+
+    if (label) {
+      const normalizedLabel = label.replace(/\s+/g, "")
+      const normalizedContentStart = result
+        ? result
+            .replace(/<[^>]+>/g, "")
+            .trim()
+            .replace(/\s+/g, "")
+        : ""
+
+      if (!normalizedContentStart || !normalizedContentStart.startsWith(normalizedLabel)) {
+        const headingTag = options?.headingLevel ?? "h2"
+        const safeHeadingTag: "h2" | "h3" | "h4" | "h5" = ["h2", "h3", "h4", "h5"].includes(headingTag)
+          ? headingTag
+          : "h2"
+        const headingIdSource = article.jo || article.joNum || ""
+        const sanitizedId = headingIdSource
+          .toString()
+          .replace(/\s+/g, "")
+          .replace(/[^0-9A-Za-z_-]/g, "-")
+        const headingIdAttr = sanitizedId ? ` id="article-${sanitizedId}"` : ""
+        const heading = `<${safeHeadingTag}${headingIdAttr}>${escapeHtml(label)}${
+          article.title ? ` (${escapeHtml(article.title)})` : ""
+        }</${safeHeadingTag}>`
+        result = `${heading}\n${result}`.trim()
+      }
+    }
+  }
+
+  return result
+}
+
+function stripLeadingArticleHeading(raw: string, article: LawArticle): string {
+  if (!raw) return raw
+
+  const normalizedLabel = (formatJO(article.jo) || article.joNum || "").replace(/\s+/g, "")
+  if (!normalizedLabel) {
+    return raw
+  }
+
+  const escapedLabel = normalizedLabel
+    .replace(/^제/, "제\\s*")
+    .replace(/조의/, "조(?:\\s*의|\\s*-\\s*)")
+    .replace(/조$/, "조")
+
+  const headingPattern = new RegExp(
+    `^\\s*${escapedLabel}(?:\\s*[（(][^）)]+[）)])?(?:\\s*[:：])?`,
+    "u",
+  )
+
+  if (!headingPattern.test(raw)) {
+    return raw
+  }
+
+  const stripped = raw.replace(headingPattern, "")
+  return stripped.replace(/^\s+/, "")
 }
 
 function escapeHtml(text: string): string {

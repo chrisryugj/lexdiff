@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { normalizeLawSearchText, resolveLawAlias } from "@/lib/search-normalizer"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const query = searchParams.get("query")
+  const rawQuery = searchParams.get("query")
+
+  if (!rawQuery) {
+    return NextResponse.json({ error: "검색어가 필요합니다" }, { status: 400 })
+  }
+
+  const normalizedQuery = normalizeLawSearchText(rawQuery)
+  const aliasResolution = resolveLawAlias(normalizedQuery)
+  const query = aliasResolution.canonical
 
   if (!OC) {
     debugLogger.error("LAW_OC 환경변수가 설정되지 않았습니다")
     return NextResponse.json({ error: "API 키가 설정되지 않았습니다" }, { status: 500 })
-  }
-
-  if (!query) {
-    return NextResponse.json({ error: "검색어가 필요합니다" }, { status: 400 })
   }
 
   try {
@@ -22,11 +27,17 @@ export async function GET(request: Request) {
       OC,
       type: "XML",
       target: "law",
-      query: query,
+      query,
     })
 
     const url = `${LAW_API_BASE}?${params.toString()}`
-    debugLogger.info("법령 검색 API 호출", { query, url })
+    debugLogger.info("법령 검색 API 호출", {
+      query,
+      rawQuery,
+      normalizedQuery,
+      aliasMatched: aliasResolution.matchedAlias,
+      url,
+    })
     console.log("[v0] Law search URL:", url)
 
     const response = await fetch(url, {
