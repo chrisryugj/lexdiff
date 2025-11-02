@@ -8,7 +8,7 @@ import { ComparisonModal } from "@/components/comparison-modal"
 import { AISummaryDialog } from "@/components/ai-summary-dialog"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { FavoritesDialog } from "@/components/favorites-dialog"
-import { ErrorReportDialog } from "@/components/error-report-dialog" // 에러 리포트 다이얼로그 추가
+import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -16,7 +16,7 @@ import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { parseArticleHistory } from "@/lib/law-parser"
 import { favoritesStore } from "@/lib/favorites-store"
-import { useErrorReportStore } from "@/lib/error-report-store" // 에러 리포트 스토어 추가
+import { useErrorReportStore } from "@/lib/error-report-store"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
@@ -39,6 +39,29 @@ function convertArticleNumberToCode(
   const display = branch > 0 ? "제" + mainNum + "조의" + branch : "제" + mainNum + "조"
 
   return { code, display }
+}
+
+function removeArticleHeaderFromContent(content: string, display: string, title?: string): string {
+  if (!content) return content
+
+  const pattern1 = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
+  content = content.replace(pattern1, "")
+
+  const pattern2 = /^제\d+조(?:의\d+)?\s*$$[^)]+$$\s*/
+  content = content.replace(pattern2, "")
+
+  if (title) {
+    const escapedDisplay = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+    const exactPattern1 = new RegExp("^" + escapedDisplay + "$$" + escapedTitle + "$$\\s*", "")
+    content = content.replace(exactPattern1, "")
+
+    const exactPattern2 = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
+    content = content.replace(exactPattern2, "")
+  }
+
+  return content.trim()
 }
 
 function extractContentFromHangHo(hangHoData: any): string {
@@ -71,34 +94,6 @@ function extractContentFromHangHo(hangHoData: any): string {
   return content
 }
 
-function removeArticleHeaderFromContent(content: string, display: string, title?: string): string {
-  if (!content) return content
-
-  // 제N조(제목) 형식 제거
-  const pattern1 = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
-  content = content.replace(pattern1, "")
-
-  // 제N조 (제목) 형식 제거 (공백 있음)
-  const pattern2 = /^제\d+조(?:의\d+)?\s*$$[^)]+$$\s*/
-  content = content.replace(pattern2, "")
-
-  // 정확한 매칭으로 제거
-  if (title) {
-    const escapedDisplay = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-    // 제N조(제목) 형식
-    const exactPattern1 = new RegExp("^" + escapedDisplay + "$$" + escapedTitle + "$$\\s*", "")
-    content = content.replace(exactPattern1, "")
-
-    // 제N조 (제목) 형식 (공백 있음)
-    const exactPattern2 = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
-    content = content.replace(exactPattern2, "")
-  }
-
-  return content.trim()
-}
-
 function parseLawJSON(jsonData: any): LawData {
   debugLogger.info("JSON 파싱 시작")
 
@@ -112,7 +107,7 @@ function parseLawJSON(jsonData: any): LawData {
     const basicInfo = lawData.기본정보 || lawData
     const meta = {
       lawId: basicInfo.법령ID || basicInfo.법령키 || "unknown",
-      lawTitle: basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
+      lawTitle: basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
       latestEffectiveDate: basicInfo.최종시행일자 || basicInfo.시행일자 || "",
       promulgation: {
         date: basicInfo.공포일자 || "",
@@ -148,7 +143,6 @@ function parseLawJSON(jsonData: any): LawData {
 
       if (unit.조문내용 && typeof unit.조문내용 === "string") {
         content = unit.조문내용.trim()
-        // 조문내용이 헤더만 있는 경우 제거
         content = removeArticleHeaderFromContent(content, display, title)
       }
 
@@ -160,11 +154,11 @@ function parseLawJSON(jsonData: any): LawData {
       }
 
       const revisionHistory: Array<{ date: string; type: string; description?: string }> = []
-      if (content) {
-        // <개정 2010.1.1> 형식 추출
-        const revPattern = /<(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)>/g
+      if (content || unit.조문참고자료) {
+        const textToSearch = (content + " " + (unit.조문참고자료 || "")).trim()
+        const revPattern = /[<[](개정|신설|전문개정|제정|삭제|제목개정)\s+([0-9., ]+)[>\]]/g
         let match: RegExpExecArray | null
-        while ((match = revPattern.exec(content)) !== null) {
+        while ((match = revPattern.exec(textToSearch)) !== null) {
           const dateStr = match[2].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
           if (dateStr.length === 8) {
             revisionHistory.push({
@@ -246,18 +240,16 @@ export default function Home() {
     newContent?: string
     effectiveDate?: string
   }>({ isOpen: false })
-
   const [mobileView, setMobileView] = useState<"list" | "content">("content")
   const [searchResults, setSearchResults] = useState<{
     laws: LawSearchResult[]
     ordinances: OrdinanceSearchResult[]
     jo?: string
   }>({ laws: [], ordinances: [] })
-
-  const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false) // 즐겨찾기 모달 상태 추가
+  const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
 
   const { toast } = useToast()
-  const { reportError } = useErrorReportStore() // 에러 리포트 함수 가져오기
+  const { reportError } = useErrorReportStore()
 
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
@@ -277,8 +269,6 @@ export default function Home() {
     query: { lawName: string; article?: string; jo?: string },
   ) => {
     console.log("[v0] ========== FETCHING LAW CONTENT ==========")
-    console.log("[v0] Selected law:", selectedLaw)
-    console.log("[v0] Query:", query)
     debugLogger.info("법령 ID 확인", { lawId: selectedLaw.lawId, lawName: selectedLaw.lawName })
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
@@ -296,14 +286,9 @@ export default function Home() {
 
       if (query.jo) {
         params.append("jo", query.jo)
-        console.log("[v0] ✓ Adding JO parameter to fetch specific article:", query.jo)
-      } else {
-        console.log("[v0] ✓ No JO parameter - fetching all articles")
       }
 
-      const apiUrl = `/api/eflaw?${params.toString()}`
-      console.log("[v0] Final API params:", params.toString())
-
+      const apiUrl = "/api/eflaw?" + params.toString()
       const response = await fetch(apiUrl)
 
       apiLogs.push({
@@ -315,24 +300,18 @@ export default function Home() {
       if (!response.ok) {
         const errorText = await response.text()
         apiLogs[apiLogs.length - 1].response = errorText
-        console.log("[v0] Eflaw error response:", errorText)
         throw new Error("법령 조회 실패")
       }
 
       const jsonText = await response.text()
       apiLogs[apiLogs.length - 1].response = jsonText.substring(0, 500) + "..."
-      console.log("[v0] Eflaw JSON received, length:", jsonText.length)
 
       const jsonData = JSON.parse(jsonText)
-      const { meta, articles } = parseLawJSON(jsonData)
-      console.log("[v0] Parsed law data:", { meta, articleCount: articles.length })
+      const parsedData = parseLawJSON(jsonData)
+      const meta = parsedData.meta
+      const articles = parsedData.articles
 
       if (query.jo && (selectedLaw.lawId || selectedLaw.mst)) {
-        console.log("[v0] [개정이력] 조문별 개정이력 조회 시작:", {
-          lawId: selectedLaw.lawId,
-          mst: selectedLaw.mst,
-          jo: query.jo,
-        })
         try {
           const historyParams = new URLSearchParams({ jo: query.jo })
           if (selectedLaw.lawId) {
@@ -340,7 +319,7 @@ export default function Home() {
           } else if (selectedLaw.mst) {
             historyParams.append("mst", selectedLaw.mst)
           }
-          const historyUrl = `/api/article-history?${historyParams.toString()}`
+          const historyUrl = "/api/article-history?" + historyParams.toString()
           const historyResponse = await fetch(historyUrl)
 
           apiLogs.push({
@@ -358,7 +337,6 @@ export default function Home() {
 
             if (targetArticle && revisionHistory.length > 0) {
               targetArticle.revisionHistory = revisionHistory
-              console.log("[v0] [개정이력] ✓ 조문에 개정이력 병합 완료")
             }
           } else {
             const errorText = await historyResponse.text()
@@ -404,8 +382,6 @@ export default function Home() {
   }
 
   const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
-    console.log("[v0] ========== 검색 시작 ==========")
-
     setIsSearching(true)
     setLawData(null)
     setLawSelectionState(null)
@@ -423,7 +399,7 @@ export default function Home() {
 
     try {
       if (isOrdinanceQuery) {
-        const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}`
+        const apiUrl = "/api/ordin-search?query=" + encodeURIComponent(lawName)
         const response = await fetch(apiUrl)
 
         apiLogs.push({
@@ -463,7 +439,7 @@ export default function Home() {
         })
         setMobileView("list")
       } else {
-        const apiUrl = `/api/law-search?query=${encodeURIComponent(lawName)}`
+        const apiUrl = "/api/law-search?query=" + encodeURIComponent(lawName)
         const response = await fetch(apiUrl)
 
         apiLogs.push({
@@ -579,12 +555,11 @@ export default function Home() {
       await fetchLawContent(law, {
         lawName: lawSelectionState.query.lawName,
         article: lawSelectionState.query.article,
-        jo: undefined, // 전체 조문 보기
+        jo: undefined,
       })
       setLawSelectionState(null)
       setMobileView("content")
     } catch (error) {
-      console.log("[v0] Law fetch error:", error)
       debugLogger.error("법령 조회 실패", error)
 
       toast({
@@ -614,7 +589,7 @@ export default function Home() {
         params.append("ordinSeq", ordinance.ordinSeq)
       }
 
-      const apiUrl = `/api/ordin?${params.toString()}`
+      const apiUrl = "/api/ordin?" + params.toString()
       const response = await fetch(apiUrl)
 
       apiLogs.push({
@@ -637,7 +612,9 @@ export default function Home() {
       const xmlText = await response.text()
       apiLogs[apiLogs.length - 1].response = xmlText.substring(0, 500) + "..."
 
-      const { meta, articles } = parseOrdinanceXML(xmlText)
+      const parsedData = parseOrdinanceXML(xmlText)
+      const meta = parsedData.meta
+      const articles = parsedData.articles
 
       if (articles.length === 0) {
         toast({
@@ -659,7 +636,6 @@ export default function Home() {
       setMobileView("content")
       debugLogger.success("자치법규 조회 완료", { ordinName: meta.lawTitle, articleCount: articles.length })
     } catch (error) {
-      console.log("[v0] Ordinance fetch error:", error)
       debugLogger.error("자치법규 조회 실패", error)
 
       reportError(
@@ -726,7 +702,7 @@ export default function Home() {
         params.append("mst", lawData.meta.mst)
       }
 
-      const response = await fetch(`/api/oldnew?${params.toString()}`)
+      const response = await fetch("/api/oldnew?" + params.toString())
       if (!response.ok) {
         throw new Error("신·구법 데이터 조회 실패")
       }
@@ -769,7 +745,7 @@ export default function Home() {
           lawTitle: lawData.meta.lawTitle,
           jo,
           effectiveDate: lawData.meta.latestEffectiveDate,
-          lastSeenSignature: `${lawData.meta.latestEffectiveDate || ""}-${lawData.meta.revisionType || ""}`,
+          lastSeenSignature: (lawData.meta.latestEffectiveDate || "") + "-" + (lawData.meta.revisionType || ""),
         })
       }
     } catch (error) {
@@ -788,7 +764,6 @@ export default function Home() {
   }
 
   const handleReset = () => {
-    console.log("[v0] 홈으로 이동 - 모든 상태 초기화")
     setLawData(null)
     setLawSelectionState(null)
     setOrdinanceSelectionState(null)
@@ -797,8 +772,7 @@ export default function Home() {
   }
 
   const handleFavoritesClick = () => {
-    console.log("[v0] 즐겨찾기 버튼 클릭")
-    setFavoritesDialogOpen(true) // handleFavoritesClick에서 모달 열기로 변경
+    setFavoritesDialogOpen(true)
   }
 
   return (
@@ -976,9 +950,8 @@ export default function Home() {
         isOpen={favoritesDialogOpen}
         onClose={() => setFavoritesDialogOpen(false)}
         onSelect={handleFavoriteSelect}
-      />{" "}
-      {/* 즐겨찾기 모달 추가 */}
-      <ErrorReportDialog /> {/* 에러 리포트 다이얼로그 추가 */}
+      />
+      <ErrorReportDialog />
       {!lawData && !lawSelectionState && !ordinanceSelectionState && (
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-6">
