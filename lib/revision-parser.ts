@@ -9,6 +9,47 @@ export interface RevisionInfo {
   lawName: string
 }
 
+export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
+  debugLogger.info("조문 개정이력 XML 파싱 시작", { xmlLength: xmlText.length })
+
+  try {
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml")
+
+    const parserError = xmlDoc.querySelector("parsererror")
+    if (parserError) {
+      throw new Error("XML 파싱 오류")
+    }
+
+    const history: RevisionHistoryItem[] = []
+
+    // Try to find revision history elements
+    const revisionElements = xmlDoc.querySelectorAll("연혁, 개정이력, Revision")
+
+    revisionElements.forEach((element) => {
+      const date = element.querySelector("공포일자, 공포일, PromulgationDate")?.textContent || ""
+      const type = element.querySelector("제개정구분, 제개정구분명, RevisionType")?.textContent || ""
+      const description = element.querySelector("개정사유, 개정내용, Description")?.textContent
+      const articleLink = element.querySelector("조문링크, ArticleLink")?.textContent
+
+      if (date || type) {
+        history.push({
+          date: formatDate(date),
+          type: type || "개정",
+          description,
+          articleLink,
+        })
+      }
+    })
+
+    debugLogger.success("조문 개정이력 파싱 완료", { count: history.length })
+    return history
+  } catch (error) {
+    debugLogger.error("조문 개정이력 파싱 실패", error)
+    return []
+  }
+}
+
 export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
   debugLogger.info("개정이력 XML 파싱 시작", { xmlLength: xmlText.length })
 

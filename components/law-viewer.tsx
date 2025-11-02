@@ -26,6 +26,8 @@ import type { LawArticle, LawMeta } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
 import { buildJO, formatJO } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
+import { RevisionHistory } from "@/components/revision-history"
+import { parseArticleHistoryXML } from "@/lib/revision-parser"
 
 interface LawViewerProps {
   meta: LawMeta
@@ -34,9 +36,9 @@ interface LawViewerProps {
   onCompare?: (jo: string) => void
   onSummarize?: (jo: string) => void
   onToggleFavorite?: (jo: string) => void
-  favorites?: Set<string>
-  isOrdinance?: boolean
-  viewMode?: "single" | "full"
+  favorites: Set<string>
+  isOrdinance: boolean
+  viewMode: "single" | "full"
 }
 
 export function LawViewer({
@@ -72,6 +74,8 @@ export function LawViewer({
   const contentRef = useRef<HTMLDivElement>(null)
   const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
+  const [revisionHistory, setRevisionHistory] = useState<any[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
   const activeArticle = actualArticles.find((a) => a.jo === activeJo)
 
@@ -104,6 +108,39 @@ export function LawViewer({
   useEffect(() => {
     articleRefs.current = {}
   }, [articles])
+
+  const fetchRevisionHistory = async () => {
+    setIsLoadingHistory(true)
+    try {
+      const params = new URLSearchParams()
+      if (meta.lawId) {
+        params.append("lawId", meta.lawId)
+      } else if (meta.mst) {
+        params.append("mst", meta.mst)
+      }
+
+      const response = await fetch(`/api/article-history?${params.toString()}`)
+      if (!response.ok) {
+        console.error("[v0] Failed to fetch revision history")
+        return
+      }
+
+      const xmlText = await response.text()
+      const history = parseArticleHistoryXML(xmlText)
+      setRevisionHistory(history)
+    } catch (error) {
+      console.error("[v0] Error fetching revision history:", error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!meta.lawId && !meta.mst) return
+    if (isOrdinance) return // Don't fetch for ordinances
+
+    fetchRevisionHistory()
+  }, [meta.lawId, meta.mst, isOrdinance])
 
   const handleArticleClick = (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
@@ -608,6 +645,11 @@ export function LawViewer({
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <p>조문을 선택하세요</p>
+                </div>
+              )}
+              {!isOrdinance && viewMode === "full" && revisionHistory.length > 0 && (
+                <div className="mt-12">
+                  <RevisionHistory history={revisionHistory} articleTitle={meta.lawTitle} />
                 </div>
               )}
             </div>
