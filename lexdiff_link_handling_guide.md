@@ -26,7 +26,7 @@ v0 수준(React + TypeScript + DRF API)에서 바로 적용 가능한 형태로 
 
 ## 3️⃣ Sanitizer 설정 예시
 
-```ts
+\`\`\`ts
 import DOMPurify from "dompurify";
 
 const allowed = {
@@ -37,7 +37,7 @@ const allowed = {
 export function sanitize(html: string) {
   return DOMPurify.sanitize(html, allowed);
 }
-```
+\`\`\`
 
 - `style` 속성 제거 (기관 보안 기준)
 - `<a>`의 `href`, `target`, `rel`만 허용
@@ -46,7 +46,7 @@ export function sanitize(html: string) {
 
 ## 4️⃣ 링크 재작성 (외부 → 내부 경로)
 
-```ts
+\`\`\`ts
 function rewriteLinks(container: HTMLElement) {
   container.querySelectorAll<HTMLAnchorElement>("a[href]").forEach(a => {
     const href = a.getAttribute("href") || "";
@@ -72,13 +72,13 @@ function rewriteLinks(container: HTMLElement) {
     }
   });
 }
-```
+\`\`\`
 
 ---
 
 ## 5️⃣ 클릭 이벤트 인터셉트 (SPA 내부 이동)
 
-```ts
+\`\`\`ts
 function attachLinkDelegation(container: HTMLElement, navigate: (path: string) => void) {
   container.addEventListener("click", (e) => {
     const a = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
@@ -90,20 +90,20 @@ function attachLinkDelegation(container: HTMLElement, navigate: (path: string) =
     }
   });
 }
-```
+\`\`\`
 
 ---
 
 ## 6️⃣ XML 기반 자동 링크 생성 (linkification)
 
-```ts
+\`\`\`ts
 function linkifyPlainText(htmlEscaped: string, currentLawId: string) {
   return htmlEscaped.replace(
     /제\s*(\d+)\s*조/g,
     (m, num) => `<a href="/law/${currentLawId}?jo=${String(num).padStart(4,"0")}00" class="jo-link">${m}</a>`
   );
 }
-```
+\`\`\`
 
 - 패턴 인식 기반으로 "제38조" 등 조문명 자동 링크화
 - 캐시된 `lawName → lawId` 매핑 사용 시 타 법령 참조도 지원
@@ -112,14 +112,14 @@ function linkifyPlainText(htmlEscaped: string, currentLawId: string) {
 
 ## 7️⃣ 통합 렌더 파이프라인
 
-```ts
+\`\`\`ts
 async function renderLawHtml(container: HTMLElement, apiHtml: string, navigate: (path: string)=>void) {
   const safe = sanitize(apiHtml);
   container.innerHTML = safe;
   rewriteLinks(container);
   attachLinkDelegation(container, navigate);
 }
-```
+\`\`\`
 
 ---
 

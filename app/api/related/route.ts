@@ -133,4 +133,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "unknown" }, { status: 500 })
   }
 }
-
