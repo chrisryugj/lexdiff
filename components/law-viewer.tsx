@@ -26,7 +26,6 @@ import type { LawArticle, LawMeta } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
 import { buildJO, formatJO } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
-import { RevisionHistory } from "@/components/revision-history"
 
 interface LawViewerProps {
   meta: LawMeta
@@ -99,14 +98,8 @@ export function LawViewer({
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
       }
-    } else if (actualArticles.length === 1 && actualArticles[0]) {
-      console.log("[v0] 조문 1개 - 자동 선택:", actualArticles[0].jo)
-      setActiveJo(actualArticles[0].jo)
-    } else if (actualArticles.length > 0 && !activeJo) {
-      console.log("[v0] activeJo 없음 - 첫 번째 조문 선택:", actualArticles[0].jo)
-      setActiveJo(actualArticles[0].jo)
     }
-  }, [selectedJo, actualArticles, isOrdinance, viewMode, isFullView, activeJo])
+  }, [selectedJo, actualArticles, isOrdinance, viewMode, isFullView])
 
   useEffect(() => {
     articleRefs.current = {}
@@ -517,26 +510,6 @@ export function LawViewer({
                       <Separator className="my-6" />
                     </div>
                   ))}
-
-                  {actualArticles.some((a) => a.revisionHistory && a.revisionHistory.length > 0) && (
-                    <div className="mt-8 pt-8 border-t border-border">
-                      <h3 className="text-lg font-semibold mb-4">개정 이력</h3>
-                      {actualArticles
-                        .filter((a) => a.revisionHistory && a.revisionHistory.length > 0)
-                        .map((article) => (
-                          <div key={article.jo} className="mb-6">
-                            <RevisionHistory
-                              history={article.revisionHistory!}
-                              articleTitle={
-                                article.title
-                                  ? `${formatSimpleJo(article.jo)} (${article.title})`
-                                  : formatSimpleJo(article.jo)
-                              }
-                            />
-                          </div>
-                        ))}
-                    </div>
-                  )}
                 </div>
               ) : viewMode === "full" ? (
                 <div className="space-y-10">
@@ -579,19 +552,6 @@ export function LawViewer({
                         dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
                       />
 
-                      {article.revisionHistory && article.revisionHistory.length > 0 && (
-                        <div className="mt-8 pt-6 border-t border-border">
-                          <RevisionHistory
-                            history={article.revisionHistory}
-                            articleTitle={
-                              article.title
-                                ? `${formatSimpleJo(article.jo)} (${article.title})`
-                                : formatSimpleJo(article.jo)
-                            }
-                          />
-                        </div>
-                      )}
-
                       {article.hasChanges && (
                         <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
                           <div className="flex items-start gap-2">
@@ -630,19 +590,6 @@ export function LawViewer({
                     onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
                   />
-
-                  {activeArticle.revisionHistory && activeArticle.revisionHistory.length > 0 && (
-                    <div className="mt-8 pt-6 border-t border-border">
-                      <RevisionHistory
-                        history={activeArticle.revisionHistory}
-                        articleTitle={
-                          activeArticle.title
-                            ? `${formatSimpleJo(activeArticle.jo)} (${activeArticle.title})`
-                            : undefined
-                        }
-                      />
-                    </div>
-                  )}
 
                   {activeArticle.hasChanges && (
                     <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">

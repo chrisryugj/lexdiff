@@ -14,7 +14,6 @@ import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
-import { parseArticleHistory } from "@/lib/law-parser"
 import { favoritesStore } from "@/lib/favorites-store"
 import { useErrorReportStore } from "@/lib/error-report-store"
 import { useToast } from "@/hooks/use-toast"
@@ -41,50 +40,53 @@ function convertArticleNumberToCode(
   return { code, display }
 }
 
-function removeArticleHeaderFromContent(content: string, display: string, title?: string): string {
-  if (!content) return content
-
-  const pattern1 = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
-  content = content.replace(pattern1, "")
-
-  const pattern2 = /^제\d+조(?:의\d+)?\s*$$[^)]+$$\s*/
-  content = content.replace(pattern2, "")
-
-  if (title) {
-    const escapedDisplay = display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-    const exactPattern1 = new RegExp("^" + escapedDisplay + "$$" + escapedTitle + "$$\\s*", "")
-    content = content.replace(exactPattern1, "")
-
-    const exactPattern2 = new RegExp("^" + escapedDisplay + "\\s*$$" + escapedTitle + "$$\\s*", "")
-    content = content.replace(exactPattern2, "")
-  }
-
-  return content.trim()
-}
-
-function extractContentFromHangHo(hangHoData: any): string {
+function extractContentFromHangArray(hangArray: any[]): string {
   let content = ""
 
-  if (!hangHoData || typeof hangHoData !== "object") {
+  if (!Array.isArray(hangArray)) {
     return content
   }
 
-  if (hangHoData.호 && Array.isArray(hangHoData.호)) {
-    for (const ho of hangHoData.호) {
-      if (ho.호번호 && ho.호내용) {
-        content += "\n" + ho.호번호 + " " + ho.호내용
-      } else if (ho.호내용) {
-        content += "\n" + ho.호내용
+  for (const hang of hangArray) {
+    // Extract 항내용 (paragraph content)
+    if (hang.항내용) {
+      let hangContent = hang.항내용
+
+      // Handle array format (some 항내용 are arrays of strings)
+      if (Array.isArray(hangContent)) {
+        hangContent = hangContent.join("\n")
       }
 
-      if (ho.목 && Array.isArray(ho.목)) {
-        for (const mok of ho.목) {
-          if (mok.목번호 && mok.목내용) {
-            content += "\n  " + mok.목번호 + " " + mok.목내용
-          } else if (mok.목내용) {
-            content += "\n  " + mok.목내용
+      content += "\n" + hangContent
+    }
+
+    // Extract 호 (items) if present
+    if (hang.호 && Array.isArray(hang.호)) {
+      for (const ho of hang.호) {
+        if (ho.호내용) {
+          let hoContent = ho.호내용
+
+          // Handle array format
+          if (Array.isArray(hoContent)) {
+            hoContent = hoContent.join("\n")
+          }
+
+          content += "\n" + hoContent
+        }
+
+        // Extract 목 (sub-items) if present
+        if (ho.목 && Array.isArray(ho.목)) {
+          for (const mok of ho.목) {
+            if (mok.목내용) {
+              let mokContent = mok.목내용
+
+              // Handle array format
+              if (Array.isArray(mokContent)) {
+                mokContent = mokContent.join("\n")
+              }
+
+              content += "\n  " + mokContent
+            }
           }
         }
       }
@@ -141,30 +143,20 @@ function parseLawJSON(jsonData: any): LawData {
 
       let content = ""
 
-      if (unit.조문내용 && typeof unit.조문내용 === "string") {
-        content = unit.조문내용.trim()
-        content = removeArticleHeaderFromContent(content, display, title)
+      if (unit.항 && Array.isArray(unit.항)) {
+        content = extractContentFromHangArray(unit.항)
       }
-
-      if (unit.항) {
-        const hangContent = extractContentFromHangHo(unit.항)
-        if (hangContent) {
-          content += (content ? "\n" : "") + hangContent
-        }
-      }
-
-      const revisionHistory: Array<{ date: string; type: string; description?: string }> = []
-      if (content || unit.조문참고자료) {
-        const textToSearch = (content + " " + (unit.조문참고자료 || "")).trim()
-        const revPattern = /[<[](개정|신설|전문개정|제정|삭제|제목개정)\s+([0-9., ]+)[>\]]/g
-        let match: RegExpExecArray | null
-        while ((match = revPattern.exec(textToSearch)) !== null) {
-          const dateStr = match[2].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
-          if (dateStr.length === 8) {
-            revisionHistory.push({
-              type: match[1],
-              date: dateStr,
-            })
+      // Fallback: if 항 is an object with 호 array (old structure)
+      else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
+        if (Array.isArray(unit.항.호)) {
+          for (const ho of unit.항.호) {
+            if (ho.호내용) {
+              let hoContent = ho.호내용
+              if (Array.isArray(hoContent)) {
+                hoContent = hoContent.join("\n")
+              }
+              content += "\n" + hoContent
+            }
           }
         }
       }
@@ -175,7 +167,6 @@ function parseLawJSON(jsonData: any): LawData {
         title: title,
         content: content.trim(),
         isPreamble: false,
-        revisionHistory: revisionHistory.length > 0 ? revisionHistory : undefined,
       })
     }
 
@@ -311,42 +302,6 @@ export default function Home() {
       const meta = parsedData.meta
       const articles = parsedData.articles
 
-      if (query.jo && (selectedLaw.lawId || selectedLaw.mst)) {
-        try {
-          const historyParams = new URLSearchParams({ jo: query.jo })
-          if (selectedLaw.lawId) {
-            historyParams.append("lawId", selectedLaw.lawId)
-          } else if (selectedLaw.mst) {
-            historyParams.append("mst", selectedLaw.mst)
-          }
-          const historyUrl = "/api/article-history?" + historyParams.toString()
-          const historyResponse = await fetch(historyUrl)
-
-          apiLogs.push({
-            url: historyUrl,
-            method: "GET",
-            status: historyResponse.status,
-          })
-
-          if (historyResponse.ok) {
-            const historyXml = await historyResponse.text()
-            apiLogs[apiLogs.length - 1].response = historyXml.substring(0, 500) + "..."
-
-            const revisionHistory = parseArticleHistory(historyXml)
-            const targetArticle = articles.find((a) => a.jo === query.jo)
-
-            if (targetArticle && revisionHistory.length > 0) {
-              targetArticle.revisionHistory = revisionHistory
-            }
-          } else {
-            const errorText = await historyResponse.text()
-            apiLogs[apiLogs.length - 1].response = errorText
-          }
-        } catch (error) {
-          console.log("[v0] [개정이력] 조회 중 오류:", error)
-        }
-      }
-
       let selectedJo: string | undefined
       const viewMode: "single" | "full" = query.jo ? "single" : "full"
 
@@ -355,8 +310,6 @@ export default function Home() {
         if (targetArticle) {
           selectedJo = targetArticle.jo
         }
-      } else if (articles.length > 0) {
-        selectedJo = articles[0].jo
       }
 
       setLawData({
