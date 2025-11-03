@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // `eslint` top-level option removed in Next.js; ESLint handling should be done via CLI or separate config.
   typescript: {
     ignoreBuildErrors: true,
   },
