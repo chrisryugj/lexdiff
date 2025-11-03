@@ -67,6 +67,10 @@ export function LawViewer({
   const actualArticles = articles.filter((a) => !a.isPreamble)
   const preambles = articles.filter((a) => a.isPreamble)
 
+  // State for dynamically loaded articles
+  const [loadedArticles, setLoadedArticles] = useState<LawArticle[]>(actualArticles)
+  const [loadingJo, setLoadingJo] = useState<string | null>(null)
+
   const [activeJo, setActiveJo] = useState<string>(selectedJo || actualArticles[0]?.jo || "")
   const [fontSize, setFontSize] = useState<number>(14)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
@@ -77,7 +81,12 @@ export function LawViewer({
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
-  const activeArticle = actualArticles.find((a) => a.jo === activeJo)
+  // Update loadedArticles when props.articles changes
+  useEffect(() => {
+    setLoadedArticles(actualArticles)
+  }, [articles])
+
+  const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
   useEffect(() => {
     console.log("[v0] [개정이력] Active article revision history:", {
@@ -169,8 +178,53 @@ export function LawViewer({
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance])
 
-  const handleArticleClick = (jo: string) => {
+  const handleArticleClick = async (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
+
+    // Check if article is already loaded
+    const existingArticle = loadedArticles.find((a) => a.jo === jo)
+
+    if (!existingArticle && !isOrdinance && (meta.lawId || meta.mst)) {
+      // Article not loaded - fetch it dynamically
+      console.log("[v0] 조문이 로드되지 않음 - 동적으로 로드:", jo)
+      setLoadingJo(jo)
+
+      try {
+        const params = new URLSearchParams()
+        if (meta.lawId) {
+          params.append("lawId", meta.lawId)
+        } else if (meta.mst) {
+          params.append("mst", meta.mst)
+        }
+        params.append("jo", jo)
+
+        const response = await fetch(`/api/eflaw?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const xmlText = await response.text()
+        const { parseLawXML } = await import("@/lib/law-xml-parser")
+        const parsed = parseLawXML(xmlText)
+
+        // Add newly fetched article to loadedArticles
+        if (parsed.articles.length > 0) {
+          const newArticle = parsed.articles[0]
+          setLoadedArticles((prev) => {
+            // Avoid duplicates
+            if (prev.find((a) => a.jo === newArticle.jo)) {
+              return prev
+            }
+            return [...prev, newArticle]
+          })
+          console.log("[v0] 조문 로드 완료:", newArticle.jo)
+        }
+      } catch (error) {
+        console.error("[v0] 조문 로드 실패:", error)
+      } finally {
+        setLoadingJo(null)
+      }
+    }
 
     setActiveJo(jo)
 
@@ -273,7 +327,7 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // 법령 체계도 조회 시도
+          // 법령만 참조 - 체계도 조회
           await openLawHierarchyModal(lawName)
           setLastExternalRef({ lawName })
         }
@@ -330,37 +384,79 @@ export function LawViewer({
       const lawId = lawIdMatch?.[1]
       const mst = mstMatch?.[1]
       if (!lawId && !mst) {
-        setRefModal({ open: true, title: lawName, html: "법령을 찾지 못했습니다." })
+        setRefModal({
+          open: true,
+          title: lawName,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+        })
         return
       }
+
+      // Build JO code for the specific article
+      let joCode = ""
+      try {
+        joCode = buildJO(articleLabel)
+      } catch (err) {
+        console.error("Failed to build JO code:", err)
+      }
+
+      // Fetch only the specific article using JO parameter (not the entire law!)
       const identifierParams = new URLSearchParams()
       if (lawId) {
         identifierParams.append("lawId", lawId)
       } else if (mst) {
         identifierParams.append("mst", mst)
       }
-      const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
-      const eflawXml = await eflawRes.text()
-      // Parse to find the target article
-      const { parseLawXML } = await import("@/lib/law-xml-parser")
-      const parsed = parseLawXML(eflawXml)
-      let joCode = ""
+
+      // Add JO parameter to fetch only the specific article
+      if (joCode) {
+        identifierParams.append("jo", joCode)
+        console.log("[citation] Fetching specific article:", { lawName, articleLabel, joCode })
+      }
+
       try {
-        joCode = buildJO(articleLabel)
-      } catch {}
-      const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-      if (found) {
+        const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
+
+        if (!eflawRes.ok) {
+          throw new Error(`HTTP ${eflawRes.status}`)
+        }
+
+        const eflawXml = await eflawRes.text()
+
+        // Parse the response (should only contain the requested article)
+        const { parseLawXML } = await import("@/lib/law-xml-parser")
+        const parsed = parseLawXML(eflawXml)
+
+        const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
+        if (found) {
+          setRefModal({
+            open: true,
+            title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
+            html: extractArticleText(found),
+          })
+        } else {
+          // Article not found - show link to law.go.kr
+          setRefModal({
+            open: true,
+            title: `${lawName} ${articleLabel}`,
+            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+          })
+        }
+      } catch (fetchErr: any) {
+        console.error("Failed to fetch article:", fetchErr)
         setRefModal({
           open: true,
-          title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-          html: extractArticleText(found),
+          title: `${lawName} ${articleLabel}`,
+          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
         })
-      } else {
-        setRefModal({ open: true, title: lawName, html: "해당 조문을 찾지 못했습니다." })
       }
     } catch (err) {
       console.error("openExternalLawArticleModal error", err)
-      setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
+      setRefModal({
+        open: true,
+        title: `${lawName} ${articleLabel}`,
+        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+      })
     }
   }
 
@@ -450,7 +546,7 @@ export function LawViewer({
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
         })
         return
       }
@@ -474,7 +570,7 @@ export function LawViewer({
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
         })
         return
       }
@@ -486,7 +582,7 @@ export function LawViewer({
       if (hierarchy.upperLaws && hierarchy.upperLaws.length > 0) {
         html += `<div><h4 class="font-semibold mb-2">상위 법령</h4><ul class="list-disc list-inside space-y-1">`
         for (const upper of hierarchy.upperLaws) {
-          html += `<li><a href="#" class="text-primary hover:underline" data-law="${upper.lawName}">${upper.lawName}</a></li>`
+          html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${upper.lawName}">${upper.lawName}</a></li>`
         }
         html += `</ul></div>`
       }
@@ -506,7 +602,7 @@ export function LawViewer({
         if (decrees.length > 0) {
           html += `<div><h4 class="font-semibold mb-2">시행령</h4><ul class="list-disc list-inside space-y-1">`
           for (const decree of decrees) {
-            html += `<li><a href="#" class="text-primary hover:underline" data-law="${decree.lawName}">${decree.lawName}</a></li>`
+            html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${decree.lawName}">${decree.lawName}</a></li>`
           }
           html += `</ul></div>`
         }
@@ -514,13 +610,13 @@ export function LawViewer({
         if (rules.length > 0) {
           html += `<div><h4 class="font-semibold mb-2">시행규칙</h4><ul class="list-disc list-inside space-y-1">`
           for (const rule of rules) {
-            html += `<li><a href="#" class="text-primary hover:underline" data-law="${rule.lawName}">${rule.lawName}</a></li>`
+            html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${rule.lawName}">${rule.lawName}</a></li>`
           }
           html += `</ul></div>`
         }
       }
 
-      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기</a></div>`
+      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기 →</a></div>`
       html += `</div>`
 
       setRefModal({
@@ -533,7 +629,7 @@ export function LawViewer({
       setRefModal({
         open: true,
         title: lawName,
-        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
       })
     }
   }
@@ -582,27 +678,33 @@ export function LawViewer({
         <Separator className="mb-4" />
         <ScrollArea className={`flex-1 ${isArticleListExpanded ? "" : "max-h-[100px] md:max-h-none"}`}>
           <div className="space-y-1 pr-4">
-            {actualArticles.map((article, index) => (
-              <button
-                key={`${article.jo}-${index}`}
-                onClick={() => handleArticleClick(article.jo)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                  activeJo === article.jo
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "hover:bg-secondary text-foreground"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex-1">
-                    {formatSimpleJo(article.jo)}
-                    {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {activeJo === article.jo ? (
-                      <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-                    ) : (
-                      <Bookmark className="h-3.5 w-3.5 opacity-40" />
-                    )}
+            {actualArticles.map((article, index) => {
+              const isLoading = loadingJo === article.jo
+              const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
+
+              return (
+                <button
+                  key={`${article.jo}-${index}`}
+                  onClick={() => handleArticleClick(article.jo)}
+                  disabled={isLoading}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    activeJo === article.jo
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "hover:bg-secondary text-foreground"
+                  } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex-1">
+                      {formatSimpleJo(article.jo)}
+                      {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
+                      {isLoading && <span className="text-xs ml-1 opacity-60">로딩중...</span>}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {activeJo === article.jo ? (
+                        <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                      ) : (
+                        <Bookmark className="h-3.5 w-3.5 opacity-40" />
+                      )}
                     <span
                       role="button"
                       tabIndex={0}
@@ -634,7 +736,8 @@ export function LawViewer({
                   </div>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         </ScrollArea>
       </Card>
@@ -828,6 +931,11 @@ export function LawViewer({
                       {index < actualArticles.length - 1 && <Separator className="my-8" />}
                     </div>
                   ))}
+                </div>
+              ) : loadingJo ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <p>조문을 불러오는 중...</p>
                 </div>
               ) : activeArticle ? (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
