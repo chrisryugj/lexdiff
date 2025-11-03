@@ -284,10 +284,6 @@ export default function Home() {
         throw new Error("선택한 법령에 대한 식별자를 찾을 수 없습니다")
       }
 
-      if (query.jo) {
-        params.append("jo", query.jo)
-      }
-
       const apiUrl = "/api/eflaw?" + params.toString()
       const response = await fetch(apiUrl)
 

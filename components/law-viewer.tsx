@@ -432,10 +432,34 @@ export function LawViewer({
                     ) : (
                       <Bookmark className="h-3.5 w-3.5 opacity-40" />
                     )}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onToggleFavorite?.(article.jo)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          onToggleFavorite?.(article.jo)
+                        }
+                      }}
+                      className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                        favorites.has(article.jo)
+                          ? "text-[var(--color-warning)]"
+                          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                      }`}
+                      aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                      aria-pressed={favorites.has(article.jo)}
+                      title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                    >
+                      <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
+                    </span>
                     {article.hasChanges && (
                       <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
                     )}
-                    {favorites.has(article.jo) && <Star className="h-3 w-3 fill-[var(--color-warning)]" />}
                   </div>
                 </div>
               </button>
