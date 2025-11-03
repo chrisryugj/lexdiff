@@ -343,8 +343,19 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // 법령만 참조 - 체계도 조회
-          await openLawHierarchyModal(lawName)
+          // 법령명만 참조 - 법제처 전체 조문 링크 제공
+          setRefModal({
+            open: true,
+            title: lawName,
+            html: `<div class="space-y-3">
+              <p><strong>「${lawName}」</strong> 전체 조문을 확인하시려면 아래 링크를 클릭하세요.</p>
+              <div class="pt-3 border-t">
+                <a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline text-lg font-semibold">
+                  법제처에서 ${lawName} 전문 보기 →
+                </a>
+              </div>
+            </div>`,
+          })
           setLastExternalRef({ lawName })
         }
       } else if (refType === "regulation") {
@@ -439,6 +450,12 @@ export function LawViewer({
 
         const eflawXml = await eflawRes.text()
 
+        // Check if response contains error message
+        if (eflawXml.includes("<errMsg>") || eflawXml.includes("<error>")) {
+          console.error("[citation] API returned error XML:", eflawXml.substring(0, 500))
+          throw new Error("API returned error response")
+        }
+
         // Parse the response (should only contain the requested article)
         const { parseLawXML } = await import("@/lib/law-xml-parser")
         const parsed = parseLawXML(eflawXml)
@@ -452,6 +469,7 @@ export function LawViewer({
           })
         } else {
           // Article not found - show link to law.go.kr
+          console.log("[citation] Article not found in parsed XML, showing fallback link")
           setRefModal({
             open: true,
             title: `${lawName} ${articleLabel}`,
@@ -459,7 +477,7 @@ export function LawViewer({
           })
         }
       } catch (fetchErr: any) {
-        console.error("Failed to fetch article:", fetchErr)
+        console.error("[citation] Failed to fetch/parse article:", { lawName, articleLabel, joCode, error: fetchErr.message })
         setRefModal({
           open: true,
           title: `${lawName} ${articleLabel}`,
