@@ -338,7 +338,15 @@ export function LawViewer({
         return
       }
 
-      // Try to fetch the law with a timeout
+      // Build JO code for the specific article
+      let joCode = ""
+      try {
+        joCode = buildJO(articleLabel)
+      } catch (err) {
+        console.error("Failed to build JO code:", err)
+      }
+
+      // Fetch only the specific article using JO parameter (not the entire law!)
       const identifierParams = new URLSearchParams()
       if (lawId) {
         identifierParams.append("lawId", lawId)
@@ -346,14 +354,14 @@ export function LawViewer({
         identifierParams.append("mst", mst)
       }
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+      // Add JO parameter to fetch only the specific article
+      if (joCode) {
+        identifierParams.append("jo", joCode)
+        console.log("[citation] Fetching specific article:", { lawName, articleLabel, joCode })
+      }
 
       try {
-        const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`, {
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
+        const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
 
         if (!eflawRes.ok) {
           throw new Error(`HTTP ${eflawRes.status}`)
@@ -361,13 +369,10 @@ export function LawViewer({
 
         const eflawXml = await eflawRes.text()
 
-        // Parse to find the target article
+        // Parse the response (should only contain the requested article)
         const { parseLawXML } = await import("@/lib/law-xml-parser")
         const parsed = parseLawXML(eflawXml)
-        let joCode = ""
-        try {
-          joCode = buildJO(articleLabel)
-        } catch {}
+
         const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
         if (found) {
           setRefModal({
@@ -384,18 +389,12 @@ export function LawViewer({
           })
         }
       } catch (fetchErr: any) {
-        clearTimeout(timeoutId)
-        if (fetchErr.name === "AbortError") {
-          // Timeout - show hierarchy instead
-          console.log("Fetch timeout, showing hierarchy instead")
-          setRefModal({
-            open: true,
-            title: `${lawName} ${articleLabel}`,
-            html: `<div class="space-y-3"><p>법령이 너무 커서 조문을 직접 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground">법제처에서 직접 확인해주세요.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
-          })
-        } else {
-          throw fetchErr
-        }
+        console.error("Failed to fetch article:", fetchErr)
+        setRefModal({
+          open: true,
+          title: `${lawName} ${articleLabel}`,
+          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+        })
       }
     } catch (err) {
       console.error("openExternalLawArticleModal error", err)
