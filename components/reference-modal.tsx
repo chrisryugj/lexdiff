@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -13,12 +13,29 @@ interface ReferenceModalProps {
   html?: string
   originalUrl?: string
   onContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
+  forceWhiteTheme?: boolean
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const canShowOriginal = !!originalUrl
+
+  // Attach event listener to the content div
+  useEffect(() => {
+    const contentEl = contentRef.current
+    if (!contentEl || !onContentClick) return
+
+    const handleClick = (e: MouseEvent) => {
+      // Convert MouseEvent to React.MouseEvent-like object
+      const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
+      onContentClick(reactEvent)
+    }
+
+    contentEl.addEventListener("click", handleClick)
+    return () => contentEl.removeEventListener("click", handleClick)
+  }, [onContentClick, html])
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
@@ -45,8 +62,13 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         ) : (
           <ScrollArea className="max-h-[65vh]">
             <div
-              className="prose prose-sm dark:prose-invert whitespace-pre-wrap leading-relaxed"
-              onClick={onContentClick}
+              ref={contentRef}
+              className={`prose prose-sm whitespace-pre-wrap leading-relaxed ${
+                forceWhiteTheme
+                  ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
+                  : "dark:prose-invert"
+              }`}
+              style={forceWhiteTheme ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem' } : undefined}
               dangerouslySetInnerHTML={{ __html: html || "연결된 본문을 불러올 수 없습니다." }}
             />
           </ScrollArea>

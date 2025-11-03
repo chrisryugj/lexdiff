@@ -76,17 +76,28 @@ export function LawViewer({
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
-  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
+  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string; forceWhiteTheme?: boolean }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
+    console.log("[v0] Updating loadedArticles from props.articles:", actualArticles.length)
     setLoadedArticles(actualArticles)
   }, [articles])
 
+  // Log when loadedArticles changes
+  useEffect(() => {
+    console.log("[v0] loadedArticles updated:", loadedArticles.length, "articles")
+    console.log("[v0] Current activeJo:", activeJo)
+  }, [loadedArticles, activeJo])
+
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
+
+  useEffect(() => {
+    console.log("[v0] activeArticle changed:", activeArticle?.jo, activeArticle?.title)
+  }, [activeArticle])
 
   useEffect(() => {
     console.log("[v0] [개정이력] Active article revision history:", {
@@ -101,7 +112,9 @@ export function LawViewer({
   useEffect(() => {
     console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance, viewMode, isFullView })
 
-    if (selectedJo) {
+    // Only update activeJo if selectedJo is different from current activeJo
+    // This prevents overriding user clicks from the sidebar
+    if (selectedJo && selectedJo !== activeJo) {
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
 
@@ -112,7 +125,7 @@ export function LawViewer({
         }, 100)
       }
     }
-  }, [selectedJo, actualArticles, isOrdinance, viewMode, isFullView])
+  }, [selectedJo, isFullView])
 
   useEffect(() => {
     articleRefs.current = {}
@@ -212,12 +225,14 @@ export function LawViewer({
           const newArticle = parsed.articles[0]
           setLoadedArticles((prev) => {
             // Avoid duplicates
-            if (prev.find((a) => a.jo === newArticle.jo)) {
+            const existing = prev.find((a) => a.jo === newArticle.jo)
+            if (existing) {
+              console.log("[v0] Article already exists, skipping")
               return prev
             }
+            console.log("[v0] Adding article to loadedArticles:", newArticle.jo)
             return [...prev, newArticle]
           })
-          console.log("[v0] 조문 로드 완료:", newArticle.jo)
         }
       } catch (error) {
         console.error("[v0] 조문 로드 실패:", error)
@@ -226,6 +241,7 @@ export function LawViewer({
       }
     }
 
+    // Always set active JO after loading attempt
     setActiveJo(jo)
 
     if (isFullView) {
@@ -327,8 +343,19 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // 법령만 참조 - 체계도 조회
-          await openLawHierarchyModal(lawName)
+          // 법령명만 참조 - 법제처 전체 조문 링크 제공
+          setRefModal({
+            open: true,
+            title: lawName,
+            html: `<div class="space-y-3">
+              <p><strong>「${lawName}」</strong> 전체 조문을 확인하시려면 아래 링크를 클릭하세요.</p>
+              <div class="pt-3 border-t">
+                <a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline text-lg font-semibold">
+                  법제처에서 ${lawName} 전문 보기 →
+                </a>
+              </div>
+            </div>`,
+          })
           setLastExternalRef({ lawName })
         }
       } else if (refType === "regulation") {
@@ -423,6 +450,12 @@ export function LawViewer({
 
         const eflawXml = await eflawRes.text()
 
+        // Check if response contains error message
+        if (eflawXml.includes("<errMsg>") || eflawXml.includes("<error>")) {
+          console.error("[citation] API returned error XML:", eflawXml.substring(0, 500))
+          throw new Error("API returned error response")
+        }
+
         // Parse the response (should only contain the requested article)
         const { parseLawXML } = await import("@/lib/law-xml-parser")
         const parsed = parseLawXML(eflawXml)
@@ -436,6 +469,7 @@ export function LawViewer({
           })
         } else {
           // Article not found - show link to law.go.kr
+          console.log("[citation] Article not found in parsed XML, showing fallback link")
           setRefModal({
             open: true,
             title: `${lawName} ${articleLabel}`,
@@ -443,7 +477,7 @@ export function LawViewer({
           })
         }
       } catch (fetchErr: any) {
-        console.error("Failed to fetch article:", fetchErr)
+        console.error("[citation] Failed to fetch/parse article:", { lawName, articleLabel, joCode, error: fetchErr.message })
         setRefModal({
           open: true,
           title: `${lawName} ${articleLabel}`,
@@ -547,6 +581,7 @@ export function LawViewer({
           open: true,
           title: lawName,
           html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+          forceWhiteTheme: true,
         })
         return
       }
@@ -571,6 +606,7 @@ export function LawViewer({
           open: true,
           title: lawName,
           html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+          forceWhiteTheme: true,
         })
         return
       }
@@ -623,6 +659,7 @@ export function LawViewer({
         open: true,
         title: `${lawName} 체계도`,
         html,
+        forceWhiteTheme: true,
       })
     } catch (err) {
       console.error("openLawHierarchyModal error", err)
@@ -630,6 +667,7 @@ export function LawViewer({
         open: true,
         title: lawName,
         html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+        forceWhiteTheme: true,
       })
     }
   }
@@ -995,6 +1033,7 @@ export function LawViewer({
         title={refModal.title || "연결된 본문"}
         html={refModal.html}
         onContentClick={handleContentClick}
+        forceWhiteTheme={refModal.forceWhiteTheme}
       />
     </div>
   )
