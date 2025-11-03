@@ -169,13 +169,28 @@
   }
 
   a.law-ref {
-    color: oklch(0.7 0.18 240);
+    color: oklch(0.65 0.2 250);
     text-decoration: underline;
+    text-decoration-thickness: 1px;
     text-underline-offset: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
   }
+
+  a.law-ref:hover {
+    color: oklch(0.75 0.22 250);
+    text-decoration-thickness: 2px;
+  }
+
   .prose a.law-ref {
-    color: oklch(0.7 0.18 240);
+    color: oklch(0.65 0.2 250);
     text-decoration: underline;
+    text-decoration-thickness: 1px;
+    cursor: pointer;
+  }
+
+  .prose a.law-ref:hover {
+    color: oklch(0.75 0.22 250);
   }
 
   a.law-html-link,
