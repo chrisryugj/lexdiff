@@ -273,7 +273,7 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // 법령 체계도 조회 시도
+          // 법령만 참조 - 체계도 조회
           await openLawHierarchyModal(lawName)
           setLastExternalRef({ lawName })
         }
@@ -330,37 +330,80 @@ export function LawViewer({
       const lawId = lawIdMatch?.[1]
       const mst = mstMatch?.[1]
       if (!lawId && !mst) {
-        setRefModal({ open: true, title: lawName, html: "법령을 찾지 못했습니다." })
+        setRefModal({
+          open: true,
+          title: lawName,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+        })
         return
       }
+
+      // Try to fetch the law with a timeout
       const identifierParams = new URLSearchParams()
       if (lawId) {
         identifierParams.append("lawId", lawId)
       } else if (mst) {
         identifierParams.append("mst", mst)
       }
-      const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
-      const eflawXml = await eflawRes.text()
-      // Parse to find the target article
-      const { parseLawXML } = await import("@/lib/law-xml-parser")
-      const parsed = parseLawXML(eflawXml)
-      let joCode = ""
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
       try {
-        joCode = buildJO(articleLabel)
-      } catch {}
-      const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-      if (found) {
-        setRefModal({
-          open: true,
-          title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-          html: extractArticleText(found),
+        const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`, {
+          signal: controller.signal,
         })
-      } else {
-        setRefModal({ open: true, title: lawName, html: "해당 조문을 찾지 못했습니다." })
+        clearTimeout(timeoutId)
+
+        if (!eflawRes.ok) {
+          throw new Error(`HTTP ${eflawRes.status}`)
+        }
+
+        const eflawXml = await eflawRes.text()
+
+        // Parse to find the target article
+        const { parseLawXML } = await import("@/lib/law-xml-parser")
+        const parsed = parseLawXML(eflawXml)
+        let joCode = ""
+        try {
+          joCode = buildJO(articleLabel)
+        } catch {}
+        const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
+        if (found) {
+          setRefModal({
+            open: true,
+            title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
+            html: extractArticleText(found),
+          })
+        } else {
+          // Article not found - show link to law.go.kr
+          setRefModal({
+            open: true,
+            title: `${lawName} ${articleLabel}`,
+            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+          })
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId)
+        if (fetchErr.name === "AbortError") {
+          // Timeout - show hierarchy instead
+          console.log("Fetch timeout, showing hierarchy instead")
+          setRefModal({
+            open: true,
+            title: `${lawName} ${articleLabel}`,
+            html: `<div class="space-y-3"><p>법령이 너무 커서 조문을 직접 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground">법제처에서 직접 확인해주세요.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+          })
+        } else {
+          throw fetchErr
+        }
       }
     } catch (err) {
       console.error("openExternalLawArticleModal error", err)
-      setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
+      setRefModal({
+        open: true,
+        title: `${lawName} ${articleLabel}`,
+        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+      })
     }
   }
 
@@ -450,7 +493,7 @@ export function LawViewer({
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
         })
         return
       }
@@ -474,7 +517,7 @@ export function LawViewer({
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
         })
         return
       }
@@ -486,7 +529,7 @@ export function LawViewer({
       if (hierarchy.upperLaws && hierarchy.upperLaws.length > 0) {
         html += `<div><h4 class="font-semibold mb-2">상위 법령</h4><ul class="list-disc list-inside space-y-1">`
         for (const upper of hierarchy.upperLaws) {
-          html += `<li><a href="#" class="text-primary hover:underline" data-law="${upper.lawName}">${upper.lawName}</a></li>`
+          html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${upper.lawName}">${upper.lawName}</a></li>`
         }
         html += `</ul></div>`
       }
@@ -506,7 +549,7 @@ export function LawViewer({
         if (decrees.length > 0) {
           html += `<div><h4 class="font-semibold mb-2">시행령</h4><ul class="list-disc list-inside space-y-1">`
           for (const decree of decrees) {
-            html += `<li><a href="#" class="text-primary hover:underline" data-law="${decree.lawName}">${decree.lawName}</a></li>`
+            html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${decree.lawName}">${decree.lawName}</a></li>`
           }
           html += `</ul></div>`
         }
@@ -514,13 +557,13 @@ export function LawViewer({
         if (rules.length > 0) {
           html += `<div><h4 class="font-semibold mb-2">시행규칙</h4><ul class="list-disc list-inside space-y-1">`
           for (const rule of rules) {
-            html += `<li><a href="#" class="text-primary hover:underline" data-law="${rule.lawName}">${rule.lawName}</a></li>`
+            html += `<li><a href="#" class="law-ref text-primary hover:underline" data-ref="law" data-law="${rule.lawName}">${rule.lawName}</a></li>`
           }
           html += `</ul></div>`
         }
       }
 
-      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기</a></div>`
+      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기 →</a></div>`
       html += `</div>`
 
       setRefModal({
@@ -533,7 +576,7 @@ export function LawViewer({
       setRefModal({
         open: true,
         title: lawName,
-        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
       })
     }
   }
