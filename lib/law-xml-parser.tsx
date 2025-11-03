@@ -345,23 +345,8 @@ function applyRevisionStyling(text: string): string {
 function linkifyRefsB(text: string): string {
   let t = text
 
-  t = t.replace(
-    /(대통령령|시행령)/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
-  )
-
-  t = t.replace(
-    /((?:[가-힣A-Za-z·]+)?부령|시행규칙)/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
-  )
-
-  t = t.replace(/제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?/g, (m) => {
-    const label = m
-    const data = m.replace(/\s+/g, "")
-    return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + "</a>"
-  })
-
-  t = t.replace(/「\s*([가-힣A-Za-z\d·]+법)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (_m, lawName, art, _p2, branch) => {
+  // 1. 「법령명」 제X조 패턴 (조문 번호 포함)
+  t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (_m, lawName, art, _p2, branch) => {
     const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
     const label = "「" + lawName + "」 " + joLabel
     return (
@@ -375,7 +360,50 @@ function linkifyRefsB(text: string): string {
     )
   })
 
-  t = t.replace(/([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (match, lawName, art, _p2, branch) => {
+  // 2. 「법령명」 단독 패턴 (조문 번호 없음)
+  t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
+    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
+  })
+
+  // 3. XXX부령으로/로 정하는 패턴
+  t = t.replace(
+    /([가-힣]+부령)(?:으로|로)\s*정하는/g,
+    (m, term) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
+  )
+
+  // 4. 대통령령으로 정하는 패턴
+  t = t.replace(
+    /(대통령령)(?:으로|로)\s*정하는/g,
+    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
+  )
+
+  // 5. XXX이/가 정하는 패턴 (관세청장이 정하는 등)
+  t = t.replace(
+    /([가-힣]+(?:청장|장관|부장관|차관|위원장|원장|이사장))(?:이|가)\s*정하는/g,
+    (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
+  )
+
+  // 6. 대통령령, 시행령 단독
+  t = t.replace(
+    /(대통령령|시행령)(?![으로로이가])/g,
+    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
+  )
+
+  // 7. 부령, 시행규칙 단독
+  t = t.replace(
+    /((?:[가-힣]+)?부령|시행규칙)(?![으로로이가])/g,
+    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
+  )
+
+  // 8. 제X조 패턴 (현재 법령의 조문)
+  t = t.replace(/제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?/g, (m) => {
+    const label = m
+    const data = m.replace(/\s+/g, "")
+    return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + "</a>"
+  })
+
+  // 9. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 이미 링크되지 않은 경우만
+  t = t.replace(/(?<!">)([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(?!<\/a>)/g, (match, lawName, art, _p2, branch) => {
     const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
     return (
       '<a href="#" class="law-ref" data-ref="law-article" data-law="' +

@@ -273,14 +273,18 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // Fallback: show minimal modal with a link
-          setRefModal({
-            open: true,
-            title: lawName,
-            html: `<a href=\"https://www.law.go.kr/법령/${encodeURIComponent(lawName)}\" target=\"_blank\" rel=\"noopener\">법령 페이지 열기</a>`,
-          })
+          // 법령 체계도 조회 시도
+          await openLawHierarchyModal(lawName)
           setLastExternalRef({ lawName })
         }
+      } else if (refType === "regulation") {
+        const kind = target.getAttribute("data-kind") || "administrative"
+        // "관세청장이 정하는" 등의 행정 규제는 안내 메시지 표시
+        setRefModal({
+          open: true,
+          title: "행정 규제 참조",
+          html: `<p>이 내용은 행정청이 정하는 고시, 훈령, 예규 등을 참조합니다.</p><p class="text-sm text-muted-foreground mt-2">구체적인 내용은 해당 행정청의 홈페이지 또는 법제처 국가법령정보센터에서 확인하실 수 있습니다.</p>`,
+        })
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
@@ -364,6 +368,107 @@ export function LawViewer({
     } catch (err) {
       console.error("openExternalLawArticleModal error", err)
       setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
+    }
+  }
+
+  // Helper: fetch law hierarchy and show in modal
+  async function openLawHierarchyModal(lawName: string) {
+    try {
+      // First search for the law to get its ID
+      const searchRes = await fetch(`/api/law-search?${new URLSearchParams({ query: lawName })}`)
+      const searchXml = await searchRes.text()
+      const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
+      const mstMatch = searchXml.match(/<법령일련번호>([^<]+)<\/법령일련번호>/)
+
+      if (!lawIdMatch && !mstMatch) {
+        setRefModal({
+          open: true,
+          title: lawName,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+        })
+        return
+      }
+
+      const lawId = lawIdMatch?.[1]
+      const mst = mstMatch?.[1]
+
+      // Fetch hierarchy information
+      const hierarchyParams = new URLSearchParams()
+      if (lawId) hierarchyParams.append("lawId", lawId)
+      else if (mst) hierarchyParams.append("mst", mst)
+
+      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`)
+      const hierarchyXml = await hierarchyRes.text()
+
+      const { parseHierarchyXML } = await import("@/lib/hierarchy-parser")
+      const hierarchy = parseHierarchyXML(hierarchyXml)
+
+      if (!hierarchy) {
+        // Fallback to basic law page
+        setRefModal({
+          open: true,
+          title: lawName,
+          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+        })
+        return
+      }
+
+      // Build hierarchy display HTML
+      let html = `<div class="space-y-4">`
+
+      // Upper laws
+      if (hierarchy.upperLaws && hierarchy.upperLaws.length > 0) {
+        html += `<div><h4 class="font-semibold mb-2">상위 법령</h4><ul class="list-disc list-inside space-y-1">`
+        for (const upper of hierarchy.upperLaws) {
+          html += `<li><a href="#" class="text-primary hover:underline" data-law="${upper.lawName}">${upper.lawName}</a></li>`
+        }
+        html += `</ul></div>`
+      }
+
+      // Current law
+      html += `<div><h4 class="font-semibold mb-2">현재 법령</h4><p>${hierarchy.lawName}</p>`
+      if (hierarchy.effectiveDate) {
+        html += `<p class="text-sm text-muted-foreground">시행일: ${hierarchy.effectiveDate}</p>`
+      }
+      html += `</div>`
+
+      // Lower laws (decree and rule)
+      if (hierarchy.lowerLaws && hierarchy.lowerLaws.length > 0) {
+        const decrees = hierarchy.lowerLaws.filter((l) => l.type === "decree")
+        const rules = hierarchy.lowerLaws.filter((l) => l.type === "rule")
+
+        if (decrees.length > 0) {
+          html += `<div><h4 class="font-semibold mb-2">시행령</h4><ul class="list-disc list-inside space-y-1">`
+          for (const decree of decrees) {
+            html += `<li><a href="#" class="text-primary hover:underline" data-law="${decree.lawName}">${decree.lawName}</a></li>`
+          }
+          html += `</ul></div>`
+        }
+
+        if (rules.length > 0) {
+          html += `<div><h4 class="font-semibold mb-2">시행규칙</h4><ul class="list-disc list-inside space-y-1">`
+          for (const rule of rules) {
+            html += `<li><a href="#" class="text-primary hover:underline" data-law="${rule.lawName}">${rule.lawName}</a></li>`
+          }
+          html += `</ul></div>`
+        }
+      }
+
+      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기</a></div>`
+      html += `</div>`
+
+      setRefModal({
+        open: true,
+        title: `${lawName} 체계도`,
+        html,
+      })
+    } catch (err) {
+      console.error("openLawHierarchyModal error", err)
+      setRefModal({
+        open: true,
+        title: lawName,
+        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener">법제처에서 보기</a></p>`,
+      })
     }
   }
 
