@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
@@ -11,9 +12,10 @@ interface ReferenceModalProps {
   title: string
   html?: string
   originalUrl?: string
+  onContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
 
   const canShowOriginal = !!originalUrl
@@ -44,6 +46,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl }: Re
           <ScrollArea className="max-h-[65vh]">
             <div
               className="prose prose-sm dark:prose-invert whitespace-pre-wrap leading-relaxed"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: html || "연결된 본문을 불러올 수 없습니다." }}
             />
           </ScrollArea>

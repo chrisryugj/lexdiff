@@ -279,11 +279,23 @@ export function LawViewer({
         }
       } else if (refType === "regulation") {
         const kind = target.getAttribute("data-kind") || "administrative"
+        const clickedText = target.textContent || ""
         // "관세청장이 정하는" 등의 행정 규제는 안내 메시지 표시
         setRefModal({
           open: true,
           title: "행정 규제 참조",
-          html: `<p>이 내용은 행정청이 정하는 고시, 훈령, 예규 등을 참조합니다.</p><p class="text-sm text-muted-foreground mt-2">구체적인 내용은 해당 행정청의 홈페이지 또는 법제처 국가법령정보센터에서 확인하실 수 있습니다.</p>`,
+          html: `<div class="space-y-3">
+            <p><strong>"${clickedText}"</strong> 부분은 행정청이 정하는 고시, 훈령, 예규, 규정 등을 참조합니다.</p>
+            <p class="text-sm text-muted-foreground">이러한 행정 규칙은 법령이 아니므로 법제처 국가법령정보센터에서 직접 확인하기 어려울 수 있습니다.</p>
+            <div class="pt-3 border-t space-y-2">
+              <p class="text-sm font-semibold">확인 방법:</p>
+              <ul class="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                <li>해당 행정청(예: 관세청, 국세청 등)의 공식 홈페이지</li>
+                <li><a href="https://www.law.go.kr/" target="_blank" rel="noopener" class="text-primary hover:underline">법제처 국가법령정보센터</a> - 고시/훈령/예규 검색</li>
+                <li><a href="https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=0&ancYd=&ancNo=&efYd=&nwJoYnInfo=N&efGubun=Y&chrClsCd=&lsId=&lsiSeq=0&joNo=#searchId" target="_blank" rel="noopener" class="text-primary hover:underline">법령 검색 페이지</a></li>
+              </ul>
+            </div>
+          </div>`,
         })
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
@@ -302,26 +314,7 @@ export function LawViewer({
       } else if (refType === "related") {
         if (!activeArticle) return
         const kind = target.getAttribute("data-kind") || "decree"
-        const joLabel = formatJO(activeArticle.jo)
-        try {
-          const qs = new URLSearchParams({ baseLaw: meta.lawTitle, joLabel, kind })
-          const res = await fetch(`/api/related?${qs.toString()}`)
-          const data = await res.json()
-          if (data?.candidates?.length > 0) {
-            const best = data.candidates[0]
-            setRefModal({
-              open: true,
-              title: `${data.lawName} ${best.joNum}${best.title ? ` (${best.title})` : ""}`,
-              html: best.html,
-            })
-          } else {
-            // fallback: 안내 모달
-            const suffix = kind === "rule" ? "시행규칙" : "시행령"
-            setRefModal({ open: true, title: `${meta.lawTitle} ${suffix}`, html: "관련 조문을 찾지 못했습니다." })
-          }
-        } catch (err) {
-          console.error("related lookup failed", err)
-        }
+        await openRelatedLawModal(kind as "decree" | "rule")
       }
     }
   }
@@ -368,6 +361,79 @@ export function LawViewer({
     } catch (err) {
       console.error("openExternalLawArticleModal error", err)
       setRefModal({ open: true, title: lawName, html: "로딩 중 오류가 발생했습니다." })
+    }
+  }
+
+  // Helper: open related law (decree or rule) modal
+  async function openRelatedLawModal(kind: "decree" | "rule") {
+    const kindLabel = kind === "decree" ? "시행령" : "시행규칙"
+
+    try {
+      // First, get the hierarchy to find the related law name
+      if (!meta.lawId && !meta.mst) {
+        setRefModal({
+          open: true,
+          title: `${meta.lawTitle} ${kindLabel}`,
+          html: `<p>관련 법령 정보를 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+        })
+        return
+      }
+
+      const hierarchyParams = new URLSearchParams()
+      if (meta.lawId) hierarchyParams.append("lawId", meta.lawId)
+      else if (meta.mst) hierarchyParams.append("mst", meta.mst)
+
+      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`)
+      const hierarchyXml = await hierarchyRes.text()
+
+      const { parseHierarchyXML } = await import("@/lib/hierarchy-parser")
+      const hierarchy = parseHierarchyXML(hierarchyXml)
+
+      if (!hierarchy || !hierarchy.lowerLaws || hierarchy.lowerLaws.length === 0) {
+        setRefModal({
+          open: true,
+          title: `${meta.lawTitle} ${kindLabel}`,
+          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+        })
+        return
+      }
+
+      // Find the matching decree or rule
+      const relatedLaw = hierarchy.lowerLaws.find((l) => l.type === kind)
+
+      if (!relatedLaw) {
+        setRefModal({
+          open: true,
+          title: `${meta.lawTitle} ${kindLabel}`,
+          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+        })
+        return
+      }
+
+      // Try to find the same article in the related law
+      if (activeArticle) {
+        try {
+          const joLabel = formatJO(activeArticle.jo)
+          await openExternalLawArticleModal(relatedLaw.lawName, joLabel)
+          return
+        } catch {
+          // If finding the same article fails, show the related law info
+        }
+      }
+
+      // Fallback: show related law info with link
+      setRefModal({
+        open: true,
+        title: relatedLaw.lawName,
+        html: `<div class="space-y-3"><p>해당 ${kindLabel}을 찾았습니다.</p><p class="text-sm"><strong>${relatedLaw.lawName}</strong></p><div class="flex gap-2 mt-4"><a href="https://www.law.go.kr/법령/${encodeURIComponent(relatedLaw.lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 전문 보기</a></div></div>`,
+      })
+    } catch (err) {
+      console.error("openRelatedLawModal error", err)
+      setRefModal({
+        open: true,
+        title: `${meta.lawTitle} ${kindLabel}`,
+        html: `<p>${kindLabel} 조회 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+      })
     }
   }
 
@@ -820,6 +886,7 @@ export function LawViewer({
         onClose={() => setRefModal({ open: false })}
         title={refModal.title || "연결된 본문"}
         html={refModal.html}
+        onContentClick={handleContentClick}
       />
     </div>
   )
