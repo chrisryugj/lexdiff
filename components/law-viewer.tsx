@@ -83,10 +83,21 @@ export function LawViewer({
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
+    console.log("[v0] Updating loadedArticles from props.articles:", actualArticles.length)
     setLoadedArticles(actualArticles)
   }, [articles])
 
+  // Log when loadedArticles changes
+  useEffect(() => {
+    console.log("[v0] loadedArticles updated:", loadedArticles.length, "articles")
+    console.log("[v0] Current activeJo:", activeJo)
+  }, [loadedArticles, activeJo])
+
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
+
+  useEffect(() => {
+    console.log("[v0] activeArticle changed:", activeArticle?.jo, activeArticle?.title)
+  }, [activeArticle])
 
   useEffect(() => {
     console.log("[v0] [개정이력] Active article revision history:", {
@@ -212,12 +223,14 @@ export function LawViewer({
           const newArticle = parsed.articles[0]
           setLoadedArticles((prev) => {
             // Avoid duplicates
-            if (prev.find((a) => a.jo === newArticle.jo)) {
+            const existing = prev.find((a) => a.jo === newArticle.jo)
+            if (existing) {
+              console.log("[v0] Article already exists, skipping")
               return prev
             }
+            console.log("[v0] Adding article to loadedArticles:", newArticle.jo)
             return [...prev, newArticle]
           })
-          console.log("[v0] 조문 로드 완료:", newArticle.jo)
         }
       } catch (error) {
         console.error("[v0] 조문 로드 실패:", error)
@@ -226,6 +239,7 @@ export function LawViewer({
       }
     }
 
+    // Always set active JO after loading attempt
     setActiveJo(jo)
 
     if (isFullView) {
