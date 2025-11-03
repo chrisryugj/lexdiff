@@ -76,7 +76,7 @@ export function LawViewer({
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
-  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string }>({ open: false })
+  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string; forceWhiteTheme?: boolean }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -563,6 +563,7 @@ export function LawViewer({
           open: true,
           title: lawName,
           html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+          forceWhiteTheme: true,
         })
         return
       }
@@ -587,6 +588,7 @@ export function LawViewer({
           open: true,
           title: lawName,
           html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+          forceWhiteTheme: true,
         })
         return
       }
@@ -639,6 +641,7 @@ export function LawViewer({
         open: true,
         title: `${lawName} 체계도`,
         html,
+        forceWhiteTheme: true,
       })
     } catch (err) {
       console.error("openLawHierarchyModal error", err)
@@ -646,6 +649,7 @@ export function LawViewer({
         open: true,
         title: lawName,
         html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+        forceWhiteTheme: true,
       })
     }
   }
@@ -1011,6 +1015,7 @@ export function LawViewer({
         title={refModal.title || "연결된 본문"}
         html={refModal.html}
         onContentClick={handleContentClick}
+        forceWhiteTheme={refModal.forceWhiteTheme}
       />
     </div>
   )

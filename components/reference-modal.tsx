@@ -13,9 +13,10 @@ interface ReferenceModalProps {
   html?: string
   originalUrl?: string
   onContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
+  forceWhiteTheme?: boolean
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -62,7 +63,12 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
           <ScrollArea className="max-h-[65vh]">
             <div
               ref={contentRef}
-              className="prose prose-sm dark:prose-invert whitespace-pre-wrap leading-relaxed"
+              className={`prose prose-sm whitespace-pre-wrap leading-relaxed ${
+                forceWhiteTheme
+                  ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
+                  : "dark:prose-invert"
+              }`}
+              style={forceWhiteTheme ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem' } : undefined}
               dangerouslySetInnerHTML={{ __html: html || "연결된 본문을 불러올 수 없습니다." }}
             />
           </ScrollArea>
