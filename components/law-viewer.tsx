@@ -112,7 +112,9 @@ export function LawViewer({
   useEffect(() => {
     console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance, viewMode, isFullView })
 
-    if (selectedJo) {
+    // Only update activeJo if selectedJo is different from current activeJo
+    // This prevents overriding user clicks from the sidebar
+    if (selectedJo && selectedJo !== activeJo) {
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
 
@@ -123,7 +125,7 @@ export function LawViewer({
         }, 100)
       }
     }
-  }, [selectedJo, actualArticles, isOrdinance, viewMode, isFullView])
+  }, [selectedJo, isFullView])
 
   useEffect(() => {
     articleRefs.current = {}
