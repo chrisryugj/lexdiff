@@ -343,19 +343,7 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          // 법령명만 참조 - 법제처 전체 조문 링크 제공
-          setRefModal({
-            open: true,
-            title: lawName,
-            html: `<div class="space-y-3">
-              <p><strong>「${lawName}」</strong> 전체 조문을 확인하시려면 아래 링크를 클릭하세요.</p>
-              <div class="pt-3 border-t">
-                <a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline text-lg font-semibold">
-                  법제처에서 ${lawName} 전문 보기 →
-                </a>
-              </div>
-            </div>`,
-          })
+          window.open(`https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`, "_blank", "noopener")
           setLastExternalRef({ lawName })
         }
       } else if (refType === "regulation") {
@@ -453,7 +441,12 @@ export function LawViewer({
 
         const eflawJson = await eflawRes.json()
         const lawData = eflawJson?.법령
-        const articleUnits = lawData?.조문?.조문단위 || []
+        const rawArticleUnits = lawData?.조문?.조문단위
+        const articleUnits = Array.isArray(rawArticleUnits)
+          ? rawArticleUnits
+          : rawArticleUnits
+          ? [rawArticleUnits]
+          : []
         const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
 
         const targetUnit =
