@@ -406,20 +406,23 @@ export function LawViewer({
       const qs = new URLSearchParams({ query: lawName })
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
-      const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
-      const mstMatch = searchXml.match(/<법령일련번호>([^<]+)<\/법령일련번호>/)
-      const lawId = lawIdMatch?.[1]
-      const mst = mstMatch?.[1]
+
+      const parser = new DOMParser()
+      const searchDoc = parser.parseFromString(searchXml, "text/xml")
+      const lawNode = searchDoc.querySelector("law")
+
+      const lawId = lawNode?.querySelector("법령ID")?.textContent || undefined
+      const mst = lawNode?.querySelector("법령일련번호")?.textContent || undefined
+      const effectiveDate = lawNode?.querySelector("시행일자")?.textContent || undefined
       if (!lawId && !mst) {
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
         })
         return
       }
 
-      // Build JO code for the specific article
       let joCode = ""
       try {
         joCode = buildJO(articleLabel)
@@ -427,18 +430,18 @@ export function LawViewer({
         console.error("Failed to build JO code:", err)
       }
 
-      // Fetch only the specific article using JO parameter (not the entire law!)
       const identifierParams = new URLSearchParams()
       if (lawId) {
         identifierParams.append("lawId", lawId)
       } else if (mst) {
         identifierParams.append("mst", mst)
       }
-
-      // Add JO parameter to fetch only the specific article
       if (joCode) {
         identifierParams.append("jo", joCode)
         console.log("[citation] Fetching specific article:", { lawName, articleLabel, joCode })
+      }
+      if (effectiveDate) {
+        identifierParams.append("efYd", effectiveDate)
       }
 
       try {
@@ -448,40 +451,61 @@ export function LawViewer({
           throw new Error(`HTTP ${eflawRes.status}`)
         }
 
-        const eflawXml = await eflawRes.text()
+        const eflawJson = await eflawRes.json()
+        const lawData = eflawJson?.법령
+        const articleUnits = lawData?.조문?.조문단위 || []
+        const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
 
-        // Check if response contains error message
-        if (eflawXml.includes("<errMsg>") || eflawXml.includes("<error>")) {
-          console.error("[citation] API returned error XML:", eflawXml.substring(0, 500))
-          throw new Error("API returned error response")
-        }
-
-        // Parse the response (should only contain the requested article)
-        const { parseLawXML } = await import("@/lib/law-xml-parser")
-        const parsed = parseLawXML(eflawXml)
-
-        const found = parsed.articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-        if (found) {
-          setRefModal({
-            open: true,
-            title: `${lawName} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-            html: extractArticleText(found),
+        const targetUnit =
+          articleUnits.find((unit: any) => typeof unit?.조문키 === "string" && unit.조문키.startsWith(normalizedJo)) ||
+          articleUnits.find((unit: any) => {
+            const num = typeof unit?.조문번호 === "string" ? unit.조문번호.replace(/\D/g, "") : ""
+            const targetNum = articleLabel.replace(/\D/g, "")
+            return num !== "" && targetNum !== "" && num === targetNum
           })
-        } else {
-          // Article not found - show link to law.go.kr
-          console.log("[citation] Article not found in parsed XML, showing fallback link")
+
+        if (!targetUnit) {
+          console.warn("[citation] Article not found in JSON response", { lawName, articleLabel, joCode })
           setRefModal({
             open: true,
             title: `${lawName} ${articleLabel}`,
-            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
           })
+          return
         }
+
+        const lawArticle: LawArticle = {
+          jo: normalizedJo,
+          joNum: articleLabel,
+          title: targetUnit.조문제목 || "",
+          content: targetUnit.조문내용 || "",
+          paragraphs: Array.isArray(targetUnit.항)
+            ? targetUnit.항.map((hang: any) => ({
+                num: typeof hang?.항번호 === "string" ? hang.항번호.trim() : "",
+                content: typeof hang?.항내용 === "string" ? hang.항내용 : "",
+                items: Array.isArray(hang?.호)
+                  ? hang.호.map((item: any) => ({
+                      num: typeof item?.호번호 === "string" ? item.호번호.trim() : "",
+                      content: typeof item?.호내용 === "string" ? item.호내용 : "",
+                    }))
+                  : undefined,
+              }))
+            : undefined,
+        }
+
+        const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
+
+        setRefModal({
+          open: true,
+          title: articleTitle,
+          html: extractArticleText(lawArticle, { structure: lawStructure }),
+        })
       } catch (fetchErr: any) {
         console.error("[citation] Failed to fetch/parse article:", { lawName, articleLabel, joCode, error: fetchErr.message })
         setRefModal({
           open: true,
           title: `${lawName} ${articleLabel}`,
-          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기</a></div></div>`,
         })
       }
     } catch (err) {
@@ -489,11 +513,10 @@ export function LawViewer({
       setRefModal({
         open: true,
         title: `${lawName} ${articleLabel}`,
-        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기</a></div></div>`,
       })
     }
   }
-
   // Helper: open related law (decree or rule) modal
   async function openRelatedLawModal(kind: "decree" | "rule") {
     const kindLabel = kind === "decree" ? "시행령" : "시행규칙"
