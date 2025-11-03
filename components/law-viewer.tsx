@@ -67,6 +67,10 @@ export function LawViewer({
   const actualArticles = articles.filter((a) => !a.isPreamble)
   const preambles = articles.filter((a) => a.isPreamble)
 
+  // State for dynamically loaded articles
+  const [loadedArticles, setLoadedArticles] = useState<LawArticle[]>(actualArticles)
+  const [loadingJo, setLoadingJo] = useState<string | null>(null)
+
   const [activeJo, setActiveJo] = useState<string>(selectedJo || actualArticles[0]?.jo || "")
   const [fontSize, setFontSize] = useState<number>(14)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
@@ -77,7 +81,12 @@ export function LawViewer({
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
-  const activeArticle = actualArticles.find((a) => a.jo === activeJo)
+  // Update loadedArticles when props.articles changes
+  useEffect(() => {
+    setLoadedArticles(actualArticles)
+  }, [articles])
+
+  const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
   useEffect(() => {
     console.log("[v0] [개정이력] Active article revision history:", {
@@ -169,8 +178,53 @@ export function LawViewer({
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance])
 
-  const handleArticleClick = (jo: string) => {
+  const handleArticleClick = async (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
+
+    // Check if article is already loaded
+    const existingArticle = loadedArticles.find((a) => a.jo === jo)
+
+    if (!existingArticle && !isOrdinance && (meta.lawId || meta.mst)) {
+      // Article not loaded - fetch it dynamically
+      console.log("[v0] 조문이 로드되지 않음 - 동적으로 로드:", jo)
+      setLoadingJo(jo)
+
+      try {
+        const params = new URLSearchParams()
+        if (meta.lawId) {
+          params.append("lawId", meta.lawId)
+        } else if (meta.mst) {
+          params.append("mst", meta.mst)
+        }
+        params.append("jo", jo)
+
+        const response = await fetch(`/api/eflaw?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const xmlText = await response.text()
+        const { parseLawXML } = await import("@/lib/law-xml-parser")
+        const parsed = parseLawXML(xmlText)
+
+        // Add newly fetched article to loadedArticles
+        if (parsed.articles.length > 0) {
+          const newArticle = parsed.articles[0]
+          setLoadedArticles((prev) => {
+            // Avoid duplicates
+            if (prev.find((a) => a.jo === newArticle.jo)) {
+              return prev
+            }
+            return [...prev, newArticle]
+          })
+          console.log("[v0] 조문 로드 완료:", newArticle.jo)
+        }
+      } catch (error) {
+        console.error("[v0] 조문 로드 실패:", error)
+      } finally {
+        setLoadingJo(null)
+      }
+    }
 
     setActiveJo(jo)
 
@@ -624,27 +678,33 @@ export function LawViewer({
         <Separator className="mb-4" />
         <ScrollArea className={`flex-1 ${isArticleListExpanded ? "" : "max-h-[100px] md:max-h-none"}`}>
           <div className="space-y-1 pr-4">
-            {actualArticles.map((article, index) => (
-              <button
-                key={`${article.jo}-${index}`}
-                onClick={() => handleArticleClick(article.jo)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                  activeJo === article.jo
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "hover:bg-secondary text-foreground"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex-1">
-                    {formatSimpleJo(article.jo)}
-                    {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {activeJo === article.jo ? (
-                      <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-                    ) : (
-                      <Bookmark className="h-3.5 w-3.5 opacity-40" />
-                    )}
+            {actualArticles.map((article, index) => {
+              const isLoading = loadingJo === article.jo
+              const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
+
+              return (
+                <button
+                  key={`${article.jo}-${index}`}
+                  onClick={() => handleArticleClick(article.jo)}
+                  disabled={isLoading}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    activeJo === article.jo
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "hover:bg-secondary text-foreground"
+                  } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex-1">
+                      {formatSimpleJo(article.jo)}
+                      {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
+                      {isLoading && <span className="text-xs ml-1 opacity-60">로딩중...</span>}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {activeJo === article.jo ? (
+                        <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                      ) : (
+                        <Bookmark className="h-3.5 w-3.5 opacity-40" />
+                      )}
                     <span
                       role="button"
                       tabIndex={0}
@@ -676,7 +736,8 @@ export function LawViewer({
                   </div>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         </ScrollArea>
       </Card>
@@ -870,6 +931,11 @@ export function LawViewer({
                       {index < actualArticles.length - 1 && <Separator className="my-8" />}
                     </div>
                   ))}
+                </div>
+              ) : loadingJo ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <p>조문을 불러오는 중...</p>
                 </div>
               ) : activeArticle ? (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
