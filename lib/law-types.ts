@@ -106,3 +106,50 @@ export interface RevisionHistoryItem {
   changeReason?: string // 변경사유
   articleLink?: string // 조문링크
 }
+
+// 3단비교 타입 정의
+export interface DelegationItem {
+  type: "시행령" | "시행규칙" | "행정규칙" // 위임 종류
+  lawName?: string // 법령명 (시행령명, 시행규칙명 등)
+  jo?: string // 조번호 (있는 경우)
+  joNum?: string // 조문 표시 (제N조)
+  title?: string // 조제목
+  content: string // 조내용
+}
+
+export interface CitationItem {
+  type: "인용" // 인용 타입
+  jo: string // 인용되는 조문의 JO 코드
+  joNum: string // 조문 표시
+  title?: string
+  content: string
+}
+
+export interface ThreeTierMeta {
+  lawId: string
+  lawName: string
+  lawSummary: string
+  sihyungryungId?: string
+  sihyungryungName?: string
+  sihyungryungSummary?: string
+  sihyungkyuchikId?: string
+  sihyungkyuchikName?: string
+  sihyungkyuchikSummary?: string
+  exists: boolean // 삼단비교존재여부
+  basis: string // 삼단비교기준 (L: 법률 기준)
+}
+
+export interface ThreeTierArticle {
+  jo: string // 6자리 JO 코드
+  joNum: string // 조문 번호 (제38조, 제10조의2 등)
+  title?: string // 조제목
+  content: string // 조내용
+  delegations: DelegationItem[] // 위임조문 목록 (시행령, 시행규칙, 행정규칙)
+  citations: CitationItem[] // 인용조문 목록 (같은 법안의 다른 조문)
+}
+
+export interface ThreeTierData {
+  meta: ThreeTierMeta
+  articles: ThreeTierArticle[]
+  kndType: "인용조문" | "위임조문"
+}
