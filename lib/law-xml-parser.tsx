@@ -317,6 +317,36 @@ export function extractArticleText(article: LawArticle): string {
   return text.trim()
 }
 
+/**
+ * Format delegation/citation content with the same styling as main articles
+ * (For plain text content without structured paragraphs/items)
+ */
+export function formatDelegationContent(content: string): string {
+  if (!content || content.trim().length === 0) {
+    return ""
+  }
+
+  let text = escapeHtml(content)
+  text = applyRevisionStyling(text)
+  text = linkifyRefsB(text)
+
+  // Replace paragraph markers with line breaks
+  text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br>$1 ')
+
+  // Replace numbered items with line breaks, but NOT dates in revision markers
+  // Negative lookbehind: not preceded by "digit. " (to skip "3. " in "2010. 3. 26.")
+  // Negative lookahead: not followed by "digit(s)." (to skip "2010. " in "2010. 3.")
+  text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
+
+  // Replace sub-items (가., 나., 다., etc.) with indented line breaks
+  text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
+
+  // Clean up any leading <br> tags
+  text = text.replace(/^(<br>)+/, '')
+
+  return text
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -344,6 +374,34 @@ function applyRevisionStyling(text: string): string {
 
 function linkifyRefsB(text: string): string {
   let t = text
+
+  // First, handle "같은 법" pattern by finding the last law name before each occurrence
+  t = t.replace(/같은\s*법\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, art, _p1, branch, _p2, para, _p3, item, offset) => {
+    // Find last 「법령명」 before this position
+    const textBefore = t.substring(0, offset)
+    const allLawMatches = textBefore.matchAll(/「\s*([^」]+)\s*」/g)
+    const lawMatchesArray = Array.from(allLawMatches)
+
+    if (lawMatchesArray.length > 0) {
+      const lastLawMatch = lawMatchesArray[lawMatchesArray.length - 1]
+      const lawName = lastLawMatch[1].trim()
+      const joLabel = "제" + art + "조" +
+        (branch ? "의" + branch : "") +
+        (para ? "제" + para + "항" : "") +
+        (item ? "제" + item + "호" : "")
+      return (
+        '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
+        lawName +
+        '" data-article="' +
+        joLabel +
+        '">같은 법 ' +
+        joLabel +
+        "</a>"
+      )
+    }
+
+    return match  // If no law found, keep original text
+  })
 
   // 1. 「법령명」 제X조 패턴 (조문 번호 포함)
   t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (_m, lawName, art, _p2, branch) => {
