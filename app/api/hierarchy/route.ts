@@ -13,40 +13,68 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let url: string
+    let finalMst = mst
+    let finalLawId = lawId
 
-    // 법령 ID나 MST가 있으면 본문 조회, 없으면 목록에서 검색
-    if (lawId || mst) {
-      const params = new URLSearchParams({
+    // lawName만 주어진 경우, 먼저 검색으로 MST 찾기
+    if (lawName && !finalMst && !finalLawId) {
+      const searchParams = new URLSearchParams({
         OC: LAW_API_KEY,
-        target: "lsStmd",
-        type: "XML",
-      })
-
-      if (lawId) {
-        params.append("ID", lawId)
-      } else if (mst) {
-        params.append("MST", mst)
-      }
-
-      url = `https://www.law.go.kr/DRF/lawService.do?${params.toString()}`
-    } else if (lawName) {
-      // 법령명으로 검색
-      const params = new URLSearchParams({
-        OC: LAW_API_KEY,
-        target: "lsStmd",
+        target: "law",
         type: "XML",
         query: lawName,
+        display: "1",
       })
 
-      url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
-    } else {
+      const searchUrl = `https://www.law.go.kr/DRF/lawSearch.do?${searchParams.toString()}`
+      console.log("[hierarchy API] Searching for law:", searchUrl)
+
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; LexDiff/1.0)",
+        },
+      })
+
+      if (searchResponse.ok) {
+        const searchXml = await searchResponse.text()
+
+        // XML에서 MST 추출 (정규식 사용)
+        const mstMatch = searchXml.match(/<법령일련번호>(\d+)<\/법령일련번호>/)
+
+        if (mstMatch && mstMatch[1]) {
+          finalMst = mstMatch[1].trim()
+          console.log("[hierarchy API] Found MST:", finalMst)
+        } else {
+          console.error("[hierarchy API] MST not found in search results")
+          return new Response("Law not found", { status: 404 })
+        }
+      } else {
+        console.error("[hierarchy API] Search failed:", searchResponse.status)
+        return new Response("Failed to search for law", { status: searchResponse.status })
+      }
+    }
+
+    // MST나 lawId로 체계도 본문 조회
+    if (!finalMst && !finalLawId) {
       return new Response("Missing required parameter: lawName, lawId, or mst", {
         status: 400,
       })
     }
 
-    console.log("[hierarchy API] Fetching:", url)
+    const params = new URLSearchParams({
+      OC: LAW_API_KEY,
+      target: "lsStmd",
+      type: "XML",
+    })
+
+    if (finalLawId) {
+      params.append("ID", finalLawId)
+    } else if (finalMst) {
+      params.append("MST", finalMst)
+    }
+
+    const url = `https://www.law.go.kr/DRF/lawService.do?${params.toString()}`
+    console.log("[hierarchy API] Fetching hierarchy:", url)
 
     const response = await fetch(url, {
       headers: {
