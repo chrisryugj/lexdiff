@@ -25,6 +25,7 @@ import {
   Link2,
   Eye,
   Loader2,
+  RefreshCw,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -34,6 +35,7 @@ import { RevisionHistory } from "@/components/revision-history"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
+import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 
 interface LawViewerProps {
   meta: LawMeta
@@ -97,6 +99,7 @@ export function LawViewer({
 
   // Admin rules state
   const [showAdminRules, setShowAdminRules] = useState(false)
+  const [adminRuleViewMode, setAdminRuleViewMode] = useState<"list" | "detail">("list")
   const [adminRuleHtml, setAdminRuleHtml] = useState<string>("")
   const [adminRuleTitle, setAdminRuleTitle] = useState<string>("")
   // Admin rule cache - key: id or serialNumber, value: { title, html }
@@ -135,8 +138,31 @@ export function LawViewer({
   const currentArticleCitations = threeTierCitation?.articles.find((a) => a.jo === activeJo)?.citations || []
 
   // Filter to only include items with actual content
+  // content가 비어있으면 실제로 내용이 없는 것이므로 필터링
   const validDelegations = currentArticleDelegations.filter((d) => d.content && d.content.trim().length > 0)
   const validCitations = currentArticleCitations.filter((c) => c.content && c.content.trim().length > 0)
+
+  // 디버깅: 현재 조문의 delegation 데이터 확인
+  useEffect(() => {
+    if (activeJo && currentArticleDelegations.length > 0) {
+      console.log(`[3단비교 디버깅] 조문 ${formatJO(activeJo)} delegation 데이터:`, {
+        전체개수: currentArticleDelegations.length,
+        유효개수: validDelegations.length,
+        시행령개수: currentArticleDelegations.filter(d => d.type === "시행령").length,
+        시행규칙개수: currentArticleDelegations.filter(d => d.type === "시행규칙").length,
+        시행령유효: validDelegations.filter(d => d.type === "시행령").length,
+        시행규칙유효: validDelegations.filter(d => d.type === "시행규칙").length,
+        상세: currentArticleDelegations.map(d => ({
+          type: d.type,
+          lawName: d.lawName,
+          joNum: d.joNum,
+          hasContent: !!d.content,
+          contentLength: d.content?.length || 0,
+          contentPreview: d.content ? d.content.substring(0, 50) + "..." : "(empty)"
+        }))
+      })
+    }
+  }, [activeJo, currentArticleDelegations])
 
   // Check if there are valid 시행규칙 items (for 3-tier view)
   const hasValidSihyungkyuchik = validDelegations.some((d) => d.type === "시행규칙")
@@ -173,6 +199,14 @@ export function LawViewer({
     if (selectedJo && selectedJo !== activeJo) {
       console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
+
+      // Reset admin rules when changing articles to prevent unnecessary searches
+      setShowAdminRules(false)
+      setAdminRuleViewMode("list")
+      setAdminRuleHtml(null)
+
+      // Reset tier view mode to 1-tier when changing articles
+      setTierViewMode("1-tier")
 
       if (!isFullView && contentRef.current) {
         console.log("[v0] 단일 조문 모드 - 스크롤 최상단 이동")
@@ -484,19 +518,12 @@ export function LawViewer({
         const clickedText = target.textContent || ""
         console.log("[v0] [행정규칙] 링크 클릭 - 행정규칙 버튼 활성화 및 2단 뷰 전환", { clickedText })
 
-        // Enable admin rules and switch to 2-tier view
+        // Enable admin rules, set list view mode, and switch to 2-tier view
         if (!showAdminRules) {
           setShowAdminRules(true)
         }
-
-        // If admin rules are already loaded and available, switch to 2-tier view
-        if (adminRules.length > 0 || showAdminRules) {
-          setTierViewMode("2-tier")
-        } else {
-          // If no admin rules yet, just enable the button (it will load automatically)
-          // Show a brief message that admin rules are being loaded
-          console.log("[v0] [행정규칙] 행정규칙 로딩 중...")
-        }
+        setAdminRuleViewMode("list")
+        setTierViewMode("2-tier")
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
@@ -516,6 +543,12 @@ export function LawViewer({
         const kind = target.getAttribute("data-kind") || "decree"
         // Expand to 2-tier view to show delegations
         console.log("[v0] [3단비교] 위임조문 클릭 - 2단뷰로 전환", { kind, activeJo: activeArticle.jo })
+
+        // Close admin rules view and restore delegation view
+        setShowAdminRules(false)
+        setAdminRuleViewMode("list")
+        setAdminRuleHtml(null)
+
         setTierViewMode("2-tier")
         // Optionally still open the modal as fallback if no delegation data
         // await openRelatedLawModal(kind as "decree" | "rule")
@@ -529,12 +562,13 @@ export function LawViewer({
       // Use serialNumber first, fallback to id (same as test page)
       const idParam = rule.serialNumber || rule.id
 
-      // Check cache first
-      const cached = adminRuleCache.get(idParam)
+      // Check IndexedDB cache first
+      const cached = await getAdminRuleContentCache(idParam)
       if (cached) {
-        console.log("[law-viewer] Using cached admin rule content:", idParam)
+        console.log("[law-viewer] Using IndexedDB cached admin rule content:", idParam)
         setAdminRuleTitle(cached.title)
         setAdminRuleHtml(cached.html)
+        setAdminRuleViewMode("detail")
         setTierViewMode("2-tier")
         return
       }
@@ -544,6 +578,7 @@ export function LawViewer({
       // Set loading state
       setAdminRuleTitle(rule.name)
       setAdminRuleHtml('<div style="text-align: center; padding: 2rem 0; color: hsl(var(--muted-foreground));"><div style="display: inline-block; width: 2rem; height: 2rem; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div><p style="margin-top: 1rem;">로딩 중...</p><style>@keyframes spin { to { transform: rotate(360deg); }}</style></div>')
+      setAdminRuleViewMode("detail")
       setTierViewMode("2-tier")
 
       console.log("[law-viewer] Fetching admin rule content:", idParam)
@@ -583,61 +618,97 @@ export function LawViewer({
         htmlParts.push('</div>')
       }
 
-      // Articles - format like law text with proper spacing
+      // Articles - format EXACTLY like law text using text + \n (not HTML blocks)
+      let textParts: string[] = []
+
       fullContent.articles.forEach((article, idx) => {
-        // Article title and number
-        htmlParts.push('<div style="margin-bottom: 24px;">')
-        htmlParts.push('<div style="font-weight: 600; font-size: 0.9375rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid hsl(var(--border)); color: hsl(var(--foreground));">')
-        htmlParts.push(article.number)
-        if (article.title) {
-          htmlParts.push(` <span style="font-weight: 400; color: hsl(var(--muted-foreground));">(${article.title})</span>`)
-        }
-        htmlParts.push('</div>')
+        // Article title - bold inline style
+        const titleHtml = '<strong style="font-size: 1rem;">' + article.number +
+          (article.title ? ' <span style="font-weight: 400; color: hsl(var(--muted-foreground));">(' + article.title + ')</span>' : '') +
+          '</strong>'
 
-        // Article content - format paragraphs (항)
-        const content = article.content
-        // Split by ① ② ③ etc. for paragraphs
-        const paragraphMarkers = content.match(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g)
+        textParts.push(titleHtml)
+        textParts.push('\n') // 제목 뒤 줄바꿈 1개
 
-        if (paragraphMarkers && paragraphMarkers.length > 0) {
-          // Has paragraph markers - format each paragraph on new line
-          let formattedContent = content
-          // Replace paragraph markers with line break + marker
-          formattedContent = formattedContent.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])/g, '<br>$1 ')
-          // Clean up leading <br>
-          formattedContent = formattedContent.replace(/^<br>/, '')
+        // Article content - process like law text
+        let content = article.content
 
-          htmlParts.push(`<div style="font-size: 0.875rem; line-height: 1.8; color: hsl(var(--foreground));">`)
-          htmlParts.push(formattedContent)
-          htmlParts.push('</div>')
+        // Escape HTML
+        content = content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;")
+
+        // Apply revision styling
+        content = content.replace(
+          /&lt;(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
+          '<span class="rev-mark">＜$1 $2＞</span>'
+        )
+        content = content.replace(
+          /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g,
+          '<span class="rev-mark">＜$1 $2＞</span>'
+        )
+
+        // Linkify law references - IMPORTANT: Order matters! Longer patterns first.
+
+        // 1. 「법령명」 제X조 pattern (긴 패턴 먼저)
+        content = content.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+          const joLabel = "제" + art + "조" + (branch ? "의" + branch : "") + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
+          const label = "「" + lawName + "」 " + joLabel
+          return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + label + '</a>'
+        })
+
+        // 2. 법 제X조 pattern (without 「」)
+        content = content.replace(/([가-힣]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+          const joLabel = "제" + art + "조" + (branch ? "의" + branch : "") + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
+          return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + lawName + ' ' + joLabel + '</a>'
+        })
+
+        // 3. 「법령명」 pattern only (짧은 패턴 마지막)
+        content = content.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
+          return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
+        })
+
+        // Check if content has paragraph markers (①②③) or numbered items (1. 2. 3.)
+        const hasParagraphMarkers = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(content)
+        const hasNumberedItems = /\d+\.\s+/.test(content)
+
+        if (hasParagraphMarkers || hasNumberedItems) {
+          // Split by paragraph markers OR numbered items (1. 2. 3.)
+          // Use lookbehind to avoid splitting in dates like "2024. 1. 1."
+          const parts = content.split(/(?=[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])|(?<!\d\. )(?=\d+\.\s+)/)
+          parts.forEach((part, pIdx) => {
+            const trimmed = part.trim()
+            if (trimmed) {
+              if (pIdx > 0) textParts.push('\n') // 항/호 앞에 줄바꿈
+              textParts.push(trimmed)
+            }
+          })
+          textParts.push('\n') // 조문 끝 줄바꿈
         } else {
-          // No paragraph markers - just display as is
-          htmlParts.push(`<div style="font-size: 0.875rem; line-height: 1.8; white-space: pre-wrap; color: hsl(var(--foreground));">`)
-          htmlParts.push(content)
-          htmlParts.push('</div>')
+          textParts.push(content)
+          textParts.push('\n') // 조문 끝 줄바꿈
         }
 
-        htmlParts.push('</div>')
-
-        // Add spacing between articles (1 line)
+        // Add spacing between articles (Separator)
         if (idx < fullContent.articles.length - 1) {
-          htmlParts.push('<div style="height: 0.5rem;"></div>')
+          textParts.push('<hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid hsl(var(--border));" />')
         }
       })
 
+      const articlesHtml = textParts.join('')
+      htmlParts.push(articlesHtml)
       const finalHtml = htmlParts.join('')
       const finalTitle = fullContent.name
 
       setAdminRuleTitle(finalTitle)
       setAdminRuleHtml(finalHtml)
 
-      // Cache the result
-      setAdminRuleCache(prev => {
-        const newCache = new Map(prev)
-        newCache.set(idParam, { title: finalTitle, html: finalHtml })
-        return newCache
-      })
-      console.log("[law-viewer] Cached admin rule content:", idParam)
+      // Cache the result to IndexedDB
+      await setAdminRuleContentCache(idParam, finalTitle, finalHtml, fullContent.effectiveDate)
+      console.log("[law-viewer] Cached admin rule content to IndexedDB:", idParam)
     } catch (error: any) {
       console.error("[law-viewer] Error loading admin rule full content:", error)
       setAdminRuleHtml(`<div style="text-align: center; padding: 2rem 0;"><p style="color: hsl(var(--destructive)); font-weight: 600; margin-bottom: 0.5rem;">전체 내용 조회 실패</p><p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">${error.message}</p></div>`)
@@ -1131,24 +1202,24 @@ export function LawViewer({
                     variant={tierViewMode === "2-tier" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
-                    title={threeTierDataType === "delegation" ? "위임조문 2단 보기" : "인용조문 2단 보기"}
+                    title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
                   >
                     {threeTierDataType === "delegation" ? (
                       <FileText className="h-4 w-4 mr-2" />
                     ) : (
                       <Link2 className="h-4 w-4 mr-2" />
                     )}
-                    2단 비교
+                    시행령
                   </Button>
                   {threeTierDataType === "delegation" && hasValidSihyungkyuchik && (
                     <Button
                       variant={tierViewMode === "3-tier" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
-                      title="위임조문 3단 보기"
+                      title="시행규칙 보기"
                     >
                       <FileText className="h-4 w-4 mr-2" />
-                      3단 비교
+                      시행규칙
                     </Button>
                   )}
                 </>
@@ -1157,7 +1228,14 @@ export function LawViewer({
               <Button
                 variant={showAdminRules ? "default" : "outline"}
                 size="sm"
-                onClick={() => setShowAdminRules(!showAdminRules)}
+                onClick={() => {
+                  const newValue = !showAdminRules
+                  setShowAdminRules(newValue)
+                  if (newValue) {
+                    // 행정규칙 활성화 시 목록 뷰로 설정
+                    setAdminRuleViewMode("list")
+                  }
+                }}
                 disabled={loadingAdminRules}
                 title="행정규칙 보기"
               >
@@ -1308,9 +1386,235 @@ export function LawViewer({
                   <p>조문을 불러오는 중...</p>
                 </div>
               ) : activeArticle ? (
-                tierViewMode === "3-tier" && threeTierDataType === "delegation" && validDelegations.length > 0 ? (
+                // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
+                showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
+                  // Admin rules detail view: 2-tier (law | admin rule content)
+                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                    {/* Left: Main article */}
+                    <div className="overflow-y-auto pr-2">
+                      <div className="mb-4 pb-3 border-b border-border">
+                        <h3 className="text-base font-bold text-foreground mb-2">
+                          {formatSimpleJo(activeArticle.jo)}
+                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                      </div>
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                      />
+                    </div>
+
+                    {/* Right: Admin rule full content */}
+                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-foreground" />
+                            <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                // Go back to list view
+                                setAdminRuleViewMode("list")
+                              }}
+                            >
+                              ← 목록
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                // Force refresh admin rule content
+                                const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                if (currentRule) {
+                                  const idParam = currentRule.serialNumber || currentRule.id
+                                  if (idParam) {
+                                    // Clear cache
+                                    await clearAdminRuleContentCache(idParam)
+                                    console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+
+                                    // Reset state
+                                    setAdminRuleHtml(null)
+
+                                    // Reload
+                                    await handleViewAdminRuleFullContent(currentRule)
+                                  }
+                                }
+                              }}
+                              title="캐시 삭제 후 다시 로드"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                            {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                              >
+                                <a
+                                  href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  법령 사이트
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto flex-1">
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                // Priority 2: Admin rules list view (행정규칙 목록 뷰)
+                ) : showAdminRules && adminRuleViewMode === "list" && (loadingAdminRules || adminRules.length > 0) ? (
+                  // Admin rules list view: 2-tier (law | admin rules list)
+                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                    {/* Left: Main article */}
+                    <div className="overflow-y-auto pr-2 flex flex-col">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                        <h3 className="text-base font-bold text-foreground mb-2">
+                          {formatSimpleJo(activeArticle.jo)}
+                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                      </div>
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                      />
+                    </div>
+
+                    {/* Right: Admin rules list */}
+                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4 text-foreground" />
+                          <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                        </div>
+                        {loadingAdminRules ? (
+                          <Badge variant="secondary" className="text-xs">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            {adminRules.length}개 매칭
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="overflow-y-auto flex-1">
+                        {loadingAdminRules ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                            <p className="text-sm">행정규칙 검색 중...</p>
+                            {adminRulesProgress && (
+                              <p className="text-xs mt-2">
+                                {adminRulesProgress.current} / {adminRulesProgress.total}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3 pr-2">
+                          {adminRules.map((rule, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-lg border border-border bg-card"
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
+                              <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
+                                {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
+                              </Badge>
+                            </div>
+                            {rule.purpose.title && (
+                              <p className="text-xs text-muted-foreground mb-2">
+                                {rule.purpose.number} ({rule.purpose.title})
+                              </p>
+                            )}
+                            <div
+                              className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
+                              style={{
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {rule.purpose.content}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleViewAdminRuleFullContent(rule)}
+                                className="flex-1 text-xs h-7"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                본문 조회
+                              </Button>
+                              {getLawGoKrLink(rule.serialNumber) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                  className="flex-1 text-xs h-7"
+                                >
+                                  <a
+                                    href={getLawGoKrLink(rule.serialNumber)!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    법령 사이트
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                // Priority 3: 3-tier delegation view (위임조문 3단 뷰)
+                ) : tierViewMode === "3-tier" && threeTierDataType === "delegation" && validDelegations.length > 0 ? (
                   // 3-tier view: Split into three columns - law | decree (시행령) | rule (시행규칙) - only for delegations
-                  <div className="grid grid-cols-3 gap-3 h-full">
+                  <div className="grid grid-cols-3 gap-3 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                     {/* Left: Main article (law) */}
                     <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
                       <div className="mb-4 pb-3 border-b border-border">
@@ -1352,14 +1656,10 @@ export function LawViewer({
                               key={idx}
                               className="p-3 rounded-lg border border-border"
                             >
-                              {delegation.joNum && (
-                                <p className="font-semibold text-sm text-foreground mb-1">{delegation.joNum}</p>
-                              )}
-                              {delegation.lawName && (
-                                <p className="text-xs text-muted-foreground mb-2">{delegation.lawName}</p>
-                              )}
                               {delegation.title && (
-                                <p className="text-xs font-semibold text-foreground mb-2">{delegation.title}</p>
+                                <p className="font-semibold text-sm text-foreground mb-2">
+                                  {delegation.title}
+                                </p>
                               )}
                               {delegation.content && (
                                 <div
@@ -1386,7 +1686,6 @@ export function LawViewer({
                     <div className="border-l border-border pl-3 overflow-y-auto">
                       <div className="mb-4 pb-3 border-b border-border">
                         <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-foreground" />
                           <h3 className="text-base font-bold text-foreground">시행규칙</h3>
                         </div>
                         <Badge variant="secondary" className="text-xs">
@@ -1401,20 +1700,10 @@ export function LawViewer({
                               key={idx}
                               className="p-3 rounded-lg border border-border"
                             >
-                              <Badge
-                                variant="secondary"
-                                className="text-xs mb-2"
-                              >
-                                {delegation.type}
-                              </Badge>
-                              {delegation.joNum && (
-                                <p className="font-semibold text-sm text-foreground mb-1">{delegation.joNum}</p>
-                              )}
-                              {delegation.lawName && (
-                                <p className="text-xs text-muted-foreground mb-2">{delegation.lawName}</p>
-                              )}
                               {delegation.title && (
-                                <p className="text-xs font-semibold text-foreground mb-2">{delegation.title}</p>
+                                <p className="font-semibold text-sm text-foreground mb-2">
+                                  {delegation.title}
+                                </p>
                               )}
                               {delegation.content && (
                                 <div
@@ -1437,9 +1726,109 @@ export function LawViewer({
                       </div>
                     </div>
                   </div>
-                ) : showAdminRules && (loadingAdminRules || adminRules.length > 0) ? (
-                  // Admin rules view: 2-tier (law | admin rules)
-                  <div className="grid grid-cols-2 gap-4 h-full">
+                // Priority 4: 2-tier delegation view (위임조문 2단 뷰)
+                ) : tierViewMode === "2-tier" && tierItems.length > 0 ? (
+                  // 2-tier view: Split horizontally - left: main article, right: delegations
+                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                    {/* Left: Main article */}
+                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                      <div className="mb-6 pb-4 border-b border-border">
+                        <h3 className="text-base font-bold text-foreground mb-2">
+                          {formatSimpleJo(activeArticle.jo)}
+                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                      </div>
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                      />
+                    </div>
+
+                    {/* Right: Delegations/Citations */}
+                    <div className="border-l border-border pl-4 overflow-y-auto">
+                      <div className="mb-4 pb-3 border-b border-border">
+                        <div className="flex items-center gap-2 mb-2">
+                          {threeTierDataType === "delegation" ? (
+                            <FileText className="h-5 w-5 text-foreground" />
+                          ) : (
+                            <Link2 className="h-5 w-5 text-foreground" />
+                          )}
+                          <h3 className="text-base font-bold text-foreground">
+                            {threeTierDataType === "delegation" ? "위임 조문" : "인용 조문"}
+                          </h3>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {tierItems.length}개 {threeTierDataType === "delegation" ? "위임" : "인용"}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-0">
+                        {tierItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="py-3 border-b border-border last:border-0"
+                          >
+                            {threeTierDataType === "delegation" ? (
+                              <>
+                                <div className="flex items-start gap-2 mb-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {item.type}
+                                  </Badge>
+                                  {item.joNum && (
+                                    <span className="font-semibold text-sm text-foreground">{item.joNum}</span>
+                                  )}
+                                </div>
+                                {item.lawName && (
+                                  <p className="text-xs text-muted-foreground mb-2 font-medium">{item.lawName}</p>
+                                )}
+                                {item.title && (
+                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {item.joNum && (
+                                  <p className="font-semibold text-sm text-foreground mb-2">{item.joNum}</p>
+                                )}
+                                {item.title && (
+                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                )}
+                              </>
+                            )}
+                            {item.content && (
+                              <div
+                                className="text-foreground leading-relaxed break-words text-sm"
+                                style={{
+                                  fontSize: `${fontSize}px`,
+                                  lineHeight: "1.8",
+                                  overflowWrap: "break-word",
+                                  wordBreak: "break-word",
+                                }}
+                                onClick={handleContentClick}
+                                dangerouslySetInnerHTML={{ __html: formatDelegationContent(item.content) }}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                // 중복 블록 제거됨 - Admin rules 뷰는 최상위로 이동됨
+                ) : false ? (
+                  // Admin rules detail view: 2-tier (law | admin rule content)
+                  <div className="grid grid-cols-2 gap-4" style={{ height: "100%" }}>
                     {/* Left: Main article */}
                     <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
                       <div className="mb-4 pb-3 border-b border-border">
@@ -1462,9 +1851,113 @@ export function LawViewer({
                       />
                     </div>
 
-                    {/* Right: Admin rules */}
-                    <div className="border-l border-border pl-4 overflow-y-auto">
-                      <div className="mb-4 pb-3 border-b border-border">
+                    {/* Right: Admin rule full content */}
+                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-foreground" />
+                            <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                // Go back to list view
+                                setAdminRuleViewMode("list")
+                              }}
+                            >
+                              ← 목록
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                // Force refresh admin rule content
+                                const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                if (currentRule) {
+                                  const idParam = currentRule.serialNumber || currentRule.id
+                                  if (idParam) {
+                                    // Clear cache
+                                    await clearAdminRuleContentCache(idParam)
+                                    console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+
+                                    // Reset state
+                                    setAdminRuleHtml(null)
+
+                                    // Reload
+                                    await handleViewAdminRuleFullContent(currentRule)
+                                  }
+                                }
+                              }}
+                              title="캐시 삭제 후 다시 로드"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                            {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                              >
+                                <a
+                                  href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  법령 사이트
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto flex-1">
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                // 중복 블록 제거됨 - Admin rules list 뷰는 최상위로 이동됨
+                ) : false ? (
+                  // Admin rules list view: 2-tier (law | admin rules list)
+                  <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
+                    {/* Left: Main article */}
+                    <div className="overflow-y-auto pr-2 flex flex-col">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                        <h3 className="text-base font-bold text-foreground mb-2">
+                          {formatSimpleJo(activeArticle.jo)}
+                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                      </div>
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                      />
+                    </div>
+
+                    {/* Right: Admin rules list */}
+                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
                         <div className="flex items-center gap-2 mb-2">
                           <FileText className="h-4 w-4 text-foreground" />
                           <h3 className="text-base font-bold text-foreground">행정규칙</h3>
@@ -1480,18 +1973,19 @@ export function LawViewer({
                           </Badge>
                         )}
                       </div>
-                      {loadingAdminRules ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                          <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                          <p className="text-sm">행정규칙 검색 중...</p>
-                          {adminRulesProgress && (
-                            <p className="text-xs mt-2">
-                              {adminRulesProgress.current} / {adminRulesProgress.total}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
+                      <div className="overflow-y-auto flex-1">
+                        {loadingAdminRules ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                            <p className="text-sm">행정규칙 검색 중...</p>
+                            {adminRulesProgress && (
+                              <p className="text-xs mt-2">
+                                {adminRulesProgress.current} / {adminRulesProgress.total}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3 pr-2">
                           {adminRules.map((rule, idx) => (
                           <div
                             key={idx}
@@ -1549,11 +2043,13 @@ export function LawViewer({
                             </div>
                           </div>
                           ))}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ) : tierViewMode === "2-tier" && (tierItems.length > 0 || adminRuleHtml) ? (
+                // 중복 블록 제거됨 - 위임조문 2단 뷰는 위로 이동됨
+                ) : false ? (
                   // 2-tier view: Split horizontally - left: main article, right: delegations/citations/admin rules
                   <div className="grid grid-cols-2 gap-4 h-full">
                     {/* Left: Main article */}
@@ -1581,7 +2077,7 @@ export function LawViewer({
 
                     {/* Right: Delegations, Citations, or Admin Rules */}
                     <div className="border-l border-border pl-4 overflow-y-auto">
-                      {adminRuleHtml ? (
+                      {adminRuleViewMode === "detail" && adminRuleHtml ? (
                         <>
                           <div className="mb-6 pb-4 border-b border-border">
                             <div className="flex items-center justify-between gap-2 mb-2">
@@ -1593,9 +2089,8 @@ export function LawViewer({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  // Go back to list view, keep in 2-tier mode
-                                  setAdminRuleHtml("")
-                                  setAdminRuleTitle("")
+                                  // Go back to list view
+                                  setAdminRuleViewMode("list")
                                 }}
                               >
                                 ← 목록

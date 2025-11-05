@@ -15,7 +15,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000 ^| findstr LISTENING') 
 if defined PID (
     echo 프로세스 발견 (PID: %PID%)
     echo 프로세스 종료 중...
-    taskkill //F //PID %PID%
+    taskkill /F /PID %PID%
     if errorlevel 1 (
         echo [경고] 프로세스 종료 실패
     ) else (
