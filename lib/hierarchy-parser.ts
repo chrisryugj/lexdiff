@@ -105,6 +105,7 @@ export function parseHierarchyXML(xmlText: string): LawHierarchy | null {
 
     // 행정규칙 파싱 (고시, 예규, 훈령 등)
     const adminRules: LawHierarchy["adminRules"] = []
+    const adminRulesMap = new Map<string, { id: string; name: string; serialNumber?: string }>()
 
     // 훈령, 예규, 고시 등 모든 행정규칙의 기본정보 선택
     const adminRuleElements = xmlDoc.querySelectorAll("행정규칙 훈령 기본정보, 행정규칙 예규 기본정보, 행정규칙 고시 기본정보, 행정규칙 공고 기본정보, 행정규칙 지침 기본정보, 행정규칙 기타 기본정보")
@@ -115,13 +116,21 @@ export function parseHierarchyXML(xmlText: string): LawHierarchy | null {
       const adminRuleSerialNumber = elem.querySelector("행정규칙일련번호")?.textContent?.trim()
 
       if (adminRuleName) {
-        adminRules.push({
-          id: adminRuleId,
-          name: adminRuleName,
-          serialNumber: adminRuleSerialNumber,
-        })
+        // serialNumber를 우선 키로 사용하고, 없으면 id 사용하여 중복 제거
+        const uniqueKey = adminRuleSerialNumber || adminRuleId
+
+        if (uniqueKey && !adminRulesMap.has(uniqueKey)) {
+          adminRulesMap.set(uniqueKey, {
+            id: adminRuleId,
+            name: adminRuleName,
+            serialNumber: adminRuleSerialNumber,
+          })
+        }
       }
     })
+
+    // Map을 배열로 변환
+    adminRules.push(...Array.from(adminRulesMap.values()))
 
     return {
       lawId,

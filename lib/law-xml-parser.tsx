@@ -359,6 +359,7 @@ function escapeHtml(text: string): string {
 function applyRevisionStyling(text: string): string {
   let styled = text
 
+  // <개정>, ＜개정＞ 형식
   styled = styled.replace(
     /&lt;(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
     '<span class="rev-mark">＜$1 $2＞</span>',
@@ -367,6 +368,17 @@ function applyRevisionStyling(text: string): string {
   styled = styled.replace(
     /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g,
     '<span class="rev-mark">＜$1 $2＞</span>',
+  )
+
+  // [본조신설], [종전 ~ 이동] 형식
+  styled = styled.replace(
+    /\[(본조신설|본조삭제)[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
+  )
+
+  styled = styled.replace(
+    /\[종전[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
   )
 
   return styled

@@ -13,7 +13,7 @@ export function DebugConsole() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
   const [isMinimized, setIsMinimized] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all")
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)

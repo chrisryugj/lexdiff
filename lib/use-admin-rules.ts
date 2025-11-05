@@ -1,10 +1,13 @@
 /**
  * 행정규칙 조회 Hook
+ * - IndexedDB 영구 캐싱 지원
+ * - API 호출 병렬화로 성능 개선
  */
 
 import { useState, useEffect } from "react"
 import { parseHierarchyXML } from "./hierarchy-parser"
 import { parseAdminRulePurposeOnly, checkLawArticleReference, type AdminRuleArticle } from "./admrul-parser"
+import { getAdminRulesListCache, setAdminRulesListCache } from "./admin-rule-cache"
 
 export interface AdminRuleMatch {
   name: string
@@ -51,9 +54,22 @@ export function useAdminRules(
       setProgress(null)
 
       try {
-        // Step 1: 법령 체계도에서 행정규칙 목록 가져오기
+        // Step 0: IndexedDB 캐시 확인
+        const cachedRules = await getAdminRulesListCache(lawName, articleNumber)
+        if (cachedRules && !cancelled) {
+          console.log("[use-admin-rules] Using cached rules:", cachedRules.length)
+          setAdminRules(cachedRules)
+          setLoading(false)
+          setProgress(null)
+          return
+        }
+
+        // Step 1: 법령 체계도에서 행정규칙 목록 가져오기 (브라우저 캐시 활용)
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
-        const hierarchyResponse = await fetch(hierarchyUrl, { cache: 'no-store' })
+        const hierarchyResponse = await fetch(hierarchyUrl, {
+          cache: 'force-cache',
+          next: { revalidate: 3600 } // 1시간 캐시
+        })
 
         if (!hierarchyResponse.ok) {
           throw new Error(`체계도 조회 실패: ${hierarchyResponse.status}`)
@@ -75,25 +91,37 @@ export function useAdminRules(
 
         const matching: AdminRuleMatch[] = []
 
-        // Step 2: 각 행정규칙 처리
-        for (let i = 0; i < rules.length; i++) {
-          if (cancelled) break
-
-          const rule = rules[i]
+        // Step 2: 모든 행정규칙 완전 병렬 처리 (최대 속도)
+        let completed = 0
+        const allPromises = rules.map(async (rule, idx) => {
           const idParam = rule.serialNumber || rule.id
-
-          if (!idParam) continue
+          if (!idParam) {
+            completed++
+            if (!cancelled) setProgress({ current: completed, total: rules.length })
+            return null
+          }
 
           try {
             const contentUrl = `/api/admrul?ID=${encodeURIComponent(idParam)}`
-            const contentResponse = await fetch(contentUrl, { cache: 'no-store' })
+            const contentResponse = await fetch(contentUrl, {
+              cache: 'force-cache',
+              next: { revalidate: 86400 } // 24시간 캐시 (행정규칙은 자주 변경되지 않음)
+            })
 
-            if (!contentResponse.ok) continue
+            if (!contentResponse.ok) {
+              completed++
+              if (!cancelled) setProgress({ current: completed, total: rules.length })
+              return null
+            }
 
             const contentXml = await contentResponse.text()
             const purposeData = parseAdminRulePurposeOnly(contentXml)
 
-            if (!purposeData || !purposeData.purpose) continue
+            if (!purposeData || !purposeData.purpose) {
+              completed++
+              if (!cancelled) setProgress({ current: completed, total: rules.length })
+              return null
+            }
 
             // 매칭 확인
             const isMatch = checkLawArticleReference(
@@ -103,28 +131,42 @@ export function useAdminRules(
               purposeData.name
             )
 
+            completed++
+            if (!cancelled) setProgress({ current: completed, total: rules.length })
+
             if (isMatch) {
               // 제목에서 매칭되었는지 내용에서 매칭되었는지 구분
               const matchType = purposeData.name.includes(articleNumber) ? "title" : "content"
 
-              matching.push({
+              return {
                 name: purposeData.name,
                 id: purposeData.id,
-                serialNumber: rule.serialNumber, // hierarchy에서 가져온 serialNumber 포함
+                serialNumber: rule.serialNumber,
                 purpose: purposeData.purpose,
                 matchType,
-              })
+              } as AdminRuleMatch
             }
+
+            return null
           } catch (err) {
             console.error(`[use-admin-rules] Error processing ${rule.name}:`, err)
+            completed++
+            if (!cancelled) setProgress({ current: completed, total: rules.length })
+            return null
           }
+        })
 
-          if (!cancelled) {
-            setProgress({ current: i + 1, total: rules.length })
-          }
-        }
+        const allResults = await Promise.all(allPromises)
+
+        allResults.forEach((result) => {
+          if (result) matching.push(result)
+        })
 
         if (!cancelled) {
+          // IndexedDB에 캐싱
+          await setAdminRulesListCache(lawName, articleNumber, matching, hierarchy.mst || "")
+          console.log("[use-admin-rules] Cached rules to IndexedDB:", matching.length)
+
           setAdminRules(matching)
           setLoading(false)
           setProgress(null)

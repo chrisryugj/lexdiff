@@ -86,6 +86,18 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
       const title = rawArticle.조제목 || ""
       const content = rawArticle.조내용 || ""
 
+      // 원본 데이터 구조 확인용 로그 (처음 1개만)
+      if (articleArray.indexOf(rawArticle) === 0) {
+        debugLogger.debug("첫 번째 조문 원본 JSON 구조", {
+          조번호: rawArticle.조번호,
+          전체키목록: Object.keys(rawArticle),
+          시행령조문존재: !!rawArticle.시행령조문,
+          시행규칙조문목록존재: !!rawArticle.시행규칙조문목록,
+          위임행정규칙목록존재: !!rawArticle.위임행정규칙목록,
+          원본데이터샘플: JSON.stringify(rawArticle).substring(0, 500)
+        })
+      }
+
       const delegations: DelegationItem[] = []
 
       // 시행령조문 파싱
@@ -106,22 +118,35 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         }
       }
 
-      // 시행규칙조문목록 파싱
-      if (rawArticle.시행규칙조문목록?.시행규칙조문) {
-        const sihyungkyuchik = Array.isArray(rawArticle.시행규칙조문목록.시행규칙조문)
-          ? rawArticle.시행규칙조문목록.시행규칙조문
-          : [rawArticle.시행규칙조문목록.시행규칙조문]
+      // 시행규칙조문 파싱 (시행령조문과 동일한 레벨)
+      if (rawArticle.시행규칙조문) {
+        const sihyungkyuchik = Array.isArray(rawArticle.시행규칙조문)
+          ? rawArticle.시행규칙조문
+          : [rawArticle.시행규칙조문]
+
+        debugLogger.debug(`조문 ${formatJoNum(jo)} 시행규칙 ${sihyungkyuchik.length}개 파싱`, {
+          시행규칙데이터: sihyungkyuchik.map(item => ({
+            조번호: item.조번호,
+            조가지번호: item.조가지번호,
+            조제목: item.조제목,
+            법령명: item.법령명,
+            조내용길이: item.조내용?.length || 0,
+            조내용미리보기: item.조내용 ? item.조내용.substring(0, 50) : "(empty)"
+          }))
+        })
 
         for (const item of sihyungkyuchik) {
           delegations.push({
             type: "시행규칙",
-            lawName: meta.sihyungkyuchikName,
+            lawName: item.법령명 || meta.sihyungkyuchikName,
             jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
             joNum: item.조번호 ? formatJoNum(convertToJO(item.조번호, item.조가지번호 || "00")) : undefined,
             title: item.조제목 || "",
             content: item.조내용 || "",
           })
         }
+      } else {
+        debugLogger.debug(`조문 ${formatJoNum(jo)} 시행규칙 데이터 없음`)
       }
 
       // 위임행정규칙목록 파싱
