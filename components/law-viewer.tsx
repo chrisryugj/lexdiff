@@ -1034,9 +1034,21 @@ export function LawViewer({
   })
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]">
+    <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]">
+      {/* Mobile overlay backdrop */}
+      {isArticleListExpanded && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsArticleListExpanded(false)}
+        />
+      )}
+
       {/* Left sidebar - Article navigation */}
-      <Card className={`p-4 flex-col overflow-hidden ${isArticleListExpanded ? 'flex' : 'hidden lg:flex'}`}>
+      <Card className={`p-4 flex-col overflow-hidden ${
+        isArticleListExpanded
+          ? 'flex fixed lg:relative top-4 left-4 right-4 bottom-4 z-50 lg:z-auto'
+          : 'hidden lg:flex'
+      }`}>
         <div className="mb-4 flex-shrink-0">
           <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
           <Badge variant="secondary" className="text-xs">
