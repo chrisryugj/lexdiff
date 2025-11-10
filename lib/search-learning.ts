@@ -1,6 +1,7 @@
 import { recordSearchQuery, recordSearchResult, recordApiMapping } from './search-feedback-db'
 import { normalizeSearchQuery } from './search-normalizer'
 import { parseSearchQuery } from './law-parser'
+import { generateEmbedding, storeSearchQueryEmbedding } from './embedding'
 
 // 검색 패턴 생성 (정규화된 쿼리 → 고유 식별자)
 export function createSearchPattern(normalizedQuery: string): string {
@@ -46,7 +47,7 @@ export async function learnFromSuccessfulSearch(params: {
     })
 
     // 3. API 파라미터 매핑 저장 (중요!)
-    await recordApiMapping({
+    const mappingId = await recordApiMapping({
       pattern,
       lawName: parsed.lawName,
       article: parsed.article || '',
@@ -58,6 +59,20 @@ export async function learnFromSuccessfulSearch(params: {
         lawTitle: apiResult.lawTitle,
       },
     })
+
+    // 4. 벡터 임베딩 생성 및 저장 (Phase 6)
+    try {
+      const embeddingResult = await generateEmbedding(rawQuery)
+      await storeSearchQueryEmbedding(rawQuery, embeddingResult.embedding, {
+        normalizedText: normalizedQuery,
+        mappedPattern: pattern,
+        mappingId: mappingId,
+      })
+      console.log(`✅ Embedding stored for: "${rawQuery}" (${embeddingResult.tokens} tokens)`)
+    } catch (error) {
+      console.error('⚠️ Failed to store embedding (non-critical):', error)
+      // Non-critical: continue even if embedding storage fails
+    }
 
     return { queryId, resultId }
   } catch (error) {

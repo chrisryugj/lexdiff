@@ -4,13 +4,15 @@ import { findCachedResult, createSearchPattern, learnFromSuccessfulSearch, getSe
 import { searchSimilarVariants, searchVariantTable } from './variant-matcher'
 import { searchHighQualityCache } from './search-feedback-db'
 import { debugLogger } from './debug-logger'
+import { l0VectorSearch } from './vector-search'
 
 export interface SearchResult {
-  source: 'L1_direct_mapping' | 'L2_variant' | 'L2_variant_table' | 'L3_quality_cache' | 'L4_api'
+  source: 'L0_vector' | 'L1_direct_mapping' | 'L2_variant' | 'L2_variant_table' | 'L3_quality_cache' | 'L4_api'
   data: any
   time: number
   pattern?: string
   variantUsed?: string
+  vectorSimilarity?: number
 }
 
 // 통합 검색 전략 (5단계 폭포수)
@@ -26,6 +28,36 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
     const parsed = parseSearchQuery(normalized)
 
     debugLogger.debug('검색 정규화', { normalized, pattern, parsed })
+
+    // L0: 벡터 유사도 검색 (5ms, 95% 정확도)
+    // 오타, 유사어 자동 처리
+    try {
+      const l0Result = await l0VectorSearch(rawQuery)
+      if (l0Result.found && l0Result.mappingId) {
+        const time = Date.now() - startTime
+        debugLogger.success('🎯 L0 벡터 검색 HIT', {
+          time,
+          similarQuery: l0Result.similarQuery,
+          similarity: l0Result.similarityScore?.toFixed(3),
+        })
+
+        // 매핑 정보를 사용하여 캐시된 결과 가져오기
+        const cachedData = await findCachedResult(l0Result.similarQuery || '')
+        if (cachedData.found) {
+          return {
+            source: 'L0_vector',
+            data: cachedData.data,
+            time,
+            pattern: l0Result.mappedPattern || undefined,
+            variantUsed: l0Result.similarQuery || undefined,
+            vectorSimilarity: l0Result.similarityScore || undefined,
+          }
+        }
+      }
+    } catch (error) {
+      debugLogger.warning('L0 벡터 검색 실패 (fallback to L1)', error)
+      // Continue to L1 if L0 fails
+    }
 
     // L1: 직접 매핑 (5ms)
     const l1Result = await findCachedResult(rawQuery)
