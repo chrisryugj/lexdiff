@@ -10,12 +10,14 @@ import { FavoritesPanel } from "@/components/favorites-panel"
 import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeedbackButtons } from "@/components/feedback-buttons"
+import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { favoritesStore } from "@/lib/favorites-store"
+import { formatJO } from "@/lib/law-parser"
 import { useErrorReportStore } from "@/lib/error-report-store"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -244,6 +246,16 @@ export default function Home() {
     effectiveDate?: string
   }>({ isOpen: false })
   const [mobileView, setMobileView] = useState<"list" | "content">("content")
+  const [articleNotFound, setArticleNotFound] = useState<{
+    requestedJo: string
+    lawTitle: string
+    nearestArticles: LawArticle[]
+    crossLawSuggestions: Array<{
+      lawTitle: string
+      lawId: string | null
+      articleJo: string
+    }>
+  } | null>(null)
   const [searchResults, setSearchResults] = useState<{
     laws: LawSearchResult[]
     ordinances: OrdinanceSearchResult[]
@@ -320,53 +332,19 @@ export default function Home() {
         } else {
           // Article not found - find nearest articles and cross-law suggestions
           const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
-          const { formatJO } = await import('@/lib/law-parser')
 
           const nearestArticles = findNearestArticles(query.jo, articles)
-          const requestedDisplay = formatJO(query.jo)
+          const crossLawSuggestions = await findCrossLawSuggestions(query.jo, meta.lawTitle)
 
-          if (nearestArticles.length > 0) {
-            // Show warning with suggestions in same law
-            toast({
-              title: "요청하신 조문을 찾을 수 없습니다",
-              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n이 법령의 ${formatJO(nearestArticles[0].jo)}를 대신 표시합니다.`,
-              variant: "default",
-              duration: 7000,
-            })
+          // Store suggestions and show banner (no auto-select)
+          setArticleNotFound({
+            requestedJo: query.jo,
+            lawTitle: meta.lawTitle,
+            nearestArticles,
+            crossLawSuggestions: crossLawSuggestions.slice(0, 3),
+          })
 
-            // Select nearest article
-            selectedJo = nearestArticles[0].jo
-            debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
-          } else {
-            // Check cross-law suggestions from database
-            const crossLawSuggestions = await findCrossLawSuggestions(query.jo, meta.lawTitle)
-
-            if (crossLawSuggestions.length > 0) {
-              const topSuggestions = crossLawSuggestions.slice(0, 3)
-              const suggestionText = topSuggestions
-                .map(s => `${s.lawTitle} ${requestedDisplay}`)
-                .join('\n')
-
-              toast({
-                title: "요청하신 조문을 찾을 수 없습니다",
-                description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다른 법령에서 많이 검색된 ${requestedDisplay}:\n${suggestionText}\n\n전체 조문 목록을 표시합니다.`,
-                variant: "default",
-                duration: 10000,
-              })
-
-              debugLogger.info(`조문 없음: ${requestedDisplay}, 다른 법령 제안: ${crossLawSuggestions.map(s => s.lawTitle).join(', ')}`)
-            } else {
-              // No suggestions at all - show full list
-              toast({
-                title: "요청하신 조문을 찾을 수 없습니다",
-                description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
-                variant: "destructive",
-                duration: 7000,
-              })
-
-              debugLogger.error(`조문 없음: ${requestedDisplay}, 대체 조문도 없음`)
-            }
-          }
+          debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
         }
       }
 
@@ -479,48 +457,19 @@ export default function Home() {
                   let finalData = { ...parsedData }
                   if (query.jo && parsedData.selectedJo === undefined) {
                     const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
-                    const { formatJO } = await import('@/lib/law-parser')
 
                     const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
-                    const requestedDisplay = formatJO(query.jo)
+                    const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
 
-                    if (nearestArticles.length > 0) {
-                      toast({
-                        title: "요청하신 조문을 찾을 수 없습니다",
-                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n이 법령의 ${formatJO(nearestArticles[0].jo)}를 대신 표시합니다.`,
-                        variant: "default",
-                        duration: 7000,
-                      })
-                      finalData.selectedJo = nearestArticles[0].jo
-                      debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
-                    } else {
-                      // Check cross-law suggestions
-                      const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
+                    // Store suggestions and show banner
+                    setArticleNotFound({
+                      requestedJo: query.jo,
+                      lawTitle: parsedData.meta.lawTitle,
+                      nearestArticles,
+                      crossLawSuggestions: crossLawSuggestions.slice(0, 3),
+                    })
 
-                      if (crossLawSuggestions.length > 0) {
-                        const topSuggestions = crossLawSuggestions.slice(0, 3)
-                        const suggestionText = topSuggestions
-                          .map(s => `${s.lawTitle} ${requestedDisplay}`)
-                          .join('\n')
-
-                        toast({
-                          title: "요청하신 조문을 찾을 수 없습니다",
-                          description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다른 법령에서 많이 검색된 ${requestedDisplay}:\n${suggestionText}\n\n전체 조문 목록을 표시합니다.`,
-                          variant: "default",
-                          duration: 10000,
-                        })
-
-                        debugLogger.info(`조문 없음: ${requestedDisplay}, 다른 법령 제안: ${crossLawSuggestions.map(s => s.lawTitle).join(', ')}`)
-                      } else {
-                        toast({
-                          title: "요청하신 조문을 찾을 수 없습니다",
-                          description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
-                          variant: "destructive",
-                          duration: 7000,
-                        })
-                        debugLogger.error(`조문 없음: ${requestedDisplay}`)
-                      }
-                    }
+                    debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
                   }
 
                   setLawData({
@@ -1037,6 +986,21 @@ export default function Home() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {articleNotFound && (
+                      <ArticleNotFoundBanner
+                        requestedJo={articleNotFound.requestedJo}
+                        lawTitle={articleNotFound.lawTitle}
+                        nearestArticles={articleNotFound.nearestArticles}
+                        crossLawSuggestions={articleNotFound.crossLawSuggestions}
+                        onSelectArticle={(jo) => {
+                          setLawData(prev => prev ? { ...prev, selectedJo: jo } : null)
+                        }}
+                        onSelectCrossLaw={(lawTitle) => {
+                          handleSearch({ lawName: lawTitle, article: formatJO(articleNotFound.requestedJo) })
+                        }}
+                        onDismiss={() => setArticleNotFound(null)}
+                      />
+                    )}
                     {lawData.searchResultId && (
                       <div className="px-4 py-3 bg-muted/50 rounded-lg border">
                         <FeedbackButtons
@@ -1065,6 +1029,21 @@ export default function Home() {
 
               <div className="hidden md:block space-y-4">
                 <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+                {articleNotFound && (
+                  <ArticleNotFoundBanner
+                    requestedJo={articleNotFound.requestedJo}
+                    lawTitle={articleNotFound.lawTitle}
+                    nearestArticles={articleNotFound.nearestArticles}
+                    crossLawSuggestions={articleNotFound.crossLawSuggestions}
+                    onSelectArticle={(jo) => {
+                      setLawData(prev => prev ? { ...prev, selectedJo: jo } : null)
+                    }}
+                    onSelectCrossLaw={(lawTitle) => {
+                      handleSearch({ lawName: lawTitle, article: formatJO(articleNotFound.requestedJo) })
+                    }}
+                    onDismiss={() => setArticleNotFound(null)}
+                  />
+                )}
                 {lawData.searchResultId && (
                   <div className="px-4 py-3 bg-muted/50 rounded-lg border">
                     <FeedbackButtons
