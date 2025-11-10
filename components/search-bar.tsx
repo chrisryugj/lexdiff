@@ -30,10 +30,15 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       return
     }
 
-    const isOrdinanceQuery = /조례|규칙|특별시|광역시|도|시|군|구/.test(query) && !/법$|령$|법률/.test(query)
+    // 법령 키워드가 있으면 무조건 법령으로 처리
+    const hasLawKeyword = /법$|령$|법률|시행령|시행규칙/.test(query)
+    // 조례/규칙 키워드가 명시적으로 있는지 확인 (시행령/시행규칙은 제외)
+    const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
+    // 조례 키워드가 있고 법령 키워드가 없으면 조례로 판단
+    const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
 
     setSearchType(isOrdinanceQuery ? "ordinance" : "law")
-    console.log("[v0] 검색어 타입 감지:", { query, type: isOrdinanceQuery ? "조례" : "법령" })
+    console.log("[v0] 검색어 타입 감지:", { query, hasLawKeyword, hasOrdinanceKeyword, type: isOrdinanceQuery ? "조례" : "법령" })
   }, [query])
 
   useEffect(() => {
@@ -173,21 +178,21 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           )}
         </Button>
       </div>
-      <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
-        {searchType === "ordinance" ? (
-          <>
-            <Building2 className="h-4 w-4 text-blue-500" />
-            <p>조례/규칙 검색 모드</p>
-          </>
-        ) : searchType === "law" ? (
-          <>
-            <Scale className="h-4 w-4 text-amber-500" />
-            <p>법령 검색 모드</p>
-          </>
-        ) : (
-          <p>💡 팁: 법령명, 조례명, 조문을 자유롭게 입력하세요. 자동으로 검색합니다.</p>
-        )}
-      </div>
+      {query.trim() && searchType && (
+        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
+          {searchType === "ordinance" ? (
+            <>
+              <Building2 className="h-3.5 w-3.5 text-blue-500" />
+              <span>조례/규칙 검색</span>
+            </>
+          ) : (
+            <>
+              <Scale className="h-3.5 w-3.5 text-amber-500" />
+              <span>법령 검색</span>
+            </>
+          )}
+        </div>
+      )}
     </form>
   )
 }
