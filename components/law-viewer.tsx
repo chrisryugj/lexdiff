@@ -1036,37 +1036,15 @@ export function LawViewer({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]">
       {/* Left sidebar - Article navigation */}
-      <Card className="p-4 flex flex-col overflow-hidden">
+      <Card className={`p-4 flex-col overflow-hidden ${isArticleListExpanded ? 'flex' : 'hidden lg:flex'}`}>
         <div className="mb-4 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
-              <Badge variant="secondary" className="text-xs">
-                {actualArticles.length}개 조문
-              </Badge>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsArticleListExpanded(!isArticleListExpanded)}
-              className="md:hidden"
-            >
-              {isArticleListExpanded ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-1" />
-                  접기
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-1" />
-                  펼치기
-                </>
-              )}
-            </Button>
-          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
+          <Badge variant="secondary" className="text-xs">
+            {actualArticles.length}개 조문
+          </Badge>
         </div>
         <Separator className="mb-4 flex-shrink-0" />
-        <div className={`flex-1 min-h-0 ${isArticleListExpanded ? "" : "max-h-[100px] md:max-h-none"}`}>
+        <div className="flex-1 min-h-0">
           <ScrollArea className="h-full">
             <div className="space-y-1 pr-4">
             {actualArticles.map((article, index) => {
@@ -1136,6 +1114,28 @@ export function LawViewer({
 
       {/* Right panel - Article content */}
       <Card className="flex flex-col">
+        {/* Mobile article list toggle */}
+        <div className="lg:hidden p-3 border-b border-border bg-muted/30">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsArticleListExpanded(!isArticleListExpanded)}
+            className="w-full"
+          >
+            {isArticleListExpanded ? (
+              <>
+                <ChevronUp className="h-4 w-4 mr-2" />
+                조문 목록 닫기
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4 mr-2" />
+                조문 목록 보기 ({actualArticles.length}개)
+              </>
+            )}
+          </Button>
+        </div>
+
         {/* Header */}
         <div className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-4 mb-3">
