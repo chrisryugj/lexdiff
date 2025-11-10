@@ -1049,6 +1049,18 @@ export function LawViewer({
           ? 'flex fixed lg:relative top-4 left-4 right-4 bottom-4 z-50 lg:z-auto'
           : 'hidden lg:flex'
       }`}>
+        {/* Mobile close button - top */}
+        {isArticleListExpanded && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsArticleListExpanded(false)}
+            className="lg:hidden mb-2 w-full"
+          >
+            닫기
+          </Button>
+        )}
+
         <div className="mb-4 flex-shrink-0">
           <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
           <Badge variant="secondary" className="text-xs">
@@ -1122,6 +1134,18 @@ export function LawViewer({
             </div>
           </ScrollArea>
         </div>
+
+        {/* Mobile close button - bottom */}
+        {isArticleListExpanded && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsArticleListExpanded(false)}
+            className="lg:hidden mt-2 w-full"
+          >
+            닫기
+          </Button>
+        )}
       </Card>
 
       {/* Right panel - Article content */}
