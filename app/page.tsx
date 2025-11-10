@@ -436,6 +436,13 @@ export default function Home() {
         if (intelligentResponse.ok) {
           const intelligentResult = await intelligentResponse.json()
 
+          console.log('📥 [Page] Intelligent Search 결과:', {
+            source: intelligentResult.source,
+            queryId: intelligentResult.searchQueryId,
+            resultId: intelligentResult.searchResultId,
+            hasIds: !!(intelligentResult.searchQueryId && intelligentResult.searchResultId),
+          })
+
           if (intelligentResult.success && intelligentResult.data) {
             debugLogger.success(`✨ 캐시 HIT: ${intelligentResult.source} (${intelligentResult.time}ms)`)
 
@@ -471,6 +478,12 @@ export default function Home() {
 
                     debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
                   }
+
+                  console.log('📝 [Page] lawData 설정:', {
+                    queryId: intelligentResult.searchQueryId,
+                    resultId: intelligentResult.searchResultId,
+                    hasIds: !!(intelligentResult.searchQueryId && intelligentResult.searchResultId),
+                  })
 
                   setLawData({
                     ...finalData,
@@ -1001,17 +1014,26 @@ export default function Home() {
                         onDismiss={() => setArticleNotFound(null)}
                       />
                     )}
-                    {lawData.searchResultId && (
-                      <div className="px-4 py-3 bg-muted/50 rounded-lg border">
-                        <FeedbackButtons
-                          searchQueryId={lawData.searchQueryId}
-                          searchResultId={lawData.searchResultId}
-                          lawId={lawData.meta.lawId}
-                          lawTitle={lawData.meta.lawTitle}
-                          articleNumber={lawData.selectedJo}
-                        />
-                      </div>
-                    )}
+                    {(() => {
+                      const shouldShow = !!lawData.searchResultId
+                      console.log('👁️ [Page] 피드백 버튼 렌더링 체크:', {
+                        searchResultId: lawData.searchResultId,
+                        searchQueryId: lawData.searchQueryId,
+                        shouldShow,
+                        lawTitle: lawData.meta.lawTitle,
+                      })
+                      return shouldShow ? (
+                        <div className="px-4 py-3 bg-muted/50 rounded-lg border">
+                          <FeedbackButtons
+                            searchQueryId={lawData.searchQueryId}
+                            searchResultId={lawData.searchResultId}
+                            lawId={lawData.meta.lawId}
+                            lawTitle={lawData.meta.lawTitle}
+                            articleNumber={lawData.selectedJo}
+                          />
+                        </div>
+                      ) : null
+                    })()}
                     <LawViewer
                       meta={lawData.meta}
                       articles={lawData.articles}

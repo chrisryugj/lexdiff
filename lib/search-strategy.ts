@@ -67,6 +67,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
             debugLogger.warning('L0 캐시 히트 학습 실패 (계속 진행)', error)
           }
 
+          console.log('🔍 [L0 Vector] 반환 IDs:', {
+            queryId: learningResult?.queryId,
+            resultId: learningResult?.resultId,
+            hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+          })
+
           return {
             source: 'L0_vector',
             data: cachedData.data,
@@ -111,6 +117,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         debugLogger.warning('L1 캐시 히트 학습 실패 (계속 진행)', error)
       }
 
+      console.log('🔍 [L1 Direct] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L1_direct_mapping',
         data: l1Result.data,
@@ -147,6 +159,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
       } catch (error) {
         debugLogger.warning('L2 변형 테이블 학습 실패 (계속 진행)', error)
       }
+
+      console.log('🔍 [L2 Variant Table] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
 
       return {
         source: 'L2_variant_table',
@@ -187,6 +205,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
       } catch (error) {
         debugLogger.warning('L2 유사 검색어 학습 실패 (계속 진행)', error)
       }
+
+      console.log('🔍 [L2 Similar] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
 
       return {
         source: 'L2_variant',
@@ -233,6 +257,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         debugLogger.warning('L3 고품질 캐시 학습 실패 (계속 진행)', error)
       }
 
+      console.log('🔍 [L3 Quality] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L3_quality_cache',
         data: l3Result.data,
@@ -265,6 +295,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
       } catch (error) {
         debugLogger.error('학습 실패', error)
       }
+
+      console.log('🔍 [L4 API] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
 
       return {
         source: 'L4_api',
