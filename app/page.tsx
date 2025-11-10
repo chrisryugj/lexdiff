@@ -317,6 +317,38 @@ export default function Home() {
         const targetArticle = articles.find((a) => a.jo === query.jo)
         if (targetArticle) {
           selectedJo = targetArticle.jo
+        } else {
+          // Article not found - find nearest articles
+          const { findNearestArticles } = await import('@/lib/article-finder')
+          const { formatJO } = await import('@/lib/law-parser')
+
+          const nearestArticles = findNearestArticles(query.jo, articles)
+          const requestedDisplay = formatJO(query.jo)
+
+          if (nearestArticles.length > 0) {
+            // Show warning with suggestions
+            const suggestions = nearestArticles.map(a => formatJO(a.jo)).join(', ')
+            toast({
+              title: "요청하신 조문을 찾을 수 없습니다",
+              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다음 조문을 대신 표시합니다: ${formatJO(nearestArticles[0].jo)}`,
+              variant: "default",
+              duration: 7000,
+            })
+
+            // Select nearest article
+            selectedJo = nearestArticles[0].jo
+            debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
+          } else {
+            // No articles found at all - show full list
+            toast({
+              title: "요청하신 조문을 찾을 수 없습니다",
+              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
+              variant: "destructive",
+              duration: 7000,
+            })
+
+            debugLogger.error(`조문 없음: ${requestedDisplay}, 대체 조문도 없음`)
+          }
         }
       }
 
@@ -425,8 +457,37 @@ export default function Home() {
                   const jsonData = JSON.parse(jsonText)
                   const parsedData = parseLawJSON(jsonData)
 
+                  // Check if requested article exists
+                  let finalData = { ...parsedData }
+                  if (query.jo && parsedData.selectedJo === undefined) {
+                    const { findNearestArticles } = await import('@/lib/article-finder')
+                    const { formatJO } = await import('@/lib/law-parser')
+
+                    const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
+                    const requestedDisplay = formatJO(query.jo)
+
+                    if (nearestArticles.length > 0) {
+                      toast({
+                        title: "요청하신 조문을 찾을 수 없습니다",
+                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다음 조문을 대신 표시합니다: ${formatJO(nearestArticles[0].jo)}`,
+                        variant: "default",
+                        duration: 7000,
+                      })
+                      finalData.selectedJo = nearestArticles[0].jo
+                      debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
+                    } else {
+                      toast({
+                        title: "요청하신 조문을 찾을 수 없습니다",
+                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
+                        variant: "destructive",
+                        duration: 7000,
+                      })
+                      debugLogger.error(`조문 없음: ${requestedDisplay}`)
+                    }
+                  }
+
                   setLawData({
-                    ...parsedData,
+                    ...finalData,
                     searchQueryId: intelligentResult.searchQueryId,
                     searchResultId: intelligentResult.searchResultId,
                   })
