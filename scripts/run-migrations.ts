@@ -56,6 +56,27 @@ async function runMigrations() {
     }
     console.log('✅ 002_mapping_schema.sql completed (4 tables)\n')
 
+    // 003_vector_schema.sql 읽기 (Phase 6: Vector Search)
+    const schema3Path = path.join(process.cwd(), 'db/migrations/003_vector_schema.sql')
+    const schema3 = fs.readFileSync(schema3Path, 'utf-8')
+
+    console.log('📝 Running 003_vector_schema.sql...')
+    const statements3 = parseSqlFile(schema3)
+
+    for (const stmt of statements3) {
+      if (stmt.trim()) {
+        try {
+          await db.execute(stmt)
+        } catch (error: any) {
+          // Ignore "already exists" errors for idempotency
+          if (!error.message?.includes('already exists')) {
+            throw error
+          }
+        }
+      }
+    }
+    console.log('✅ 003_vector_schema.sql completed (5 vector tables)\n')
+
     // 테이블 확인
     console.log('📊 Verifying tables...')
     const result = await db.execute(`
