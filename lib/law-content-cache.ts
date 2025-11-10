@@ -91,15 +91,27 @@ export async function setLawContentCache(
   articles: LawArticle[]
 ): Promise<void> {
   try {
+    if (!lawId) {
+      console.warn('⚠️ lawId가 없어 캐시 저장 건너뜀')
+      return
+    }
+
     const db = await openDB()
     const key = `${lawId}_${effectiveDate}`
+
+    console.log(`💾 캐시 저장 중: ${meta.lawTitle}`, {
+      lawId,
+      effectiveDate: effectiveDate || '(없음)',
+      articles: articles.length,
+      key,
+    })
 
     const entry: LawContentCacheEntry = {
       key,
       timestamp: Date.now(),
       lawId,
       lawTitle: meta.lawTitle,
-      effectiveDate,
+      effectiveDate: effectiveDate || '',
       meta,
       articles,
     }
@@ -115,12 +127,12 @@ export async function setLawContentCache(
 
     db.close()
 
-    console.log(`💾 Cached law content: ${meta.lawTitle} (${articles.length} articles)`)
+    console.log(`✅ 캐시 저장 완료: ${meta.lawTitle} (${articles.length}개 조문, key: ${key})`)
 
     // 백그라운드로 만료된 캐시 정리
     cleanExpiredCache().catch(console.error)
   } catch (error) {
-    console.error("Failed to cache law content:", error)
+    console.error("❌ 캐시 저장 실패:", error)
   }
 }
 
@@ -131,20 +143,42 @@ export async function getLawContentCache(
 ): Promise<LawContentCacheEntry | null> {
   try {
     const db = await openDB()
-    const key = `${lawId}_${effectiveDate}`
-
     const tx = db.transaction(CONTENT_STORE, "readonly")
     const store = tx.objectStore(CONTENT_STORE)
-    const request = store.get(key)
 
-    const entry = await new Promise<LawContentCacheEntry | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    let entry: LawContentCacheEntry | undefined
+
+    // effectiveDate가 있으면 정확히 매칭
+    if (effectiveDate) {
+      const key = `${lawId}_${effectiveDate}`
+      console.log(`🔍 캐시 조회 (정확한 키): ${key}`)
+      const request = store.get(key)
+      entry = await new Promise<LawContentCacheEntry | undefined>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+    } else {
+      // effectiveDate가 없으면 lawId로 모든 항목 조회 후 가장 최신 것 선택
+      console.log(`🔍 캐시 조회 (lawId만): ${lawId}`)
+      const index = store.index("lawId")
+      const request = index.getAll(lawId)
+
+      const entries = await new Promise<LawContentCacheEntry[]>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result || [])
+        request.onerror = () => reject(request.error)
+      })
+
+      // 가장 최신 캐시 선택 (timestamp 기준)
+      if (entries.length > 0) {
+        entry = entries.sort((a, b) => b.timestamp - a.timestamp)[0]
+        console.log(`📋 Found ${entries.length} cache entries, using most recent`)
+      }
+    }
 
     db.close()
 
     if (!entry) {
+      console.log(`❌ 캐시 MISS: ${lawId}`)
       return null
     }
 
@@ -153,14 +187,14 @@ export async function getLawContentCache(
     if (entry.timestamp < expiryTime) {
       console.log(`⏰ Cache expired for ${entry.lawTitle}`)
       // 만료된 캐시는 비동기로 삭제
-      clearLawContentCache(lawId, effectiveDate).catch(console.error)
+      clearLawContentCache(lawId, entry.effectiveDate).catch(console.error)
       return null
     }
 
-    console.log(`💾 Cache HIT: ${entry.lawTitle} (${entry.articles.length} articles)`)
+    console.log(`✅ 캐시 HIT: ${entry.lawTitle} (${entry.articles.length}개 조문, key: ${entry.key})`)
     return entry
   } catch (error) {
-    console.error("Failed to get law content cache:", error)
+    console.error("❌ 캐시 조회 실패:", error)
     return null
   }
 }

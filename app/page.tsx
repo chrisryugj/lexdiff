@@ -434,12 +434,23 @@ export default function Home() {
             searchResultId: learningResult.resultId,
           } : null)
         } else {
-          // 학습 실패 시 임시 ID 생성 (음수 타임스탬프로 구분)
+          // 학습 실패 시 에러 상세 정보 읽기
+          let errorDetails = null
+          try {
+            errorDetails = await learningResponse.json()
+          } catch (e) {
+            errorDetails = { error: '응답 파싱 실패' }
+          }
+
+          // 임시 ID 생성 (음수 타임스탬프로 구분)
           const tempQueryId = -Date.now()
           const tempResultId = -(Date.now() + 1)
 
-          debugLogger.warning('⚠️ 학습 API 실패, 임시 ID 생성', {
+          debugLogger.error('❌ 학습 API 실패, 임시 ID 생성', {
             status: learningResponse.status,
+            statusText: learningResponse.statusText,
+            error: errorDetails?.error,
+            details: errorDetails?.details,
             tempQueryId,
             tempResultId,
             피드백버튼표시: '예 (임시 ID)',
@@ -452,13 +463,14 @@ export default function Home() {
             searchResultId: tempResultId,
           } : null)
         }
-      } catch (learnError) {
+      } catch (learnError: any) {
         // 네트워크 에러 등으로 학습 실패 시에도 임시 ID 생성
         const tempQueryId = -Date.now()
         const tempResultId = -(Date.now() + 1)
 
-        debugLogger.warning('⚠️ 학습 예외 발생, 임시 ID 생성', {
-          error: learnError,
+        debugLogger.error('❌ 학습 예외 발생, 임시 ID 생성', {
+          error: learnError?.message || String(learnError),
+          errorType: learnError?.name,
           tempQueryId,
           tempResultId,
           피드백버튼표시: '예 (임시 ID)',
