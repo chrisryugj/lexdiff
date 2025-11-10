@@ -391,7 +391,8 @@ export default function Home() {
         viewMode,
       })
 
-      debugLogger.success("✅ L4 API 호출 완료", { lawTitle: meta.lawTitle, articleCount: articles.length })
+      const dataSource = lawContentCache ? "캐시" : "API"
+      debugLogger.success(`✅ L4 법령 조회 완료 (${dataSource})`, { lawTitle: meta.lawTitle, articleCount: articles.length })
 
       // 🚀 Phase 2: 성공한 검색 자동 학습 - API 라우트 사용
       try {
@@ -578,7 +579,12 @@ export default function Home() {
                     effectiveDate,
                     parsedData.meta,
                     parsedData.articles
-                  ).catch((error) => {
+                  ).then(() => {
+                    debugLogger.info('💾 법령 본문 캐시 저장 완료', {
+                      lawTitle: parsedData.meta.lawTitle,
+                      key: `${cachedData.lawId}_${effectiveDate}`
+                    })
+                  }).catch((error) => {
                     console.error('법령 본문 캐시 저장 실패:', error)
                   })
                 }
