@@ -32,22 +32,22 @@ export function ArticleNotFoundBanner({
   const requestedDisplay = formatJO(requestedJo)
 
   return (
-    <Card className="p-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 mb-4">
+    <Card className="p-4 border-orange-500/50 bg-muted/80 mb-4">
       <div className="flex items-start gap-3">
-        <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+        <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
         <div className="flex-1 space-y-3">
           <div>
-            <h3 className="font-semibold text-yellow-900 dark:text-yellow-100">
+            <h3 className="font-semibold text-foreground">
               요청하신 조문을 찾을 수 없습니다
             </h3>
-            <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
-              {lawTitle}에 <strong>{requestedDisplay}</strong>가(이) 없습니다.
+            <p className="text-sm text-muted-foreground mt-1">
+              {lawTitle}에 <strong className="text-foreground">{requestedDisplay}</strong>가(이) 없습니다.
             </p>
           </div>
 
           {nearestArticles.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+              <p className="text-sm font-medium text-foreground">
                 이 법령의 유사 조문:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -60,7 +60,6 @@ export function ArticleNotFoundBanner({
                       onSelectArticle(article.jo)
                       onDismiss()
                     }}
-                    className="bg-white dark:bg-gray-800"
                   >
                     {formatJO(article.jo)}
                     {article.title && (
@@ -77,7 +76,7 @@ export function ArticleNotFoundBanner({
 
           {crossLawSuggestions.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+              <p className="text-sm font-medium text-foreground">
                 다른 법령에서 많이 검색된 {requestedDisplay}:
               </p>
               <div className="space-y-1">
@@ -90,10 +89,10 @@ export function ArticleNotFoundBanner({
                       onSelectCrossLaw?.(suggestion.lawTitle)
                       onDismiss()
                     }}
-                    className="w-full justify-start text-left h-auto py-2 px-3 bg-white dark:bg-gray-800"
+                    className="w-full justify-start text-left h-auto py-2 px-3"
                   >
                     <div className="flex-1">
-                      <div className="font-medium">{suggestion.lawTitle} {requestedDisplay}</div>
+                      <div className="font-medium text-foreground">{suggestion.lawTitle} {requestedDisplay}</div>
                     </div>
                     <ChevronRight className="h-4 w-4 ml-2 flex-shrink-0" />
                   </Button>
