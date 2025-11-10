@@ -318,19 +318,18 @@ export default function Home() {
         if (targetArticle) {
           selectedJo = targetArticle.jo
         } else {
-          // Article not found - find nearest articles
-          const { findNearestArticles } = await import('@/lib/article-finder')
+          // Article not found - find nearest articles and cross-law suggestions
+          const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
           const { formatJO } = await import('@/lib/law-parser')
 
           const nearestArticles = findNearestArticles(query.jo, articles)
           const requestedDisplay = formatJO(query.jo)
 
           if (nearestArticles.length > 0) {
-            // Show warning with suggestions
-            const suggestions = nearestArticles.map(a => formatJO(a.jo)).join(', ')
+            // Show warning with suggestions in same law
             toast({
               title: "요청하신 조문을 찾을 수 없습니다",
-              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다음 조문을 대신 표시합니다: ${formatJO(nearestArticles[0].jo)}`,
+              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n이 법령의 ${formatJO(nearestArticles[0].jo)}를 대신 표시합니다.`,
               variant: "default",
               duration: 7000,
             })
@@ -339,15 +338,34 @@ export default function Home() {
             selectedJo = nearestArticles[0].jo
             debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
           } else {
-            // No articles found at all - show full list
-            toast({
-              title: "요청하신 조문을 찾을 수 없습니다",
-              description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
-              variant: "destructive",
-              duration: 7000,
-            })
+            // Check cross-law suggestions from database
+            const crossLawSuggestions = await findCrossLawSuggestions(query.jo, meta.lawTitle)
 
-            debugLogger.error(`조문 없음: ${requestedDisplay}, 대체 조문도 없음`)
+            if (crossLawSuggestions.length > 0) {
+              const topSuggestions = crossLawSuggestions.slice(0, 3)
+              const suggestionText = topSuggestions
+                .map(s => `${s.lawTitle} ${requestedDisplay}`)
+                .join('\n')
+
+              toast({
+                title: "요청하신 조문을 찾을 수 없습니다",
+                description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다른 법령에서 많이 검색된 ${requestedDisplay}:\n${suggestionText}\n\n전체 조문 목록을 표시합니다.`,
+                variant: "default",
+                duration: 10000,
+              })
+
+              debugLogger.info(`조문 없음: ${requestedDisplay}, 다른 법령 제안: ${crossLawSuggestions.map(s => s.lawTitle).join(', ')}`)
+            } else {
+              // No suggestions at all - show full list
+              toast({
+                title: "요청하신 조문을 찾을 수 없습니다",
+                description: `${meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
+                variant: "destructive",
+                duration: 7000,
+              })
+
+              debugLogger.error(`조문 없음: ${requestedDisplay}, 대체 조문도 없음`)
+            }
           }
         }
       }
@@ -460,7 +478,7 @@ export default function Home() {
                   // Check if requested article exists
                   let finalData = { ...parsedData }
                   if (query.jo && parsedData.selectedJo === undefined) {
-                    const { findNearestArticles } = await import('@/lib/article-finder')
+                    const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
                     const { formatJO } = await import('@/lib/law-parser')
 
                     const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
@@ -469,20 +487,39 @@ export default function Home() {
                     if (nearestArticles.length > 0) {
                       toast({
                         title: "요청하신 조문을 찾을 수 없습니다",
-                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다음 조문을 대신 표시합니다: ${formatJO(nearestArticles[0].jo)}`,
+                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n이 법령의 ${formatJO(nearestArticles[0].jo)}를 대신 표시합니다.`,
                         variant: "default",
                         duration: 7000,
                       })
                       finalData.selectedJo = nearestArticles[0].jo
                       debugLogger.warning(`조문 없음: ${requestedDisplay}, 대체: ${formatJO(nearestArticles[0].jo)}`)
                     } else {
-                      toast({
-                        title: "요청하신 조문을 찾을 수 없습니다",
-                        description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
-                        variant: "destructive",
-                        duration: 7000,
-                      })
-                      debugLogger.error(`조문 없음: ${requestedDisplay}`)
+                      // Check cross-law suggestions
+                      const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
+
+                      if (crossLawSuggestions.length > 0) {
+                        const topSuggestions = crossLawSuggestions.slice(0, 3)
+                        const suggestionText = topSuggestions
+                          .map(s => `${s.lawTitle} ${requestedDisplay}`)
+                          .join('\n')
+
+                        toast({
+                          title: "요청하신 조문을 찾을 수 없습니다",
+                          description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n다른 법령에서 많이 검색된 ${requestedDisplay}:\n${suggestionText}\n\n전체 조문 목록을 표시합니다.`,
+                          variant: "default",
+                          duration: 10000,
+                        })
+
+                        debugLogger.info(`조문 없음: ${requestedDisplay}, 다른 법령 제안: ${crossLawSuggestions.map(s => s.lawTitle).join(', ')}`)
+                      } else {
+                        toast({
+                          title: "요청하신 조문을 찾을 수 없습니다",
+                          description: `${parsedData.meta.lawTitle}에 ${requestedDisplay}가(이) 없습니다.\n\n전체 조문 목록을 표시합니다.`,
+                          variant: "destructive",
+                          duration: 7000,
+                        })
+                        debugLogger.error(`조문 없음: ${requestedDisplay}`)
+                      }
                     }
                   }
 

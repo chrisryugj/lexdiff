@@ -93,3 +93,60 @@ export function articleExists(
 ): boolean {
   return articles.some(a => a.jo === jo)
 }
+
+/**
+ * Find same article number in other laws from database
+ * Returns laws where users successfully searched for this article
+ * Sorted by popularity (search count) and quality score
+ */
+export async function findCrossLawSuggestions(
+  articleJo: string,
+  currentLawName: string
+): Promise<Array<{
+  lawTitle: string
+  lawId: string | null
+  articleJo: string
+  searchCount: number
+  qualityScore: number
+}>> {
+  try {
+    // Dynamically import to avoid circular dependencies
+    const { db } = await import('./db')
+
+    const result = await db.execute({
+      sql: `
+        SELECT
+          sr.law_title,
+          sr.law_id,
+          sr.article_jo,
+          COUNT(DISTINCT sr.query_id) as search_count,
+          COALESCE(AVG(sq.quality_score), 0) as avg_quality_score,
+          SUM(sq.positive_count) as total_positive
+        FROM search_results sr
+        LEFT JOIN search_quality_scores sq ON sr.id = sq.search_result_id
+        WHERE sr.article_jo = ?
+          AND sr.law_title != ?
+          AND sr.law_title IS NOT NULL
+        GROUP BY sr.law_title, sr.law_id, sr.article_jo
+        HAVING search_count > 0
+        ORDER BY
+          total_positive DESC,
+          avg_quality_score DESC,
+          search_count DESC
+        LIMIT 5
+      `,
+      args: [articleJo, currentLawName],
+    })
+
+    return result.rows.map(row => ({
+      lawTitle: row.law_title as string,
+      lawId: (row.law_id as string) || null,
+      articleJo: row.article_jo as string,
+      searchCount: (row.search_count as number) || 0,
+      qualityScore: (row.avg_quality_score as number) || 0,
+    }))
+  } catch (error) {
+    console.error('Failed to find cross-law suggestions:', error)
+    return []
+  }
+}
