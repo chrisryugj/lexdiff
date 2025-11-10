@@ -13,6 +13,8 @@ export interface SearchResult {
   pattern?: string
   variantUsed?: string
   vectorSimilarity?: number
+  searchQueryId?: number
+  searchResultId?: number
 }
 
 // 통합 검색 전략 (5단계 폭포수)
@@ -129,9 +131,10 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
       const time = Date.now() - startTime
 
       // 자동 학습
+      let learningResult: { queryId: number; resultId: number } | null = null
       try {
         const sessionId = getSessionId()
-        await learnFromSuccessfulSearch({
+        learningResult = await learnFromSuccessfulSearch({
           rawQuery,
           normalizedQuery: normalized,
           pattern,
@@ -139,7 +142,7 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
           apiResult,
           sessionId,
         })
-        debugLogger.success('📚 학습 완료', { pattern })
+        debugLogger.success('📚 학습 완료', { pattern, queryId: learningResult.queryId, resultId: learningResult.resultId })
       } catch (error) {
         debugLogger.error('학습 실패', error)
       }
@@ -148,6 +151,8 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         source: 'L4_api',
         data: apiResult,
         time,
+        searchQueryId: learningResult?.queryId,
+        searchResultId: learningResult?.resultId,
       }
     }
 

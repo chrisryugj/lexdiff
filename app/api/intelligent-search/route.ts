@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       time: result.time,
       pattern: result.pattern,
       variantUsed: result.variantUsed,
+      searchQueryId: result.searchQueryId,
+      searchResultId: result.searchResultId,
     })
   } catch (error: any) {
     debugLogger.error('Intelligent search API 실패', error)

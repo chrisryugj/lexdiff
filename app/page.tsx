@@ -425,7 +425,11 @@ export default function Home() {
                   const jsonData = JSON.parse(jsonText)
                   const parsedData = parseLawJSON(jsonData)
 
-                  setLawData(parsedData)
+                  setLawData({
+                    ...parsedData,
+                    searchQueryId: intelligentResult.searchQueryId,
+                    searchResultId: intelligentResult.searchResultId,
+                  })
                   setMobileView("content")
                   setIsSearching(false)
                   return
