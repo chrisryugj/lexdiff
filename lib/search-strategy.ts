@@ -1,0 +1,176 @@
+import { parseSearchQuery } from './law-parser'
+import { normalizeSearchQuery } from './search-normalizer'
+import { findCachedResult, createSearchPattern, learnFromSuccessfulSearch, getSessionId } from './search-learning'
+import { searchSimilarVariants, searchVariantTable } from './variant-matcher'
+import { searchHighQualityCache } from './search-feedback-db'
+import { debugLogger } from './debug-logger'
+
+export interface SearchResult {
+  source: 'L1_direct_mapping' | 'L2_variant' | 'L2_variant_table' | 'L3_quality_cache' | 'L4_api'
+  data: any
+  time: number
+  pattern?: string
+  variantUsed?: string
+}
+
+// 통합 검색 전략 (5단계 폭포수)
+export async function intelligentSearch(rawQuery: string): Promise<SearchResult> {
+  const startTime = Date.now()
+
+  try {
+    debugLogger.info('🔍 검색 시작', { rawQuery })
+
+    // 정규화
+    const normalized = normalizeSearchQuery(rawQuery)
+    const pattern = createSearchPattern(normalized)
+    const parsed = parseSearchQuery(normalized)
+
+    debugLogger.debug('검색 정규화', { normalized, pattern, parsed })
+
+    // L1: 직접 매핑 (5ms)
+    const l1Result = await findCachedResult(rawQuery)
+    if (l1Result.found) {
+      const time = Date.now() - startTime
+      debugLogger.success('✨ L1 직접 매핑 HIT', { time, pattern })
+      return {
+        source: 'L1_direct_mapping',
+        data: l1Result.data,
+        time,
+        pattern: l1Result.pattern,
+      }
+    }
+
+    // L2: 변형 테이블 검색 (5-10ms, 더 빠름)
+    const l2TableResult = await searchVariantTable(rawQuery)
+    if (l2TableResult?.found) {
+      const time = Date.now() - startTime
+      debugLogger.success('🔄 L2 변형 테이블 HIT', { time })
+      return {
+        source: 'L2_variant_table',
+        data: l2TableResult.data,
+        time,
+      }
+    }
+
+    // L2: 유사 검색어 생성 및 검색 (10ms)
+    const l2Result = await searchSimilarVariants(rawQuery, pattern)
+    if (l2Result) {
+      const time = Date.now() - startTime
+      debugLogger.success('🔄 L2 유사 검색어 HIT', {
+        time,
+        variantUsed: l2Result.variantUsed,
+        variantType: l2Result.variantType
+      })
+      return {
+        source: 'L2_variant',
+        data: l2Result.data,
+        time,
+        variantUsed: l2Result.variantUsed,
+      }
+    }
+
+    // L3: 고품질 캐시 (30ms) - Phase 5: quality_score > 0.8인 결과만
+    const l3Result = await searchHighQualityCache({
+      lawName: parsed.lawName,
+      articleJo: parsed.jo,
+    })
+
+    if (l3Result?.found) {
+      const time = Date.now() - startTime
+      debugLogger.success('⭐ L3 고품질 캐시 HIT', {
+        time,
+        qualityScore: l3Result.qualityScore,
+        successCount: l3Result.successCount,
+      })
+      return {
+        source: 'L3_quality_cache',
+        data: l3Result.data,
+        time,
+      }
+    }
+
+    // L4: API 호출 (500-2000ms)
+    debugLogger.warning('⏳ L4 API 호출 필요')
+    const apiResult = await fetchFromAPI(parsed)
+
+    if (apiResult) {
+      const time = Date.now() - startTime
+
+      // 자동 학습
+      try {
+        const sessionId = getSessionId()
+        await learnFromSuccessfulSearch({
+          rawQuery,
+          normalizedQuery: normalized,
+          pattern,
+          parsed,
+          apiResult,
+          sessionId,
+        })
+        debugLogger.success('📚 학습 완료', { pattern })
+      } catch (error) {
+        debugLogger.error('학습 실패', error)
+      }
+
+      return {
+        source: 'L4_api',
+        data: apiResult,
+        time,
+      }
+    }
+
+    throw new Error('검색 결과를 찾을 수 없습니다')
+  } catch (error) {
+    debugLogger.error('검색 실패', error)
+    throw error
+  }
+}
+
+// API 호출 (기존 로직)
+async function fetchFromAPI(parsed: ReturnType<typeof parseSearchQuery>) {
+  const { lawName, article } = parsed
+
+  if (!lawName) {
+    throw new Error('법령명을 입력해주세요')
+  }
+
+  try {
+    // 법령 검색
+    const searchUrl = `/api/law-search?query=${encodeURIComponent(lawName)}`
+    const searchRes = await fetch(searchUrl)
+
+    if (!searchRes.ok) {
+      throw new Error('법령 검색 실패')
+    }
+
+    const searchData = await searchRes.json()
+
+    if (!searchData.lawId) {
+      throw new Error('법령을 찾을 수 없습니다')
+    }
+
+    // 법령 내용 가져오기
+    const lawUrl = `/api/eflaw?lawId=${searchData.lawId}`
+    const lawRes = await fetch(lawUrl)
+
+    if (!lawRes.ok) {
+      throw new Error('법령 조회 실패')
+    }
+
+    const lawData = await lawRes.json()
+
+    return {
+      lawId: searchData.lawId,
+      mst: searchData.mst,
+      lawTitle: lawData.lawTitle || searchData.lawTitle,
+      effectiveDate: lawData.effectiveDate,
+      articleContent: lawData.articles?.[0]?.content || '',
+      articles: lawData.articles || [],
+      isOrdinance: false,
+      ...lawData,
+    }
+  } catch (error) {
+    debugLogger.error('API 호출 실패', error)
+    throw error
+  }
+}

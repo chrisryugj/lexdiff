@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "latest",
     "@hookform/resolvers": "^3.10.0",
+    "@libsql/client": "^0.15.0",
     "@modelcontextprotocol/sdk": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
@@ -48,6 +49,7 @@
     "clsx": "^2.1.1",
     "cmdk": "latest",
     "date-fns": "4.1.0",
+    "dotenv": "^17.2.3",
     "embla-carousel-react": "latest",
     "iconv-lite": "latest",
     "immer": "latest",
