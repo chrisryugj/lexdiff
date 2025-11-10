@@ -344,6 +344,9 @@ export function LawViewer({
   const handleArticleClick = async (jo: string) => {
     console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
 
+    // Close article list on mobile after selection
+    setIsArticleListExpanded(false)
+
     // Scroll content area to top - do this first before any state updates
     const scrollToTop = () => {
       if (contentRef.current) {
