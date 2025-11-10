@@ -26,11 +26,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    debugLogger.info('📚 검색 학습 API 호출', { rawQuery })
+    debugLogger.info('📚 검색 학습 API 호출', {
+      rawQuery,
+      lawTitle: apiResult.lawTitle,
+      hasLawId: !!apiResult.lawId,
+    })
+
+    // DB 연결 상태 체크
+    try {
+      const { db } = await import('@/lib/db')
+      const dbTest = await db.execute('SELECT 1 as test')
+      debugLogger.success('✅ Turso DB 연결 성공', {
+        testResult: dbTest.rows[0],
+        dbType: process.env.TURSO_DATABASE_URL ? 'Turso 원격 DB' : '로컬 SQLite'
+      })
+    } catch (dbError: any) {
+      debugLogger.error('❌ Turso DB 연결 실패', {
+        error: dbError.message,
+        code: dbError.code,
+        cause: dbError.cause?.message,
+        dbUrl: process.env.TURSO_DATABASE_URL?.slice(0, 50) + '...',
+      })
+      throw new Error(`DB 연결 실패: ${dbError.message}`)
+    }
 
     const normalized = normalizeSearchQuery(rawQuery)
     const pattern = createSearchPattern(normalized)
     const parsed = parseSearchQuery(normalized)
+
+    debugLogger.info('🔄 검색 학습 시작', {
+      normalized,
+      pattern,
+      lawName: parsed.lawName,
+      article: parsed.article,
+    })
 
     const result = await learnFromSuccessfulSearch({
       rawQuery,
@@ -41,7 +70,12 @@ export async function POST(request: NextRequest) {
       sessionId: getSessionId(),
     })
 
-    debugLogger.success('📚 검색 학습 완료', { pattern, queryId: result.queryId })
+    debugLogger.success('✅ 검색 학습 완료', {
+      pattern,
+      queryId: result.queryId,
+      resultId: result.resultId,
+      피드백버튼표시: '예',
+    })
 
     return NextResponse.json({
       success: true,
@@ -50,12 +84,21 @@ export async function POST(request: NextRequest) {
       pattern,
     })
   } catch (error: any) {
-    debugLogger.error('검색 학습 API 실패', error)
+    debugLogger.error('❌ 검색 학습 API 실패', {
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+      code: error.code,
+      cause: error.cause?.message,
+    })
 
     return NextResponse.json(
       {
         success: false,
         error: error.message || '학습 중 오류가 발생했습니다',
+        details: {
+          code: error.code,
+          cause: error.cause?.message,
+        }
       },
       { status: 500 }
     )

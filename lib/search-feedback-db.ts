@@ -9,22 +9,34 @@ export async function recordSearchQuery(params: {
   searchType: 'law' | 'ordinance'
   sessionId?: string
 }): Promise<number> {
-  const result = await query(`
-    INSERT INTO search_queries (
-      raw_query, normalized_query, parsed_law_name,
-      parsed_article, parsed_jo, search_type, user_session_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [
-    params.rawQuery,
-    params.normalizedQuery,
-    params.parsedLawName,
-    params.parsedArticle || null,
-    params.parsedJo || null,
-    params.searchType,
-    params.sessionId || null
-  ])
+  try {
+    const result = await query(`
+      INSERT INTO search_queries (
+        raw_query, normalized_query, parsed_law_name,
+        parsed_article, parsed_jo, search_type, user_session_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      params.rawQuery,
+      params.normalizedQuery,
+      params.parsedLawName,
+      params.parsedArticle || null,
+      params.parsedJo || null,
+      params.searchType,
+      params.sessionId || null
+    ])
 
-  return result.lastInsertRowid as number
+    return result.lastInsertRowid as number
+  } catch (error: any) {
+    console.error('❌ DB 에러: recordSearchQuery 실패', {
+      error: error.message,
+      code: error.code,
+      params: {
+        rawQuery: params.rawQuery,
+        lawName: params.parsedLawName,
+      }
+    })
+    throw error
+  }
 }
 
 export async function recordSearchResult(params: {
@@ -37,23 +49,35 @@ export async function recordSearchResult(params: {
   effectiveDate?: string
   resultType: 'law' | 'ordinance'
 }): Promise<number> {
-  const result = await query(`
-    INSERT INTO search_results (
-      query_id, law_id, law_title, law_mst,
-      article_jo, article_content, effective_date, result_type
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    params.queryId,
-    params.lawId || null,
-    params.lawTitle,
-    params.lawMst || null,
-    params.articleJo || null,
-    params.articleContent || null,
-    params.effectiveDate || null,
-    params.resultType
-  ])
+  try {
+    const result = await query(`
+      INSERT INTO search_results (
+        query_id, law_id, law_title, law_mst,
+        article_jo, article_content, effective_date, result_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      params.queryId,
+      params.lawId || null,
+      params.lawTitle,
+      params.lawMst || null,
+      params.articleJo || null,
+      params.articleContent || null,
+      params.effectiveDate || null,
+      params.resultType
+    ])
 
-  return result.lastInsertRowid as number
+    return result.lastInsertRowid as number
+  } catch (error: any) {
+    console.error('❌ DB 에러: recordSearchResult 실패', {
+      error: error.message,
+      code: error.code,
+      params: {
+        queryId: params.queryId,
+        lawTitle: params.lawTitle,
+      }
+    })
+    throw error
+  }
 }
 
 export async function recordApiMapping(params: {
@@ -63,24 +87,36 @@ export async function recordApiMapping(params: {
   jo: string
   apiParams: any
 }): Promise<number> {
-  const result = await query(`
-    INSERT INTO api_parameter_mappings (
-      normalized_pattern, law_name, article_display, article_jo,
-      api_params, api_endpoint, success_count, last_success_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))
-    ON CONFLICT(normalized_pattern) DO UPDATE SET
-      success_count = success_count + 1,
-      last_success_at = datetime('now')
-  `, [
-    params.pattern,
-    params.lawName,
-    params.article,
-    params.jo,
-    JSON.stringify(params.apiParams),
-    '/api/eflaw'
-  ])
+  try {
+    const result = await query(`
+      INSERT INTO api_parameter_mappings (
+        normalized_pattern, law_name, article_display, article_jo,
+        api_params, api_endpoint, success_count, last_success_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))
+      ON CONFLICT(normalized_pattern) DO UPDATE SET
+        success_count = success_count + 1,
+        last_success_at = datetime('now')
+    `, [
+      params.pattern,
+      params.lawName,
+      params.article,
+      params.jo,
+      JSON.stringify(params.apiParams),
+      '/api/eflaw'
+    ])
 
-  return result.lastInsertRowid as number
+    return result.lastInsertRowid as number
+  } catch (error: any) {
+    console.error('❌ DB 에러: recordApiMapping 실패', {
+      error: error.message,
+      code: error.code,
+      params: {
+        pattern: params.pattern,
+        lawName: params.lawName,
+      }
+    })
+    throw error
+  }
 }
 
 export async function searchDirectMapping(pattern: string) {

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       articleNumber,
     })
 
-    // searchResultId가 없으면 에러 (나중에는 생성할 수도 있지만 일단은 필수)
+    // searchResultId가 없으면 에러
     if (!searchResultId) {
       return NextResponse.json(
         { error: 'searchResultId가 필요합니다' },
@@ -40,9 +40,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 임시 ID (음수)인 경우: DB 저장 건너뛰고 클라이언트에서만 처리
+    if (searchResultId < 0) {
+      debugLogger.warning('⚠️ 임시 ID 피드백 (DB 저장 생략)', {
+        searchResultId,
+        feedback,
+        lawTitle,
+        articleNumber,
+        message: '학습 실패로 인한 임시 ID - 클라이언트에서만 저장됨'
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: '피드백이 로컬에 저장되었습니다',
+        isTemporary: true,
+      })
+    }
+
     const sessionId = getSessionId()
 
-    // 피드백 저장 및 품질 점수 자동 업데이트
+    // 정상 ID: DB에 피드백 저장 및 품질 점수 자동 업데이트
     await recordUserFeedback({
       searchResultId,
       feedbackType: feedback,
@@ -50,7 +67,7 @@ export async function POST(request: NextRequest) {
       sessionId,
     })
 
-    debugLogger.success('피드백 저장 완료', { searchResultId, feedback })
+    debugLogger.success('✅ 피드백 DB 저장 완료', { searchResultId, feedback })
 
     return NextResponse.json({
       success: true,
