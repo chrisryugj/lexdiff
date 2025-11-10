@@ -24,6 +24,12 @@ export async function learnFromSuccessfulSearch(params: {
 
   try {
     // 1. 검색 쿼리 기록
+    console.log('📝 Step 1/4: 검색 쿼리 기록 중...', {
+      rawQuery,
+      lawName: parsed.lawName,
+      article: parsed.article,
+    })
+
     const queryId = await recordSearchQuery({
       rawQuery,
       normalizedQuery,
@@ -34,7 +40,15 @@ export async function learnFromSuccessfulSearch(params: {
       sessionId,
     })
 
+    console.log('✅ Step 1 완료: queryId =', queryId)
+
     // 2. 검색 결과 저장
+    console.log('📝 Step 2/4: 검색 결과 저장 중...', {
+      queryId,
+      lawTitle: apiResult.lawTitle,
+      lawId: apiResult.lawId,
+    })
+
     const resultId = await recordSearchResult({
       queryId,
       lawId: apiResult.lawId,
@@ -46,7 +60,14 @@ export async function learnFromSuccessfulSearch(params: {
       resultType: apiResult.isOrdinance ? 'ordinance' : 'law',
     })
 
+    console.log('✅ Step 2 완료: resultId =', resultId)
+
     // 3. API 파라미터 매핑 저장 (중요!)
+    console.log('📝 Step 3/4: API 매핑 저장 중...', {
+      pattern,
+      lawName: parsed.lawName,
+    })
+
     const mappingId = await recordApiMapping({
       pattern,
       lawName: parsed.lawName,
@@ -60,7 +81,11 @@ export async function learnFromSuccessfulSearch(params: {
       },
     })
 
+    console.log('✅ Step 3 완료: mappingId =', mappingId)
+
     // 4. 벡터 임베딩 생성 및 저장 (Phase 6)
+    console.log('📝 Step 4/4: 벡터 임베딩 저장 중... (선택사항)')
+
     try {
       const embeddingResult = await generateEmbedding(rawQuery)
       await storeSearchQueryEmbedding(rawQuery, embeddingResult.embedding, {
@@ -68,15 +93,20 @@ export async function learnFromSuccessfulSearch(params: {
         mappedPattern: pattern,
         mappingId: mappingId,
       })
-      console.log(`✅ Embedding stored for: "${rawQuery}" (${embeddingResult.tokens} tokens)`)
+      console.log(`✅ Step 4 완료: Embedding stored (${embeddingResult.tokens} tokens)`)
     } catch (error) {
-      console.error('⚠️ Failed to store embedding (non-critical):', error)
+      console.warn('⚠️ Step 4 건너뜀: Embedding 저장 실패 (비필수)', error)
       // Non-critical: continue even if embedding storage fails
     }
 
+    console.log('🎉 학습 완료!', { queryId, resultId })
     return { queryId, resultId }
-  } catch (error) {
-    console.error('❌ Failed to learn from search:', error)
+  } catch (error: any) {
+    console.error('❌ 학습 실패:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+    })
     throw error
   }
 }
