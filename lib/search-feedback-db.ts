@@ -25,7 +25,8 @@ export async function recordSearchQuery(params: {
       params.sessionId || null
     ])
 
-    return result.lastInsertRowid as number
+    // BigInt를 Number로 변환 (JSON 직렬화 문제 해결)
+    return Number(result.lastInsertRowid)
   } catch (error: any) {
     console.error('❌ DB 에러: recordSearchQuery 실패', {
       error: error.message,
@@ -66,7 +67,8 @@ export async function recordSearchResult(params: {
       params.resultType
     ])
 
-    return result.lastInsertRowid as number
+    // BigInt를 Number로 변환 (JSON 직렬화 문제 해결)
+    return Number(result.lastInsertRowid)
   } catch (error: any) {
     console.error('❌ DB 에러: recordSearchResult 실패', {
       error: error.message,
@@ -105,7 +107,8 @@ export async function recordApiMapping(params: {
       '/api/eflaw'
     ])
 
-    return result.lastInsertRowid as number
+    // BigInt를 Number로 변환 (JSON 직렬화 문제 해결)
+    return Number(result.lastInsertRowid)
   } catch (error: any) {
     console.error('❌ DB 에러: recordApiMapping 실패', {
       error: error.message,
