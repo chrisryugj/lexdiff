@@ -46,6 +46,33 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         // 매핑 정보를 사용하여 캐시된 결과 가져오기
         const cachedData = await findCachedResult(l0Result.similarQuery || '')
         if (cachedData.found) {
+          // 캐시 히트 시에도 학습 (queryId, resultId 생성)
+          let learningResult: { queryId: number; resultId: number } | null = null
+          try {
+            const sessionId = getSessionId()
+            learningResult = await learnFromSuccessfulSearch({
+              rawQuery,
+              normalizedQuery: normalized,
+              pattern,
+              parsed,
+              apiResult: {
+                ...cachedData.data,
+                lawTitle: cachedData.data.lawTitle || parsed.lawName,
+                articleContent: '',
+                isOrdinance: false,
+              },
+              sessionId,
+            })
+          } catch (error) {
+            debugLogger.warning('L0 캐시 히트 학습 실패 (계속 진행)', error)
+          }
+
+          console.log('🔍 [L0 Vector] 반환 IDs:', {
+            queryId: learningResult?.queryId,
+            resultId: learningResult?.resultId,
+            hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+          })
+
           return {
             source: 'L0_vector',
             data: cachedData.data,
@@ -53,6 +80,8 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
             pattern: l0Result.mappedPattern || undefined,
             variantUsed: l0Result.similarQuery || undefined,
             vectorSimilarity: l0Result.similarityScore || undefined,
+            searchQueryId: learningResult?.queryId,
+            searchResultId: learningResult?.resultId,
           }
         }
       }
@@ -66,11 +95,41 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
     if (l1Result.found) {
       const time = Date.now() - startTime
       debugLogger.success('✨ L1 직접 매핑 HIT', { time, pattern })
+
+      // 캐시 히트 시에도 학습 (queryId, resultId 생성)
+      let learningResult: { queryId: number; resultId: number } | null = null
+      try {
+        const sessionId = getSessionId()
+        learningResult = await learnFromSuccessfulSearch({
+          rawQuery,
+          normalizedQuery: normalized,
+          pattern,
+          parsed,
+          apiResult: {
+            ...l1Result.data,
+            lawTitle: l1Result.data.lawTitle || parsed.lawName,
+            articleContent: '',
+            isOrdinance: false,
+          },
+          sessionId,
+        })
+      } catch (error) {
+        debugLogger.warning('L1 캐시 히트 학습 실패 (계속 진행)', error)
+      }
+
+      console.log('🔍 [L1 Direct] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L1_direct_mapping',
         data: l1Result.data,
         time,
         pattern: l1Result.pattern,
+        searchQueryId: learningResult?.queryId,
+        searchResultId: learningResult?.resultId,
       }
     }
 
@@ -79,10 +138,40 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
     if (l2TableResult?.found) {
       const time = Date.now() - startTime
       debugLogger.success('🔄 L2 변형 테이블 HIT', { time })
+
+      // 캐시 히트 시에도 학습
+      let learningResult: { queryId: number; resultId: number } | null = null
+      try {
+        const sessionId = getSessionId()
+        learningResult = await learnFromSuccessfulSearch({
+          rawQuery,
+          normalizedQuery: normalized,
+          pattern,
+          parsed,
+          apiResult: {
+            ...l2TableResult.data,
+            lawTitle: l2TableResult.data.lawTitle || parsed.lawName,
+            articleContent: '',
+            isOrdinance: false,
+          },
+          sessionId,
+        })
+      } catch (error) {
+        debugLogger.warning('L2 변형 테이블 학습 실패 (계속 진행)', error)
+      }
+
+      console.log('🔍 [L2 Variant Table] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L2_variant_table',
         data: l2TableResult.data,
         time,
+        searchQueryId: learningResult?.queryId,
+        searchResultId: learningResult?.resultId,
       }
     }
 
@@ -95,11 +184,41 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         variantUsed: l2Result.variantUsed,
         variantType: l2Result.variantType
       })
+
+      // 캐시 히트 시에도 학습
+      let learningResult: { queryId: number; resultId: number } | null = null
+      try {
+        const sessionId = getSessionId()
+        learningResult = await learnFromSuccessfulSearch({
+          rawQuery,
+          normalizedQuery: normalized,
+          pattern,
+          parsed,
+          apiResult: {
+            ...l2Result.data,
+            lawTitle: l2Result.data.lawTitle || parsed.lawName,
+            articleContent: '',
+            isOrdinance: false,
+          },
+          sessionId,
+        })
+      } catch (error) {
+        debugLogger.warning('L2 유사 검색어 학습 실패 (계속 진행)', error)
+      }
+
+      console.log('🔍 [L2 Similar] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L2_variant',
         data: l2Result.data,
         time,
         variantUsed: l2Result.variantUsed,
+        searchQueryId: learningResult?.queryId,
+        searchResultId: learningResult?.resultId,
       }
     }
 
@@ -116,10 +235,40 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
         qualityScore: l3Result.qualityScore,
         successCount: l3Result.successCount,
       })
+
+      // 캐시 히트 시에도 학습
+      let learningResult: { queryId: number; resultId: number } | null = null
+      try {
+        const sessionId = getSessionId()
+        learningResult = await learnFromSuccessfulSearch({
+          rawQuery,
+          normalizedQuery: normalized,
+          pattern,
+          parsed,
+          apiResult: {
+            ...l3Result.data,
+            lawTitle: l3Result.data.lawTitle || parsed.lawName,
+            articleContent: '',
+            isOrdinance: false,
+          },
+          sessionId,
+        })
+      } catch (error) {
+        debugLogger.warning('L3 고품질 캐시 학습 실패 (계속 진행)', error)
+      }
+
+      console.log('🔍 [L3 Quality] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
+
       return {
         source: 'L3_quality_cache',
         data: l3Result.data,
         time,
+        searchQueryId: learningResult?.queryId,
+        searchResultId: learningResult?.resultId,
       }
     }
 
@@ -146,6 +295,12 @@ export async function intelligentSearch(rawQuery: string): Promise<SearchResult>
       } catch (error) {
         debugLogger.error('학습 실패', error)
       }
+
+      console.log('🔍 [L4 API] 반환 IDs:', {
+        queryId: learningResult?.queryId,
+        resultId: learningResult?.resultId,
+        hasIds: !!(learningResult?.queryId && learningResult?.resultId),
+      })
 
       return {
         source: 'L4_api',
