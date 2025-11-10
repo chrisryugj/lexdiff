@@ -63,28 +63,33 @@ export function FeedbackButtons({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">이 검색 결과가 도움이 되었나요?</span>
-      <Button
-        variant={userFeedback === "positive" ? "default" : "outline"}
-        size="sm"
-        onClick={() => handleFeedback("positive")}
-        disabled={isSubmitting || userFeedback === "positive"}
-        className="gap-1"
-      >
-        <ThumbsUp className={`h-4 w-4 ${userFeedback === "positive" ? "fill-current" : ""}`} />
-        <span>도움됨</span>
-      </Button>
-      <Button
-        variant={userFeedback === "negative" ? "destructive" : "outline"}
-        size="sm"
-        onClick={() => handleFeedback("negative")}
-        disabled={isSubmitting || userFeedback === "negative"}
-        className="gap-1"
-      >
-        <ThumbsDown className={`h-4 w-4 ${userFeedback === "negative" ? "fill-current" : ""}`} />
-        <span>도움 안됨</span>
-      </Button>
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-muted-foreground">
+        <span className="hidden sm:inline">이 검색 결과가 도움이 되었나요?</span>
+        <span className="sm:hidden">도움이 되었나요?</span>
+      </span>
+      <div className="flex gap-2">
+        <Button
+          variant={userFeedback === "positive" ? "default" : "outline"}
+          size="sm"
+          onClick={() => handleFeedback("positive")}
+          disabled={isSubmitting || userFeedback === "positive"}
+          className="gap-1"
+        >
+          <ThumbsUp className={`h-4 w-4 ${userFeedback === "positive" ? "fill-current" : ""}`} />
+          <span className="hidden xs:inline">도움됨</span>
+        </Button>
+        <Button
+          variant={userFeedback === "negative" ? "destructive" : "outline"}
+          size="sm"
+          onClick={() => handleFeedback("negative")}
+          disabled={isSubmitting || userFeedback === "negative"}
+          className="gap-1"
+        >
+          <ThumbsDown className={`h-4 w-4 ${userFeedback === "negative" ? "fill-current" : ""}`} />
+          <span className="hidden xs:inline">도움 안됨</span>
+        </Button>
+      </div>
     </div>
   )
 }
