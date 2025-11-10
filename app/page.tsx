@@ -434,10 +434,42 @@ export default function Home() {
             searchResultId: learningResult.resultId,
           } : null)
         } else {
-          debugLogger.error('❌ 학습 API 응답 실패', { status: learningResponse.status })
+          // 학습 실패 시 임시 ID 생성 (음수 타임스탬프로 구분)
+          const tempQueryId = -Date.now()
+          const tempResultId = -(Date.now() + 1)
+
+          debugLogger.warning('⚠️ 학습 API 실패, 임시 ID 생성', {
+            status: learningResponse.status,
+            tempQueryId,
+            tempResultId,
+            피드백버튼표시: '예 (임시 ID)',
+          })
+
+          // 임시 ID로 피드백 버튼 표시
+          setLawData(prev => prev ? {
+            ...prev,
+            searchQueryId: tempQueryId,
+            searchResultId: tempResultId,
+          } : null)
         }
       } catch (learnError) {
-        debugLogger.error('❌ 학습 실패 (검색은 성공)', learnError)
+        // 네트워크 에러 등으로 학습 실패 시에도 임시 ID 생성
+        const tempQueryId = -Date.now()
+        const tempResultId = -(Date.now() + 1)
+
+        debugLogger.warning('⚠️ 학습 예외 발생, 임시 ID 생성', {
+          error: learnError,
+          tempQueryId,
+          tempResultId,
+          피드백버튼표시: '예 (임시 ID)',
+        })
+
+        // 임시 ID로 피드백 버튼 표시
+        setLawData(prev => prev ? {
+          ...prev,
+          searchQueryId: tempQueryId,
+          searchResultId: tempResultId,
+        } : null)
       }
     } catch (error) {
       reportError(
@@ -558,21 +590,35 @@ export default function Home() {
                   debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
                 }
 
-                const hasValidIds = !!(intelligentResult.searchQueryId && intelligentResult.searchResultId)
+                // 학습 실패 시 임시 ID 생성
+                let queryId = intelligentResult.searchQueryId
+                let resultId = intelligentResult.searchResultId
+
+                if (!queryId || !resultId) {
+                  queryId = -Date.now()
+                  resultId = -(Date.now() + 1)
+                  debugLogger.warning('⚠️ 학습 데이터 없음, 임시 ID 생성', {
+                    tempQueryId: queryId,
+                    tempResultId: resultId,
+                    피드백버튼표시: '예 (임시 ID)',
+                  })
+                }
+
+                const hasValidIds = !!(queryId && resultId)
 
                 debugLogger.success('✅ 법령 데이터 준비 완료', {
                   lawTitle: parsedData.meta.lawTitle,
                   articleCount: parsedData.articles.length,
-                  queryId: intelligentResult.searchQueryId,
-                  resultId: intelligentResult.searchResultId,
+                  queryId,
+                  resultId,
                   hasValidIds,
                   피드백버튼표시: hasValidIds ? '예' : '아니오',
                 })
 
                 setLawData({
                   ...finalData,
-                  searchQueryId: intelligentResult.searchQueryId,
-                  searchResultId: intelligentResult.searchResultId,
+                  searchQueryId: queryId,
+                  searchResultId: resultId,
                 })
                 setMobileView("content")
                 setIsSearching(false)
