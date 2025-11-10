@@ -34,6 +34,13 @@ export const db = createClient(
 
 if (tursoUrl && tursoToken) {
   console.log('☁️  Using Turso remote database:', tursoUrl.split('.')[0] + '...')
+
+  // Auto-run migrations on startup (Phase 6)
+  import('./auto-migrate').then(({ runMigrationsIfNeeded }) => {
+    runMigrationsIfNeeded().catch((error) => {
+      console.error('⚠️  Auto-migration failed:', error)
+    })
+  })
 } else {
   console.log('📦 Using local SQLite database (lexdiff-local.db)')
   console.log('💡 To use Turso, set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in .env.local')
