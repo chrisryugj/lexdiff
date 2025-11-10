@@ -116,3 +116,17 @@ export function resolveLawAlias(lawName: string): LawAliasResolution {
     alternatives: [],
   }
 }
+
+// 전체 검색 쿼리 정규화 (Phase 2: 학습 시스템용)
+export function normalizeSearchQuery(query: string): string {
+  let normalized = normalizeLawSearchText(query)
+
+  // 법령명 약칭 해결
+  const parsed = require('./law-parser').parseSearchQuery(normalized)
+  if (parsed.lawName) {
+    const resolved = resolveLawAlias(parsed.lawName)
+    normalized = normalized.replace(parsed.lawName, resolved.canonical)
+  }
+
+  return normalized
+}

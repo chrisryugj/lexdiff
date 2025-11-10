@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx claude-plugins:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 5 curl:*)",
+      "Bash(NUL)",
+      "Bash(timeout /T 2 /NOBREAK)",
+      "WebFetch(domain:www.law.go.kr)",
+      "Bash(git pull:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(pnpm install:*)",
+      "Bash(bash)",
+      "Bash(npx tsx:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm add:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm update:*)",
+      "Bash(npm run build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -9,6 +9,7 @@ import { AISummaryDialog } from "@/components/ai-summary-dialog"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
+import { FeedbackButtons } from "@/components/feedback-buttons"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -219,6 +220,8 @@ export default function Home() {
     selectedJo?: string
     isOrdinance?: boolean
     viewMode?: "single" | "full"
+    searchQueryId?: number
+    searchResultId?: number
   } | null>(null)
   const [lawSelectionState, setLawSelectionState] = useState<{
     results: LawSearchResult[]
@@ -325,6 +328,42 @@ export default function Home() {
       })
 
       debugLogger.success("검색 완료", { lawTitle: meta.lawTitle, articleCount: articles.length })
+
+      // 🚀 Phase 2: 성공한 검색 자동 학습 - API 라우트 사용
+      try {
+        const rawQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
+
+        const learningResponse = await fetch('/api/search-learning', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rawQuery,
+            apiResult: {
+              lawId: selectedLaw.lawId,
+              mst: selectedLaw.mst,
+              lawTitle: meta.lawTitle,
+              effectiveDate: meta.latestEffectiveDate,
+              articleContent: articles[0]?.content || '',
+              articles,
+              isOrdinance: false,
+            },
+          }),
+        })
+
+        if (learningResponse.ok) {
+          const learningResult = await learningResponse.json()
+          debugLogger.success('📚 검색 학습 완료', learningResult)
+
+          // ID를 lawData에 업데이트
+          setLawData(prev => prev ? {
+            ...prev,
+            searchQueryId: learningResult.queryId,
+            searchResultId: learningResult.resultId,
+          } : null)
+        }
+      } catch (learnError) {
+        debugLogger.warning('학습 실패 (검색은 성공)', learnError)
+      }
     } catch (error) {
       reportError(
         "법령 조회",
@@ -354,6 +393,53 @@ export default function Home() {
     const jo = query.jo
 
     debugLogger.info(isOrdinanceQuery ? "조례 검색 시작" : "법령 검색 시작", { lawName, articleNumber, jo })
+
+    // 🚀 Phase 2-4: Intelligent Search (법령만, 조례는 기존 로직) - API 라우트 사용
+    if (!isOrdinanceQuery) {
+      const rawQuery = `${query.lawName}${query.article ? ` ${query.article}` : ''}`
+
+      try {
+        const intelligentResponse = await fetch('/api/intelligent-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rawQuery }),
+        })
+
+        if (intelligentResponse.ok) {
+          const intelligentResult = await intelligentResponse.json()
+
+          if (intelligentResult.success && intelligentResult.data) {
+            debugLogger.success(`✨ 캐시 HIT: ${intelligentResult.source} (${intelligentResult.time}ms)`)
+
+            // 캐시된 데이터로 LawViewer 렌더링
+            try {
+              const cachedData = intelligentResult.data
+
+              // 법령 내용 가져오기 (캐시에 lawId가 있으면)
+              if (cachedData.lawId) {
+                const apiUrl = `/api/eflaw?lawId=${cachedData.lawId}${cachedData.mst ? `&MST=${cachedData.mst}` : ''}`
+                const response = await fetch(apiUrl)
+
+                if (response.ok) {
+                  const jsonText = await response.text()
+                  const jsonData = JSON.parse(jsonText)
+                  const parsedData = parseLawJSON(jsonData)
+
+                  setLawData(parsedData)
+                  setMobileView("content")
+                  setIsSearching(false)
+                  return
+                }
+              }
+            } catch (error) {
+              debugLogger.warning('캐시 데이터 활용 실패, 기존 로직으로 폴백', error)
+            }
+          }
+        }
+      } catch (error) {
+        debugLogger.warning('Intelligent search API 호출 실패, 기존 로직으로 폴백', error)
+      }
+    }
 
     try {
       if (isOrdinanceQuery) {
@@ -848,22 +934,46 @@ export default function Home() {
                     </Button>
                   </div>
                 ) : (
-                  <LawViewer
-                    meta={lawData.meta}
-                    articles={lawData.articles}
-                    selectedJo={lawData.selectedJo}
-                    viewMode={lawData.viewMode}
-                    onCompare={handleCompare}
-                    onSummarize={handleSummarize}
-                    onToggleFavorite={handleToggleFavorite}
-                    favorites={favorites}
-                    isOrdinance={lawData.isOrdinance}
-                  />
+                  <div className="space-y-4">
+                    {lawData.searchResultId && (
+                      <div className="px-4 py-3 bg-muted/50 rounded-lg border">
+                        <FeedbackButtons
+                          searchQueryId={lawData.searchQueryId}
+                          searchResultId={lawData.searchResultId}
+                          lawId={lawData.meta.lawId}
+                          lawTitle={lawData.meta.lawTitle}
+                          articleNumber={lawData.selectedJo}
+                        />
+                      </div>
+                    )}
+                    <LawViewer
+                      meta={lawData.meta}
+                      articles={lawData.articles}
+                      selectedJo={lawData.selectedJo}
+                      viewMode={lawData.viewMode}
+                      onCompare={handleCompare}
+                      onSummarize={handleSummarize}
+                      onToggleFavorite={handleToggleFavorite}
+                      favorites={favorites}
+                      isOrdinance={lawData.isOrdinance}
+                    />
+                  </div>
                 )}
               </div>
 
               <div className="hidden md:block space-y-4">
                 <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+                {lawData.searchResultId && (
+                  <div className="px-4 py-3 bg-muted/50 rounded-lg border">
+                    <FeedbackButtons
+                      searchQueryId={lawData.searchQueryId}
+                      searchResultId={lawData.searchResultId}
+                      lawId={lawData.meta.lawId}
+                      lawTitle={lawData.meta.lawTitle}
+                      articleNumber={lawData.selectedJo}
+                    />
+                  </div>
+                )}
                 <LawViewer
                   meta={lawData.meta}
                   articles={lawData.articles}
