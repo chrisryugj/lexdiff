@@ -299,28 +299,64 @@ export default function Home() {
         throw new Error("선택한 법령에 대한 식별자를 찾을 수 없습니다")
       }
 
-      const apiUrl = "/api/eflaw?" + params.toString()
-      const response = await fetch(apiUrl)
+      // IndexedDB 캐시 체크
+      const { getLawContentCache, setLawContentCache } = await import('@/lib/law-content-cache')
 
-      apiLogs.push({
-        url: apiUrl,
-        method: "GET",
-        status: response.status,
-      })
+      // effectiveDate를 모르므로 빈 문자열로 시도 (캐시에는 lawId만으로도 조회 가능)
+      const lawContentCache = await getLawContentCache(selectedLaw.lawId || '', '')
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        apiLogs[apiLogs.length - 1].response = errorText
-        throw new Error("법령 조회 실패")
+      let meta
+      let articles
+
+      if (lawContentCache) {
+        debugLogger.success('💾 법령 본문 캐시 HIT (IndexedDB)', {
+          lawTitle: lawContentCache.lawTitle,
+          articles: lawContentCache.articles.length,
+        })
+
+        meta = lawContentCache.meta
+        articles = lawContentCache.articles
+      } else {
+        debugLogger.info('📄 법령 전문 조회 중 (eflaw API)', { lawId: selectedLaw.lawId })
+
+        const apiUrl = "/api/eflaw?" + params.toString()
+        const response = await fetch(apiUrl)
+
+        apiLogs.push({
+          url: apiUrl,
+          method: "GET",
+          status: response.status,
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          apiLogs[apiLogs.length - 1].response = errorText
+          throw new Error("법령 조회 실패")
+        }
+
+        const jsonText = await response.text()
+        apiLogs[apiLogs.length - 1].response = jsonText.substring(0, 500) + "..."
+
+        const jsonData = JSON.parse(jsonText)
+        const parsedData = parseLawJSON(jsonData)
+        meta = parsedData.meta
+        articles = parsedData.articles
+
+        // IndexedDB에 캐시 저장
+        setLawContentCache(
+          selectedLaw.lawId || '',
+          meta.latestEffectiveDate || '',
+          meta,
+          articles
+        ).catch((error) => {
+          console.error('법령 본문 캐시 저장 실패:', error)
+        })
+
+        debugLogger.success('💾 법령 본문 캐시 저장 완료', {
+          lawTitle: meta.lawTitle,
+          effectiveDate: meta.latestEffectiveDate,
+        })
       }
-
-      const jsonText = await response.text()
-      apiLogs[apiLogs.length - 1].response = jsonText.substring(0, 500) + "..."
-
-      const jsonData = JSON.parse(jsonText)
-      const parsedData = parseLawJSON(jsonData)
-      const meta = parsedData.meta
-      const articles = parsedData.articles
 
       let selectedJo: string | undefined
       const viewMode: "single" | "full" = query.jo ? "single" : "full"
@@ -460,55 +496,87 @@ export default function Home() {
 
               // 법령 내용 가져오기 (캐시에 lawId가 있으면)
               if (cachedData.lawId) {
-                debugLogger.info('📄 법령 전문 조회 중 (eflaw API)', { lawId: cachedData.lawId })
+                // IndexedDB 캐시 체크
+                const { getLawContentCache, setLawContentCache } = await import('@/lib/law-content-cache')
+                const effectiveDate = cachedData.effectiveDate || ''
 
-                const apiUrl = `/api/eflaw?lawId=${cachedData.lawId}${cachedData.mst ? `&MST=${cachedData.mst}` : ''}`
-                const response = await fetch(apiUrl)
+                const lawContentCache = await getLawContentCache(cachedData.lawId, effectiveDate)
 
-                if (response.ok) {
-                  const jsonText = await response.text()
-                  const jsonData = JSON.parse(jsonText)
-                  const parsedData = parseLawJSON(jsonData)
+                let parsedData
+                if (lawContentCache) {
+                  debugLogger.success('💾 법령 본문 캐시 HIT (IndexedDB)', {
+                    lawTitle: lawContentCache.lawTitle,
+                    articles: lawContentCache.articles.length,
+                  })
 
-                  // Check if requested article exists
-                  let finalData = { ...parsedData }
-                  if (query.jo && parsedData.selectedJo === undefined) {
-                    const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
+                  parsedData = {
+                    meta: lawContentCache.meta,
+                    articles: lawContentCache.articles,
+                    selectedJo: query.jo,
+                  }
+                } else {
+                  debugLogger.info('📄 법령 전문 조회 중 (eflaw API)', { lawId: cachedData.lawId })
 
-                    const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
-                    const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
+                  const apiUrl = `/api/eflaw?lawId=${cachedData.lawId}${cachedData.mst ? `&MST=${cachedData.mst}` : ''}`
+                  const response = await fetch(apiUrl)
 
-                    // Store suggestions and show banner
-                    setArticleNotFound({
-                      requestedJo: query.jo,
-                      lawTitle: parsedData.meta.lawTitle,
-                      nearestArticles,
-                      crossLawSuggestions: crossLawSuggestions.slice(0, 3),
-                    })
-
-                    debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
+                  if (!response.ok) {
+                    throw new Error('법령 전문 조회 실패')
                   }
 
-                  const hasValidIds = !!(intelligentResult.searchQueryId && intelligentResult.searchResultId)
+                  const jsonText = await response.text()
+                  const jsonData = JSON.parse(jsonText)
+                  parsedData = parseLawJSON(jsonData)
 
-                  debugLogger.success('✅ 법령 데이터 준비 완료', {
-                    lawTitle: parsedData.meta.lawTitle,
-                    articleCount: parsedData.articles.length,
-                    queryId: intelligentResult.searchQueryId,
-                    resultId: intelligentResult.searchResultId,
-                    hasValidIds,
-                    피드백버튼표시: hasValidIds ? '예' : '아니오',
+                  // IndexedDB에 캐시 저장
+                  setLawContentCache(
+                    cachedData.lawId,
+                    effectiveDate,
+                    parsedData.meta,
+                    parsedData.articles
+                  ).catch((error) => {
+                    console.error('법령 본문 캐시 저장 실패:', error)
                   })
-
-                  setLawData({
-                    ...finalData,
-                    searchQueryId: intelligentResult.searchQueryId,
-                    searchResultId: intelligentResult.searchResultId,
-                  })
-                  setMobileView("content")
-                  setIsSearching(false)
-                  return
                 }
+
+                // Check if requested article exists
+                let finalData = { ...parsedData }
+                if (query.jo && parsedData.selectedJo === undefined) {
+                  const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
+
+                  const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
+                  const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
+
+                  // Store suggestions and show banner
+                  setArticleNotFound({
+                    requestedJo: query.jo,
+                    lawTitle: parsedData.meta.lawTitle,
+                    nearestArticles,
+                    crossLawSuggestions: crossLawSuggestions.slice(0, 3),
+                  })
+
+                  debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
+                }
+
+                const hasValidIds = !!(intelligentResult.searchQueryId && intelligentResult.searchResultId)
+
+                debugLogger.success('✅ 법령 데이터 준비 완료', {
+                  lawTitle: parsedData.meta.lawTitle,
+                  articleCount: parsedData.articles.length,
+                  queryId: intelligentResult.searchQueryId,
+                  resultId: intelligentResult.searchResultId,
+                  hasValidIds,
+                  피드백버튼표시: hasValidIds ? '예' : '아니오',
+                })
+
+                setLawData({
+                  ...finalData,
+                  searchQueryId: intelligentResult.searchQueryId,
+                  searchResultId: intelligentResult.searchResultId,
+                })
+                setMobileView("content")
+                setIsSearching(false)
+                return
               }
             } catch (error) {
               debugLogger.warning('캐시 데이터 활용 실패, 기존 로직으로 폴백', error)
