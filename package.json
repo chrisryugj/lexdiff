@@ -7,7 +7,11 @@
     "dev": "next dev",
     "lint": "eslint .",
     "restart": "scripts\\restart-dev.cmd",
-    "start": "next start"
+    "start": "next start",
+    "build-embeddings": "node scripts/build-article-embeddings.mjs",
+    "build-embeddings:laws": "node scripts/build-article-embeddings.mjs --laws-only",
+    "build-embeddings:ordinances": "node scripts/build-article-embeddings.mjs --ordinances-only",
+    "build-embeddings:test": "node scripts/build-article-embeddings.mjs --dry-run --limit 2"
   },
   "dependencies": {
     "@google/genai": "latest",
