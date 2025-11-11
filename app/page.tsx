@@ -11,6 +11,9 @@ import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeedbackButtons } from "@/components/feedback-buttons"
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
+import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
+import { RagResultCard } from "@/components/rag-result-card"
+import { RagAnswerCard } from "@/components/rag-answer-card"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -234,6 +237,8 @@ interface OrdinanceSearchResult {
   ordinKind?: string
 }
 
+type SearchMode = 'basic' | 'rag'
+
 export default function Home() {
   const [isSearching, setIsSearching] = useState(false)
   const [lawData, setLawData] = useState<{
@@ -282,6 +287,13 @@ export default function Home() {
     jo?: string
   }>({ laws: [], ordinances: [] })
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
+
+  // RAG 관련 상태 (Phase 3: 기존 시스템 통합)
+  const [searchMode, setSearchMode] = useState<SearchMode>('basic')
+  const [ragResults, setRagResults] = useState<any[]>([])
+  const [ragAnswer, setRagAnswer] = useState<any>(null)
+  const [ragLoading, setRagLoading] = useState(false)
+  const [ragError, setRagError] = useState<string | null>(null)
 
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -1139,6 +1151,88 @@ export default function Home() {
     })
   }
 
+  // RAG 검색 핸들러 (Phase 3: 기존 시스템 통합)
+  const handleRagSearch = async (query: string, options: SearchOptions) => {
+    setRagLoading(true)
+    setRagError(null)
+    setRagResults([])
+    setRagAnswer(null)
+
+    try {
+      // 1. 벡터 검색
+      debugLogger.info('RAG 검색 시작', { query, options })
+
+      const searchUrl = `/api/rag-search?query=${encodeURIComponent(query)}&limit=${options.limit}&threshold=${options.threshold}${options.lawFilter ? `&lawFilter=${encodeURIComponent(options.lawFilter)}` : ''}`
+      const searchRes = await fetch(searchUrl)
+
+      if (!searchRes.ok) {
+        throw new Error(`검색 실패: ${searchRes.status}`)
+      }
+
+      const searchData = await searchRes.json()
+
+      if (!searchData.success) {
+        throw new Error(searchData.error || '검색 실패')
+      }
+
+      debugLogger.success('RAG 검색 완료', {
+        results: searchData.results.length,
+        tokens: searchData.metadata.embeddingTokens,
+      })
+
+      setRagResults(searchData.results)
+
+      // 2. AI 답변 생성 (검색 결과가 있는 경우)
+      if (searchData.results.length > 0) {
+        debugLogger.info('AI 답변 생성 시작')
+
+        const answerRes = await fetch('/api/rag-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            context: searchData.results.map((r: any) => ({
+              lawName: r.lawName,
+              articleDisplay: r.articleDisplay,
+              articleContent: r.articleContent,
+              similarity: r.similarity,
+            })),
+          }),
+        })
+
+        if (!answerRes.ok) {
+          throw new Error(`답변 생성 실패: ${answerRes.status}`)
+        }
+
+        const answerData = await answerRes.json()
+
+        if (!answerData.success) {
+          throw new Error(answerData.error || '답변 생성 실패')
+        }
+
+        debugLogger.success('AI 답변 생성 완료', {
+          tokens: answerData.metadata.tokensUsed,
+        })
+
+        setRagAnswer(answerData.answer)
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '알 수 없는 오류'
+      debugLogger.error('RAG 검색 오류', { error: errorMsg })
+      setRagError(errorMsg)
+    } finally {
+      setRagLoading(false)
+    }
+  }
+
+  // 인용 조문 클릭 핸들러
+  const handleCitationClick = (lawName: string, articleDisplay: string) => {
+    // 기본 검색 모드로 전환하고 해당 조문 표시
+    const query = `${lawName} ${articleDisplay}`
+    setSearchMode('basic')
+    handleSearch({ lawName, article: articleDisplay })
+  }
+
   const handleCompare = (jo: string) => {
     debugLogger.info("신·구법 비교 요청", { jo })
     setComparisonModal({ isOpen: true, jo })
@@ -1321,11 +1415,73 @@ export default function Home() {
                 </p>
               </div>
 
-              <SearchBar onSearch={handleSearch} isLoading={isSearching} />
-
-              <div className="w-full max-w-3xl space-y-4">
-                <FavoritesPanel onSelect={handleFavoriteSelect} />
+              {/* 검색 모드 토글 */}
+              <div className="flex items-center justify-center gap-2 p-2 bg-muted rounded-lg">
+                <Button
+                  variant={searchMode === 'basic' ? 'default' : 'ghost'}
+                  onClick={() => setSearchMode('basic')}
+                  size="sm"
+                >
+                  기본 검색
+                </Button>
+                <Button
+                  variant={searchMode === 'rag' ? 'default' : 'ghost'}
+                  onClick={() => setSearchMode('rag')}
+                  size="sm"
+                >
+                  AI 검색 (RAG)
+                </Button>
               </div>
+
+              {/* 기본 검색 모드 */}
+              {searchMode === 'basic' && (
+                <>
+                  <SearchBar onSearch={handleSearch} isLoading={isSearching} />
+                  <div className="w-full max-w-3xl space-y-4">
+                    <FavoritesPanel onSelect={handleFavoriteSelect} />
+                  </div>
+                </>
+              )}
+
+              {/* RAG 검색 모드 */}
+              {searchMode === 'rag' && (
+                <div className="w-full max-w-4xl space-y-4">
+                  <RagSearchPanel
+                    onSearch={handleRagSearch}
+                    isLoading={ragLoading}
+                    error={ragError}
+                  />
+
+                  {/* AI 답변 */}
+                  {ragAnswer && (
+                    <RagAnswerCard
+                      answer={ragAnswer}
+                      onCitationClick={handleCitationClick}
+                    />
+                  )}
+
+                  {/* 검색 결과 */}
+                  {ragResults.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-lg">검색 결과 ({ragResults.length}개)</h3>
+                      {ragResults.map((result, index) => (
+                        <RagResultCard
+                          key={index}
+                          result={result}
+                          onClick={() => handleCitationClick(result.lawName, result.articleDisplay)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 결과 없음 */}
+                  {!ragLoading && ragResults.length === 0 && !ragError && ragAnswer === null && (
+                    <div className="text-center text-muted-foreground py-8">
+                      질문을 입력하고 검색해주세요
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
