@@ -95,22 +95,43 @@ export async function collectData(
  * 조례 데이터 수집
  */
 async function collectOrdinance(target: DataTarget): Promise<CollectedSource> {
-  // 1. 검색어 생성
-  const searchQuery = [target.region, ...(target.keywords || [])].filter(Boolean).join(' ')
+  // 1. 검색어 생성 - 점진적으로 키워드를 줄여가며 시도
+  const keywords = target.keywords || []
+  const searchQueries = [
+    // 첫 시도: 지역 + 핵심 키워드 1개 (가장 중요한 것만)
+    [target.region, keywords[0]].filter(Boolean).join(' '),
+    // 두 번째 시도: 지역 + 핵심 키워드 2개
+    [target.region, keywords.slice(0, 2).join(' ')].filter(Boolean).join(' '),
+    // 세 번째 시도: 지역명만
+    target.region,
+  ].filter((q) => q && q.trim().length > 0)
 
-  console.log(`🔍 [Ordinance Search] Query: "${searchQuery}"`)
+  let searchResults: any = null
 
-  // 2. 조례 검색
-  const searchResponse = await fetch(`/api/ordin-search?query=${encodeURIComponent(searchQuery)}`)
+  // 키워드를 줄여가며 재시도
+  for (const searchQuery of searchQueries) {
+    console.log(`🔍 [Ordinance Search] Trying query: "${searchQuery}"`)
 
-  if (!searchResponse.ok) {
-    throw new Error(`Ordinance search failed: ${searchResponse.statusText}`)
+    const searchResponse = await fetch(`/api/ordin-search?query=${encodeURIComponent(searchQuery)}`)
+
+    if (!searchResponse.ok) {
+      console.warn(`Search failed for "${searchQuery}": ${searchResponse.statusText}`)
+      continue
+    }
+
+    const results = await searchResponse.json()
+
+    if (results.list && results.list.length > 0) {
+      console.log(`✅ [Ordinance Search] Found ${results.list.length} results with query: "${searchQuery}"`)
+      searchResults = results
+      break
+    } else {
+      console.warn(`No results for query: "${searchQuery}", trying next...`)
+    }
   }
 
-  const searchResults = await searchResponse.json()
-
-  if (!searchResults.list || searchResults.list.length === 0) {
-    throw new Error(`No ordinance found for: ${searchQuery}`)
+  if (!searchResults || !searchResults.list || searchResults.list.length === 0) {
+    throw new Error(`No ordinance found for region: ${target.region}`)
   }
 
   console.log(`✅ [Ordinance Search] Found ${searchResults.list.length} results`)
