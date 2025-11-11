@@ -3,7 +3,7 @@
  * 수집된 소스 데이터를 바탕으로 AI 분석을 수행하고 스트리밍 응답
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { ragSessionStore } from '@/lib/rag-session-store'
 import type { RAGSession } from '@/lib/rag-session-store'
 import { filterMultipleSources, logFilterResults } from '@/lib/rag-content-filter'
@@ -36,12 +36,19 @@ export async function POST(request: Request) {
     // 프롬프트 구성
     const prompt = buildRAGPrompt(session, query)
 
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+    }
+
     // Gemini API 초기화
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+    const ai = new GoogleGenAI({ apiKey })
 
     // 스트리밍 생성
-    const result = await model.generateContentStream(prompt)
+    const result = await ai.models.generateContentStream({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    })
 
     // Server-Sent Events (SSE) 스트리밍
     const encoder = new TextEncoder()
@@ -50,8 +57,8 @@ export async function POST(request: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text()
+          for await (const chunk of result) {
+            const text = chunk.text
             fullResponse += text
 
             // 청크 전송

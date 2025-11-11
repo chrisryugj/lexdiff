@@ -3,7 +3,7 @@
  * Gemini를 사용하여 사용자 질문의 의도를 분석하고 필요한 데이터를 식별
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import type { AnalysisIntent } from '@/lib/intent-analyzer'
 
 export async function POST(request: Request) {
@@ -14,17 +14,24 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Query is required' }, { status: 400 })
     }
 
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+    }
+
     // Gemini API 초기화
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+    const ai = new GoogleGenAI({ apiKey })
 
     // 프롬프트 구성
     const prompt = buildIntentAnalysisPrompt(query)
 
     // Gemini 호출
-    const result = await model.generateContent(prompt)
-    const response = result.response
-    const text = response.text()
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    })
+
+    const text = response.text
 
     // JSON 파싱
     const intent = parseIntentResponse(text)
