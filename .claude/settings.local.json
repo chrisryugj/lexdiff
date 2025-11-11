@@ -25,7 +25,16 @@
       "Bash(pnpm add:*)",
       "Bash(node -e:*)",
       "Bash(pnpm update:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(if exist .next rmdir /s /q .next)",
+      "Bash(node check-db.mjs:*)",
+      "Bash(node check-vector-db.mjs:*)",
+      "Bash(rd /s /q .next 2)",
+      "Bash(nul)",
+      "Bash(node check-law-sizes.mjs:*)",
+      "Bash(node clear-bad-learning.mjs:*)",
+      "Bash(node reset-all-learning.mjs:*)",
+      "Bash(.gitignore)"
     ],
     "deny": [],
     "ask": []

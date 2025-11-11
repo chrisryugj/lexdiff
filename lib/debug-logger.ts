@@ -66,7 +66,10 @@ class DebugLogger {
   }
 
   private notifyListeners() {
-    this.listeners.forEach((listener) => listener(this.getLogs()))
+    // React 렌더링 사이클 밖에서 실행되도록 비동기 처리
+    queueMicrotask(() => {
+      this.listeners.forEach((listener) => listener(this.getLogs()))
+    })
   }
 }
 

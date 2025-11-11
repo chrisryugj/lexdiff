@@ -88,27 +88,31 @@ export async function recordApiMapping(params: {
   article: string
   jo: string
   apiParams: any
+  searchResultId?: number // Phase 5: L3 캐시용
 }): Promise<number> {
   try {
     const result = await query(`
       INSERT INTO api_parameter_mappings (
         normalized_pattern, law_name, article_display, article_jo,
-        api_params, api_endpoint, success_count, last_success_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        api_params, api_endpoint, search_result_id, success_count, last_success_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
       ON CONFLICT(normalized_pattern) DO UPDATE SET
+        search_result_id = excluded.search_result_id,
         success_count = success_count + 1,
         last_success_at = datetime('now')
+      RETURNING id
     `, [
       params.pattern,
       params.lawName,
       params.article,
       params.jo,
       JSON.stringify(params.apiParams),
-      '/api/eflaw'
+      '/api/eflaw',
+      params.searchResultId || null
     ])
 
-    // BigInt를 Number로 변환 (JSON 직렬화 문제 해결)
-    return Number(result.lastInsertRowid)
+    // RETURNING id를 사용하여 정확한 ID 반환
+    return Number(result.rows[0].id)
   } catch (error: any) {
     console.error('❌ DB 에러: recordApiMapping 실패', {
       error: error.message,

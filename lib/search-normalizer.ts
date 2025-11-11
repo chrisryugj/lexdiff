@@ -13,11 +13,22 @@ export interface LawAliasResolution {
 }
 
 const BASIC_CHAR_MAP = new Map<string, string>([
+  // 법 오타
   ["벚", "법"],
   ["벆", "법"],
   ["벋", "법"],
   ["뻡", "법"],
   ["볍", "법"],
+  ["뱝", "법"],
+  // 세 오타
+  ["셰", "세"],
+  ["쉐", "세"],
+  // 관 오타
+  ["괸", "관"],
+  ["곽", "관"],
+  // 업 오타
+  ["엄", "업"],
+  ["얼", "업"],
 ])
 
 const LAW_ALIAS_ENTRIES: LawAliasEntry[] = [
@@ -69,7 +80,7 @@ function normalizeAliasKey(value: string): string {
 }
 
 function normalizeBasicTypos(value: string): string {
-  return value.replace(/[벚벆벋뻡볍]/gu, (char) => BASIC_CHAR_MAP.get(char) ?? char)
+  return value.replace(/[벚벆벋뻡볍뱝셰쉐괸곽엄얼]/gu, (char) => BASIC_CHAR_MAP.get(char) ?? char)
 }
 
 export function normalizeLawSearchText(input: string): string {
@@ -117,7 +128,18 @@ export function resolveLawAlias(lawName: string): LawAliasResolution {
   }
 }
 
-// 전체 검색 쿼리 정규화 (Phase 2: 학습 시스템용)
+/**
+ * Phase 7: 조문 번호를 표준 형식으로 정규화
+ * "38조" → "제38조"
+ * "10조의2" → "제10조의2"
+ * "제38조" → "제38조" (이미 정규화됨)
+ */
+function normalizeArticleNumber(text: string): string {
+  // "숫자+조" 패턴을 "제+숫자+조"로 변환 (이미 "제"가 없는 경우만)
+  return text.replace(/(\s)(\d+조(?:의\d+)?)/g, '$1제$2')
+}
+
+// 전체 검색 쿼리 정규화 (Phase 2: 학습 시스템용, Phase 7: 조문 번호 정규화 추가)
 export function normalizeSearchQuery(query: string): string {
   let normalized = normalizeLawSearchText(query)
 
@@ -127,6 +149,9 @@ export function normalizeSearchQuery(query: string): string {
     const resolved = resolveLawAlias(parsed.lawName)
     normalized = normalized.replace(parsed.lawName, resolved.canonical)
   }
+
+  // Phase 7: 조문 번호 정규화 (searchKey 통일을 위해)
+  normalized = normalizeArticleNumber(normalized)
 
   return normalized
 }

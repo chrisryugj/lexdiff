@@ -44,9 +44,9 @@ export async function GET(request: Request) {
 
     debugLogger.info("위임조문 API 요청")
 
+    // 2MB 캐시 한계 회피: Next.js data cache 비활성화, HTTP 캐싱만 사용
     const delegationResponse = await fetch(delegationUrl, {
-      next: { revalidate: 3600 },
-      cache: "force-cache"
+      cache: "no-store" // Next.js data cache 비활성화 (2MB 한계 회피)
     })
 
     if (!delegationResponse.ok) {

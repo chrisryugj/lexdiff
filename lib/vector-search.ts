@@ -256,14 +256,16 @@ export async function l0VectorSearch(
 ): Promise<L0SearchResult> {
   const startTime = Date.now()
 
+  debugLogger.info(`🔍 [L0 Vector] Searching for: "${queryText}"`)
+
   try {
-    const bestMatch = await findBestMatchingQuery(queryText, 0.90)
+    const bestMatch = await findBestMatchingQuery(queryText, 0.80)
 
     const elapsed = Date.now() - startTime
 
     if (bestMatch && bestMatch.mappingId) {
       debugLogger.success(
-        `[L0 Vector] Match found in ${elapsed}ms: "${bestMatch.queryText}" (similarity: ${bestMatch.similarityScore.toFixed(3)})`
+        `🎯 [L0 Vector] Match found in ${elapsed}ms: "${bestMatch.queryText}" (similarity: ${bestMatch.similarityScore.toFixed(3)}, mappingId: ${bestMatch.mappingId})`
       )
 
       return {
@@ -276,7 +278,7 @@ export async function l0VectorSearch(
       }
     }
 
-    debugLogger.info(`[L0 Vector] No match found in ${elapsed}ms`)
+    debugLogger.warning(`❌ [L0 Vector] No match found in ${elapsed}ms (threshold: 0.80)`)
 
     return {
       found: false,
@@ -287,7 +289,7 @@ export async function l0VectorSearch(
       source: 'L0_vector',
     }
   } catch (error) {
-    debugLogger.error('[L0 Vector] Search failed:', error)
+    debugLogger.error('❌ [L0 Vector] Search failed:', error)
     throw error
   }
 }

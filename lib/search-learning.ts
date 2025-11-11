@@ -62,10 +62,11 @@ export async function learnFromSuccessfulSearch(params: {
 
     console.log('✅ Step 2 완료: resultId =', resultId)
 
-    // 3. API 파라미터 매핑 저장 (중요!)
+    // 3. API 파라미터 매핑 저장 (중요! + Phase 5: resultId 연결)
     console.log('📝 Step 3/4: API 매핑 저장 중...', {
       pattern,
       lawName: parsed.lawName,
+      resultId, // Phase 5: L3 캐시용
     })
 
     const mappingId = await recordApiMapping({
@@ -79,6 +80,7 @@ export async function learnFromSuccessfulSearch(params: {
         effectiveDate: apiResult.effectiveDate,
         lawTitle: apiResult.lawTitle,
       },
+      searchResultId: resultId, // Phase 5: L3 캐시용
     })
 
     console.log('✅ Step 3 완료: mappingId =', mappingId)

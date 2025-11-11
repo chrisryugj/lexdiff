@@ -327,22 +327,66 @@ async function fetchFromAPI(parsed: ReturnType<typeof parseSearchQuery>) {
   }
 
   try {
-    // 법령 검색
-    const searchUrl = `/api/law-search?query=${encodeURIComponent(lawName)}`
+    // 법령 검색 - 외부 API 직접 호출
+    const LAW_OC = process.env.LAW_OC || 'ryuseungin'
+    const searchUrl = `https://www.law.go.kr/DRF/lawSearch.do?OC=${LAW_OC}&type=XML&target=law&query=${encodeURIComponent(lawName)}`
+
+    debugLogger.debug('법령 검색 API 호출', { searchUrl })
     const searchRes = await fetch(searchUrl)
 
     if (!searchRes.ok) {
       throw new Error('법령 검색 실패')
     }
 
-    const searchData = await searchRes.json()
+    const searchXML = await searchRes.text()
 
-    if (!searchData.lawId) {
-      throw new Error('법령을 찾을 수 없습니다')
+    debugLogger.debug('법령 검색 API 응답', {
+      length: searchXML.length,
+      preview: searchXML.substring(0, 500)
+    })
+
+    // XML 파싱 (정규식 사용 - 간단한 추출)
+    const lawIdMatch = searchXML.match(/<법령ID>(\d+)<\/법령ID>/)
+    const mstMatch = searchXML.match(/<법령일련번호>(\d+)<\/법령일련번호>/)
+    const lawTitleMatch = searchXML.match(/<법령명한글><!\[CDATA\[(.*?)\]\]><\/법령명한글>/)
+
+    const lawId = lawIdMatch?.[1]
+    const mst = mstMatch?.[1]
+    const lawTitle = lawTitleMatch?.[1]
+
+    // 법령을 찾지 못한 경우 → 벡터 검색으로 유사 검색어 제안
+    if (!lawId) {
+      debugLogger.warning('법령 ID 추출 실패, 벡터 검색으로 유사 검색어 찾는 중...', {
+        lawName,
+        xmlLength: searchXML.length,
+      })
+
+      // 벡터 검색으로 유사 검색어 찾기
+      try {
+        const { searchSimilarQueries } = await import('./vector-search')
+        const similarQueries = await searchSimilarQueries(lawName, {
+          topK: 3,
+          threshold: 0.75, // 75% 유사도
+          excludeSelf: true,
+        })
+
+        if (similarQueries.length > 0) {
+          const suggestions = similarQueries.map(q => q.queryText).join(', ')
+          debugLogger.info(`💡 유사 검색어 제안: ${suggestions}`)
+
+          throw new Error(`법령을 찾을 수 없습니다.\n\n혹시 이것을 찾으셨나요?\n• ${similarQueries.map(q => q.queryText).join('\n• ')}`)
+        }
+      } catch (vectorError) {
+        debugLogger.warning('벡터 검색 실패 (계속 진행)', vectorError)
+      }
+
+      throw new Error(`법령을 찾을 수 없습니다: ${lawName}`)
     }
 
-    // 법령 내용 가져오기
-    const lawUrl = `/api/eflaw?lawId=${searchData.lawId}`
+    // 법령 내용 가져오기 - 외부 API 직접 호출
+    const lawUrl = `https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=${LAW_OC}&type=JSON&ID=${lawId}`
+
+    debugLogger.debug('법령 내용 API 호출', { lawUrl })
     const lawRes = await fetch(lawUrl)
 
     if (!lawRes.ok) {
@@ -352,12 +396,12 @@ async function fetchFromAPI(parsed: ReturnType<typeof parseSearchQuery>) {
     const lawData = await lawRes.json()
 
     return {
-      lawId: searchData.lawId,
-      mst: searchData.mst,
-      lawTitle: lawData.lawTitle || searchData.lawTitle,
-      effectiveDate: lawData.effectiveDate,
-      articleContent: lawData.articles?.[0]?.content || '',
-      articles: lawData.articles || [],
+      lawId,
+      mst,
+      lawTitle: lawData.법령?.기본정보?.법령명_한글 || lawTitle,
+      effectiveDate: lawData.법령?.기본정보?.시행일자,
+      articleContent: '',
+      articles: [],
       isOrdinance: false,
       ...lawData,
     }

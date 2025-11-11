@@ -9,8 +9,13 @@ let migrationRun = false
 
 export async function runMigrationsIfNeeded() {
   // Only run once per app instance
-  if (migrationRun) return
+  if (migrationRun) {
+    console.log('⏭️  Migrations already checked in this session')
+    return
+  }
   migrationRun = true
+
+  console.log('🔍 Checking database migrations...')
 
   try {
     // Check if vector tables exist
@@ -25,12 +30,12 @@ export async function runMigrationsIfNeeded() {
       // Run 003_vector_schema.sql
       await runVectorSchemaMigration()
 
-      console.log('✅ Phase 6 migration completed')
+      console.log('✅ Phase 6 migration completed successfully')
     } else {
-      console.log('✓ Vector search tables already exist')
+      console.log('✅ Vector search tables already exist (skip migration)')
     }
   } catch (error) {
-    console.error('⚠️  Migration check failed (non-critical):', error)
+    console.error('❌ Migration check failed (non-critical):', error)
     // Don't throw - allow app to continue
   }
 }

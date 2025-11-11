@@ -6,6 +6,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { ragSessionStore } from '@/lib/rag-session-store'
 import type { RAGSession } from '@/lib/rag-session-store'
+import { filterMultipleSources, logFilterResults } from '@/lib/rag-content-filter'
 
 export async function POST(request: Request) {
   try {
@@ -100,22 +101,55 @@ export async function POST(request: Request) {
  * RAG 프롬프트 구성
  */
 function buildRAGPrompt(session: RAGSession, userQuery: string): string {
-  // 1. 소스 데이터 컨텍스트
-  const sourcesContext = session.sources
+  // 1. 키워드 추출 (intent의 키워드 사용)
+  const keywords: string[] = []
+  session.intent.targets.forEach((target) => {
+    if (target.keywords) {
+      keywords.push(...target.keywords)
+    }
+  })
+
+  // 사용자 쿼리에서도 키워드 추출 (간단한 로직)
+  const queryWords = userQuery
+    .split(/\s+/)
+    .filter((word) => word.length >= 2)
+    .filter((word) => !['이다', '있다', '없다', '해줘', '알려줘', '비교', '분석'].includes(word))
+
+  keywords.push(...queryWords)
+
+  // 중복 제거
+  const uniqueKeywords = Array.from(new Set(keywords))
+
+  console.log(`🔑 [Keywords for filtering] ${uniqueKeywords.join(', ')}`)
+
+  // 2. 소스 필터링 (스마트하게 관련 조문만 추출)
+  const filteredSources = filterMultipleSources(session.sources, uniqueKeywords, {
+    maxArticles: 30,
+    maxContentLength: 15000,
+    includeTableOfContents: true,
+  })
+
+  // 필터 결과 로깅
+  logFilterResults(filteredSources)
+
+  // 3. 소스 데이터 컨텍스트 구성
+  const sourcesContext = filteredSources
     .map(
-      (source, index) => `
-## 소스 ${index + 1}: ${source.title}
+      (filtered, index) => `
+## 소스 ${index + 1}: ${filtered.source.title}
 
 **메타데이터**:
-- 종류: ${getSourceTypeLabel(source.type)}
-${source.metadata.region ? `- 지역: ${source.metadata.region}` : ''}
-${source.metadata.lawId ? `- 법령ID: ${source.metadata.lawId}` : ''}
-- 조문 수: ${source.metadata.totalArticles}개
-- 수집 시각: ${new Date(source.metadata.collectedAt).toLocaleString('ko-KR')}
+- 종류: ${getSourceTypeLabel(filtered.source.type)}
+${filtered.source.metadata.region ? `- 지역: ${filtered.source.metadata.region}` : ''}
+${filtered.source.metadata.lawId ? `- 법령ID: ${filtered.source.metadata.lawId}` : ''}
+- 전체 조문 수: ${filtered.source.metadata.totalArticles}개
+- 포함된 조문: ${filtered.includedArticles.length}개 (${filtered.filterMethod} 방식)
+${filtered.excludedCount > 0 ? `- 제외된 조문: ${filtered.excludedCount}개` : ''}
+- 수집 시각: ${new Date(filtered.source.metadata.collectedAt).toLocaleString('ko-KR')}
 
-**전문**:
+**내용**:
 \`\`\`
-${source.content.length > 15000 ? source.content.substring(0, 15000) + '\n\n... (이하 생략)' : source.content}
+${filtered.filteredContent}
 \`\`\`
 `
     )
