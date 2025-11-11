@@ -27,6 +27,9 @@ pnpm install
 # Start development server (http://localhost:3000)
 npm run dev
 
+# Clean restart (Windows) - stops all Node processes and clears caches
+restart-server.cmd
+
 # Lint
 npm run lint
 
@@ -35,6 +38,12 @@ npm run build
 
 # Start production server
 npm start
+```
+
+### Database Maintenance
+```bash
+# Reset all learning data (Turso DB) - use when learning system is corrupted
+node reset-all-learning.mjs
 ```
 
 ### Environment Variables
@@ -259,6 +268,35 @@ headers: {
 }
 ```
 
+### Multi-Phase Search System
+
+The application originally implemented a multi-layer caching and learning system:
+
+**Phase 5: Intelligent Search** (CURRENTLY DISABLED)
+- Learning-based law name mapping using Turso DB
+- Stores search queries and results for pattern matching
+- L1-L4 cache layers for progressive fallback
+- **Status**: Temporarily disabled due to data corruption issues (see 2025-11-11 changelog)
+
+**Phase 6: Vector Search** (CURRENTLY DISABLED)
+- Voyage AI embeddings for semantic similarity
+- `search_query_embeddings` table in Turso DB
+- **Status**: Temporarily disabled along with Phase 5
+
+**Phase 7: IndexedDB Query Cache** (ACTIVE)
+- Browser-side caching using IndexedDB (database: `LexDiffCache`)
+- Keyed by full query string (law name + article)
+- ~25ms retrieval time for cached queries
+- 7-day cache expiry
+- Implementation: `lib/law-content-cache.ts`
+- **Critical**: Article validation must check actual article existence before setting `selectedJo`
+
+**Basic Search** (ACTIVE - Primary Path)
+- Direct `/api/law-search` calls to law.go.kr
+- Similarity-based law name matching using Levenshtein distance
+- Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
+- Implementation: `lib/text-similarity.ts`
+
 ## Common Debugging
 
 ### Debug Console Usage
@@ -294,6 +332,169 @@ Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` through
 - **Package Manager**: Supports npm or pnpm
 
 ## 변경 이력 (Change Log)
+
+### 2025-11-11: 긴급 수정 - Phase 5/6 비활성화 및 Phase 7 버그 수정
+
+#### 발견된 문제들
+
+서버 재시작 후 검색 시스템 전체 붕괴 발견:
+
+1. **모든 법령의 최초 검색 시 "검색결과 없음" + 1조 표시**
+   - 원인: Phase 7 캐시에서 `selectedJo`를 조문 존재 여부 확인 없이 무조건 설정
+   - 파일: `app/page.tsx:576`
+
+2. **잘못된 법령 연결**
+   - "형법" 검색 시 "군에서의 형의 집행 및 군수용자의 처우에 관한 법률" 연결
+   - 원인: Phase 5 학습 데이터 오염 (80개 쿼리, 80개 결과)
+
+3. **법령 선택 UI 미표시**
+   - "세법" 검색 시 사용자 선택 없이 "개별소비세법"으로 자동 연결
+   - 원인: 기본 검색 매칭 로직의 낮은 유사도 임계값
+
+4. **조문 없음 메시지 지속**
+   - 이전 검색의 "조문 없음" 메시지가 새 검색에도 표시
+   - 원인: 검색 초기화 시 `articleNotFound` 상태 미초기화
+
+#### 적용된 해결책
+
+1. **Phase 5/6 완전 비활성화** (`app/page.tsx:627-793`)
+   ```typescript
+   // ⚠️ Phase 5/6 (Intelligent Search) 일시 비활성화
+   // 학습 시스템이 잘못된 법령을 반환하는 문제 때문에 기본 검색으로 복귀
+   console.log('⚠️ Phase 5/6 비활성화 - 기본 검색 사용')
+
+   /* ===== Phase 5 비활성화 =====
+   [157 lines of intelligent-search logic commented out]
+   ===== Phase 5 비활성화 끝 ===== */
+   ```
+
+2. **Phase 7 조문 검증 버그 수정** (`app/page.tsx:572-603`)
+   ```typescript
+   // BEFORE (버그):
+   const parsedData = {
+     selectedJo: query.jo,  // ← 무조건 설정
+   }
+
+   // AFTER (수정):
+   let selectedJo: string | undefined = undefined
+
+   if (query.jo) {
+     const targetArticle = cachedContent.articles.find(a => a.jo === query.jo)
+     if (targetArticle) {
+       selectedJo = targetArticle.jo
+     } else {
+       // 조문 없음 → 가장 유사한 조문 자동 선택
+       const nearestArticles = findNearestArticles(query.jo, cachedContent.articles)
+       if (nearestArticles.length > 0) {
+         selectedJo = nearestArticles[0].jo
+       }
+       setArticleNotFound({...})  // 배너로 안내
+     }
+   }
+   ```
+
+3. **조문 없음 UX 개선** (`app/page.tsx:402-425, 582-603`)
+   - 변경 전: 빈 화면 + 에러 메시지만 표시
+   - 변경 후: 가장 유사한 조문 자동 선택 + 배너로 대안 제시
+   - 적용 경로: Phase 7 경로 및 기본 검색 경로 모두
+
+4. **검색 초기화 수정** (`app/page.tsx:545`)
+   ```typescript
+   setArticleNotFound(null)  // 이전 검색의 "조문 없음" 메시지 제거
+   ```
+
+5. **디스플레이 필드 수정** (`app/page.tsx:195, 394, 707`)
+   ```typescript
+   // BEFORE: a.display (undefined)
+   // AFTER: a.joNum (올바른 필드명)
+   ```
+
+6. **법령 매칭 로직 개선** (`app/page.tsx:863-891`)
+   - 레벤슈타인 거리 기반 유사도 계산 도입
+   - 검색어 길이별 적응형 임계값:
+     - ≤2글자: 85% 유사도 필요
+     - 3+글자: 60% 유사도 필요
+   - 새 파일: `lib/text-similarity.ts`
+
+7. **학습 데이터 완전 초기화**
+   - 새 스크립트: `reset-all-learning.mjs`
+   - 삭제 내용:
+     - `search_results`: 80개 행
+     - `search_queries`: 80개 행
+     - `search_query_embeddings`: 8개 행
+
+#### 새로 추가된 파일
+
+1. **`reset-all-learning.mjs`**
+   - 용도: Turso DB의 모든 학습 데이터 완전 삭제
+   - 사용: `node reset-all-learning.mjs`
+
+2. **`lib/text-similarity.ts`**
+   - 레벤슈타인 거리 알고리즘 구현
+   - `calculateSimilarity(a, b)`: 0~1 범위 유사도 반환
+   - `findMostSimilar()`: 후보 중 최적 매칭 검색
+
+3. **`EMERGENCY_FIX_PLAN.md`**
+   - 상세 문제 분석 및 해결 계획 문서
+   - 3가지 해결 방안 비교 (Phase 완전 제거 vs 부분 비활성화 vs 전면 수정)
+
+#### 현재 시스템 상태
+
+**활성화된 구성요소**:
+- ✅ Phase 7: IndexedDB 캐시 (버그 수정됨)
+- ✅ 기본 검색: law-search API + 개선된 유사도 매칭
+- ✅ 조문 자동 선택: 요청 조문 없을 시 가장 유사한 조문 표시
+
+**비활성화된 구성요소**:
+- ❌ Phase 5: Intelligent Search (주석 처리)
+- ❌ Phase 6: Vector Search (주석 처리)
+
+#### 예상 동작
+
+```
+"형법 22조" 검색:
+→ Phase 7 캐시 미스
+→ Phase 5/6 건너뜀 (비활성화)
+→ 기본 검색: "형법" 100% 매칭 ✅
+→ 제22조 내용 표시 ✅
+
+"세법" 검색:
+→ 기본 검색
+→ 정확 매칭 없음
+→ 유사도 < 85% (2글자 임계값)
+→ 사용자 선택 UI 표시 ✅
+
+"형법 999조" 검색 (존재하지 않는 조문):
+→ "형법" 매칭
+→ 999조 없음
+→ 가장 유사한 조문(예: 373조) 자동 선택
+→ 배너: "요청하신 제999조는 없습니다. 유사한 제373조를 표시합니다" ✅
+```
+
+#### 영향을 받는 파일
+
+- `app/page.tsx`: Phase 5/6 비활성화, Phase 7 버그 수정, 매칭 로직 개선
+- `lib/text-similarity.ts`: 신규 파일 - 레벤슈타인 거리 계산
+- `reset-all-learning.mjs`: 신규 파일 - DB 학습 데이터 초기화
+- `EMERGENCY_FIX_PLAN.md`: 신규 문서 - 상세 분석 및 계획
+- `restart-server.cmd`: 기존 파일 - 완전 클린 재시작 스크립트
+
+#### 향후 계획
+
+**단기 (1주일)**:
+- 기본 검색 안정화 모니터링
+- Phase 7만 사용한 성능 검증
+- 사용자 피드백 수집
+
+**중기 (1개월)**:
+- Phase 5 재설계: 신뢰도 점수 시스템 도입
+- 자동 검증 메커니즘 구현
+- Phase 6 벡터 검색 정확도 개선
+
+**장기 (3개월)**:
+- 전체 시스템 안정화
+- 학습 데이터 품질 관리 시스템
+- 모니터링 대시보드 구축
 
 ### 2025-11-05: 행정규칙 시스템 및 3단 비교 완전 구현
 

@@ -144,6 +144,11 @@ function parseLawJSON(jsonData: any): LawData {
       const code = result.code
       const display = result.display
 
+      // Debug: Log article parsing for "조의" articles
+      if (branchNum && Number.parseInt(branchNum) > 0) {
+        console.log(`📄 [파싱] 조의 조문: ${display} (JO: ${code}, articleNum: ${articleNum}, branchNum: ${branchNum})`)
+      }
+
       let content = ""
 
       if (unit.항 && Array.isArray(unit.항)) {
@@ -183,6 +188,21 @@ function parseLawJSON(jsonData: any): LawData {
     }
 
     debugLogger.success("JSON 파싱 완료: " + articles.length + "개 조문")
+
+    // Debug: Show JO code range
+    if (articles.length > 0) {
+      console.log(`📄 [파싱 완료] ${meta.lawTitle}: ${articles.length}개 조문`)
+      console.log(`   JO 코드 범위: ${articles[0]?.jo} (${articles[0]?.joNum}) ~ ${articles[articles.length - 1]?.jo} (${articles[articles.length - 1]?.joNum})`)
+
+      // Show all "조의" articles
+      const branchArticles = articles.filter(a => {
+        const branchNum = parseInt(a.jo.slice(-2))
+        return branchNum > 0
+      })
+      if (branchArticles.length > 0) {
+        console.log(`   조의 조문 ${branchArticles.length}개:`, branchArticles.map(a => `${a.jo}(${a.joNum})`).join(', '))
+      }
+    }
 
     return {
       meta: meta,
@@ -362,25 +382,46 @@ export default function Home() {
       const viewMode: "single" | "full" = query.jo ? "single" : "full"
 
       if (query.jo) {
+        console.log(`🔍 [조문 검색] 요청: jo=${query.jo}, 전체 조문 수: ${articles.length}`)
+
+        // Debug: Show sample JO codes
+        const sampleJos = articles.slice(0, 10).map(a => a.jo).join(', ')
+        console.log(`   샘플 JO 코드 (처음 10개): ${sampleJos}`)
+
+        // Check if any "조의" articles exist
+        const branchArticles = articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
+        if (branchArticles.length > 0) {
+          console.log(`   조의 조문 발견: ${branchArticles.length}개`, branchArticles.slice(0, 5).map(a => `${a.jo}(${a.joNum})`).join(', '))
+        }
+
         const targetArticle = articles.find((a) => a.jo === query.jo)
+        console.log(`   조문 검색 결과: ${targetArticle ? '✅ 발견' : '❌ 없음'}`)
+
         if (targetArticle) {
           selectedJo = targetArticle.jo
         } else {
-          // Article not found - find nearest articles and cross-law suggestions
-          const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
+          // Article not found - find nearest articles and auto-select the closest one
+          const { findNearestArticles } = await import('@/lib/article-finder')
 
           const nearestArticles = findNearestArticles(query.jo, articles)
-          const crossLawSuggestions = await findCrossLawSuggestions(query.jo, meta.lawTitle)
 
-          // Store suggestions and show banner (no auto-select)
+          if (nearestArticles.length > 0) {
+            // 가장 가까운 조문을 자동 선택
+            selectedJo = nearestArticles[0].jo
+            console.log(`⚠️ [기본 검색] 조문 없음, 유사 조문 자동 선택: ${nearestArticles[0].joNum}`)
+            debugLogger.warning(`조문 없음: ${query.jo} → 유사 조문 표시: ${nearestArticles[0].joNum}`)
+          } else {
+            console.warn(`❌ [기본 검색] 조문 없음, 유사 조문도 없음: jo=${query.jo}`)
+            debugLogger.warning(`조문 없음: ${query.jo}`)
+          }
+
+          // Store suggestions and show banner (auto-select closest, but show alternatives)
           setArticleNotFound({
             requestedJo: query.jo,
             lawTitle: meta.lawTitle,
             nearestArticles,
-            crossLawSuggestions: crossLawSuggestions.slice(0, 3),
+            crossLawSuggestions: [], // 다른 법령 추천은 서버 사이드에서만 가능
           })
-
-          debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
         }
       }
 
@@ -391,8 +432,12 @@ export default function Home() {
         viewMode,
       })
 
-      const dataSource = lawContentCache ? "캐시" : "API"
-      debugLogger.success(`✅ L4 법령 조회 완료 (${dataSource})`, { lawTitle: meta.lawTitle, articleCount: articles.length })
+      const contentSource = lawContentCache ? "IndexedDB 캐시" : "eflaw API"
+      debugLogger.success(`✅ 법령 본문 로드 완료 (${contentSource})`, {
+        lawTitle: meta.lawTitle,
+        articleCount: articles.length,
+        searchSource: "L4 새 검색"
+      })
 
       // 🚀 Phase 2: 성공한 검색 자동 학습 - API 라우트 사용
       try {
@@ -421,11 +466,12 @@ export default function Home() {
           const learningResult = await learningResponse.json()
           const hasValidIds = !!(learningResult.queryId && learningResult.resultId)
 
-          debugLogger.success('✅ 검색 학습 완료', {
+          debugLogger.success('✅ 검색 학습 완료 (DB 저장)', {
             queryId: learningResult.queryId,
             resultId: learningResult.resultId,
             hasValidIds,
             피드백버튼표시: hasValidIds ? '예' : '아니오',
+            다음검색부터: 'L1-L3 캐시 활성화'
           })
 
           // ID를 lawData에 업데이트
@@ -504,6 +550,7 @@ export default function Home() {
     setLawSelectionState(null)
     setOrdinanceSelectionState(null)
     setSearchResults({ laws: [], ordinances: [] })
+    setArticleNotFound(null) // 이전 검색의 "조문 없음" 메시지 제거
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
@@ -514,10 +561,91 @@ export default function Home() {
 
     debugLogger.info(isOrdinanceQuery ? "조례 검색 시작" : "법령 검색 시작", { lawName, articleNumber, jo })
 
-    // 🚀 Phase 2-4: Intelligent Search (법령만, 조례는 기존 로직) - API 라우트 사용
+    // 🚀 Phase 7: IndexedDB 우선 체크 (법령만)
     if (!isOrdinanceQuery) {
       const rawQuery = `${query.lawName}${query.article ? ` ${query.article}` : ''}`
 
+      try {
+        const t0 = performance.now()
+        const { getLawContentCacheByQuery } = await import('@/lib/law-content-cache')
+        const cachedContent = await getLawContentCacheByQuery(rawQuery)
+        const t1 = performance.now()
+
+        if (cachedContent) {
+          debugLogger.success(`💾 [Phase 7] IndexedDB 캐시 HIT (${Math.round(t1 - t0)}ms) - API 호출 없음!`, {
+            lawTitle: cachedContent.lawTitle,
+            articles: cachedContent.articles.length,
+          })
+
+          // 조문 존재 확인 (Phase 7 버그 수정)
+          let selectedJo: string | undefined = undefined
+
+          if (query.jo) {
+            // 실제로 조문이 있는지 확인
+            const targetArticle = cachedContent.articles.find(a => a.jo === query.jo)
+            if (targetArticle) {
+              selectedJo = targetArticle.jo
+              console.log(`✅ [Phase 7] 조문 발견: ${targetArticle.joNum}`)
+            } else {
+              // 조문 없음 처리 - 가장 유사한 조문을 자동으로 선택
+              const { findNearestArticles } = await import('@/lib/article-finder')
+              const nearestArticles = findNearestArticles(query.jo, cachedContent.articles)
+
+              if (nearestArticles.length > 0) {
+                // 가장 가까운 조문을 자동 선택
+                selectedJo = nearestArticles[0].jo
+                console.log(`⚠️ [Phase 7] 조문 없음, 유사 조문 자동 선택: ${nearestArticles[0].joNum}`)
+                debugLogger.warning(`조문 없음: ${query.jo} → 유사 조문 표시: ${nearestArticles[0].joNum}`)
+              } else {
+                console.warn(`❌ [Phase 7] 조문 없음, 유사 조문도 없음: jo=${query.jo}`)
+                debugLogger.warning(`조문 없음: ${query.jo}`)
+              }
+
+              // 배너로 안내 메시지 표시 (가장 가까운 조문을 보여주되, 다른 대안도 제시)
+              setArticleNotFound({
+                requestedJo: query.jo,
+                lawTitle: cachedContent.meta.lawTitle,
+                nearestArticles,
+                crossLawSuggestions: [],
+              })
+            }
+          }
+
+          // 파싱된 데이터 생성
+          const parsedData = {
+            meta: cachedContent.meta,
+            articles: cachedContent.articles,
+            selectedJo,  // ← 수정: 조문이 있을 때만 설정
+          }
+
+          // 임시 ID 생성 (피드백 버튼용)
+          const queryId = -Date.now()
+          const resultId = -(Date.now() + 1)
+
+          setLawData({
+            ...finalData,
+            meta: {
+              ...finalData.meta,
+              searchResultId: resultId,
+              searchQueryId: queryId,
+            },
+          })
+
+          setIsSearching(false)
+          return // ← 여기서 종료! API 호출 없음!
+        } else {
+          debugLogger.info(`❌ [Phase 7] IndexedDB 캐시 MISS (${Math.round(t1 - t0)}ms) - 기본 검색 진행`)
+        }
+      } catch (error) {
+        debugLogger.warning('[Phase 7] IndexedDB 캐시 조회 실패, 기본 검색으로 진행', error)
+      }
+
+      // ⚠️ Phase 5/6 (Intelligent Search) 일시 비활성화
+      // 학습 시스템이 잘못된 법령을 반환하는 문제 때문에 기본 검색으로 복귀
+      console.log('⚠️ Phase 5/6 비활성화 - 기본 검색 사용')
+
+      // intelligent-search 주석 처리 시작
+      /* ===== Phase 5 비활성화 =====
       try {
         const intelligentResponse = await fetch('/api/intelligent-search', {
           method: 'POST',
@@ -542,14 +670,16 @@ export default function Home() {
               // 법령 내용 가져오기 (캐시에 lawId가 있으면)
               if (cachedData.lawId) {
                 // IndexedDB 캐시 체크
+                const t1 = performance.now()
                 const { getLawContentCache, setLawContentCache } = await import('@/lib/law-content-cache')
                 const effectiveDate = cachedData.effectiveDate || ''
 
                 const lawContentCache = await getLawContentCache(cachedData.lawId, effectiveDate)
+                const t2 = performance.now()
 
                 let parsedData
                 if (lawContentCache) {
-                  debugLogger.success('💾 법령 본문 캐시 HIT (IndexedDB)', {
+                  debugLogger.success(`💾 법령 본문 캐시 HIT (IndexedDB, ${Math.round(t2 - t1)}ms)`, {
                     lawTitle: lawContentCache.lawTitle,
                     articles: lawContentCache.articles.length,
                   })
@@ -560,6 +690,7 @@ export default function Home() {
                     selectedJo: query.jo,
                   }
                 } else {
+                  const t3 = performance.now()
                   debugLogger.info('📄 법령 전문 조회 중 (eflaw API)', { lawId: cachedData.lawId })
 
                   const apiUrl = `/api/eflaw?lawId=${cachedData.lawId}${cachedData.mst ? `&MST=${cachedData.mst}` : ''}`
@@ -572,17 +703,21 @@ export default function Home() {
                   const jsonText = await response.text()
                   const jsonData = JSON.parse(jsonText)
                   parsedData = parseLawJSON(jsonData)
+                  const t4 = performance.now()
+                  debugLogger.info(`📄 법령 전문 조회 완료 (${Math.round(t4 - t3)}ms)`)
 
-                  // IndexedDB에 캐시 저장
+                  // Phase 7: IndexedDB에 캐시 저장 (검색어 키 포함!)
                   setLawContentCache(
                     cachedData.lawId,
                     effectiveDate,
                     parsedData.meta,
-                    parsedData.articles
+                    parsedData.articles,
+                    rawQuery  // Phase 7: 검색어 전달!
                   ).then(() => {
-                    debugLogger.info('💾 법령 본문 캐시 저장 완료', {
+                    debugLogger.info('💾 [Phase 7] 법령 본문 캐시 저장 완료 (검색어 키 포함)', {
                       lawTitle: parsedData.meta.lawTitle,
-                      key: `${cachedData.lawId}_${effectiveDate}`
+                      key: `${cachedData.lawId}_${effectiveDate}`,
+                      searchKey: `query:${rawQuery}`
                     })
                   }).catch((error) => {
                     console.error('법령 본문 캐시 저장 실패:', error)
@@ -592,20 +727,33 @@ export default function Home() {
                 // Check if requested article exists
                 let finalData = { ...parsedData }
                 if (query.jo && parsedData.selectedJo === undefined) {
-                  const { findNearestArticles, findCrossLawSuggestions } = await import('@/lib/article-finder')
+                  console.log(`🔍 [Phase 5 - 조문 검색] 요청: jo=${query.jo}, 전체 조문 수: ${parsedData.articles.length}`)
+
+                  // Debug: Show sample JO codes
+                  const sampleJos = parsedData.articles.slice(0, 10).map(a => a.jo).join(', ')
+                  console.log(`   샘플 JO 코드 (처음 10개): ${sampleJos}`)
+
+                  // Check if any "조의" articles exist
+                  const branchArticles = parsedData.articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
+                  if (branchArticles.length > 0) {
+                    console.log(`   조의 조문 발견: ${branchArticles.length}개`, branchArticles.slice(0, 5).map(a => `${a.jo}(${a.joNum})`).join(', '))
+                  }
+
+                  const t5 = performance.now()
+                  const { findNearestArticles } = await import('@/lib/article-finder')
 
                   const nearestArticles = findNearestArticles(query.jo, parsedData.articles)
-                  const crossLawSuggestions = await findCrossLawSuggestions(query.jo, parsedData.meta.lawTitle)
+                  const t6 = performance.now()
 
                   // Store suggestions and show banner
                   setArticleNotFound({
                     requestedJo: query.jo,
                     lawTitle: parsedData.meta.lawTitle,
                     nearestArticles,
-                    crossLawSuggestions: crossLawSuggestions.slice(0, 3),
+                    crossLawSuggestions: [], // 다른 법령 추천은 서버 사이드에서만 가능
                   })
 
-                  debugLogger.warning(`조문 없음: ${query.jo}, 제안: ${nearestArticles.length}개 + ${crossLawSuggestions.length}개 다른 법령`)
+                  debugLogger.warning(`조문 없음: ${query.jo}, 제안 생성 (${Math.round(t6 - t5)}ms): ${nearestArticles.length}개`)
                 }
 
                 // 학습 실패 시 임시 ID 생성
@@ -623,10 +771,14 @@ export default function Home() {
                 }
 
                 const hasValidIds = !!(queryId && resultId)
+                const contentSourceName = lawContentCache ? "IndexedDB 캐시" : "eflaw API"
 
-                debugLogger.success('✅ 법령 데이터 준비 완료', {
+                debugLogger.success(`✅ 검색 완료 (${sourceLayer} + ${contentSourceName})`, {
                   lawTitle: parsedData.meta.lawTitle,
                   articleCount: parsedData.articles.length,
+                  searchCache: intelligentResult.source,
+                  contentCache: lawContentCache ? 'HIT' : 'MISS',
+                  totalTime: `${intelligentResult.time}ms (검색만)`,
                   queryId,
                   resultId,
                   hasValidIds,
@@ -651,7 +803,12 @@ export default function Home() {
         debugLogger.warning('Intelligent search API 호출 실패, 기존 로직으로 폴백', error)
       }
     }
+    ===== Phase 5 비활성화 끝 ===== */
 
+    // Phase 5 건너뛰고 바로 기본 검색으로 진행
+    } // Phase 7 종료
+
+    // === 기본 검색 시작 ===
     try {
       if (isOrdinanceQuery) {
         const apiUrl = "/api/ordin-search?query=" + encodeURIComponent(lawName)
@@ -674,9 +831,10 @@ export default function Home() {
         const results = parseOrdinanceSearchXML(xmlText)
 
         if (results.length === 0) {
+          // 조례는 벡터 검색 미지원 (Phase 5/6는 법령만)
           reportError(
             "조례 검색",
-            new Error("검색 결과를 찾을 수 없습니다"),
+            new Error(`검색 결과를 찾을 수 없습니다: ${query.lawName}`),
             {
               query: query.lawName,
               searchType: "조례",
@@ -714,6 +872,8 @@ export default function Home() {
         const results = parseLawSearchXML(xmlText)
 
         if (results.length === 0) {
+          // 벡터 검색은 search-strategy.ts에서 처리됨 (Phase 5/6)
+
           reportError(
             "법령 검색",
             new Error("검색 결과를 찾을 수 없습니다"),
@@ -729,15 +889,55 @@ export default function Home() {
         }
 
         const normalizedLawName = lawName.replace(/\s+/g, "")
-        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
 
+        console.log(`🔍 [법령 검색] 검색어: "${lawName}", 결과: ${results.length}개`)
+        console.log(`   결과 목록:`, results.slice(0, 5).map(r => r.lawName).join(', '))
+
+        // 1. 정확히 일치하는 법령 찾기
+        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
+        console.log(`   정확 매칭: ${exactMatch ? exactMatch.lawName : '없음'}`)
+
+        // 2. 유사도 기반 매칭 (정확한 매칭이 없을 때만)
         if (!exactMatch) {
-          exactMatch = results.find(
-            (r) =>
-              r.lawName.replace(/\s+/g, "").startsWith(normalizedLawName) &&
-              !r.lawName.includes("시행령") &&
-              !r.lawName.includes("시행규칙"),
+          const { findMostSimilar } = await import('@/lib/text-similarity')
+
+          // 시행령/시행규칙 제외하고 검색
+          const mainLawResults = results.filter(
+            (r) => !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙")
           )
+
+          // 검색어 길이에 따라 임계값 조정
+          // 짧은 검색어(2글자 이하)는 매우 높은 유사도(85%)만 허용
+          // 긴 검색어(3글자 이상)는 60% 유사도 허용
+          const minSimilarity = normalizedLawName.length <= 2 ? 0.85 : 0.6
+
+          const bestMatch = findMostSimilar(
+            normalizedLawName,
+            mainLawResults,
+            (r) => r.lawName.replace(/\s+/g, ""),
+            minSimilarity,
+          )
+
+          if (bestMatch) {
+            exactMatch = bestMatch.item
+            console.log(`   유사도 매칭: ${exactMatch.lawName} (유사도: ${(bestMatch.similarity * 100).toFixed(0)}%, 임계값: ${(minSimilarity * 100).toFixed(0)}%)`)
+          } else {
+            console.log(`   유사도 매칭: 없음 (최소 ${(minSimilarity * 100).toFixed(0)}% 필요)`)
+          }
+        }
+
+        // 3. 매칭 실패 시 사용자에게 선택하도록 제안
+        if (!exactMatch && results.length > 0) {
+          console.warn(`⚠️ [법령 검색] "${lawName}"의 정확한 매칭 실패, 사용자 선택 필요`)
+          console.log(`   제안 목록:`, results.map(r => r.lawName).join(', '))
+
+          // 여러 결과 중 선택하도록 UI 표시
+          setLawSelectionState({
+            results: results,
+            query: query,
+          })
+          setIsSearching(false)
+          return
         }
 
         if (exactMatch && !jo) {
