@@ -41,7 +41,10 @@
       "Bash(npm start)",
       "Bash(timeout 5 bash:*)",
       "Bash(timeout 3 bash:*)",
-      "Bash(timeout 6 bash:*)"
+      "Bash(timeout 6 bash:*)",
+      "Bash(npm run build-embeddings:test:*)",
+      "Bash(timeout /T 5 /NOBREAK)",
+      "Bash(npx shadcn@latest add collapsible label slider)"
     ],
     "deny": [],
     "ask": []
