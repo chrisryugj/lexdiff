@@ -197,15 +197,25 @@ async function fetchLawContent(lawName) {
     throw new Error(`Search failed: ${searchRes.status}`)
   }
 
-  const searchData = await searchRes.json()
-  if (!searchData.laws || searchData.laws.length === 0) {
-    throw new Error(`No results found`)
+  // Parse XML response (simple regex approach)
+  const searchXml = await searchRes.text()
+
+  // Extract first law ID
+  const lawIdMatch = searchXml.match(/<법령ID[^>]*>([^<]+)<\/법령ID>/) ||
+                     searchXml.match(/<법령일련번호[^>]*>([^<]+)<\/법령일련번호>/)
+
+  // Extract first law title (handle CDATA)
+  const lawTitleMatch = searchXml.match(/<법령명[^>]*>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령명>/) ||
+                        searchXml.match(/<법령명한글[^>]*>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령명한글>/)
+
+  const lawId = lawIdMatch?.[1]
+  const lawTitle = lawTitleMatch?.[1]
+
+  if (!lawId) {
+    throw new Error(`No lawId found in XML response`)
   }
 
-  const law = searchData.laws[0]
-  const lawId = law.lawId || law.mst
-
-  console.log(`  ✓ Found: ${law.lawTitle} (${lawId})`)
+  console.log(`  ✓ Found: ${lawTitle} (${lawId})`)
 
   // Fetch content
   const contentUrl = `${baseUrl}/api/eflaw?lawId=${lawId}`
@@ -215,12 +225,44 @@ async function fetchLawContent(lawName) {
     throw new Error(`Content fetch failed: ${contentRes.status}`)
   }
 
-  const contentData = await contentRes.json()
+  const rawData = await contentRes.json()
+
+  // Parse law.go.kr JSON format: {"법령": {"조문": {"조문단위": [...]}}}
+  const articles = []
+  if (rawData.법령?.조문?.조문단위) {
+    const rawArticles = Array.isArray(rawData.법령.조문.조문단위)
+      ? rawData.법령.조문.조문단위
+      : [rawData.법령.조문.조문단위]
+
+    for (const article of rawArticles) {
+      const jo = article.조문번호 || ''
+      const title = article.조문제목 || ''
+
+      // Handle 조문내용 - it can be a string, array, or nested structure
+      let content = ''
+      if (typeof article.조문내용 === 'string') {
+        content = article.조문내용
+      } else if (Array.isArray(article.조문내용)) {
+        content = article.조문내용.join('\n')
+      } else if (article.조문내용) {
+        // Try to extract text from nested structure
+        content = JSON.stringify(article.조문내용)
+      }
+
+      if (content && content.trim()) {
+        articles.push({
+          jo,
+          title,
+          content: content.trim(),
+        })
+      }
+    }
+  }
 
   return {
     lawId,
-    lawName: law.lawTitle,
-    content: contentData,
+    lawName: lawTitle,
+    content: { articles },
   }
 }
 
@@ -252,6 +294,9 @@ async function processLaw(lawName) {
         const embeddingResult = await generateEmbedding(article.content)
         stats.totalEmbeddings++
         stats.totalTokens += embeddingResult.tokens
+
+        // Rate limiting: Wait 20 seconds between requests (3 RPM free tier limit)
+        await new Promise(resolve => setTimeout(resolve, 20000))
 
         if (embeddingResult.cached) {
           stats.cachedEmbeddings++
