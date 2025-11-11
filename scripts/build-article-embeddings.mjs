@@ -16,9 +16,9 @@
  *   --dry-run            실제 DB에 저장하지 않고 테스트만
  */
 
-import { db } from '../lib/db.js'
-import { generateEmbedding, storeLawArticleEmbedding } from '../lib/embedding.js'
-import { debugLogger } from '../lib/debug-logger.js'
+import { db } from '../lib/db'
+import { generateEmbedding, storeLawArticleEmbedding } from '../lib/embedding'
+import { debugLogger } from '../lib/debug-logger'
 
 // ============================================
 // Priority Laws (from PRIORITY_LAWS_LIST.md)
