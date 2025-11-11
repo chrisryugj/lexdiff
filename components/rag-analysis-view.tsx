@@ -138,27 +138,27 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100vh-4rem)] bg-gray-900">
       {/* Left: Sources Panel */}
-      <div className="w-80 border-r bg-gray-50 overflow-y-auto">
+      <div className="w-80 border-r border-gray-700 bg-gray-800 overflow-y-auto">
         <div className="p-4">
-          <h3 className="font-bold text-lg mb-4">📚 참고 자료</h3>
+          <h3 className="font-bold text-lg mb-4 text-white">📚 참고 자료</h3>
 
           {session && session.sources.length > 0 && (
             <div className="space-y-3">
               {session.sources.map((source, index) => (
-                <div key={source.id} className="bg-white p-3 rounded-lg shadow-sm">
+                <div key={source.id} className="bg-gray-700 p-3 rounded-lg border border-gray-600">
                   <div className="flex items-start gap-2">
                     <span className="text-lg flex-shrink-0">
                       {source.type === 'ordinance' ? '📄' : '📖'}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">{source.title}</h4>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <h4 className="font-medium text-sm text-white">{source.title}</h4>
+                      <p className="text-xs text-gray-400 mt-1">
                         {source.metadata.totalArticles}개 조문
                       </p>
                       {source.metadata.region && (
-                        <p className="text-xs text-blue-600 mt-1">{source.metadata.region}</p>
+                        <p className="text-xs text-blue-400 mt-1">{source.metadata.region}</p>
                       )}
                     </div>
                   </div>
@@ -181,23 +181,23 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
       </div>
 
       {/* Right: Analysis Result */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-gray-900">
         {/* Analysis Display */}
         <div className="flex-1 overflow-y-auto p-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4">
               <div className="flex items-start gap-2">
-                <span className="text-red-600">❌</span>
+                <span className="text-red-400">❌</span>
                 <div className="flex-1">
-                  <h4 className="font-medium text-red-800">오류 발생</h4>
-                  <p className="text-sm text-red-600 mt-1">{error}</p>
+                  <h4 className="font-medium text-red-200">오류 발생</h4>
+                  <p className="text-sm text-red-300 mt-1">{error}</p>
                 </div>
               </div>
             </div>
           )}
 
           {analysis && (
-            <div className="prose max-w-none">
+            <div className="prose prose-invert max-w-none">
               <ReactMarkdown>{analysis}</ReactMarkdown>
             </div>
           )}
@@ -205,9 +205,9 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
           {isAnalyzing && !analysis && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-                <p className="text-gray-600">AI가 분석 중입니다...</p>
-                <p className="text-sm text-gray-500 mt-2">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
+                <p className="text-gray-200">AI가 분석 중입니다...</p>
+                <p className="text-sm text-gray-400 mt-2">
                   수집된 자료를 바탕으로 답변을 생성하고 있습니다
                 </p>
               </div>
@@ -216,7 +216,7 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
 
           {!session && !isCollecting && !error && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center text-gray-500">
+              <div className="text-center text-gray-400">
                 <p className="text-lg">AI 법령 분석</p>
                 <p className="text-sm mt-2">자연어 질문을 입력하면 시작됩니다</p>
               </div>
@@ -226,7 +226,7 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
 
         {/* Follow-up Chat */}
         {session && !isAnalyzing && !isCollecting && (
-          <div className="border-t p-4 bg-white">
+          <div className="border-t border-gray-700 p-4 bg-gray-800">
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -243,7 +243,7 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
                   name="query"
                   type="text"
                   placeholder="후속 질문을 입력하세요..."
-                  className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={isAnalyzing}
                 />
                 <button
@@ -254,7 +254,7 @@ export function RAGAnalysisView({ initialQuery }: { initialQuery: string }) {
                   질문
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-gray-400 mt-2">
                 💡 Tip: 이미 수집된 자료를 바탕으로 추가 질문을 할 수 있습니다
               </p>
             </form>
