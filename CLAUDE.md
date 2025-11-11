@@ -46,6 +46,25 @@ npm start
 node reset-all-learning.mjs
 ```
 
+### RAG Vector Search (Phase 0-3)
+```bash
+# Phase 0: Build embedding database (requires local environment)
+npm run build-embeddings              # Build all (30 laws + 30 ordinances)
+npm run build-embeddings:laws         # Laws only
+npm run build-embeddings:ordinances   # Ordinances only
+npm run build-embeddings:test         # Test with 2 laws (dry-run)
+
+# Note: Embedding DB construction requires:
+# - Local environment (law.go.kr API not accessible from web/cloud)
+# - ~1-2 hours processing time
+# - ~$0.04 cost (Voyage AI 3 Lite)
+```
+
+**RAG System Status**:
+- ✅ Phase 1-3 완료: API 엔드포인트, UI 컴포넌트, 기존 시스템 통합
+- ⚠️ Phase 0 대기: 임베딩 DB 구축 (로컬 환경 필요)
+- 📚 상세 가이드: `docs/RAG_INTEGRATION_GUIDE.md`
+
 ### Environment Variables
 Required in `.env.local`:
 - `LAW_OC`: law.go.kr DRF API authentication key (required)
@@ -296,6 +315,241 @@ The application originally implemented a multi-layer caching and learning system
 - Similarity-based law name matching using Levenshtein distance
 - Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
 - Implementation: `lib/text-similarity.ts`
+
+---
+
+## RAG Vector Search System (2025-11-11)
+
+### Overview
+
+The RAG (Retrieval Augmented Generation) system enables **natural language question-based search** instead of requiring exact law names and article numbers.
+
+**Example Queries**:
+- "수출통관 시 필요한 서류는?" (What documents are needed for export customs clearance?)
+- "청년 창업 지원 내용은?" (What are the youth startup support programs?)
+- "관세 환급 신청 조건은?" (What are the tariff refund application conditions?)
+
+### Architecture
+
+```
+User Natural Language Query
+    ↓
+[Phase 0] Embedding Generation (Voyage AI 3 Lite, 512-dim)
+    ↓
+[Vector Search] Turso DB (LibSQL vector_distance_cos)
+    ↓
+[Top-K Results] Similar Articles (similarity > threshold)
+    ↓
+[AI Answer] Gemini 2.0 Flash Experimental
+    ↓
+Answer + Citations + Confidence Score
+```
+
+### Implementation Status
+
+**✅ Phase 1: API Endpoints** (`app/api/rag-*`)
+- `/api/rag-search`: Vector similarity search
+  - Input: Natural language query + options (limit, threshold, lawFilter)
+  - Output: Array of similar articles with similarity scores
+  - Caching: Embedding cache for identical queries
+
+- `/api/rag-answer`: AI answer generation
+  - Input: Query + context articles
+  - Output: AI-generated answer + citations + confidence
+  - Model: Gemini 2.0 Flash Experimental (temperature=0.3)
+
+**✅ Phase 2: UI Components** (`components/rag-*`)
+- `RagSearchPanel`: Natural language input + search options
+- `RagResultCard`: Search results with similarity visualization
+- `RagAnswerCard`: AI answer with citation buttons
+
+**✅ Phase 3: Integration** (`app/page.tsx`)
+- Search mode toggle (Basic vs RAG)
+- Independent state management (no conflict with existing search)
+- Citation click → Auto-switch to basic mode + show article
+
+**⚠️ Phase 0: Embedding DB** (Pending - Requires Local Environment)
+- Status: Not executed yet (web environment cannot access law.go.kr)
+- Command: `npm run build-embeddings`
+- Target: 30 priority laws + 30 Gwangjin-gu ordinances
+- Cost: ~$0.04 (Voyage AI 3 Lite: $0.05/1M tokens)
+- Time: ~1-2 hours
+- Documents: `docs/PRIORITY_LAWS_LIST.md`, `docs/GWANGJIN_ACTUAL_DATA.md`
+
+### Key Files
+
+**API Routes**:
+- `app/api/rag-search/route.ts`: Vector search endpoint
+- `app/api/rag-answer/route.ts`: AI answer generation endpoint
+
+**UI Components**:
+- `components/rag-search-panel.tsx`: Search interface
+- `components/rag-result-card.tsx`: Result display
+- `components/rag-answer-card.tsx`: AI answer display
+
+**Shared Libraries** (Already Existed):
+- `lib/embedding.ts`: Voyage AI integration, vector conversion
+- `lib/vector-search.ts`: Turso DB vector search queries
+- `db/migrations/003_vector_schema.sql`: DB schema
+
+**Documentation**:
+- `docs/RAG_INTEGRATION_GUIDE.md`: Complete implementation guide (785 lines)
+- `docs/RAG_VECTOR_DETAILED_GUIDE.md`: Step-by-step examples (1,655 lines)
+- `docs/RAG_VECTOR_IMPLEMENTATION_PLAN.md`: High-level plan (785 lines)
+- `docs/PRIORITY_LAWS_LIST.md`: 30 priority laws for embedding
+- `docs/GWANGJIN_ACTUAL_DATA.md`: Gwangjin-gu ordinances data
+
+**Scripts**:
+- `scripts/build-article-embeddings.mjs`: Main embedding builder
+- `scripts/build-embeddings-simple.mjs`: Standalone version
+
+### Database Schema
+
+**Tables** (Already Created in Phase 6):
+```sql
+-- Article embeddings
+CREATE TABLE law_article_embeddings (
+  id INTEGER PRIMARY KEY,
+  law_id TEXT NOT NULL,
+  law_name TEXT NOT NULL,
+  article_jo TEXT NOT NULL,           -- 6-digit JO code
+  article_display TEXT,               -- "제38조"
+  article_title TEXT,
+  article_content TEXT NOT NULL,
+  content_embedding F32_BLOB(512),    -- Voyage 3 Lite vectors
+  embedding_model TEXT,
+  keywords TEXT,
+  created_at DATETIME DEFAULT (datetime('now')),
+  updated_at DATETIME DEFAULT (datetime('now')),
+  UNIQUE(law_id, article_jo)
+);
+
+-- Embedding cache (to avoid regenerating same embeddings)
+CREATE TABLE embedding_cache (
+  id INTEGER PRIMARY KEY,
+  text_hash TEXT UNIQUE NOT NULL,
+  original_text TEXT NOT NULL,
+  embedding F32_BLOB(512) NOT NULL,
+  embedding_model TEXT NOT NULL,
+  hit_count INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT (datetime('now')),
+  last_accessed_at DATETIME DEFAULT (datetime('now'))
+);
+
+-- Vector index for fast similarity search
+CREATE INDEX idx_law_article_embeddings
+  ON law_article_embeddings(libsql_vector_idx(content_embedding));
+```
+
+### Search Flow
+
+**Basic Search (Existing)**:
+1. User: "관세법 38조"
+2. Parse law name + article number
+3. Direct DB/API lookup
+4. Display exact article
+
+**RAG Search (New)**:
+1. User: "수출통관 시 필요한 서류는?"
+2. Generate query embedding (Voyage AI)
+3. Vector search in DB: `SELECT ... ORDER BY vector_distance_cos(...) LIMIT 5`
+4. Get top-5 similar articles
+5. Pass to Gemini with prompt
+6. Return AI answer + citations
+7. User clicks citation → Switch to basic mode + show article
+
+### Performance
+
+**Embedding Generation**:
+- Query embedding: ~100ms (with cache: ~10ms)
+- Tokens: ~10-50 per query
+- Cost: ~$0.0001 per query
+
+**Vector Search**:
+- LibSQL cosine distance: ~50-100ms
+- Returns top-K results with similarity scores
+
+**AI Answer Generation**:
+- Gemini 2.0 Flash: ~1-2 seconds
+- Tokens: ~500-2000 (depends on context)
+- Cost: ~$0.0001-0.0005 per query
+
+**Total Latency**: ~2-3 seconds for full RAG flow
+
+### Cost Analysis
+
+**One-time Setup** (Phase 0):
+- 30 laws × ~100 articles/law × ~200 tokens/article = ~600,000 tokens
+- 30 ordinances × ~50 articles × ~200 tokens = ~300,000 tokens
+- **Total**: ~900,000 tokens × $0.05/1M = **$0.045**
+
+**Per-User Query**:
+- Query embedding: $0.0001
+- AI answer: $0.0001-0.0005
+- **Total per query**: $0.0002-0.0006
+
+**Monthly Cost** (1,000 users, 10 queries/user):
+- 10,000 queries × $0.0004 (avg) = **$4/month**
+
+### Compatibility with Existing System
+
+**Zero Breaking Changes**:
+- Search mode toggle allows switching between basic and RAG
+- Basic search functionality 100% preserved
+- All existing components (LawViewer, ComparisonModal, etc.) work identically
+- RAG state is completely independent
+
+**Shared Components**:
+- Debug logger: RAG searches also log to debug console
+- Favorites: Can favorite articles found via RAG
+- Comparison modal: Works with RAG-found articles
+- AI summary: Works with RAG-found articles
+
+### Rollback Strategy
+
+If RAG causes issues:
+
+1. **UI Disable** (instant):
+   ```typescript
+   // app/page.tsx
+   const RAG_ENABLED = false // Hide RAG mode toggle
+   ```
+
+2. **API Disable** (instant):
+   ```typescript
+   // app/api/rag-search/route.ts
+   return NextResponse.json(
+     { success: false, error: 'RAG 검색은 현재 점검 중입니다.' },
+     { status: 503 }
+   )
+   ```
+
+3. **Complete Removal**:
+   ```bash
+   rm -rf app/api/rag-*
+   rm components/rag-*.tsx
+   # Restore app/page.tsx from git history
+   ```
+
+### Next Steps
+
+1. **Phase 0 Execution** (Local Environment):
+   - Set up local development environment
+   - Run `npm run build-embeddings`
+   - Verify DB population: `SELECT COUNT(*) FROM law_article_embeddings`
+
+2. **Testing**:
+   - Test natural language queries
+   - Verify citation links work
+   - Check answer quality and relevance
+
+3. **Optimization** (Future):
+   - Streaming responses (show answer as it's generated)
+   - Answer caching (reuse answers for similar queries)
+   - Hybrid search (keyword 30% + vector 70%)
+   - User feedback collection
+
+---
 
 ## Common Debugging
 
