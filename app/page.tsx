@@ -14,6 +14,7 @@ import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
 import { RagResultCard } from "@/components/rag-result-card"
 import { RagAnswerCard } from "@/components/rag-answer-card"
+import { detectQueryType } from "@/lib/query-detector"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -24,8 +25,9 @@ import { formatJO } from "@/lib/law-parser"
 import { useErrorReportStore } from "@/lib/error-report-store"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Sparkles, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
 
@@ -294,6 +296,10 @@ export default function Home() {
   const [ragAnswer, setRagAnswer] = useState<any>(null)
   const [ragLoading, setRagLoading] = useState(false)
   const [ragError, setRagError] = useState<string | null>(null)
+  const [ragProgress, setRagProgress] = useState(0)
+
+  // File Search RAG 상태 (자동 전환용)
+  const [fileSearchQuery, setFileSearchQuery] = useState<string | null>(null)
 
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -557,12 +563,41 @@ export default function Home() {
   }
 
   const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
+    // 🤖 자동 자연어 검색 감지
+    const fullQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
+    const queryDetection = detectQueryType(fullQuery)
+
+    debugLogger.info('🔍 검색 타입 감지', {
+      query: fullQuery,
+      type: queryDetection.type,
+      confidence: queryDetection.confidence,
+      reason: queryDetection.reason
+    })
+
+    // 자연어 쿼리 감지 시 File Search RAG로 자동 전환
+    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.8) {
+      debugLogger.success('✨ 자연어 검색 감지 → File Search RAG로 전환', {
+        query: fullQuery,
+        confidence: queryDetection.confidence
+      })
+
+      setIsSearching(false)
+      setFileSearchQuery(fullQuery)
+      setSearchMode('rag')
+
+      // File Search RAG 실행
+      handleFileSearchRag(fullQuery)
+      return
+    }
+
+    // 기본 구조화 검색 계속 진행
     setIsSearching(true)
     setLawData(null)
     setLawSelectionState(null)
     setOrdinanceSelectionState(null)
     setSearchResults({ laws: [], ordinances: [] })
     setArticleNotFound(null) // 이전 검색의 "조문 없음" 메시지 제거
+    setFileSearchQuery(null) // File Search RAG 상태 초기화
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
@@ -1151,6 +1186,112 @@ export default function Home() {
     })
   }
 
+  // File Search RAG 핸들러 (SSE 스트리밍)
+  const handleFileSearchRag = async (query: string) => {
+    setRagLoading(true)
+    setRagError(null)
+    setRagAnswer(null)
+    setRagProgress(0)
+
+    // 프로그레스 애니메이션 (가짜 진행률)
+    const progressInterval = setInterval(() => {
+      setRagProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + 10
+      })
+    }, 300)
+
+    try {
+      debugLogger.info('📡 File Search RAG 시작', { query })
+
+      const response = await fetch('/api/file-search-rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      })
+
+      if (!response.ok) {
+        throw new Error('File Search RAG 요청 실패')
+      }
+
+      setRagProgress(30)
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('스트림을 읽을 수 없습니다')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullContent = ''
+      let citations: any[] = []
+
+      setRagProgress(50)
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
+              setRagLoading(false)
+              continue
+            }
+
+            try {
+              const parsed = JSON.parse(data)
+
+              if (parsed.type === 'text') {
+                fullContent += parsed.text
+                // 텍스트를 받을 때마다 조금씩 진행률 증가
+                setRagProgress((prev) => Math.min(prev + 5, 95))
+              } else if (parsed.type === 'citations') {
+                citations = parsed.citations || []
+              }
+            } catch (e) {
+              console.error('SSE 파싱 오류:', e)
+            }
+          }
+        }
+      }
+
+      clearInterval(progressInterval)
+      setRagProgress(100)
+
+      // RagAnswerCard 형식으로 변환
+      const formattedAnswer = {
+        content: fullContent,
+        citations: citations.map((c: any) => ({
+          lawName: c.lawName || '알 수 없음',
+          articleDisplay: c.articleNum || '',
+          relevance: 'high' as const
+        })),
+        confidence: 'high' as const
+      }
+
+      setRagAnswer(formattedAnswer)
+      debugLogger.success('✅ File Search RAG 완료', {
+        contentLength: fullContent.length,
+        citationsCount: citations.length
+      })
+
+    } catch (error) {
+      clearInterval(progressInterval)
+      const errorMsg = error instanceof Error ? error.message : '알 수 없는 오류'
+      debugLogger.error('❌ File Search RAG 오류', { error: errorMsg })
+      setRagError(errorMsg)
+      setRagProgress(0)
+    } finally {
+      setRagLoading(false)
+    }
+  }
+
   // RAG 검색 핸들러 (Phase 3: 기존 시스템 통합)
   const handleRagSearch = async (query: string, options: SearchOptions) => {
     setRagLoading(true)
@@ -1225,11 +1366,14 @@ export default function Home() {
     }
   }
 
-  // 인용 조문 클릭 핸들러
+  // 인용 조문 클릭 핸들러 - RAG 결과 유지한 채로 조문 표시
   const handleCitationClick = (lawName: string, articleDisplay: string) => {
-    // 기본 검색 모드로 전환하고 해당 조문 표시
-    const query = `${lawName} ${articleDisplay}`
-    setSearchMode('basic')
+    // RAG 결과는 유지하고, 새 창에서 해당 조문 표시하거나 조용히 로드
+    // 사용자가 명시적으로 닫기 전까지 AI 검색 결과는 유지됨
+    debugLogger.info('인용 조문 클릭', { lawName, articleDisplay })
+
+    // 새 검색은 수행하지만, searchMode는 변경하지 않음
+    // 이렇게 하면 AI 결과창은 유지되면서 기본 검색 기능만 호출
     handleSearch({ lawName, article: articleDisplay })
   }
 
@@ -1318,6 +1462,11 @@ export default function Home() {
     setOrdinanceSelectionState(null)
     setSearchResults({ laws: [], ordinances: [] })
     setMobileView("content")
+    setFileSearchQuery(null) // File Search RAG 초기화
+    setSearchMode('basic') // 기본 검색 모드로 복귀
+    setRagResults([])
+    setRagAnswer(null)
+    setRagError(null)
   }
 
   const handleFavoritesClick = () => {
@@ -1415,44 +1564,41 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* 검색 모드 토글 */}
-              <div className="flex items-center justify-center gap-2 p-2 bg-muted rounded-lg">
-                <Button
-                  variant={searchMode === 'basic' ? 'default' : 'ghost'}
-                  onClick={() => setSearchMode('basic')}
-                  size="sm"
-                >
-                  기본 검색
-                </Button>
-                <Button
-                  variant={searchMode === 'rag' ? 'default' : 'ghost'}
-                  onClick={() => setSearchMode('rag')}
-                  size="sm"
-                >
-                  AI 검색 (RAG)
-                </Button>
-              </div>
+              {/* 통합 검색창 (모드 자동 전환) */}
+              <SearchBar
+                onSearch={handleSearch}
+                isLoading={isSearching || ragLoading}
+                searchMode={searchMode}
+              />
 
-              {/* 기본 검색 모드 */}
               {searchMode === 'basic' && (
-                <>
-                  <SearchBar onSearch={handleSearch} isLoading={isSearching} />
-                  <div className="w-full max-w-3xl space-y-4">
-                    <FavoritesPanel onSelect={handleFavoriteSelect} />
-                  </div>
-                </>
+                <div className="w-full max-w-3xl space-y-4">
+                  <FavoritesPanel onSelect={handleFavoriteSelect} />
+                </div>
               )}
 
-              {/* RAG 검색 모드 */}
+              {/* RAG 검색 모드 - File Search만 사용 */}
               {searchMode === 'rag' && (
                 <div className="w-full max-w-4xl space-y-4">
-                  <RagSearchPanel
-                    onSearch={handleRagSearch}
-                    isLoading={ragLoading}
-                    error={ragError}
-                  />
+                  {/* 질문 표시 - 다크 테마 */}
+                  {fileSearchQuery && (
+                    <div className="p-4 bg-card border border-border rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Sparkles className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground mb-1">질문</p>
+                          <p className="text-base text-foreground">{fileSearchQuery}</p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={handleReset}>
+                          새 검색
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* AI 답변 */}
+                  {/* AI 답변 (기존 RAG UI 재사용) */}
                   {ragAnswer && (
                     <RagAnswerCard
                       answer={ragAnswer}
@@ -1460,24 +1606,40 @@ export default function Home() {
                     />
                   )}
 
-                  {/* 검색 결과 */}
-                  {ragResults.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-lg">검색 결과 ({ragResults.length}개)</h3>
-                      {ragResults.map((result, index) => (
-                        <RagResultCard
-                          key={index}
-                          result={result}
-                          onClick={() => handleCitationClick(result.lawName, result.articleDisplay)}
-                        />
-                      ))}
+                  {/* 로딩 상태 - 프로그레스 바 포함 */}
+                  {ragLoading && (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      <div className="w-full max-w-md space-y-2">
+                        <p className="text-sm text-muted-foreground text-center">
+                          AI가 답변을 생성하고 있습니다...
+                        </p>
+                        <Progress value={ragProgress} className="h-2" />
+                        <p className="text-xs text-muted-foreground text-center">
+                          {ragProgress < 30 && '📚 법령 데이터베이스 검색 중...'}
+                          {ragProgress >= 30 && ragProgress < 50 && '🔍 관련 조문 분석 중...'}
+                          {ragProgress >= 50 && ragProgress < 95 && '✍️ AI 답변 스트리밍 중...'}
+                          {ragProgress >= 95 && ragProgress < 100 && '✅ 마무리 중...'}
+                          {ragProgress === 100 && '✨ 완료!'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 오류 표시 */}
+                  {ragError && (
+                    <div className="p-4 border-destructive border rounded-lg">
+                      <p className="text-sm font-medium text-destructive mb-1">오류 발생</p>
+                      <p className="text-sm text-muted-foreground">{ragError}</p>
                     </div>
                   )}
 
                   {/* 결과 없음 */}
-                  {!ragLoading && ragResults.length === 0 && !ragError && ragAnswer === null && (
-                    <div className="text-center text-muted-foreground py-8">
-                      질문을 입력하고 검색해주세요
+                  {!fileSearchQuery && !ragLoading && !ragAnswer && !ragError && (
+                    <div className="text-center text-muted-foreground py-12">
+                      <p className="mb-2">💡 자연어로 질문해보세요</p>
+                      <p className="text-sm">예: "관세법 38조에 대해 알려줘"</p>
+                      <p className="text-xs mt-4">자연어로 입력하면 자동으로 AI 검색이 활성화됩니다</p>
                     </div>
                   )}
                 </div>

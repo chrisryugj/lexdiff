@@ -6,14 +6,27 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { RAGAnalysisView } from '@/components/rag-analysis-view'
+import { FileSearchRAGView } from '@/components/file-search-rag-view'
 import { classifyQuery, logClassification, needsUserConfirmation } from '@/lib/query-classifier'
 
 export default function RAGTestPage() {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [activeQuery, setActiveQuery] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [classification, setClassification] = useState<any>(null)
+  const [useFileSearch, setUseFileSearch] = useState(true)  // File Search 기본값
+
+  /**
+   * Citation 클릭 시 메인 페이지로 이동하여 해당 법령 조회
+   */
+  function handleCitationClick(lawName: string, articleNum: string) {
+    const searchQuery = `${lawName} ${articleNum}`.trim()
+    console.log('[RAG Test] Citation clicked:', { lawName, articleNum, searchQuery })
+    router.push(`/?query=${encodeURIComponent(searchQuery)}`)
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,8 +67,42 @@ export default function RAGTestPage() {
     <div className="h-screen flex flex-col bg-gray-900">
       {/* Header */}
       <div className="border-b border-gray-700 bg-gray-800 px-6 py-4">
-        <h1 className="text-2xl font-bold text-white">🤖 AI 법령 분석 (RAG Mode)</h1>
-        <p className="text-sm text-gray-400 mt-1">Phase 9 Pro - Small RAG Test</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">🤖 AI 법령 분석 (RAG Mode)</h1>
+            <p className="text-sm text-gray-400 mt-1">Phase 9 Pro - Small RAG Test</p>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setUseFileSearch(true)
+                setActiveQuery('')
+              }}
+              className={`px-4 py-2 rounded-lg transition ${
+                useFileSearch
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              🔍 File Search
+            </button>
+            <button
+              onClick={() => {
+                setUseFileSearch(false)
+                setActiveQuery('')
+              }}
+              className={`px-4 py-2 rounded-lg transition ${
+                !useFileSearch
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              📦 Manual RAG
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -139,8 +186,15 @@ export default function RAGTestPage() {
         </div>
       )}
 
-      {/* RAG Analysis View */}
-      {activeQuery && <RAGAnalysisView initialQuery={activeQuery} />}
+      {/* RAG Analysis View - Mode에 따라 다른 컴포넌트 렌더링 */}
+      {activeQuery && (
+        useFileSearch
+          ? <FileSearchRAGView
+              initialQuery={activeQuery}
+              onCitationClick={handleCitationClick}
+            />
+          : <RAGAnalysisView initialQuery={activeQuery} />
+      )}
     </div>
   )
 }

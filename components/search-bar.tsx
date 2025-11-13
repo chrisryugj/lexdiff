@@ -3,20 +3,22 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Loader2, Clock, Scale, Building2 } from "lucide-react"
+import { Search, Loader2, Clock, Scale, Building2, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import { cn } from "@/lib/utils"
 
 interface SearchBarProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => void
   isLoading?: boolean
+  searchMode?: 'basic' | 'rag'
 }
 
 const MAX_RECENT = 5
 
-export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
+export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchBarProps) {
   const [query, setQuery] = useState("")
   const [showRecent, setShowRecent] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
@@ -124,7 +126,9 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     <form onSubmit={handleSubmit} className="w-full max-w-3xl relative">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          {searchType === "ordinance" ? (
+          {searchMode === 'rag' ? (
+            <Sparkles className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
+          ) : searchType === "ordinance" ? (
             <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
           ) : searchType === "law" ? (
             <Scale className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
@@ -134,11 +138,14 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           <Input
             ref={inputRef}
             type="text"
-            placeholder='예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'
+            placeholder={searchMode === 'rag' ? '✨ AI가 답변을 생성하고 있습니다...' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
-            className="pl-11 h-12 text-base"
+            className={cn(
+              "pl-11 h-12 text-base transition-all duration-300",
+              searchMode === 'rag' && "ring-2 ring-purple-500/50 border-purple-300 shadow-lg shadow-purple-500/20"
+            )}
             disabled={isLoading}
           />
 
@@ -178,7 +185,14 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           )}
         </Button>
       </div>
-      {query.trim() && searchType && (
+      {searchMode === 'rag' ? (
+        <div className="mt-2 text-xs flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-300/30 rounded-full">
+            <Sparkles className="h-3.5 w-3.5 text-purple-600 animate-pulse" />
+            <span className="font-medium text-purple-700">AI 법령 검색 활성화</span>
+          </div>
+        </div>
+      ) : query.trim() && searchType && (
         <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
           {searchType === "ordinance" ? (
             <>

@@ -44,7 +44,22 @@
       "Bash(timeout 6 bash:*)",
       "Bash(npm run build-embeddings:test:*)",
       "Bash(timeout /T 5 /NOBREAK)",
-      "Bash(npx shadcn@latest add collapsible label slider)"
+      "Bash(npx shadcn@latest add collapsible label slider)",
+      "Bash(tasklist:*)",
+      "Bash(timeout /T 3 /NOBREAK)",
+      "Bash(cmd.exe /c restart-server.cmd)",
+      "Bash(kill:*)",
+      "Bash(npm run file-search:upload:*)",
+      "Bash(npm run file-search:upload-with-ids:*)",
+      "Bash(npx shadcn:*)",
+      "Bash(npm run file-search:list:*)",
+      "Bash(node scripts/check-article-38.mjs:*)",
+      "Bash(node scripts/fetch-article-38.mjs:*)",
+      "Bash(node scripts/test-law-api-methods.mjs:*)",
+      "Bash(node scripts/download-uploaded-law.mjs:*)",
+      "Bash(cmd.exe /c \"taskkill /F /IM node.exe\")",
+      "Bash(node scripts/test-eflaw.mjs:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

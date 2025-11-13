@@ -11,10 +11,13 @@
     "build-embeddings": "tsx scripts/build-article-embeddings.mts",
     "build-embeddings:laws": "tsx scripts/build-article-embeddings.mts --laws-only",
     "build-embeddings:ordinances": "tsx scripts/build-article-embeddings.mts --ordinances-only",
-    "build-embeddings:test": "tsx scripts/build-article-embeddings.mts --dry-run --limit 2"
+    "build-embeddings:test": "tsx scripts/build-article-embeddings.mts --dry-run --limit 2",
+    "file-search:upload": "tsx scripts/upload-laws-to-file-search.mts",
+    "file-search:upload-with-ids": "tsx scripts/upload-laws-with-ids.mts",
+    "file-search:list": "tsx scripts/list-file-search-files.mts"
   },
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/genai": "^1.29.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@libsql/client": "^0.15.0",
@@ -33,7 +36,7 @@
     "@radix-ui/react-menubar": "latest",
     "@radix-ui/react-navigation-menu": "latest",
     "@radix-ui/react-popover": "latest",
-    "@radix-ui/react-progress": "latest",
+    "@radix-ui/react-progress": "^1.1.7",
     "@radix-ui/react-radio-group": "latest",
     "@radix-ui/react-scroll-area": "latest",
     "@radix-ui/react-select": "latest",

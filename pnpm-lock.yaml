@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@google/genai':
-        specifier: latest
-        version: 1.28.0(@modelcontextprotocol/sdk@1.20.2)
+        specifier: ^1.29.0
+        version: 1.29.0(@modelcontextprotocol/sdk@1.20.2)
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
@@ -66,7 +66,7 @@ importers:
         specifier: latest
         version: 1.1.15(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@radix-ui/react-progress':
-        specifier: latest
+        specifier: ^1.1.7
         version: 1.1.7(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@radix-ui/react-radio-group':
         specifier: latest
@@ -428,8 +428,8 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
-  '@google/genai@1.28.0':
-    resolution: {integrity: sha512-0pfZ1EWQsM9kINsL+mFKJvpzM6NRHS9t360S1MzKq4JtIwTj/RbsPpC/K5wpKiPy9PC+J+bsz/9gvaL51++KrA==}
+  '@google/genai@1.29.0':
+    resolution: {integrity: sha512-cQP7Ssa06W+MSAyVtL/812FBtZDoDehnFObIpK1xo5Uv4XvqBcVZ8OhXgihOIXWn7xvPQGvLclR8+yt3Ysnd9g==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.20.1
@@ -3124,7 +3124,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
-  '@google/genai@1.28.0(@modelcontextprotocol/sdk@1.20.2)':
+  '@google/genai@1.29.0(@modelcontextprotocol/sdk@1.20.2)':
     dependencies:
       google-auth-library: 10.5.0
       ws: 8.18.3

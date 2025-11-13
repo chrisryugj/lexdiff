@@ -9,7 +9,7 @@
 import type { AdminRuleMatch } from "./use-admin-rules"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 1
+const DB_VERSION = 3
 const LIST_STORE = "adminRulesListCache"
 const CONTENT_STORE = "adminRulesContentCache"
 const CACHE_EXPIRY_DAYS = 30 // 30일 후 자동 삭제

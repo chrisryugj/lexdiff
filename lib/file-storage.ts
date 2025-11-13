@@ -1,0 +1,271 @@
+/**
+ * File Storage Utility
+ * Manages local file storage for parsed laws
+ */
+
+import fs from 'fs/promises'
+import path from 'path'
+import { ParsedLawMetadata } from './law-parser-server'
+
+const DATA_DIR = path.join(process.cwd(), 'data')
+const PARSED_LAWS_DIR = path.join(DATA_DIR, 'parsed-laws')
+const UPLOAD_LOGS_DIR = path.join(DATA_DIR, 'upload-logs')
+
+export interface SavedLawFile {
+  lawId: string
+  lawName: string
+  effectiveDate: string
+  articleCount: number
+  fileSize: number
+  savedAt: string
+  markdownPath: string
+  metadataPath: string | null
+}
+
+/**
+ * Sanitize filename for file system
+ */
+function sanitizeFilename(name: string): string {
+  // Remove special characters that are invalid in filenames
+  return name
+    .replace(/[<>:"/\\|?*]/g, '') // Windows invalid chars
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .trim()
+}
+
+/**
+ * Ensure directories exist
+ */
+export async function ensureDirectories() {
+  await fs.mkdir(PARSED_LAWS_DIR, { recursive: true })
+  await fs.mkdir(UPLOAD_LOGS_DIR, { recursive: true })
+}
+
+/**
+ * Save parsed law to local files
+ * Uses law name as filename (sanitized)
+ */
+export async function saveParsedLaw(
+  lawId: string,
+  markdown: string,
+  metadata: ParsedLawMetadata
+): Promise<SavedLawFile> {
+  await ensureDirectories()
+
+  // Use law name as filename (sanitized)
+  const sanitizedName = sanitizeFilename(metadata.lawName)
+  const markdownPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.md`)
+  const metadataPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.meta.json`)
+
+  // Save markdown
+  await fs.writeFile(markdownPath, markdown, 'utf-8')
+
+  // Save metadata
+  const metaContent = {
+    ...metadata,
+    lawId, // Store lawId in metadata for reference
+    savedAt: new Date().toISOString()
+  }
+  await fs.writeFile(metadataPath, JSON.stringify(metaContent, null, 2), 'utf-8')
+
+  const fileSize = Buffer.byteLength(markdown, 'utf-8')
+
+  console.log(`[File Storage] ✅ Saved: ${metadata.lawName} (${fileSize} bytes)`)
+
+  return {
+    lawId,
+    lawName: metadata.lawName,
+    effectiveDate: metadata.effectiveDate,
+    articleCount: metadata.articleCount,
+    fileSize,
+    savedAt: metaContent.savedAt,
+    markdownPath,
+    metadataPath
+  }
+}
+
+/**
+ * Extract metadata from markdown content
+ */
+async function extractMetadataFromMarkdown(markdownPath: string, lawName: string): Promise<any> {
+  try {
+    const markdown = await fs.readFile(markdownPath, 'utf-8')
+
+    // Extract lawId from **법령 ID**: XXXXXX pattern
+    const lawIdMatch = markdown.match(/\*\*법령 ID\*\*:\s*(\d+)/)
+    const lawId = lawIdMatch ? lawIdMatch[1] : 'unknown'
+
+    // Count articles (lines starting with ## 제)
+    const articleMatches = markdown.match(/^## 제\d+조/gm) || []
+    const articleCount = articleMatches.length
+
+    // Extract effective date from **시행일**: YYYY년 MM월 DD일 pattern
+    let effectiveDate: string
+    const dateMatch = markdown.match(/\*\*시행일\*\*:\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/)
+    if (dateMatch) {
+      const [, year, month, day] = dateMatch
+      effectiveDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    } else {
+      effectiveDate = new Date().toISOString().split('T')[0]
+    }
+
+    return {
+      lawName,
+      lawId,
+      effectiveDate,
+      articleCount,
+      fetchedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error(`[File Storage] Error extracting metadata from ${lawName}:`, error)
+    return {
+      lawName,
+      lawId: 'unknown',
+      effectiveDate: new Date().toISOString().split('T')[0],
+      articleCount: 0,
+      fetchedAt: new Date().toISOString()
+    }
+  }
+}
+
+/**
+ * List all saved parsed laws
+ * Auto-generates metadata for .md files without .meta.json
+ */
+export async function listParsedLaws(): Promise<SavedLawFile[]> {
+  await ensureDirectories()
+
+  try {
+    const files = await fs.readdir(PARSED_LAWS_DIR)
+    const mdFiles = files.filter((f) => f.endsWith('.md'))
+
+    const laws: SavedLawFile[] = []
+
+    for (const mdFile of mdFiles) {
+      const lawNameFromFile = mdFile.replace('.md', '')
+      const markdownPath = path.join(PARSED_LAWS_DIR, mdFile)
+      const metadataPath = path.join(PARSED_LAWS_DIR, `${lawNameFromFile}.meta.json`)
+
+      try {
+        const stats = await fs.stat(markdownPath)
+        let metadata: any
+
+        // Check if metadata file exists
+        try {
+          const metaContent = await fs.readFile(metadataPath, 'utf-8')
+          metadata = JSON.parse(metaContent)
+        } catch {
+          // No metadata file - extract from markdown and create one
+          console.log(`[File Storage] 📝 Generating metadata for: ${lawNameFromFile}`)
+          metadata = await extractMetadataFromMarkdown(markdownPath, lawNameFromFile)
+
+          // Save generated metadata
+          const metaContent = {
+            ...metadata,
+            savedAt: stats.mtime.toISOString(),
+            autoGenerated: true
+          }
+          await fs.writeFile(metadataPath, JSON.stringify(metaContent, null, 2), 'utf-8')
+        }
+
+        laws.push({
+          lawId: metadata.lawId || 'unknown',
+          lawName: metadata.lawName || lawNameFromFile,
+          effectiveDate: metadata.effectiveDate || new Date().toISOString().split('T')[0],
+          articleCount: metadata.articleCount || 0,
+          fileSize: stats.size,
+          savedAt: metadata.savedAt || metadata.fetchedAt || stats.mtime.toISOString(),
+          markdownPath,
+          metadataPath
+        })
+      } catch (error) {
+        console.error(`[File Storage] Error reading ${lawNameFromFile}:`, error)
+      }
+    }
+
+    // Sort by savedAt descending
+    laws.sort((a, b) => {
+      return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
+    })
+
+    return laws
+  } catch (error) {
+    console.error('[File Storage] Error listing parsed laws:', error)
+    return []
+  }
+}
+
+/**
+ * Read parsed law from local file
+ * Accepts either law name or law ID (for backward compatibility)
+ */
+export async function readParsedLaw(lawNameOrId: string): Promise<{ markdown: string; metadata: any } | null> {
+  // Try sanitized law name first
+  const sanitizedName = sanitizeFilename(lawNameOrId)
+  let markdownPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.md`)
+  let metadataPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.meta.json`)
+
+  try {
+    const markdown = await fs.readFile(markdownPath, 'utf-8')
+    let metadata: any
+
+    try {
+      const metaContent = await fs.readFile(metadataPath, 'utf-8')
+      metadata = JSON.parse(metaContent)
+    } catch {
+      // No metadata - extract from markdown
+      metadata = await extractMetadataFromMarkdown(markdownPath, lawNameOrId)
+    }
+
+    return { markdown, metadata }
+  } catch (error) {
+    console.error(`[File Storage] Error reading ${lawNameOrId}:`, error)
+    return null
+  }
+}
+
+/**
+ * Delete parsed law from local files
+ * Accepts either law name or law ID (for backward compatibility)
+ */
+export async function deleteParsedLaw(lawNameOrId: string): Promise<boolean> {
+  const sanitizedName = sanitizeFilename(lawNameOrId)
+  const markdownPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.md`)
+  const metadataPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.meta.json`)
+
+  try {
+    await fs.unlink(markdownPath)
+
+    // Try to delete metadata if exists (optional)
+    try {
+      await fs.unlink(metadataPath)
+    } catch {
+      // Metadata file might not exist, ignore
+    }
+
+    console.log(`[File Storage] ✅ Deleted: ${lawNameOrId}`)
+    return true
+  } catch (error) {
+    console.error(`[File Storage] Error deleting ${lawNameOrId}:`, error)
+    return false
+  }
+}
+
+/**
+ * Log upload operation
+ */
+export async function logUpload(lawId: string, lawName: string, status: 'success' | 'error', error?: string) {
+  await ensureDirectories()
+
+  const today = new Date().toISOString().split('T')[0]
+  const logPath = path.join(UPLOAD_LOGS_DIR, `${today}.log`)
+
+  const timestamp = new Date().toISOString()
+  const logEntry = `[${timestamp}] ${status.toUpperCase()} - ${lawId} - ${lawName}${error ? ` - ${error}` : ''}\n`
+
+  try {
+    await fs.appendFile(logPath, logEntry, 'utf-8')
+  } catch (error) {
+    console.error('[File Storage] Error writing log:', error)
+  }
+}
