@@ -385,16 +385,26 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
     debugLogger.info('관련 법령 섹션 없음')
   }
 
-  // 중복 제거 (법령명 + JO 코드 기준)
-  const uniqueLaws = Array.from(
-    new Map(laws.map(law => [`${law.lawName}-${law.jo}`, law])).values()
-  )
+  // 중복 제거 (법령명 + JO 코드 기준, 발췌조문 우선)
+  const lawsMap = new Map<string, ParsedRelatedLaw>()
+
+  for (const law of laws) {
+    const key = `${law.lawName}-${law.jo}`
+    const existing = lawsMap.get(key)
+
+    // 발췌조문이 있으면 우선, 없으면 추가
+    if (!existing || law.source === 'excerpt') {
+      lawsMap.set(key, law)
+    }
+  }
+
+  const uniqueLaws = Array.from(lawsMap.values())
 
   debugLogger.success('전체 법령 추출 완료', {
     total: uniqueLaws.length,
     excerpt: uniqueLaws.filter(l => l.source === 'excerpt').length,
     related: uniqueLaws.filter(l => l.source === 'related').length,
-    laws: uniqueLaws.map(l => `${l.lawName} ${l.article}`)
+    laws: uniqueLaws.map(l => `${l.lawName} ${l.article} (${l.source})`)
   })
 
   return uniqueLaws
