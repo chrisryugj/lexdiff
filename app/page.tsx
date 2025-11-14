@@ -639,6 +639,8 @@ export default function Home() {
         let buffer = ''
         let fullContent = ''
         let receivedCitations: any[] = []
+        let lastUpdateTime = 0
+        const UPDATE_THROTTLE_MS = 100 // 100ms마다 UI 업데이트 (모바일 성능 최적화)
 
         // 스트리밍 시작 시 로딩 메시지 제거
         setAiAnswerContent('')
@@ -663,9 +665,14 @@ export default function Home() {
                 const parsed = JSON.parse(data)
                 if (parsed.type === 'text') {
                   fullContent += parsed.text
-                  // ^ 기호를 띄어쓰기로 변경하여 실시간 업데이트
-                  const processedContent = fullContent.replace(/\^/g, ' ')
-                  setAiAnswerContent(processedContent)
+
+                  // Throttle: 100ms마다만 UI 업데이트 (모바일 성능 최적화)
+                  const now = Date.now()
+                  if (now - lastUpdateTime >= UPDATE_THROTTLE_MS) {
+                    const processedContent = fullContent.replace(/\^/g, ' ')
+                    setAiAnswerContent(processedContent)
+                    lastUpdateTime = now
+                  }
                 } else if (parsed.type === 'citations') {
                   // Citations 데이터 수신
                   receivedCitations = parsed.citations || []
