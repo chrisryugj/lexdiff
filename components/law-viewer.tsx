@@ -163,8 +163,14 @@ export function LawViewer({
               <button
                 onClick={(e) => {
                   e.preventDefault()
+                  e.stopPropagation()
                   console.log('[발췌조문 링크] 클릭됨:', parsed)
+                  console.log('[발췌조문 링크] onRelatedArticleClick:', onRelatedArticleClick)
                   handleRelatedLawClick(parsed)
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
                 }}
                 className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
                 type="button"
@@ -195,8 +201,14 @@ export function LawViewer({
               <button
                 onClick={(e) => {
                   e.preventDefault()
+                  e.stopPropagation()
                   console.log('[관련법령 링크] 클릭됨:', parsed)
+                  console.log('[관련법령 링크] onRelatedArticleClick:', onRelatedArticleClick)
                   handleRelatedLawClick(parsed)
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
                 }}
                 className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
                 type="button"
