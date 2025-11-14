@@ -38,6 +38,7 @@ import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
 import { useToast } from "@/hooks/use-toast"
 
 interface LawViewerProps {
@@ -2354,7 +2355,7 @@ export function LawViewer({
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3">
-                        <ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                           {aiAnswerContent}
                         </ReactMarkdown>
                       </div>
@@ -2464,7 +2465,7 @@ export function LawViewer({
                         [&_p]:leading-relaxed [&_p]:my-3"
                       style={{ fontSize: `${fontSize}px` }}
                     >
-                      <ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                         {aiAnswerContent}
                       </ReactMarkdown>
                     </div>
