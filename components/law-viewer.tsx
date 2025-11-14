@@ -37,9 +37,8 @@ import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
-import ReactMarkdown from 'react-markdown'
-import remarkBreaks from 'remark-breaks'
 import { useToast } from "@/hooks/use-toast"
+import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 
 interface LawViewerProps {
   meta: LawMeta
@@ -132,98 +131,11 @@ export function LawViewer({
   // Admin rule cache - key: id or serialNumber, value: { title, html }
   const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
 
-  // 관련 법령 클릭 핸들러
-  const handleRelatedLawClick = useCallback((parsed: ParsedRelatedLaw) => {
-    console.log('[LawViewer] 관련 법령 클릭:', parsed)
-
-    if (onRelatedArticleClick) {
-      onRelatedArticleClick(parsed.lawName, parsed.jo, parsed.article)
-    } else {
-      toast({
-        title: "기능 준비 중",
-        description: `${parsed.lawName} ${parsed.article} 조회 기능을 준비 중입니다.`,
-      })
-    }
-  }, [onRelatedArticleClick, toast])
-
-  // ReactMarkdown 커스텀 컴포넌트
-  const markdownComponents = useMemo(() => ({
-    // 발췌조문 헤더 (strong 태그) - 📜 이모지가 있는 것만 링크로 변환
-    strong: ({ children, ...props }: any) => {
-      // [object Object] 방지: children을 문자열로 변환
-      const text = typeof children === 'string' ? children :
-                   Array.isArray(children) ? children.join('') :
-                   String(children || '')
-
-      // "📜 관세법 제38조 (신고납부)" 형식만 감지 (발췌조문만)
-      if (text.includes('📜')) {
-        const parsed = parseRelatedLawTitle(text, 'excerpt')
-
-        if (parsed) {
-          return (
-            <strong {...props}>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  debugLogger.info('🔗 [AI 답변] 발췌조문 링크 클릭', parsed)
-                  handleRelatedLawClick(parsed)
-                }}
-                className="law-ref text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
-                data-ref="ai-excerpt"
-                data-law={parsed.lawName}
-                data-jo={parsed.jo}
-              >
-                <ExternalLink className="h-3 w-3" />
-                {text}
-              </a>
-            </strong>
-          )
-        }
-      }
-
-      return <strong {...props}>{children}</strong>
-    },
-
-    // 관련법령 리스트 (li 태그) - "법령명 제N조" 패턴만 링크로 변환
-    li: ({ children, ...props }: any) => {
-      // [object Object] 방지: children을 문자열로 변환
-      const text = typeof children === 'string' ? children :
-                   Array.isArray(children) ? children.join('') :
-                   String(children || '')
-
-      // "법령명 제N조" 패턴이 있는 경우만 링크로 변환
-      if (text.match(/^.+?\s+제\d+조/)) {
-        const parsed = parseRelatedLawTitle(text, 'related')
-
-        if (parsed) {
-          return (
-            <li {...props}>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  debugLogger.info('🔗 [AI 답변] 관련법령 링크 클릭', parsed)
-                  handleRelatedLawClick(parsed)
-                }}
-                className="law-ref text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
-                data-ref="ai-related"
-                data-law={parsed.lawName}
-                data-jo={parsed.jo}
-              >
-                <ExternalLink className="h-3 w-3" />
-                {text}
-              </a>
-            </li>
-          )
-        }
-      }
-
-      return <li {...props}>{children}</li>
-    },
-  }), [handleRelatedLawClick])
+  // AI 답변 HTML 변환 (섹션별 링크 처리)
+  const aiAnswerHTML = useMemo(() => {
+    if (!aiAnswerContent) return ''
+    return convertAIAnswerToHTML(aiAnswerContent)
+  }, [aiAnswerContent])
 
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
@@ -590,6 +502,31 @@ export function LawViewer({
     const target = e.target as HTMLElement
     if (target && target.tagName === "A") {
       e.preventDefault()
+
+      // AI 답변 링크 처리 (law-link 클래스)
+      if (target.classList.contains('law-link')) {
+        const lawName = target.getAttribute('data-law') || ''
+        const jo = target.getAttribute('data-jo') || ''
+        const article = target.getAttribute('data-article') || ''
+        const source = target.getAttribute('data-source') || 'related'
+
+        debugLogger.info(`🔗 [AI 답변] ${source === 'excerpt' ? '발췌조문' : '관련법령'} 링크 클릭`, {
+          lawName,
+          jo,
+          article
+        })
+
+        if (onRelatedArticleClick) {
+          onRelatedArticleClick(lawName, jo, article)
+        } else {
+          toast({
+            title: "기능 준비 중",
+            description: `${lawName} ${article} 조회 기능을 준비 중입니다.`,
+          })
+        }
+        return
+      }
+
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
         const articleLabel = target.getAttribute("data-article") || ""
@@ -1273,10 +1210,21 @@ export function LawViewer({
                           key={`${law.lawName}-${law.jo}-${idx}`}
                           onClick={(e) => {
                             e.preventDefault()
-                            console.log('[사이드바 링크] 클릭됨:', law)
-                            console.log('[사이드바 링크] onRelatedArticleClick:', onRelatedArticleClick)
+                            e.stopPropagation()
+                            debugLogger.info('🔗 [사이드바] 법령 링크 클릭', {
+                              lawName: law.lawName,
+                              jo: law.jo,
+                              article: law.article,
+                              sources: Array.from(sources),
+                              hasClickHandler: !!onRelatedArticleClick
+                            })
                             if (onRelatedArticleClick) {
                               onRelatedArticleClick(law.lawName, law.jo, law.article)
+                            } else {
+                              toast({
+                                title: "기능 준비 중",
+                                description: `${law.lawName} ${law.article} 조회 기능을 준비 중입니다.`,
+                              })
                             }
                           }}
                           className="w-full text-left px-3 py-2.5 rounded-md text-sm
@@ -2569,14 +2517,9 @@ export function LawViewer({
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
                         style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                      >
-                        <ReactMarkdown
-                          remarkPlugins={[remarkBreaks]}
-                          components={markdownComponents}
-                        >
-                          {aiAnswerContent}
-                        </ReactMarkdown>
-                      </div>
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
+                      />
 
                       {/* AI 답변 주의사항 */}
                       <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
@@ -2703,14 +2646,9 @@ export function LawViewer({
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
                       style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                    >
-                      <ReactMarkdown
-                        remarkPlugins={[remarkBreaks]}
-                        components={markdownComponents}
-                      >
-                        {aiAnswerContent}
-                      </ReactMarkdown>
-                    </div>
+                      onClick={handleContentClick}
+                      dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
+                    />
 
                     {/* AI 답변 주의사항 */}
                     <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
