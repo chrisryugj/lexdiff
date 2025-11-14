@@ -303,6 +303,7 @@ export default function Home() {
   const [aiAnswerContent, setAiAnswerContent] = useState<string>('')
   const [aiRelatedLaws, setAiRelatedLaws] = useState<any[]>([])
   const [isAiMode, setIsAiMode] = useState(false)
+  const [fileSearchFailed, setFileSearchFailed] = useState(false) // 검색 실패 감지
 
   // AI 모드 - 관련 법령 2단 비교 상태
   const [comparisonLaw, setComparisonLaw] = useState<{
@@ -675,6 +676,18 @@ export default function Home() {
         // ^ 기호를 띄어쓰기로 변경 (최종 처리)
         const processedContent = fullContent.replace(/\^/g, ' ')
 
+        // 검색 실패 감지 (프롬프트에서 정의한 실패 메시지 패턴)
+        const searchFailed = processedContent.includes('File Search Store에서') &&
+                            processedContent.includes('찾을 수 없습니다')
+        setFileSearchFailed(searchFailed)
+
+        if (searchFailed) {
+          debugLogger.warning('⚠️ File Search 검색 실패 감지', {
+            query: fullQuery,
+            contentPreview: processedContent.substring(0, 200)
+          })
+        }
+
         // AI 답변에서 관련 법령 추출
         const relatedLaws = extractRelatedLaws(processedContent)
 
@@ -729,6 +742,7 @@ export default function Home() {
     setAiAnswerContent('') // AI 답변 초기화
     setAiRelatedLaws([])
     setIsAiMode(false)
+    setFileSearchFailed(false) // 검색 실패 상태 초기화
     setComparisonLaw(null) // 비교 법령 초기화
     setIsLoadingComparison(false)
 
@@ -1849,6 +1863,7 @@ export default function Home() {
                       aiAnswerContent={aiAnswerContent}
                       relatedArticles={aiRelatedLaws}
                       onRelatedArticleClick={handleCitationClick}
+                      fileSearchFailed={fileSearchFailed}
                       comparisonLawMeta={comparisonLaw?.meta || null}
                       comparisonLawArticles={comparisonLaw?.articles || []}
                       comparisonLawSelectedJo={comparisonLaw?.selectedJo}
@@ -1900,6 +1915,7 @@ export default function Home() {
                   aiAnswerContent={aiAnswerContent}
                   relatedArticles={aiRelatedLaws}
                   onRelatedArticleClick={handleCitationClick}
+                  fileSearchFailed={fileSearchFailed}
                   comparisonLawMeta={comparisonLaw?.meta || null}
                   comparisonLawArticles={comparisonLaw?.articles || []}
                   comparisonLawSelectedJo={comparisonLaw?.selectedJo}
