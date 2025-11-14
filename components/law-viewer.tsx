@@ -157,10 +157,15 @@ export function LawViewer({
         const parsed = parseRelatedLawTitle(text, 'excerpt')
 
         if (parsed) {
+          console.log('[발췌조문 링크] 클릭 핸들러 설정:', parsed)
           return (
             <strong {...props}>
               <button
-                onClick={() => handleRelatedLawClick(parsed)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  console.log('[발췌조문 링크] 클릭됨:', parsed)
+                  handleRelatedLawClick(parsed)
+                }}
                 className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
                 type="button"
               >
@@ -173,6 +178,38 @@ export function LawViewer({
       }
 
       return <strong {...props}>{children}</strong>
+    },
+
+    // 관련법령 리스트 (li 태그) - "법령명 제N조" 패턴만 링크로 변환
+    li: ({ children, ...props }: any) => {
+      const text = String(children)
+
+      // "법령명 제N조" 패턴이 있는 경우만 링크로 변환
+      if (text.match(/^.+?\s+제\d+조/)) {
+        const parsed = parseRelatedLawTitle(text, 'related')
+
+        if (parsed) {
+          console.log('[관련법령 링크] 클릭 핸들러 설정:', parsed)
+          return (
+            <li {...props}>
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  console.log('[관련법령 링크] 클릭됨:', parsed)
+                  handleRelatedLawClick(parsed)
+                }}
+                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
+                type="button"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {text}
+              </button>
+            </li>
+          )
+        }
+      }
+
+      return <li {...props}>{children}</li>
     },
   }), [handleRelatedLawClick])
 
@@ -1165,12 +1202,20 @@ export function LawViewer({
                     relatedArticles.map((law, idx) => (
                       <button
                         key={`${law.lawName}-${law.jo}-${idx}`}
-                        onClick={() => onRelatedArticleClick?.(law.lawName, law.jo, law.article)}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          console.log('[사이드바 링크] 클릭됨:', law)
+                          console.log('[사이드바 링크] onRelatedArticleClick:', onRelatedArticleClick)
+                          if (onRelatedArticleClick) {
+                            onRelatedArticleClick(law.lawName, law.jo, law.article)
+                          }
+                        }}
                         className="w-full text-left px-3 py-2.5 rounded-md text-sm
                                    border border-blue-800/20 hover:border-blue-600/40
                                    bg-gradient-to-r from-blue-950/20 to-purple-950/20
                                    hover:from-blue-900/40 hover:to-purple-900/40
                                    transition-all duration-200 group"
+                        type="button"
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-1.5 flex-1">
@@ -1327,7 +1372,9 @@ export function LawViewer({
             ) : (
               <>
                 <ChevronDown className="h-4 w-4 mr-2" />
-                조문 목록 보기 ({actualArticles.length}개)
+                {aiAnswerMode
+                  ? `답변 속 법령 보기 (${relatedArticles.length}개)`
+                  : `조문 목록 보기 (${actualArticles.length}개)`}
               </>
             )}
           </Button>
