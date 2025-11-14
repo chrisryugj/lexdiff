@@ -57,6 +57,7 @@ interface LawViewerProps {
   aiAnswerContent?: string
   relatedArticles?: ParsedRelatedLaw[]
   onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
+  fileSearchFailed?: boolean  // 검색 실패 여부
 
   // AI 모드 - 관련 법령 2단 비교
   comparisonLawMeta?: LawMeta | null
@@ -79,6 +80,7 @@ export function LawViewer({
   aiAnswerContent,
   relatedArticles = [],
   onRelatedArticleClick,
+  fileSearchFailed = false,
   comparisonLawMeta = null,
   comparisonLawArticles = [],
   comparisonLawSelectedJo,
@@ -2347,14 +2349,29 @@ export function LawViewer({
                         </Badge>
                       </div>
 
-                      <div className="prose prose-sm max-w-none dark:prose-invert
+                      {/* 검색 실패 경고 메시지 */}
+                      {fileSearchFailed && (
+                        <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
+                              <p className="text-xs text-red-200/80">
+                                File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="prose prose-sm max-w-none dark:prose-invert break-words
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
-                        [&_p]:leading-relaxed [&_p]:my-3">
+                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words">
                         <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                           {aiAnswerContent}
                         </ReactMarkdown>
@@ -2403,6 +2420,21 @@ export function LawViewer({
                 ) : (
                   // 기본 AI 답변 (비교 법령 없음)
                   <>
+                    {/* 검색 실패 경고 메시지 */}
+                    {fileSearchFailed && (
+                      <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
+                            <p className="text-xs text-red-200/80">
+                              File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mb-4 pb-3 border-b border-border">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -2455,14 +2487,14 @@ export function LawViewer({
                     </div>
 
                     <div
-                      className="prose prose-sm max-w-none dark:prose-invert
+                      className="prose prose-sm max-w-none dark:prose-invert break-words
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
-                        [&_p]:leading-relaxed [&_p]:my-3"
+                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       <ReactMarkdown remarkPlugins={[remarkBreaks]}>
