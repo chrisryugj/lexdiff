@@ -638,6 +638,7 @@ export default function Home() {
 
         let buffer = ''
         let fullContent = ''
+        let receivedCitations: any[] = []
 
         // 스트리밍 시작 시 로딩 메시지 제거
         setAiAnswerContent('')
@@ -665,6 +666,13 @@ export default function Home() {
                   // ^ 기호를 띄어쓰기로 변경하여 실시간 업데이트
                   const processedContent = fullContent.replace(/\^/g, ' ')
                   setAiAnswerContent(processedContent)
+                } else if (parsed.type === 'citations') {
+                  // Citations 데이터 수신
+                  receivedCitations = parsed.citations || []
+                  debugLogger.info('📚 Citations 수신', {
+                    count: receivedCitations.length,
+                    citations: receivedCitations
+                  })
                 }
               } catch (e) {
                 // 파싱 에러 무시
@@ -693,7 +701,13 @@ export default function Home() {
 
         debugLogger.success('✅ AI 답변 완료', {
           contentLength: processedContent.length,
-          relatedLaws: relatedLaws.length
+          relatedLaws: relatedLaws.length,
+          citationsReceived: receivedCitations.length,
+          citationDetails: receivedCitations.map(c => ({
+            lawName: c.lawName,
+            articleNum: c.articleNum,
+            source: c.source
+          }))
         })
 
         // AI 답변 상태 설정
