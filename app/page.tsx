@@ -594,7 +594,26 @@ export default function Home() {
 
       setIsSearching(true)
       setIsAiMode(true)
-      setSearchMode('basic')  // 기본 검색 모드 유지 (법령뷰 사용)
+      setSearchMode('rag')  // RAG 검색 모드 활성화 (검색창 글로우 효과 및 버튼 스타일 적용)
+
+      // 즉시 본문뷰로 이동 (로딩 중 표시)
+      const loadingLawData = {
+        meta: {
+          lawId: 'ai-answer-loading',
+          lawTitle: 'AI 답변 생성 중...',
+          promulgationDate: new Date().toISOString().split('T')[0],
+          lawType: 'AI',
+          isOrdinance: false
+        },
+        articles: [],
+        selectedJo: undefined,
+        isOrdinance: false
+      }
+      setLawData(loadingLawData)
+      setMobileView("content")
+
+      // 로딩 중 메시지 표시
+      setAiAnswerContent('## 🔄 AI가 답변을 생성하는 중입니다...\n\n법령 데이터베이스를 검색하고 있습니다.')
 
       // AI 답변을 위한 File Search API 호출
       try {
@@ -619,6 +638,9 @@ export default function Home() {
         let buffer = ''
         let fullContent = ''
 
+        // 스트리밍 시작 시 로딩 메시지 제거
+        setAiAnswerContent('')
+
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
@@ -639,6 +661,9 @@ export default function Home() {
                 const parsed = JSON.parse(data)
                 if (parsed.type === 'text') {
                   fullContent += parsed.text
+                  // ^ 기호를 띄어쓰기로 변경하여 실시간 업데이트
+                  const processedContent = fullContent.replace(/\^/g, ' ')
+                  setAiAnswerContent(processedContent)
                 }
               } catch (e) {
                 // 파싱 에러 무시
@@ -647,16 +672,19 @@ export default function Home() {
           }
         }
 
+        // ^ 기호를 띄어쓰기로 변경 (최종 처리)
+        const processedContent = fullContent.replace(/\^/g, ' ')
+
         // AI 답변에서 관련 법령 추출
-        const relatedLaws = extractRelatedLaws(fullContent)
+        const relatedLaws = extractRelatedLaws(processedContent)
 
         debugLogger.success('✅ AI 답변 완료', {
-          contentLength: fullContent.length,
+          contentLength: processedContent.length,
           relatedLaws: relatedLaws.length
         })
 
         // AI 답변 상태 설정
-        setAiAnswerContent(fullContent)
+        setAiAnswerContent(processedContent)
         setAiRelatedLaws(relatedLaws)
 
         // 더미 lawData 설정 (법령뷰 표시를 위해)
