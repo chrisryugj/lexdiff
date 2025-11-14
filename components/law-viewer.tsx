@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -133,7 +133,7 @@ export function LawViewer({
   const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
 
   // 관련 법령 클릭 핸들러
-  const handleRelatedLawClick = (parsed: ParsedRelatedLaw) => {
+  const handleRelatedLawClick = useCallback((parsed: ParsedRelatedLaw) => {
     console.log('[LawViewer] 관련 법령 클릭:', parsed)
 
     if (onRelatedArticleClick) {
@@ -144,15 +144,15 @@ export function LawViewer({
         description: `${parsed.lawName} ${parsed.article} 조회 기능을 준비 중입니다.`,
       })
     }
-  }
+  }, [onRelatedArticleClick, toast])
 
   // ReactMarkdown 커스텀 컴포넌트
   const markdownComponents = useMemo(() => ({
-    // 발췌조문 헤더 (strong 태그)
+    // 발췌조문 헤더 (strong 태그) - 📜 이모지가 있는 것만 링크로 변환
     strong: ({ children, ...props }: any) => {
       const text = String(children)
 
-      // "📜 관세법 제38조 (신고납부)" 형식 감지
+      // "📜 관세법 제38조 (신고납부)" 형식만 감지 (발췌조문만)
       if (text.includes('📜')) {
         const parsed = parseRelatedLawTitle(text, 'excerpt')
 
@@ -174,34 +174,7 @@ export function LawViewer({
 
       return <strong {...props}>{children}</strong>
     },
-
-    // 관련 법령 리스트 (li 태그)
-    li: ({ children, ...props }: any) => {
-      const text = String(children)
-
-      // "## 📖 관련 법령" 섹션 내의 리스트만 파싱
-      if (text.match(/^.+?\s+제\d+조/)) {
-        const parsed = parseRelatedLawTitle(text, 'related')
-
-        if (parsed) {
-          return (
-            <li {...props}>
-              <button
-                onClick={() => handleRelatedLawClick(parsed)}
-                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
-                type="button"
-              >
-                <ExternalLink className="h-3 w-3" />
-                {text}
-              </button>
-            </li>
-          )
-        }
-      }
-
-      return <li {...props}>{children}</li>
-    },
-  }), [onRelatedArticleClick, toast])
+  }), [handleRelatedLawClick])
 
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
