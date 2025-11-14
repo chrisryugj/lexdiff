@@ -150,34 +150,34 @@ export function LawViewer({
   const markdownComponents = useMemo(() => ({
     // 발췌조문 헤더 (strong 태그) - 📜 이모지가 있는 것만 링크로 변환
     strong: ({ children, ...props }: any) => {
-      const text = String(children)
+      // [object Object] 방지: children을 문자열로 변환
+      const text = typeof children === 'string' ? children :
+                   Array.isArray(children) ? children.join('') :
+                   String(children || '')
 
       // "📜 관세법 제38조 (신고납부)" 형식만 감지 (발췌조문만)
       if (text.includes('📜')) {
         const parsed = parseRelatedLawTitle(text, 'excerpt')
 
         if (parsed) {
-          console.log('[발췌조문 링크] 클릭 핸들러 설정:', parsed)
           return (
             <strong {...props}>
-              <button
+              <a
+                href="#"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  console.log('[발췌조문 링크] 클릭됨:', parsed)
-                  console.log('[발췌조문 링크] onRelatedArticleClick:', onRelatedArticleClick)
+                  debugLogger.info('🔗 [AI 답변] 발췌조문 링크 클릭', parsed)
                   handleRelatedLawClick(parsed)
                 }}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
-                type="button"
+                className="law-ref text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
+                data-ref="ai-excerpt"
+                data-law={parsed.lawName}
+                data-jo={parsed.jo}
               >
                 <ExternalLink className="h-3 w-3" />
                 {text}
-              </button>
+              </a>
             </strong>
           )
         }
@@ -188,34 +188,34 @@ export function LawViewer({
 
     // 관련법령 리스트 (li 태그) - "법령명 제N조" 패턴만 링크로 변환
     li: ({ children, ...props }: any) => {
-      const text = String(children)
+      // [object Object] 방지: children을 문자열로 변환
+      const text = typeof children === 'string' ? children :
+                   Array.isArray(children) ? children.join('') :
+                   String(children || '')
 
       // "법령명 제N조" 패턴이 있는 경우만 링크로 변환
       if (text.match(/^.+?\s+제\d+조/)) {
         const parsed = parseRelatedLawTitle(text, 'related')
 
         if (parsed) {
-          console.log('[관련법령 링크] 클릭 핸들러 설정:', parsed)
           return (
             <li {...props}>
-              <button
+              <a
+                href="#"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  console.log('[관련법령 링크] 클릭됨:', parsed)
-                  console.log('[관련법령 링크] onRelatedArticleClick:', onRelatedArticleClick)
+                  debugLogger.info('🔗 [AI 답변] 관련법령 링크 클릭', parsed)
                   handleRelatedLawClick(parsed)
                 }}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
-                type="button"
+                className="law-ref text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
+                data-ref="ai-related"
+                data-law={parsed.lawName}
+                data-jo={parsed.jo}
               >
                 <ExternalLink className="h-3 w-3" />
                 {text}
-              </button>
+              </a>
             </li>
           )
         }
@@ -1193,17 +1193,60 @@ export function LawViewer({
                 <BookOpen className="h-4 w-4 text-blue-500" />
                 <h3 className="text-sm font-semibold text-foreground">답변 속 법령 조문</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  전체 {relatedArticles.length}개
-                </Badge>
-                <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
-                  📜 발췌 {relatedArticles.filter(l => l.source === 'excerpt').length}
-                </Badge>
-                <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
-                  📖 관련 {relatedArticles.filter(l => l.source === 'related').length}
-                </Badge>
-              </div>
+              {(() => {
+                // 중복 제거를 위한 그룹화 (카운트 계산용)
+                const grouped = new Map<string, { source: Set<string> }>()
+                relatedArticles.forEach(law => {
+                  const key = `${law.lawName}|${law.jo}`
+                  const existing = grouped.get(key)
+                  if (existing) {
+                    existing.source.add(law.source)
+                  } else {
+                    grouped.set(key, { source: new Set([law.source]) })
+                  }
+                })
+
+                // 중복 제거된 고유 조문 수
+                const uniqueCount = grouped.size
+
+                // 발췌만 있는 조문 수 (관련법령에도 있으면 제외)
+                const excerptOnlyCount = Array.from(grouped.values()).filter(
+                  g => g.source.has('excerpt') && g.source.size === 1
+                ).length
+
+                // 관련법령만 있는 조문 수 (발췌에도 있으면 제외)
+                const relatedOnlyCount = Array.from(grouped.values()).filter(
+                  g => g.source.has('related') && g.source.size === 1
+                ).length
+
+                // 둘 다 있는 조문 수
+                const bothCount = Array.from(grouped.values()).filter(
+                  g => g.source.size === 2
+                ).length
+
+                return (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary" className="text-xs">
+                      전체 {uniqueCount}개
+                    </Badge>
+                    {excerptOnlyCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
+                        📜 발췌 {excerptOnlyCount}
+                      </Badge>
+                    )}
+                    {relatedOnlyCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
+                        📖 관련 {relatedOnlyCount}
+                      </Badge>
+                    )}
+                    {bothCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
+                        📜📖 둘 다 {bothCount}
+                      </Badge>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
             <Separator className="mb-4 flex-shrink-0" />
 
