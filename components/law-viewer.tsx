@@ -1199,48 +1199,64 @@ export function LawViewer({
               <ScrollArea className="h-full">
                 <div className="space-y-2 pr-4">
                   {relatedArticles.length > 0 ? (
-                    relatedArticles.map((law, idx) => (
-                      <button
-                        key={`${law.lawName}-${law.jo}-${idx}`}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          console.log('[사이드바 링크] 클릭됨:', law)
-                          console.log('[사이드바 링크] onRelatedArticleClick:', onRelatedArticleClick)
-                          if (onRelatedArticleClick) {
-                            onRelatedArticleClick(law.lawName, law.jo, law.article)
-                          }
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-md text-sm
-                                   border border-blue-800/20 hover:border-blue-600/40
-                                   bg-gradient-to-r from-blue-950/20 to-purple-950/20
-                                   hover:from-blue-900/40 hover:to-purple-900/40
-                                   transition-all duration-200 group"
-                        type="button"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-1.5 flex-1">
-                            <ExternalLink className="h-3 w-3 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
-                            <span className="font-medium text-blue-300 group-hover:text-blue-200">
-                              {law.lawName}
-                            </span>
+                    (() => {
+                      // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
+                      const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
+
+                      relatedArticles.forEach(law => {
+                        const key = `${law.lawName}|${law.jo}`
+                        const existing = grouped.get(key)
+                        if (existing) {
+                          existing.sources.add(law.source)
+                        } else {
+                          grouped.set(key, { law, sources: new Set([law.source]) })
+                        }
+                      })
+
+                      return Array.from(grouped.values()).map(({ law, sources }, idx) => (
+                        <button
+                          key={`${law.lawName}-${law.jo}-${idx}`}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            console.log('[사이드바 링크] 클릭됨:', law)
+                            console.log('[사이드바 링크] onRelatedArticleClick:', onRelatedArticleClick)
+                            if (onRelatedArticleClick) {
+                              onRelatedArticleClick(law.lawName, law.jo, law.article)
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2.5 rounded-md text-sm
+                                     border border-blue-800/20 hover:border-blue-600/40
+                                     bg-gradient-to-r from-blue-950/20 to-purple-950/20
+                                     hover:from-blue-900/40 hover:to-purple-900/40
+                                     transition-all duration-200 group"
+                          type="button"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <ExternalLink className="h-3 w-3 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
+                              <span className="font-medium text-blue-300 group-hover:text-blue-200">
+                                {law.lawName}
+                              </span>
+                            </div>
+                            {/* 출처 아이콘 (중복 시 여러 개 표시) */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {sources.has('excerpt') && (
+                                <span className="text-[10px]" title="발췌조문">📜</span>
+                              )}
+                              {sources.has('related') && (
+                                <span className="text-[10px]" title="관련법령">📖</span>
+                              )}
+                            </div>
                           </div>
-                          {/* 출처 배지 */}
-                          <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
-                            law.source === 'excerpt'
-                              ? 'bg-purple-900/50 text-purple-300'
-                              : 'bg-blue-900/50 text-blue-300'
-                          }`}>
-                            {law.source === 'excerpt' ? '📜 발췌' : '📖 관련'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground pl-4">
-                          {law.article}
-                          {law.title && (
-                            <span className="text-blue-400/70 ml-1">{law.title}</span>
-                          )}
-                        </div>
-                      </button>
-                    ))
+                          <div className="text-xs text-muted-foreground pl-4">
+                            {law.article}
+                            {law.title && (
+                              <span className="text-blue-400/70 ml-1">{law.title}</span>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    })()
                   ) : (
                     <div className="text-sm text-muted-foreground text-center py-8">
                       관련 법령이 없습니다
@@ -2506,6 +2522,12 @@ export function LawViewer({
                           {aiAnswerContent}
                         </ReactMarkdown>
                       </div>
+
+                      {/* AI 답변 주의사항 */}
+                      <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                      </div>
                     </div>
 
                     {/* Right: Comparison Law Article */}
@@ -2610,7 +2632,7 @@ export function LawViewer({
                           <Separator orientation="vertical" className="h-5 hidden sm:block" />
                           <div className="flex items-center gap-1.5 px-2 bg-green-950/30 rounded-md" title="답변 신뢰도">
                             <ShieldCheck className="h-4 w-4 text-green-400" />
-                            <span className="text-xs font-medium text-green-400">높음</span>
+                            <span className="text-xs font-medium text-green-400">신뢰도 높음</span>
                           </div>
                         </div>
                       </div>
@@ -2633,6 +2655,12 @@ export function LawViewer({
                       >
                         {aiAnswerContent}
                       </ReactMarkdown>
+                    </div>
+
+                    {/* AI 답변 주의사항 */}
+                    <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                      <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>
                   </>
                 )

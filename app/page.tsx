@@ -1840,13 +1840,14 @@ export default function Home() {
                       />
                     )}
                     {(() => {
-                      const shouldShow = !!lawData.searchResultId
+                      const shouldShow = !!lawData.searchResultId && !isAiMode
 
                       // 디버그 로거에만 표시 (렌더링마다 찍히지 않도록 useEffect 대신 여기서 한번만)
                       if (typeof window !== 'undefined') {
                         debugLogger.info('👁️ 피드백 버튼 렌더링 체크', {
                           searchResultId: lawData.searchResultId || '없음',
                           searchQueryId: lawData.searchQueryId || '없음',
+                          isAiMode: isAiMode ? '예' : '아니오',
                           shouldShow: shouldShow ? '예' : '아니오',
                           lawTitle: lawData.meta.lawTitle,
                         })
@@ -1862,13 +1863,7 @@ export default function Home() {
                             articleNumber={lawData.selectedJo}
                           />
                         </div>
-                      ) : (
-                        <div className="px-4 py-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                          <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                            ⚠️ 피드백 버튼 미표시 (searchResultId 없음)
-                          </p>
-                        </div>
-                      )
+                      ) : null
                     })()}
                     <LawViewer
                       meta={lawData.meta}
@@ -1911,7 +1906,7 @@ export default function Home() {
                     onDismiss={() => setArticleNotFound(null)}
                   />
                 )}
-                {lawData.searchResultId && (
+                {lawData.searchResultId && !isAiMode && (
                   <div className="px-4 py-3 bg-muted/50 rounded-lg border">
                     <FeedbackButtons
                       searchQueryId={lawData.searchQueryId}
