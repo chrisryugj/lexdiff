@@ -38,6 +38,7 @@ import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
 import { useToast } from "@/hooks/use-toast"
 
 interface LawViewerProps {
@@ -2349,12 +2350,12 @@ export function LawViewer({
                       <div className="prose prose-sm max-w-none dark:prose-invert
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/50 [&_blockquote]:dark:bg-blue-950/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3">
-                        <ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                           {aiAnswerContent}
                         </ReactMarkdown>
                       </div>
@@ -2457,14 +2458,14 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/50 [&_blockquote]:dark:bg-blue-950/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3"
                       style={{ fontSize: `${fontSize}px` }}
                     >
-                      <ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                         {aiAnswerContent}
                       </ReactMarkdown>
                     </div>
