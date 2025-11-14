@@ -12,6 +12,8 @@
     "build-embeddings:laws": "tsx scripts/build-article-embeddings.mts --laws-only",
     "build-embeddings:ordinances": "tsx scripts/build-article-embeddings.mts --ordinances-only",
     "build-embeddings:test": "tsx scripts/build-article-embeddings.mts --dry-run --limit 2",
+    "download:ordinances": "node scripts/download-all-ordinances.mjs",
+    "download:ordinances:fast": "node scripts/download-all-ordinances.mjs 500",
     "file-search:upload": "tsx scripts/upload-laws-to-file-search.mts",
     "file-search:upload-with-ids": "tsx scripts/upload-laws-with-ids.mts",
     "file-search:list": "tsx scripts/list-file-search-files.mts"

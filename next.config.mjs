@@ -7,6 +7,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Next.js 16: Turbopack이 기본값이므로 빈 설정으로 경고 제거
+  turbopack: {},
 }
 
 export default nextConfig

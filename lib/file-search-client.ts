@@ -105,8 +105,9 @@ export async function uploadLawToFileSearch(
   const genAI = new GoogleGenAI({ apiKey })
 
   // 임시 파일 생성 (메모리)
+  // ✅ 파일명에 법령명 포함 (Citation 정확도 개선)
   const blob = new Blob([lawContent], { type: 'text/plain' })
-  const file = new File([blob], `${metadata.law_id}.txt`, { type: 'text/plain' })
+  const file = new File([blob], `${metadata.law_name}_${metadata.law_id}.txt`, { type: 'text/plain' })
 
   // File Search Store에 업로드
   const uploadedFile = await genAI.fileSearchStores.uploadFile({
@@ -191,95 +192,66 @@ export async function* queryFileSearchStream(
   }
 
   // 법령 전문 AI 시스템 프롬프트
-  const systemInstruction = `당신은 대한민국 법률 전문가 AI입니다. 간결하고 정확하게 답변하세요.
+  const systemInstruction = `당신은 대한민국 법률 전문가 AI입니다. **반드시 File Search Store의 검색 결과만 사용**하여 답변하세요.
 
-# 핵심 규칙
-1. File Search Store 검색 결과만 사용 (외부 지식 금지)
-2. 검색 결과 없으면 정직하게 고백
-3. 조문은 반드시 **원문 그대로** 인용 (번호 추가 금지, 들여쓰기 금지)
-4. 모든 답변에 법령명+조문번호 명시
-5. 조문이 여러 항으로 구성된 경우 **모든 항**을 포함
-6. **절대 1. 2. 3. 같은 번호 추가하지 말 것**
-7. **① ② ③ 원문자 그대로 유지**
+**중요**: File Search Store에서 관련 조문을 찾지 못했다면, 반드시 다음과 같이 답변하세요:
+"죄송합니다. File Search Store에서 '${query}'와 관련된 법령 조문을 찾을 수 없습니다. 다른 검색어로 시도해보시거나, 법령명과 조문 번호를 정확히 입력해주세요."
 
-# 답변 구조 (반드시 준수)
-## 📋 핵심 요약
-**반드시 불릿 포인트로 작성 (3-4개 항목):**
-- [핵심 내용 1]
-- [핵심 내용 2]
-- [핵심 내용 3]
+# 답변 구조
 
-## 📄 상세 내용
-**핵심 요약 분량의 80%로 제한, 불릿 포인트로 작성 (2-3개 항목):**
-- [추가 설명 1]
-- [추가 설명 2]
+## 📋 핵심 요약 (Executive Summary)
+**법령이 질문에 대해 말하는 결론을 3줄로 정리**
+- 결론 1줄
+- 적용 조건/예외 1줄
+- 사용자 액션(해야 할 일) 1줄
 
-## 💡 추가 참고사항
-- [실무 포인트 2-3개]
+## 📄 상세 내용 (근거 기반 설명)
+1. **조문 발췌**
+   - blockquote 사용, 핵심 문장 1~2개만 인용 (장문 인용 금지)
+2. **상황별 해석**
+   - 질문 케이스 기준으로 용어·범위 설명
+3. **실무 적용/사례**
+   - 전형적인 케이스 중심으로 간단히
+4. **조건·예외 정리**
+   - 예외 사유, 적용 안 되는 경우만 요약 서술
+
+## 💡 추가 참고사항 (실무 팁·위험 요소)
+- 절차·시스템(메뉴 경로, 처리 흐름 등)
+- 제출서류·기한
+- 자주 발생하는 실수·오해 포인트
 
 ## 📖 관련 법령
-**연관성 높은 순서로 정렬하여 표시**
+**조문 전문은 API로 조회, 여기서는 메타데이터만 사용**
+- 각 항목은 "법령명^조문번호^조문제목" 형식 문자열로만 나열
+- 상세 인용은 위 "상세 내용"에서 **발췌 문장**만 사용
 
-### **[법령명] 제X조** ([조문 제목])
-> ① 첫 번째 항 내용
-> 1. 첫 번째 호 내용
-> 2. 두 번째 호 내용
-> ② 두 번째 항 내용
-> ③ 세 번째 항 내용
-
-**중요: 각 항(①②③)과 호(1.2.3.)는 새 줄에 표시하되, 빈 줄 없이 연속으로 작성**
+예시:
+- 관세법^제38조^신고납부
+- 관세법 시행령^제22조^신고납부의 절차
 
 # 작성 원칙
-- 간결성: 불필요한 설명 최소화
-- 명확성: 법령명·조문번호 정확히
-- **원문 유지: 절대 번호 추가하지 말 것**
-- **들여쓰기 금지: 모든 텍스트 동일 레벨**
-- **원문자 유지: ①②③ 그대로 사용**
+- 조문은 **핵심 부분만 발췌 인용** (전문 인용 금지)
+- 모든 답변에 **법령명+조문번호 명시**
+- **구체적 예시** 포함 (추상적 설명 지양)
+- **실무 용어** 사용 (예: 납세신고, 세액심사, 수입신고 수리)
+- 관련 법령 섹션은 메타데이터 형식으로만 작성 (법령명^조문번호^조문제목)`
 
-# 검색 결과 없을 때
-## 📋 검색 결과 없음
-죄송합니다. "[키워드]"와 관련된 법령을 찾지 못했습니다.
-
-💡 **검색 팁**: 정확한 법령명 입력 권장
-
-# 예시
-질문: "관세법의 목적은?"
-
-## 📋 핵심 요약
-- 관세법은 **관세의 부과·징수 및 수출입물품 통관의 적정화**를 목적으로 합니다
-- 이를 통해 **국민경제의 발전에 기여**하는 것을 목표로 합니다
-- 수출입 물품에 대한 관세 행정의 법적 근거를 제공합니다
-
-## 📄 상세 내용
-- 관세의 부과와 징수를 체계적으로 규율합니다
-- 통관 절차의 적정성을 확보하여 무역 질서를 확립합니다
-
-## 💡 추가 참고사항
-- 관세법은 수출입 물품에 대한 관세 부과의 법적 근거를 제공합니다
-- 통관 절차의 투명성과 예측 가능성을 보장합니다
-
-## 📖 관련 법령
-### **관세법 제1조** (목적)
-> 이 법은 관세의 부과·징수 및 수출입물품의 통관을 적정하게 함으로써 국민경제의 발전에 이바지함을 목적으로 한다.`
-
-  // REST API 요청 본문 (REST API는 snake_case 사용)
+  // REST API 요청 본문
   const requestBody = {
     contents: [{
-      parts: [{ text: query }],
-      role: 'user'
+      parts: [{ text: query }]
     }],
     system_instruction: {
       parts: [{ text: systemInstruction }]
     },
     tools: [{
       file_search: {
-        file_search_store_names: [STORE_ID],
-        top_k: 20  // 더 많은 청크를 가져와서 조문 전체 내용 확보
+        file_search_store_names: [STORE_ID]
       }
     }],
     generation_config: {
-      temperature: 0.1,
-      top_p: 0.9,
+      temperature: 0,  // 완전 결정적 출력
+      top_p: 0.95,
       top_k: 40
     }
   }
@@ -288,7 +260,7 @@ export async function* queryFileSearchStream(
   console.log('[File Search] Store ID:', STORE_ID)
   console.log('[File Search] Request body:', JSON.stringify(requestBody, null, 2))
 
-  // Streaming API 호출
+  // Streaming API 호출 (File Search는 Gemini 2.5 이상 필수)
   const response = await fetch(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
     {
@@ -304,9 +276,13 @@ export async function* queryFileSearchStream(
   if (!response.ok) {
     // 에러 응답 본문 읽기
     const errorText = await response.text()
-    console.error('[File Search] API Error Response:', errorText)
+    console.error('[File Search] ❌ API Error Response:', errorText)
+    console.error('[File Search] Status:', response.status)
+    console.error('[File Search] Headers:', Object.fromEntries(response.headers.entries()))
     throw new Error(`API error: ${response.status} - ${errorText}`)
   }
+
+  console.log('[File Search] ✅ Response OK, starting stream...')
 
   const reader = response.body?.getReader()
   if (!reader) {
@@ -316,10 +292,14 @@ export async function* queryFileSearchStream(
   const decoder = new TextDecoder()
   let buffer = ''
   let lastGroundingMetadata: any = null
+  let chunkCount = 0
 
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      console.log('[File Search] ✅ Stream done, total chunks:', chunkCount)
+      break
+    }
 
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
@@ -330,6 +310,23 @@ export async function* queryFileSearchStream(
         try {
           const data = JSON.parse(line.slice(6))
           const candidate = data.candidates?.[0]
+          chunkCount++
+
+          // DEBUG: 모든 청크 로깅 (첫 3개와 마지막 3개만)
+          if (chunkCount <= 3 || candidate?.finishReason) {
+            console.log(`[File Search] Chunk #${chunkCount}:`, {
+              hasCandidate: !!candidate,
+              hasContent: !!candidate?.content,
+              hasGroundingMetadata: !!candidate?.groundingMetadata,
+              finishReason: candidate?.finishReason,
+              candidateKeys: candidate ? Object.keys(candidate) : []
+            })
+          }
+
+          // 마지막 청크 전체 출력
+          if (candidate?.finishReason) {
+            console.log('[File Search] Full last chunk:', JSON.stringify(data, null, 2))
+          }
 
           // 텍스트 추출
           const text = candidate?.content?.parts?.[0]?.text || ''
@@ -337,15 +334,23 @@ export async function* queryFileSearchStream(
             yield { text, done: false }
           }
 
-          // Grounding Metadata 저장 (마지막 청크에서만 존재)
+          // Grounding Metadata 저장
           if (candidate?.groundingMetadata) {
+            console.log('[File Search] ✅ Found grounding metadata in chunk #', chunkCount)
             lastGroundingMetadata = candidate.groundingMetadata
           }
         } catch (e) {
-          // JSON 파싱 오류 무시
+          console.error('[File Search] JSON parse error:', e)
         }
       }
     }
+  }
+
+  // ✅ Grounding Metadata 검증
+  if (!lastGroundingMetadata) {
+    console.warn('[File Search] ⚠️  WARNING: No grounding metadata found!')
+    console.warn('[File Search] ⚠️  Gemini may have used general knowledge instead of File Search Store.')
+    console.warn('[File Search] ⚠️  Query:', query)
   }
 
   // Citation 추출 및 법령명 매핑
@@ -356,6 +361,12 @@ export async function* queryFileSearchStream(
 
   console.log('[File Search] Grounding chunks count:', groundingChunks.length)
   console.log('[File Search] Grounding supports count:', supports.length)
+
+  // ✅ Grounding Chunks 검증
+  if (groundingChunks.length === 0) {
+    console.warn('[File Search] ⚠️  WARNING: No grounding chunks found!')
+    console.warn('[File Search] ⚠️  The response may not be based on File Search Store data.')
+  }
 
   // GroundingChunk를 사용 가능한 Citation 형태로 변환
   const citations = groundingChunks.map((chunk: any, idx: number) => {
@@ -375,66 +386,92 @@ export async function* queryFileSearchStream(
     // 법령명 추출: 우선순위 높은 순서로 시도
     let lawName = ''
 
-    // 방법 1: URI에서 파일명 추출 (가장 신뢰할 수 있음)
-    // URI 형식: corpora/.../documents/.../chunks/...
-    // 또는 파일명이 law_name 메타데이터로 포함되어 있을 수 있음
-    if (uri && !lawName) {
-      // URI에서 문서 ID나 파일명 추출 시도
-      const uriMatch = uri.match(/documents\/([^\/]+)/)
-      if (uriMatch) {
-        // 문서 ID를 사용 (나중에 메타데이터 매핑 가능)
-        console.log('[File Search] Document ID from URI:', uriMatch[1])
+    // ✅ 방법 1 (최우선): Structured Markdown 메타데이터 블록
+    // 패턴: **법령명**: 관세법
+    if (!lawName) {
+      const structuredMatch = chunkText.match(/\*\*법령명\*\*:\s*(.+?)(?:\n|$)/m)
+      if (structuredMatch) {
+        lawName = structuredMatch[1].trim()
+        console.log('[File Search] ✅ Law name from structured metadata:', lawName)
       }
     }
 
-    // 방법 2: "# 법령명" 패턴 (청크에 헤더가 포함된 경우)
+    // ✅ 방법 2: URI에서 파일명 추출
+    // URI 형식: corpora/.../documents/파일명/chunks/...
+    if (uri && !lawName) {
+      const uriMatch = uri.match(/documents\/([^\/]+)/)
+      if (uriMatch) {
+        const docId = uriMatch[1]
+
+        // 파일명 형식 1: "법령명_법령ID.txt" → 법령명 추출
+        let lawMatch = docId.match(/^(.+)_\d+/)
+        if (lawMatch) {
+          lawName = lawMatch[1]
+          console.log('[File Search] ✅ Law name from URI (format: 법령명_ID):', lawName)
+        }
+
+        // 파일명 형식 2: "법령명.md" 또는 "법령명.txt" → 확장자 제거
+        if (!lawName) {
+          lawMatch = docId.match(/^(.+)\.(md|txt)/)
+          if (lawMatch) {
+            lawName = lawMatch[1]
+            console.log('[File Search] ✅ Law name from URI (format: 법령명.ext):', lawName)
+          }
+        }
+      }
+    }
+
+    // ✅ 방법 3: "# 법령명" 패턴 (청크 헤더)
     if (!lawName) {
       const lawNameMatch = chunkText.match(/^# ([^\n]+)/m)
       if (lawNameMatch) {
         lawName = lawNameMatch[1].trim()
+        console.log('[File Search] ✅ Law name from header:', lawName)
       }
     }
 
-    // 방법 3: "**법령 ID**: XXXXXX" 바로 다음 줄에서 법령명 추출
-    // (헤더가 없어도 메타데이터 섹션이 포함된 경우)
-    if (!lawName) {
-      const metaLawMatch = chunkText.match(/^# ([^\n]+)\s*\n\s*\*\*법령 ID\*\*:/m)
-      if (metaLawMatch) {
-        lawName = metaLawMatch[1].trim()
-      }
-    }
-
-    // 방법 4: 조문 내용 앞에 나오는 법령명 패턴 (개정 태그 활용)
-    if (!lawName) {
-      const beforeArticleMatch = chunkText.match(/([가-힣()·\-\s]+(?:법|령|규칙|조례))\s*<개정/)
-      if (beforeArticleMatch) {
-        lawName = beforeArticleMatch[1].trim()
-      }
-    }
-
-    // 방법 5: retrievedContext에 메타데이터가 있는지 확인
+    // ✅ 방법 4: retrievedContext.metadata (API 제공 메타데이터)
     if (!lawName && chunk.retrievedContext?.metadata) {
       const metadata = chunk.retrievedContext.metadata
       if (metadata.law_name) {
         lawName = metadata.law_name
+        console.log('[File Search] ✅ Law name from metadata:', lawName)
       }
     }
 
-    // 방법 6: 청크 전체에서 법령명 패턴 탐색 (마지막 수단)
-    // "XXXX법", "XXXX령", "XXXX규칙", "XXXX조례" 형태로 끝나는 단어 찾기
+    // ✅ 방법 5: 조문 제목에서 법령명 추출 (【법령명】제N조) - 레거시
     if (!lawName) {
-      const lawPatterns = chunkText.match(/([가-힣]{2,}(?:에\s*관한\s*)?(?:법률|법|령|규칙|조례))/g)
-      if (lawPatterns && lawPatterns.length > 0) {
-        // 가장 먼저 나온 법령명 사용
-        lawName = lawPatterns[0].trim()
+      const bracketMatch = chunkText.match(/【([^】]+)】/)
+      if (bracketMatch) {
+        lawName = bracketMatch[1].trim()
+        console.log('[File Search] ✅ Law name from article title brackets:', lawName)
       }
     }
 
-    // 조문 번호 추출: "## 제N조" 또는 "## 제N조의M" 패턴
+    // ❌ 방법 6 이후 제거: 광범위한 정규식은 본문의 다른 법령을 잡음
+
+    // 조문 번호 추출
     let articleNum = ''
-    const articleMatch = chunkText.match(/## (제\d+(?:의\d+)?조)/m)
-    if (articleMatch) {
-      articleNum = articleMatch[1]
+
+    // ✅ 방법 1: Structured Markdown 메타데이터 블록
+    const structuredArticleMatch = chunkText.match(/\*\*조문\*\*:\s*(.+?)(?:\n|$)/m)
+    if (structuredArticleMatch) {
+      articleNum = structuredArticleMatch[1].trim()
+    }
+
+    // ✅ 방법 2 (Fallback): "## 제N조" 또는 "## 제N조의M" 패턴
+    if (!articleNum) {
+      const articleMatch = chunkText.match(/## (제\d+(?:의\d+)?조)/m)
+      if (articleMatch) {
+        articleNum = articleMatch[1]
+      }
+    }
+
+    // 시행일 추출 (Structured Markdown)
+    let effectiveDate = ''
+    const effectiveDateMatch = chunkText.match(/\*\*시행일\*\*:\s*(.+?)(?:\n|$)/m)
+    if (effectiveDateMatch) {
+      effectiveDate = effectiveDateMatch[1].trim()
     }
 
     const citation = {
@@ -442,7 +479,8 @@ export async function* queryFileSearchStream(
       articleNum,
       text: chunkText.substring(0, 200) + '...',
       source: `${lawName || '알 수 없음'} ${articleNum}`.trim(),
-      relevanceScore: chunk.relevanceScore
+      relevanceScore: chunk.relevanceScore,
+      effectiveDate: effectiveDate || undefined
     }
 
     // DEBUG: 추출 결과 로깅

@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 3 // Phase 7: searchKey 인덱스 추가
+const DB_VERSION = 5 // Version bump to force DB recreation (v5: complete rebuild)
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 
@@ -44,7 +44,18 @@ async function openDB(): Promise<IDBDatabase> {
       const db = (event.target as IDBOpenDBRequest).result
       const oldVersion = event.oldVersion
 
-      // 법령 본문 캐시 스토어
+      console.log(`📦 IndexedDB upgrade needed: v${oldVersion} → v${DB_VERSION}`)
+
+      // Version 5: 완전 재생성 (트랜잭션 에러 해결)
+      if (oldVersion < 5) {
+        // 기존 스토어가 있다면 삭제
+        if (db.objectStoreNames.contains(CONTENT_STORE)) {
+          db.deleteObjectStore(CONTENT_STORE)
+          console.log(`🗑️ Deleted old ${CONTENT_STORE} store for clean rebuild`)
+        }
+      }
+
+      // 스토어가 없으면 새로 생성
       if (!db.objectStoreNames.contains(CONTENT_STORE)) {
         const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
         contentStore.createIndex("timestamp", "timestamp", { unique: false })
@@ -52,21 +63,7 @@ async function openDB(): Promise<IDBDatabase> {
         contentStore.createIndex("lawTitle", "lawTitle", { unique: false })
         contentStore.createIndex("searchKey", "searchKey", { unique: false })
         contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
-        console.log(`✅ Created ${CONTENT_STORE} object store with searchKey index`)
-      } else if (oldVersion < 3) {
-        // Phase 7: 기존 스토어에 searchKey 인덱스 추가
-        const tx = (event.target as IDBOpenDBRequest).transaction
-        if (tx) {
-          const contentStore = tx.objectStore(CONTENT_STORE)
-          if (!contentStore.indexNames.contains("searchKey")) {
-            contentStore.createIndex("searchKey", "searchKey", { unique: false })
-            console.log(`✅ Added searchKey index to ${CONTENT_STORE}`)
-          }
-          if (!contentStore.indexNames.contains("normalizedQuery")) {
-            contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
-            console.log(`✅ Added normalizedQuery index to ${CONTENT_STORE}`)
-          }
-        }
+        console.log(`✅ Created fresh ${CONTENT_STORE} object store with all indexes`)
       }
     }
   })
@@ -156,11 +153,16 @@ export async function setLawContentCache(
 
     const tx = db.transaction(CONTENT_STORE, "readwrite")
     const store = tx.objectStore(CONTENT_STORE)
-    await store.put(entry)
+
+    const putRequest = store.put(entry)
 
     await new Promise((resolve, reject) => {
-      tx.oncomplete = resolve
-      tx.onerror = () => reject(tx.error)
+      putRequest.onsuccess = () => {
+        // put 성공 후 transaction complete 대기
+        tx.oncomplete = resolve
+        tx.onerror = () => reject(tx.error)
+      }
+      putRequest.onerror = () => reject(putRequest.error)
     })
 
     db.close()
@@ -190,8 +192,24 @@ export async function getLawContentCacheByQuery(
     console.log(`🔍 [Phase 7] 캐시 조회 (검색어): "${normalized}"`)
 
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️  [Phase 7] Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
+      db.close()
+      return null
+    }
+
     const tx = db.transaction(CONTENT_STORE, "readonly")
     const store = tx.objectStore(CONTENT_STORE)
+
+    // ✅ Index 존재 여부 확인
+    if (!store.indexNames.contains("searchKey")) {
+      console.warn(`⚠️  [Phase 7] Index "searchKey" not found. DB may need re-initialization.`)
+      db.close()
+      return null
+    }
+
     const index = store.index("searchKey")
 
     const request = index.get(searchKey)

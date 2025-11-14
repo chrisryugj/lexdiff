@@ -272,3 +272,100 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
   debugLogger.success("조문 변경이력 파싱 완료", { count: history.length })
   return history
 }
+
+/**
+ * AI 답변에서 관련 법령 제목 파싱
+ *
+ * 입력 예시: "**관세법 제38조 (신고납부)**"
+ * 출력: { lawName: "관세법", article: "제38조", jo: "003800", title: "(신고납부)", display: "관세법 제38조 (신고납부)" }
+ */
+export interface ParsedRelatedLaw {
+  lawName: string        // "관세법"
+  article: string        // "제38조"
+  jo: string            // "003800" (6-digit JO code)
+  title?: string        // "(신고납부)"
+  display: string       // "관세법 제38조 (신고납부)" (전체 표시명)
+  fullText?: string     // 조문 전문 (나중에 로드)
+}
+
+export function parseRelatedLawTitle(title: string): ParsedRelatedLaw | null {
+  // "**관세법 제38조 (신고납부)**" 또는 "관세법 제38조 (신고납부)" 같은 형식 파싱
+  const cleanTitle = title.replace(/\*\*/g, '').trim()
+
+  // 법령명 + 제N조 + (제목) 패턴
+  const pattern = /^(.+?)\s+(제\d+조(?:의\d+)?)\s*(\([^)]+\))?/
+  const match = cleanTitle.match(pattern)
+
+  if (!match) {
+    debugLogger.warning('관련법령 제목 파싱 실패', { title })
+    return null
+  }
+
+  const [, lawName, article, titlePart] = match
+
+  try {
+    // 제38조 → 003800 변환
+    const { articleNumber, branchNumber } = parseArticleComponents(article)
+    const jo = buildJO(articleNumber, branchNumber)
+
+    debugLogger.debug('관련법령 파싱 성공', {
+      lawName,
+      article,
+      jo,
+      title: titlePart,
+      display: cleanTitle
+    })
+
+    return {
+      lawName: lawName.trim(),
+      article,
+      jo,
+      title: titlePart?.trim(),
+      display: cleanTitle
+    }
+  } catch (error) {
+    debugLogger.error('JO 코드 변환 실패', { article, error })
+    return null
+  }
+}
+
+/**
+ * AI 답변 마크다운에서 관련 법령 목록 추출
+ *
+ * "## 📖 관련 법령" 섹션에서 ### 제목들을 파싱
+ */
+export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
+  const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
+  const match = markdown.match(relatedLawsPattern)
+
+  if (!match) {
+    debugLogger.info('관련 법령 섹션 없음')
+    return []
+  }
+
+  const section = match[0]
+  const h3Pattern = /###\s+([^\n]+)/g
+  const laws: ParsedRelatedLaw[] = []
+  let titleMatch
+
+  while ((titleMatch = h3Pattern.exec(section)) !== null) {
+    let title = titleMatch[1].trim()
+
+    // 다음 줄 괄호 병합 (file-search-answer-display.tsx와 동일 로직)
+    const nextLineStart = titleMatch.index + titleMatch[0].length
+    const remainingText = section.substring(nextLineStart)
+    const nextLineMatch = remainingText.match(/^\s*(\([^)]+\))/)
+
+    if (nextLineMatch) {
+      title += ' ' + nextLineMatch[1]
+    }
+
+    const parsed = parseRelatedLawTitle(title)
+    if (parsed) {
+      laws.push(parsed)
+    }
+  }
+
+  debugLogger.success('관련 법령 추출 완료', { count: laws.length, laws })
+  return laws
+}

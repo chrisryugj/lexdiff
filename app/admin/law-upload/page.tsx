@@ -11,8 +11,10 @@ import { LawParserPanel } from '@/components/admin/law-parser-panel'
 import { LawPreviewCard } from '@/components/admin/law-preview-card'
 import { UploadProgressPanel } from '@/components/admin/upload-progress-panel'
 import { StoreManagerPanel } from '@/components/admin/store-manager-panel'
+import { EnforcementDownloadPanel } from '@/components/admin/enforcement-download-panel'
+import { OrdinanceUploadPanel } from '@/components/admin/ordinance-upload-panel'
 
-type Tab = 'parse' | 'upload' | 'manage'
+type Tab = 'parse' | 'enforcement' | 'upload' | 'ordinance' | 'manage'
 
 interface ParsedLaw {
   lawId: string
@@ -148,6 +150,16 @@ export default function AdminLawUploadPage() {
               1️⃣ 파싱
             </button>
             <button
+              onClick={() => setActiveTab('enforcement')}
+              className={`px-4 py-3 font-medium transition-colors ${
+                activeTab === 'enforcement'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              2️⃣ 시행령/규칙
+            </button>
+            <button
               onClick={() => setActiveTab('upload')}
               className={`px-4 py-3 font-medium transition-colors ${
                 activeTab === 'upload'
@@ -155,12 +167,22 @@ export default function AdminLawUploadPage() {
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
-              2️⃣ 업로드
+              3️⃣ 법령 업로드
               {savedLaws.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
                   {savedLaws.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('ordinance')}
+              className={`px-4 py-3 font-medium transition-colors ${
+                activeTab === 'ordinance'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              4️⃣ 조례 업로드
             </button>
             <button
               onClick={() => setActiveTab('manage')}
@@ -170,7 +192,7 @@ export default function AdminLawUploadPage() {
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
-              3️⃣ 관리
+              5️⃣ 관리
             </button>
           </div>
         </div>
@@ -194,9 +216,13 @@ export default function AdminLawUploadPage() {
           </div>
         )}
 
+        {activeTab === 'enforcement' && <EnforcementDownloadPanel />}
+
         {activeTab === 'upload' && (
           <UploadProgressPanel savedLaws={savedLaws} onUploadComplete={handleUploadComplete} />
         )}
+
+        {activeTab === 'ordinance' && <OrdinanceUploadPanel />}
 
         {activeTab === 'manage' && <StoreManagerPanel onRefresh={loadSavedLaws} />}
       </div>

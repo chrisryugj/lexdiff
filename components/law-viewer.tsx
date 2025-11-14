@@ -26,16 +26,19 @@ import {
   Eye,
   Loader2,
   RefreshCw,
+  ShieldCheck,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
-import { buildJO, formatJO } from "@/lib/law-parser"
+import { buildJO, formatJO, type ParsedRelatedLaw } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
+import ReactMarkdown from 'react-markdown'
+import { useToast } from "@/hooks/use-toast"
 
 interface LawViewerProps {
   meta: LawMeta
@@ -47,6 +50,18 @@ interface LawViewerProps {
   favorites: Set<string>
   isOrdinance: boolean
   viewMode: "single" | "full"
+
+  // AI 답변 모드 (File Search RAG)
+  aiAnswerMode?: boolean
+  aiAnswerContent?: string
+  relatedArticles?: ParsedRelatedLaw[]
+  onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
+
+  // AI 모드 - 관련 법령 2단 비교
+  comparisonLawMeta?: LawMeta | null
+  comparisonLawArticles?: LawArticle[]
+  comparisonLawSelectedJo?: string
+  isLoadingComparison?: boolean
 }
 
 export function LawViewer({
@@ -59,8 +74,17 @@ export function LawViewer({
   favorites = new Set(),
   isOrdinance = false,
   viewMode = "single",
+  aiAnswerMode = false,
+  aiAnswerContent,
+  relatedArticles = [],
+  onRelatedArticleClick,
+  comparisonLawMeta = null,
+  comparisonLawArticles = [],
+  comparisonLawSelectedJo,
+  isLoadingComparison = false,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
+  const { toast } = useToast()
 
   console.log("[v0] LawViewer 렌더링:", {
     lawTitle: meta.lawTitle,
@@ -1046,12 +1070,64 @@ export function LawViewer({
         />
       )}
 
-      {/* Left sidebar - Article navigation */}
+      {/* Left sidebar - AI 답변 모드 or 조문 목록 */}
       <Card className={`p-4 flex-col overflow-hidden ${
         isArticleListExpanded
           ? 'flex fixed lg:relative top-4 left-4 right-4 bottom-4 z-50 lg:z-auto'
           : 'hidden lg:flex'
       }`}>
+        {aiAnswerMode ? (
+          // ========== AI 모드: 왼쪽은 관련 법령 목록 ==========
+          <>
+            {/* Mobile close button */}
+            {isArticleListExpanded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsArticleListExpanded(false)}
+                className="lg:hidden mb-2 w-full"
+              >
+                닫기
+              </Button>
+            )}
+
+            <div className="mb-4 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-blue-500" />
+                <h3 className="text-sm font-semibold text-foreground">관련 법령</h3>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {relatedArticles.length}개 법령
+              </Badge>
+            </div>
+            <Separator className="mb-4 flex-shrink-0" />
+
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                <div className="space-y-1 pr-4">
+                  {relatedArticles.length > 0 ? (
+                    relatedArticles.map((law, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onRelatedArticleClick?.(law.lawName, law.jo, law.article)}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm bg-secondary/30 hover:bg-secondary transition-colors"
+                      >
+                        <div className="font-medium text-cyan-400">{law.display}</div>
+                        {law.title && <div className="text-xs text-gray-400 mt-0.5">{law.title}</div>}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      관련 법령이 없습니다
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </>
+        ) : (
+          // ========== 기존 조문 목록 ==========
+          <>
         {/* Mobile close button - top */}
         {isArticleListExpanded && (
           <Button
@@ -1149,6 +1225,8 @@ export function LawViewer({
             닫기
           </Button>
         )}
+          </>
+        )}
       </Card>
 
       {/* Right panel - Article content */}
@@ -1175,14 +1253,15 @@ export function LawViewer({
           </Button>
         </div>
 
-        {/* Header */}
-        <div className="border-b border-border p-4">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
+        {/* Header - Hidden in AI Answer Mode */}
+        {!aiAnswerMode && (
+          <div className="border-b border-border p-4">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
                   {!isOrdinance && viewMode === "full" && (
                     <Badge variant="outline" className="text-xs">
                       전체 조문
@@ -1311,7 +1390,8 @@ export function LawViewer({
               <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full" ref={contentRef}>
@@ -2251,6 +2331,144 @@ export function LawViewer({
                       </div>
                     )}
                   </div>
+                )
+              ) : aiAnswerMode && aiAnswerContent ? (
+                // AI 모드: AI 답변 표시 (비교 법령이 있으면 2단 뷰)
+                comparisonLawMeta && comparisonLawArticles.length > 0 ? (
+                  // 2단 비교 뷰: AI 답변 (좌) + 관련 법령 (우)
+                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                    {/* Left: AI Answer */}
+                    <div className="overflow-y-auto pr-2">
+                      <div className="mb-3 pb-2 border-b border-border flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-blue-500" />
+                        <Badge variant="secondary" className="text-xs">
+                          File Search RAG
+                        </Badge>
+                      </div>
+
+                      <div className="prose prose-sm max-w-none dark:prose-invert
+                        [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
+                        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/50 [&_blockquote]:dark:bg-blue-950/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
+                        [&_ul]:my-3 [&_li]:my-1.5
+                        [&_ol]:my-3 [&_ol_li]:my-1.5
+                        [&_p]:leading-relaxed [&_p]:my-3">
+                        <ReactMarkdown>
+                          {aiAnswerContent}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+
+                    {/* Right: Comparison Law Article */}
+                    <div className="overflow-y-auto pr-2">
+                      {isLoadingComparison ? (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          <p>관련 법령을 불러오는 중...</p>
+                        </div>
+                      ) : (() => {
+                        const comparisonArticle = comparisonLawArticles.find(a => a.jo === comparisonLawSelectedJo) || comparisonLawArticles[0]
+                        if (!comparisonArticle) {
+                          return (
+                            <div className="flex items-center justify-center h-full text-muted-foreground">
+                              <p>관련 법령 조문을 찾을 수 없습니다</p>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <div className="mb-6 pb-4 border-b border-border">
+                              <h3 className="text-base font-bold text-foreground mb-2">
+                                {formatSimpleJo(comparisonArticle.jo)}
+                                {comparisonArticle.title && <span className="text-muted-foreground text-sm"> ({comparisonArticle.title})</span>}
+                              </h3>
+                              <Badge variant="outline" className="text-xs">
+                                {comparisonLawMeta.lawTitle}
+                              </Badge>
+                            </div>
+
+                            <div
+                              className="law-content text-sm text-foreground leading-relaxed"
+                              style={{ fontSize: `${fontSize}px` }}
+                              dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle) }}
+                            />
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                ) : (
+                  // 기본 AI 답변 (비교 법령 없음)
+                  <>
+                    <div className="mb-4 pb-3 border-b border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-6 w-6 text-blue-500" />
+                          <h2 className="text-xl font-bold text-foreground">AI 답변</h2>
+                          <Badge variant="secondary" className="text-xs ml-2">
+                            File Search RAG
+                          </Badge>
+                        </div>
+
+                        {/* AI 답변 컨트롤 */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFontSize((prev) => Math.max(12, prev - 2))}
+                            className="h-7 px-2"
+                            title="글자 작게"
+                          >
+                            <ZoomOut className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFontSize((prev) => Math.min(20, prev + 2))}
+                            className="h-7 px-2"
+                            title="글자 크게"
+                          >
+                            <ZoomIn className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(aiAnswerContent)
+                              toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
+                            }}
+                            className="h-7 px-2"
+                            title="복사"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Separator orientation="vertical" className="h-5" />
+                          <div className="flex items-center gap-1.5 px-2" title="답변 신뢰도">
+                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-500" />
+                            <span className="text-xs font-medium text-green-700 dark:text-green-400">높음</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="prose prose-sm max-w-none dark:prose-invert
+                        [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
+                        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-blue-50/50 [&_blockquote]:dark:bg-blue-950/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4
+                        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
+                        [&_ul]:my-3 [&_li]:my-1.5
+                        [&_ol]:my-3 [&_ol_li]:my-1.5
+                        [&_p]:leading-relaxed [&_p]:my-3"
+                      style={{ fontSize: `${fontSize}px` }}
+                    >
+                      <ReactMarkdown>
+                        {aiAnswerContent}
+                      </ReactMarkdown>
+                    </div>
+                  </>
                 )
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

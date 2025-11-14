@@ -15,6 +15,7 @@ import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-pane
 import { RagResultCard } from "@/components/rag-result-card"
 import { RagAnswerCard } from "@/components/rag-answer-card"
 import { detectQueryType } from "@/lib/query-detector"
+import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -298,8 +299,18 @@ export default function Home() {
   const [ragError, setRagError] = useState<string | null>(null)
   const [ragProgress, setRagProgress] = useState(0)
 
-  // File Search RAG 상태 (자동 전환용)
-  const [fileSearchQuery, setFileSearchQuery] = useState<string | null>(null)
+  // AI 답변 상태 (File Search RAG)
+  const [aiAnswerContent, setAiAnswerContent] = useState<string>('')
+  const [aiRelatedLaws, setAiRelatedLaws] = useState<any[]>([])
+  const [isAiMode, setIsAiMode] = useState(false)
+
+  // AI 모드 - 관련 법령 2단 비교 상태
+  const [comparisonLaw, setComparisonLaw] = useState<{
+    meta: LawMeta | null
+    articles: LawArticle[]
+    selectedJo?: string
+  } | null>(null)
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false)
 
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -574,19 +585,109 @@ export default function Home() {
       reason: queryDetection.reason
     })
 
-    // 자연어 쿼리 감지 시 File Search RAG로 자동 전환
-    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.8) {
-      debugLogger.success('✨ 자연어 검색 감지 → File Search RAG로 전환', {
+    // 자연어로 판단되면 File Search API를 호출하여 AI 답변을 받고 법령뷰로 표시
+    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+      debugLogger.success('✨ 자연어 검색 감지 → AI 답변 모드', {
         query: fullQuery,
         confidence: queryDetection.confidence
       })
 
-      setIsSearching(false)
-      setFileSearchQuery(fullQuery)
-      setSearchMode('rag')
+      setIsSearching(true)
+      setIsAiMode(true)
+      setSearchMode('basic')  // 기본 검색 모드 유지 (법령뷰 사용)
 
-      // File Search RAG 실행
-      handleFileSearchRag(fullQuery)
+      // AI 답변을 위한 File Search API 호출
+      try {
+        const response = await fetch('/api/file-search-rag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: fullQuery })
+        })
+
+        if (!response.ok) {
+          throw new Error('File Search API 호출 실패')
+        }
+
+        // SSE 스트리밍 읽기
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+
+        if (!reader) {
+          throw new Error('Response body 읽기 실패')
+        }
+
+        let buffer = ''
+        let fullContent = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+
+              if (data === '[DONE]') {
+                continue
+              }
+
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.type === 'text') {
+                  fullContent += parsed.text
+                }
+              } catch (e) {
+                // 파싱 에러 무시
+              }
+            }
+          }
+        }
+
+        // AI 답변에서 관련 법령 추출
+        const relatedLaws = extractRelatedLaws(fullContent)
+
+        debugLogger.success('✅ AI 답변 완료', {
+          contentLength: fullContent.length,
+          relatedLaws: relatedLaws.length
+        })
+
+        // AI 답변 상태 설정
+        setAiAnswerContent(fullContent)
+        setAiRelatedLaws(relatedLaws)
+
+        // 더미 lawData 설정 (법령뷰 표시를 위해)
+        const aiLawData = {
+          meta: {
+            lawId: 'ai-answer',
+            lawTitle: 'AI 답변',
+            promulgationDate: new Date().toISOString().split('T')[0],
+            lawType: 'AI',
+            isOrdinance: false
+          },
+          articles: [], // AI 모드에서는 조문 목록 대신 관련 법령 표시
+          selectedJo: undefined,
+          isOrdinance: false
+        }
+
+        setLawData(aiLawData)
+        setIsSearching(false)
+        setMobileView("content")
+
+      } catch (error) {
+        debugLogger.error('❌ File Search API 오류', error)
+        setIsSearching(false)
+        setIsAiMode(false)
+        toast({
+          title: "AI 검색 실패",
+          description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
+          variant: "destructive"
+        })
+      }
+
       return
     }
 
@@ -597,7 +698,11 @@ export default function Home() {
     setOrdinanceSelectionState(null)
     setSearchResults({ laws: [], ordinances: [] })
     setArticleNotFound(null) // 이전 검색의 "조문 없음" 메시지 제거
-    setFileSearchQuery(null) // File Search RAG 상태 초기화
+    setAiAnswerContent('') // AI 답변 초기화
+    setAiRelatedLaws([])
+    setIsAiMode(false)
+    setComparisonLaw(null) // 비교 법령 초기화
+    setIsLoadingComparison(false)
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
@@ -1366,15 +1471,74 @@ export default function Home() {
     }
   }
 
-  // 인용 조문 클릭 핸들러 - RAG 결과 유지한 채로 조문 표시
-  const handleCitationClick = (lawName: string, articleDisplay: string) => {
-    // RAG 결과는 유지하고, 새 창에서 해당 조문 표시하거나 조용히 로드
-    // 사용자가 명시적으로 닫기 전까지 AI 검색 결과는 유지됨
-    debugLogger.info('인용 조문 클릭', { lawName, articleDisplay })
+  // AI 모드 - 관련 법령 클릭 핸들러 (2단 비교 표시)
+  const handleCitationClick = async (lawName: string, jo: string, article: string) => {
+    // AI 답변은 유지하고, 클릭한 법령을 2단 비교로 표시
+    debugLogger.info('관련 법령 클릭', { lawName, jo, article })
 
-    // 새 검색은 수행하지만, searchMode는 변경하지 않음
-    // 이렇게 하면 AI 결과창은 유지되면서 기본 검색 기능만 호출
-    handleSearch({ lawName, article: articleDisplay })
+    try {
+      setIsLoadingComparison(true)
+
+      // 1. 법령 검색 (lawId 획득)
+      const searchUrl = `/api/law-search?query=${encodeURIComponent(lawName)}`
+      debugLogger.info('법령 검색 API 호출', { url: searchUrl })
+
+      const searchRes = await fetch(searchUrl)
+      if (!searchRes.ok) {
+        throw new Error('법령 검색 실패')
+      }
+
+      const searchData = await searchRes.json()
+      if (!searchData.success || !searchData.data || searchData.data.length === 0) {
+        throw new Error('법령을 찾을 수 없습니다')
+      }
+
+      const law = searchData.data[0]
+      const lawId = law.lawId || law.mst
+
+      debugLogger.success('법령 검색 성공', { lawId, lawTitle: law.lawTitle })
+
+      // 2. 법령 전문 로드
+      const eflawUrl = `/api/eflaw?lawId=${lawId}`
+      debugLogger.info('법령 전문 API 호출', { url: eflawUrl })
+
+      const eflawRes = await fetch(eflawUrl)
+      if (!eflawRes.ok) {
+        throw new Error('법령 전문 로드 실패')
+      }
+
+      const eflawData = await eflawRes.json()
+      if (!eflawData.success) {
+        throw new Error(eflawData.error || '법령 전문 로드 실패')
+      }
+
+      const { meta, articles } = eflawData
+
+      debugLogger.success('법령 전문 로드 성공', {
+        lawTitle: meta.lawTitle,
+        articleCount: articles.length,
+        targetJo: jo
+      })
+
+      // 3. 비교 법령 상태 설정 (2단 비교 활성화)
+      setComparisonLaw({
+        meta,
+        articles,
+        selectedJo: jo
+      })
+
+      setIsLoadingComparison(false)
+
+    } catch (err) {
+      debugLogger.error('관련 법령 로드 실패', err)
+      console.error('Failed to load related law:', err)
+      setIsLoadingComparison(false)
+      toast({
+        title: "법령 로드 실패",
+        description: err instanceof Error ? err.message : '법령을 불러올 수 없습니다',
+        variant: "destructive"
+      })
+    }
   }
 
   const handleCompare = (jo: string) => {
@@ -1462,7 +1626,6 @@ export default function Home() {
     setOrdinanceSelectionState(null)
     setSearchResults({ laws: [], ordinances: [] })
     setMobileView("content")
-    setFileSearchQuery(null) // File Search RAG 초기화
     setSearchMode('basic') // 기본 검색 모드로 복귀
     setRagResults([])
     setRagAnswer(null)
@@ -1577,73 +1740,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* RAG 검색 모드 - File Search만 사용 */}
-              {searchMode === 'rag' && (
-                <div className="w-full max-w-4xl space-y-4">
-                  {/* 질문 표시 - 다크 테마 */}
-                  {fileSearchQuery && (
-                    <div className="p-4 bg-card border border-border rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                          <Sparkles className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-muted-foreground mb-1">질문</p>
-                          <p className="text-base text-foreground">{fileSearchQuery}</p>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={handleReset}>
-                          새 검색
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI 답변 (기존 RAG UI 재사용) */}
-                  {ragAnswer && (
-                    <RagAnswerCard
-                      answer={ragAnswer}
-                      onCitationClick={handleCitationClick}
-                    />
-                  )}
-
-                  {/* 로딩 상태 - 프로그레스 바 포함 */}
-                  {ragLoading && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-4">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      <div className="w-full max-w-md space-y-2">
-                        <p className="text-sm text-muted-foreground text-center">
-                          AI가 답변을 생성하고 있습니다...
-                        </p>
-                        <Progress value={ragProgress} className="h-2" />
-                        <p className="text-xs text-muted-foreground text-center">
-                          {ragProgress < 30 && '📚 법령 데이터베이스 검색 중...'}
-                          {ragProgress >= 30 && ragProgress < 50 && '🔍 관련 조문 분석 중...'}
-                          {ragProgress >= 50 && ragProgress < 95 && '✍️ AI 답변 스트리밍 중...'}
-                          {ragProgress >= 95 && ragProgress < 100 && '✅ 마무리 중...'}
-                          {ragProgress === 100 && '✨ 완료!'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 오류 표시 */}
-                  {ragError && (
-                    <div className="p-4 border-destructive border rounded-lg">
-                      <p className="text-sm font-medium text-destructive mb-1">오류 발생</p>
-                      <p className="text-sm text-muted-foreground">{ragError}</p>
-                    </div>
-                  )}
-
-                  {/* 결과 없음 */}
-                  {!fileSearchQuery && !ragLoading && !ragAnswer && !ragError && (
-                    <div className="text-center text-muted-foreground py-12">
-                      <p className="mb-2">💡 자연어로 질문해보세요</p>
-                      <p className="text-sm">예: "관세법 38조에 대해 알려줘"</p>
-                      <p className="text-xs mt-4">자연어로 입력하면 자동으로 AI 검색이 활성화됩니다</p>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* AI 답변이 없고, RAG 검색 패널만 표시 */}
             </div>
           ) : (
             <div className="space-y-4">
@@ -1720,6 +1817,14 @@ export default function Home() {
                       onToggleFavorite={handleToggleFavorite}
                       favorites={favorites}
                       isOrdinance={lawData.isOrdinance}
+                      aiAnswerMode={isAiMode}
+                      aiAnswerContent={aiAnswerContent}
+                      relatedArticles={aiRelatedLaws}
+                      onRelatedArticleClick={handleCitationClick}
+                      comparisonLawMeta={comparisonLaw?.meta || null}
+                      comparisonLawArticles={comparisonLaw?.articles || []}
+                      comparisonLawSelectedJo={comparisonLaw?.selectedJo}
+                      isLoadingComparison={isLoadingComparison}
                     />
                   </div>
                 )}
@@ -1763,6 +1868,14 @@ export default function Home() {
                   onToggleFavorite={handleToggleFavorite}
                   favorites={favorites}
                   isOrdinance={lawData.isOrdinance}
+                  aiAnswerMode={isAiMode}
+                  aiAnswerContent={aiAnswerContent}
+                  relatedArticles={aiRelatedLaws}
+                  onRelatedArticleClick={handleCitationClick}
+                  comparisonLawMeta={comparisonLaw?.meta || null}
+                  comparisonLawArticles={comparisonLaw?.articles || []}
+                  comparisonLawSelectedJo={comparisonLaw?.selectedJo}
+                  isLoadingComparison={isLoadingComparison}
                 />
               </div>
             </div>

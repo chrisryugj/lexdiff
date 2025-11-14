@@ -3,12 +3,13 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Loader2, Clock, Scale, Building2, Sparkles } from "lucide-react"
+import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { cn } from "@/lib/utils"
+import { detectQueryType } from "@/lib/query-detector"
 
 interface SearchBarProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => void
@@ -22,14 +23,27 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   const [query, setQuery] = useState("")
   const [showRecent, setShowRecent] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
-  const [searchType, setSearchType] = useState<"law" | "ordinance" | null>(null)
+  const [searchType, setSearchType] = useState<"law" | "ordinance" | "ai" | null>(null)
+  const [isNaturalQuery, setIsNaturalQuery] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!query.trim()) {
       setSearchType(null)
+      setIsNaturalQuery(false)
       return
+    }
+
+    // 자연어 감지
+    const queryDetection = detectQueryType(query)
+    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+      setSearchType("ai")
+      setIsNaturalQuery(true)
+      console.log("[v0] AI 검색 모드 감지:", { query, confidence: queryDetection.confidence })
+      return
+    } else {
+      setIsNaturalQuery(false)
     }
 
     // 법령 키워드가 있으면 무조건 법령으로 처리
@@ -138,13 +152,13 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           <Input
             ref={inputRef}
             type="text"
-            placeholder={searchMode === 'rag' ? '✨ AI가 답변을 생성하고 있습니다...' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
+            placeholder={searchMode === 'rag' ? '✨ 자연어로 질문해보세요 (예: "수입 관세는 언제 납부하나요?")' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
             className={cn(
-              "pl-11 h-12 text-base transition-all duration-300",
-              searchMode === 'rag' && "ring-2 ring-purple-500/50 border-purple-300 shadow-lg shadow-purple-500/20"
+              "pl-11 h-12 text-base transition-all duration-500",
+              searchMode === 'rag' && "ring-2 ring-purple-500/70 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)] animate-pulse-slow bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20"
             )}
             disabled={isLoading}
           />
@@ -173,28 +187,38 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
             </div>
           )}
         </div>
-        <Button type="submit" size="lg" disabled={isLoading || !query.trim()} className="h-12 px-6 sm:px-8">
+        <Button
+          type="submit"
+          size="lg"
+          disabled={isLoading || !query.trim()}
+          className={cn(
+            "h-12 px-6 sm:px-8 transition-all duration-300",
+            searchMode === 'rag' && "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/50 animate-pulse-slow"
+          )}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span className="hidden sm:inline">검색 중</span>
+              <span className="hidden sm:inline">{searchMode === 'rag' ? 'AI 검색 중' : '검색 중'}</span>
               <span className="sm:hidden">검색</span>
             </>
           ) : (
-            "검색"
+            <>
+              {searchMode === 'rag' && <Sparkles className="mr-2 h-4 w-4" />}
+              <span className="hidden sm:inline">{searchMode === 'rag' ? 'AI 검색' : '검색'}</span>
+              <span className="sm:hidden">검색</span>
+            </>
           )}
         </Button>
       </div>
-      {searchMode === 'rag' ? (
-        <div className="mt-2 text-xs flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-300/30 rounded-full">
-            <Sparkles className="h-3.5 w-3.5 text-purple-600 animate-pulse" />
-            <span className="font-medium text-purple-700">AI 법령 검색 활성화</span>
-          </div>
-        </div>
-      ) : query.trim() && searchType && (
+      {query.trim() && searchType && (
         <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
-          {searchType === "ordinance" ? (
+          {searchType === "ai" ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300/30 rounded-full">
+              <Bot className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
+              <span className="font-medium text-blue-700">AI 검색 모드</span>
+            </div>
+          ) : searchType === "ordinance" ? (
             <>
               <Building2 className="h-3.5 w-3.5 text-blue-500" />
               <span>조례/규칙 검색</span>

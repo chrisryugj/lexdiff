@@ -6,6 +6,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { ParsedLawMetadata } from './law-parser-server'
+import { convertToStructuredMarkdown, isStructuredMarkdown } from './markdown-converter'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const PARSED_LAWS_DIR = path.join(DATA_DIR, 'parsed-laws')
@@ -55,32 +56,31 @@ export async function saveParsedLaw(
   // Use law name as filename (sanitized)
   const sanitizedName = sanitizeFilename(metadata.lawName)
   const markdownPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.md`)
-  const metadataPath = path.join(PARSED_LAWS_DIR, `${sanitizedName}.meta.json`)
 
-  // Save markdown
-  await fs.writeFile(markdownPath, markdown, 'utf-8')
-
-  // Save metadata
-  const metaContent = {
-    ...metadata,
-    lawId, // Store lawId in metadata for reference
-    savedAt: new Date().toISOString()
+  // ✅ Convert to structured markdown if not already
+  let finalMarkdown = markdown
+  if (!isStructuredMarkdown(markdown)) {
+    console.log(`[File Storage] 🔄 Converting to structured markdown: ${metadata.lawName}`)
+    finalMarkdown = convertToStructuredMarkdown(markdown)
   }
-  await fs.writeFile(metadataPath, JSON.stringify(metaContent, null, 2), 'utf-8')
 
-  const fileSize = Buffer.byteLength(markdown, 'utf-8')
+  // Save structured markdown
+  await fs.writeFile(markdownPath, finalMarkdown, 'utf-8')
+
+  const fileSize = Buffer.byteLength(finalMarkdown, 'utf-8')
 
   console.log(`[File Storage] ✅ Saved: ${metadata.lawName} (${fileSize} bytes)`)
 
+  // ⚠️ meta.json 생성 제거됨 (메타데이터는 MD 파일 내에 포함)
   return {
     lawId,
     lawName: metadata.lawName,
     effectiveDate: metadata.effectiveDate,
     articleCount: metadata.articleCount,
     fileSize,
-    savedAt: metaContent.savedAt,
+    savedAt: new Date().toISOString(),
     markdownPath,
-    metadataPath
+    metadataPath: null // ⚠️ No longer generating .meta.json
   }
 }
 

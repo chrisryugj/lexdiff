@@ -165,14 +165,19 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
                   return <code className="px-1.5 py-0.5 bg-muted rounded font-mono" style={{ fontSize: `${fontSize - 2}px` }} {...props}>{children}</code>
                 }
 
-                const codeKey = `code_${Math.random()}`
+                // ✅ Content-based key (re-render 시에도 유지)
+                const content = String(children).trim()
+                const codeKey = `code_${content.substring(0, 100).replace(/[^a-zA-Z0-9가-힣]/g, '_')}`
                 const isExpanded = expandedSections[codeKey] ?? false
 
                 return (
                   <div className="my-1 border border-border rounded-lg overflow-hidden">
                     <div
                       className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border cursor-pointer hover:bg-muted"
-                      onClick={() => toggleSection(codeKey)}
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                        toggleSection(codeKey)
+                      }}
                     >
                       <span className="text-sm font-semibold text-foreground" style={{ fontSize: `${fontSize}px` }}>
                         📜 관련 조문 (원문)
@@ -227,30 +232,6 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
             {content}
           </ReactMarkdown>
         </div>
-
-        {/* 인용 조문 */}
-        {citations.length > 0 && (
-          <div className="border-t border-border pt-4">
-            <p className="text-sm font-medium mb-2 text-muted-foreground">📚 참고 조문:</p>
-            <div className="flex flex-wrap gap-2">
-              {citations.map((citation, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onCitationClick?.(citation.lawName, citation.articleDisplay)}
-                  className={cn(
-                    'text-xs',
-                    citation.relevance === 'high' && 'border-primary text-primary'
-                  )}
-                >
-                  {citation.lawName} {citation.articleDisplay}
-                  {citation.relevance === 'high' && ' ★'}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* 주의사항 - 다크 테마 */}
         <div className="flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded">

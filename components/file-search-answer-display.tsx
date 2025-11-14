@@ -77,7 +77,7 @@ function CollapsibleBlockquote({
       <div className="my-1">
         <h3
           onClick={toggleExpanded}
-          className="text-base font-bold mt-2 mb-0.5 text-cyan-300 cursor-pointer hover:text-cyan-200 transition-colors flex items-center gap-1"
+          className="!text-sm !font-semibold !mt-2 !mb-0.5 text-cyan-300 cursor-pointer hover:text-cyan-200 transition-colors flex items-center gap-1"
         >
           {isExpanded ? <ChevronUp className="w-4 h-4 inline" /> : <ChevronDown className="w-4 h-4 inline" />}
           {title}
@@ -86,7 +86,7 @@ function CollapsibleBlockquote({
           <div className="relative">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
             <div
-              className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-1"
+              className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-0"
               style={{ fontSize: `${fontSize}px` }}
             >
               {renderContent()}
@@ -139,6 +139,12 @@ export function FileSearchAnswerDisplay({
   const [progress, setProgress] = useState(0)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const [copied, setCopied] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})  // ✅ 접기/펼치기 상태
+
+  // 섹션 토글
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({ ...prev, [sectionKey]: !prev[sectionKey] }))
+  }
 
   // 복사 함수
   const handleCopy = async () => {
@@ -178,47 +184,46 @@ export function FileSearchAnswerDisplay({
     return highlightedText
   }
 
-  // 관련법령 섹션 전처리: H3 + blockquote를 CollapsibleBlockquote로 변환
-  const processedAnswer = React.useMemo(() => {
-    if (!answer) return ''
+  // 관련법령 섹션 전처리: H3 제목을 CollapsibleBlockquote title로 전달
+  const { processedAnswer, lawArticleTitles } = React.useMemo(() => {
+    if (!answer) return { processedAnswer: '', lawArticleTitles: [] }
 
     // 📖 관련 법령 섹션만 찾아서 처리
     const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
     const match = answer.match(relatedLawsPattern)
 
-    if (!match) return answer
+    if (!match) return { processedAnswer: answer, lawArticleTitles: [] }
 
     const beforeSection = answer.substring(0, match.index!)
     let relatedLawsSection = match[0]
 
-    // H3 제목 제거 (CollapsibleBlockquote가 렌더링)
-    relatedLawsSection = relatedLawsSection.replace(/###\s+([^\n]+)\n/g, '')
-
-    return beforeSection + relatedLawsSection
-  }, [answer])
-
-  // 관련법령 H3 제목 추출
-  const lawArticleTitles = React.useMemo(() => {
-    if (!answer) return []
-
-    const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
-    const match = answer.match(relatedLawsPattern)
-
-    if (!match) {
-      console.log('[Law Titles] No 관련 법령 section found')
-      return []
-    }
-
+    // H3 제목 추출 (다음 줄 괄호 병합)
     const titles: string[] = []
     const h3Pattern = /###\s+([^\n]+)/g
     let titleMatch
 
-    while ((titleMatch = h3Pattern.exec(match[0])) !== null) {
-      titles.push(titleMatch[1])
+    while ((titleMatch = h3Pattern.exec(relatedLawsSection)) !== null) {
+      let title = titleMatch[1].trim()
+
+      // 다음 줄에 괄호로 시작하는 텍스트가 있으면 병합
+      const nextLineStart = titleMatch.index + titleMatch[0].length
+      const remainingText = relatedLawsSection.substring(nextLineStart)
+      const nextLineMatch = remainingText.match(/^\s*(\([^)]+\))/)
+
+      if (nextLineMatch) {
+        title += ' ' + nextLineMatch[1]  // 공백 + 괄호 추가
+      }
+
+      titles.push(title)
     }
 
-    console.log('[Law Titles] Extracted titles:', titles)
-    return titles
+    // H3 제목 제거 (CollapsibleBlockquote가 title로 렌더링)
+    relatedLawsSection = relatedLawsSection.replace(/###\s+([^\n]+)\n/g, '')
+
+    return {
+      processedAnswer: beforeSection + relatedLawsSection,
+      lawArticleTitles: titles
+    }
   }, [answer])
 
   // 커스텀 마크다운 컴포넌트 (다크테마 최적화)
@@ -234,7 +239,7 @@ export function FileSearchAnswerDisplay({
         inRelatedLawsSection = text.includes('📖') && text.includes('관련')
 
         return (
-          <h2 className="text-lg font-bold mt-3 mb-1 text-white">
+          <h2 className="text-white" style={{ fontSize: '24px', fontWeight: 900, marginTop: '20px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
             {children}
           </h2>
         )
@@ -245,7 +250,7 @@ export function FileSearchAnswerDisplay({
           return null // 관련법령 섹션의 H3는 렌더링하지 않음
         }
         return (
-          <h3 className="text-base font-bold mt-2 mb-0.5 text-cyan-300">
+          <h3 className="text-cyan-300" style={{ fontSize: '16px', fontWeight: 700, marginTop: '8px', marginBottom: '2px' }}>
             {children}
           </h3>
         )
@@ -254,6 +259,7 @@ export function FileSearchAnswerDisplay({
       blockquote: ({ children }) => {
         let title: string | undefined = undefined
 
+        // 관련법령 섹션에서만 제목 표시 (접기/펼치기 가능)
         if (inRelatedLawsSection) {
           relatedLawsH3Index++
           if (relatedLawsH3Index < lawArticleTitles.length) {
@@ -273,19 +279,36 @@ export function FileSearchAnswerDisplay({
           {children}
         </strong>
       ),
+      // 이탤릭 - 다크테마
+      em: ({ children }) => (
+        <em className="italic text-gray-300">
+          {children}
+        </em>
+      ),
+      // 링크 - 다크테마
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-400 hover:text-cyan-300 underline"
+        >
+          {children}
+        </a>
+      ),
     // 리스트 - 들여쓰기 개선
     ul: ({ children }) => (
-      <ul className="my-0.5 ml-8 space-y-0.5 list-disc text-gray-300" style={{ fontSize: `${fontSize}px` }}>
+      <ul className="ml-6 list-disc text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
         {children}
       </ul>
     ),
     ol: ({ children }) => (
-      <ol className="my-0.5 ml-8 space-y-0.5 list-decimal text-gray-300" style={{ fontSize: `${fontSize}px` }}>
+      <ol className="ml-6 list-decimal text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
         {children}
       </ol>
     ),
     li: ({ children }) => (
-      <li className="text-gray-300">
+      <li className="text-gray-300" style={{ marginBottom: '0px' }}>
         {children}
       </li>
     ),
@@ -297,12 +320,49 @@ export function FileSearchAnswerDisplay({
         </p>
       )
     },
-    // 코드 블록
-      code: ({ children }) => {
-        return <code className="px-1 py-0.5 bg-gray-700 rounded text-cyan-300 text-xs">{children}</code>
+    // 코드 블록 - 접기/펼치기 지원
+      code: ({ node, inline, className, children, ...props }) => {
+        if (inline) {
+          return <code className="px-1 py-0.5 bg-gray-700 rounded text-cyan-300 text-xs">{children}</code>
+        }
+
+        // ✅ Content-based key (re-render 시에도 유지)
+        const content = String(children).trim()
+        const codeKey = `code_${content.substring(0, 100).replace(/[^a-zA-Z0-9가-힣]/g, '_')}`
+        const isExpanded = expandedSections[codeKey] ?? false
+
+        return (
+          <div className="my-1 border border-gray-700 rounded-lg overflow-hidden">
+            <div
+              className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700 cursor-pointer hover:bg-gray-750"
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                toggleSection(codeKey)
+              }}
+            >
+              <span className="text-sm font-semibold text-gray-200" style={{ fontSize: `${fontSize}px` }}>
+                📜 관련 조문 (원문)
+              </span>
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-400" />
+              )}
+            </div>
+            {isExpanded && (
+              <code
+                className="block p-4 bg-gray-900 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto text-gray-200"
+                style={{ fontSize: `${fontSize}px` }}
+                {...props}
+              >
+                {children}
+              </code>
+            )}
+          </div>
+        )
       }
     }
-  }, [fontSize, queryKeywords, answer, lawArticleTitles])
+  }, [fontSize, queryKeywords, answer, lawArticleTitles, expandedSections])
 
   useEffect(() => {
     let isCancelled = false
@@ -538,51 +598,12 @@ export function FileSearchAnswerDisplay({
             </div>
           </div>
 
-          <div className="prose prose-sm max-w-none prose-invert">
+          <div className="max-w-none">
             <ReactMarkdown components={markdownComponents}>{processedAnswer}</ReactMarkdown>
           </div>
         </Card>
       )}
 
-      {/* 참고한 법령 목록 (법령명+조문+시행일) */}
-      {referencedLaws.length > 0 && (
-        <Card className="p-4 bg-gray-950 border-gray-800">
-          <p className="text-sm text-gray-400 mb-3">📚 참고한 법령</p>
-          <div className="space-y-2">
-            {referencedLaws.map((law, idx) => (
-              <div
-                key={idx}
-                onClick={() => onCitationClick && onCitationClick(law.lawName, law.articles[0])}
-                className="group p-3 bg-gray-900/50 hover:bg-gray-900 rounded-lg cursor-pointer transition-all border border-gray-800 hover:border-cyan-700"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-cyan-300 group-hover:text-cyan-200">
-                      {law.lawName}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {law.articles.map((article, aIdx) => (
-                        <span
-                          key={aIdx}
-                          className="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded"
-                        >
-                          {article}
-                        </span>
-                      ))}
-                    </div>
-                    {law.effectiveDate && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        시행: {law.effectiveDate}
-                      </p>
-                    )}
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-cyan-400 flex-shrink-0" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* 에러 메시지 - 다크테마 */}
       {error && (
