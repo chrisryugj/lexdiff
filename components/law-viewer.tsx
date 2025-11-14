@@ -2364,14 +2364,17 @@ export function LawViewer({
                         </div>
                       )}
 
-                      <div className="prose prose-sm max-w-none dark:prose-invert break-words
+                      <div
+                        className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
-                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words">
+                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
+                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                      >
                         <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                           {aiAnswerContent}
                         </ReactMarkdown>
@@ -2436,7 +2439,7 @@ export function LawViewer({
                     )}
 
                     <div className="mb-4 pb-3 border-b border-border">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <Sparkles className="h-6 w-6 text-blue-500" />
                           <h2 className="text-xl font-bold text-foreground">AI 답변</h2>
@@ -2446,7 +2449,7 @@ export function LawViewer({
                         </div>
 
                         {/* AI 답변 컨트롤 */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2477,25 +2480,25 @@ export function LawViewer({
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
-                          <Separator orientation="vertical" className="h-5" />
-                          <div className="flex items-center gap-1.5 px-2" title="답변 신뢰도">
-                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-500" />
-                            <span className="text-xs font-medium text-green-700 dark:text-green-400">높음</span>
+                          <Separator orientation="vertical" className="h-5 hidden sm:block" />
+                          <div className="flex items-center gap-1.5 px-2 bg-green-950/30 rounded-md" title="답변 신뢰도">
+                            <ShieldCheck className="h-4 w-4 text-green-400" />
+                            <span className="text-xs font-medium text-green-400">높음</span>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <div
-                      className="prose prose-sm max-w-none dark:prose-invert break-words
+                      className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
-                      style={{ fontSize: `${fontSize}px` }}
+                      style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                     >
                       <ReactMarkdown remarkPlugins={[remarkBreaks]}>
                         {aiAnswerContent}
