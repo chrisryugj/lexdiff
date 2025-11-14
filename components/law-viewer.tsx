@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
-import { buildJO, formatJO, type ParsedRelatedLaw } from "@/lib/law-parser"
+import { buildJO, formatJO, type ParsedRelatedLaw, parseRelatedLawTitle } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
@@ -131,6 +131,78 @@ export function LawViewer({
   const [adminRuleTitle, setAdminRuleTitle] = useState<string>("")
   // Admin rule cache - key: id or serialNumber, value: { title, html }
   const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
+
+  // 관련 법령 클릭 핸들러
+  const handleRelatedLawClick = (parsed: ParsedRelatedLaw) => {
+    console.log('[LawViewer] 관련 법령 클릭:', parsed)
+
+    if (onRelatedArticleClick) {
+      onRelatedArticleClick(parsed.lawName, parsed.jo, parsed.article)
+    } else {
+      toast({
+        title: "기능 준비 중",
+        description: `${parsed.lawName} ${parsed.article} 조회 기능을 준비 중입니다.`,
+      })
+    }
+  }
+
+  // ReactMarkdown 커스텀 컴포넌트
+  const markdownComponents = useMemo(() => ({
+    // 발췌조문 헤더 (strong 태그)
+    strong: ({ children, ...props }: any) => {
+      const text = String(children)
+
+      // "📜 관세법 제38조 (신고납부)" 형식 감지
+      if (text.includes('📜')) {
+        const parsed = parseRelatedLawTitle(text, 'excerpt')
+
+        if (parsed) {
+          return (
+            <strong {...props}>
+              <button
+                onClick={() => handleRelatedLawClick(parsed)}
+                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
+                type="button"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {text}
+              </button>
+            </strong>
+          )
+        }
+      }
+
+      return <strong {...props}>{children}</strong>
+    },
+
+    // 관련 법령 리스트 (li 태그)
+    li: ({ children, ...props }: any) => {
+      const text = String(children)
+
+      // "## 📖 관련 법령" 섹션 내의 리스트만 파싱
+      if (text.match(/^.+?\s+제\d+조/)) {
+        const parsed = parseRelatedLawTitle(text, 'related')
+
+        if (parsed) {
+          return (
+            <li {...props}>
+              <button
+                onClick={() => handleRelatedLawClick(parsed)}
+                className="text-blue-400 hover:text-blue-300 underline cursor-pointer inline-flex items-center gap-1 transition-colors"
+                type="button"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {text}
+              </button>
+            </li>
+          )
+        }
+      }
+
+      return <li {...props}>{children}</li>
+    },
+  }), [onRelatedArticleClick, toast])
+
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
     if (!activeJo) return null
@@ -1096,27 +1168,59 @@ export function LawViewer({
 
             <div className="mb-4 flex-shrink-0">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-semibold text-foreground">관련 법령</h3>
+                <BookOpen className="h-4 w-4 text-blue-500" />
+                <h3 className="text-sm font-semibold text-foreground">답변 속 법령 조문</h3>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {relatedArticles.length}개 법령
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  전체 {relatedArticles.length}개
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
+                  📜 발췌 {relatedArticles.filter(l => l.source === 'excerpt').length}
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
+                  📖 관련 {relatedArticles.filter(l => l.source === 'related').length}
+                </Badge>
+              </div>
             </div>
             <Separator className="mb-4 flex-shrink-0" />
 
             <div className="flex-1 min-h-0">
               <ScrollArea className="h-full">
-                <div className="space-y-1 pr-4">
+                <div className="space-y-2 pr-4">
                   {relatedArticles.length > 0 ? (
                     relatedArticles.map((law, idx) => (
                       <button
-                        key={idx}
+                        key={`${law.lawName}-${law.jo}-${idx}`}
                         onClick={() => onRelatedArticleClick?.(law.lawName, law.jo, law.article)}
-                        className="w-full text-left px-3 py-2 rounded-md text-sm bg-secondary/30 hover:bg-secondary transition-colors"
+                        className="w-full text-left px-3 py-2.5 rounded-md text-sm
+                                   border border-blue-800/20 hover:border-blue-600/40
+                                   bg-gradient-to-r from-blue-950/20 to-purple-950/20
+                                   hover:from-blue-900/40 hover:to-purple-900/40
+                                   transition-all duration-200 group"
                       >
-                        <div className="font-medium text-cyan-400">{law.display}</div>
-                        {law.title && <div className="text-xs text-gray-400 mt-0.5">{law.title}</div>}
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <ExternalLink className="h-3 w-3 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
+                            <span className="font-medium text-blue-300 group-hover:text-blue-200">
+                              {law.lawName}
+                            </span>
+                          </div>
+                          {/* 출처 배지 */}
+                          <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
+                            law.source === 'excerpt'
+                              ? 'bg-purple-900/50 text-purple-300'
+                              : 'bg-blue-900/50 text-blue-300'
+                          }`}>
+                            {law.source === 'excerpt' ? '📜 발췌' : '📖 관련'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground pl-4">
+                          {law.article}
+                          {law.title && (
+                            <span className="text-blue-400/70 ml-1">{law.title}</span>
+                          )}
+                        </div>
                       </button>
                     ))
                   ) : (
@@ -2375,7 +2479,10 @@ export function LawViewer({
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
                         style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                       >
-                        <ReactMarkdown remarkPlugins={[remarkBreaks]}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkBreaks]}
+                          components={markdownComponents}
+                        >
                           {aiAnswerContent}
                         </ReactMarkdown>
                       </div>
@@ -2500,7 +2607,10 @@ export function LawViewer({
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
                       style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                     >
-                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkBreaks]}
+                        components={markdownComponents}
+                      >
                         {aiAnswerContent}
                       </ReactMarkdown>
                     </div>

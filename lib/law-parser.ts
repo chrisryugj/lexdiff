@@ -285,12 +285,16 @@ export interface ParsedRelatedLaw {
   jo: string            // "003800" (6-digit JO code)
   title?: string        // "(신고납부)"
   display: string       // "관세법 제38조 (신고납부)" (전체 표시명)
+  source: 'excerpt' | 'related'  // 발췌조문 vs 관련법령
   fullText?: string     // 조문 전문 (나중에 로드)
 }
 
-export function parseRelatedLawTitle(title: string): ParsedRelatedLaw | null {
-  // "**관세법 제38조 (신고납부)**" 또는 "관세법 제38조 (신고납부)" 같은 형식 파싱
-  const cleanTitle = title.replace(/\*\*/g, '').trim()
+export function parseRelatedLawTitle(title: string, source: 'excerpt' | 'related' = 'related'): ParsedRelatedLaw | null {
+  // 이모지 및 마크다운 제거
+  const cleanTitle = title
+    .replace(/\*\*/g, '')
+    .replace(/📜|📋|📖/g, '')
+    .trim()
 
   // 법령명 + 제N조 + (제목) 패턴
   const pattern = /^(.+?)\s+(제\d+조(?:의\d+)?)\s*(\([^)]+\))?/
@@ -305,15 +309,15 @@ export function parseRelatedLawTitle(title: string): ParsedRelatedLaw | null {
 
   try {
     // 제38조 → 003800 변환
-    const { articleNumber, branchNumber } = parseArticleComponents(article)
-    const jo = buildJO(articleNumber, branchNumber)
+    const jo = buildJO(article)
 
     debugLogger.debug('관련법령 파싱 성공', {
       lawName,
       article,
       jo,
       title: titlePart,
-      display: cleanTitle
+      display: cleanTitle,
+      source
     })
 
     return {
@@ -321,7 +325,8 @@ export function parseRelatedLawTitle(title: string): ParsedRelatedLaw | null {
       article,
       jo,
       title: titlePart?.trim(),
-      display: cleanTitle
+      display: cleanTitle,
+      source
     }
   } catch (error) {
     debugLogger.error('JO 코드 변환 실패', { article, error })
@@ -330,42 +335,67 @@ export function parseRelatedLawTitle(title: string): ParsedRelatedLaw | null {
 }
 
 /**
- * AI 답변 마크다운에서 관련 법령 목록 추출
+ * AI 답변 마크다운에서 발췌조문 헤더 + 관련 법령 목록 모두 추출
  *
- * "## 📖 관련 법령" 섹션에서 ### 제목들을 파싱
+ * 패턴 1: **📜 관세법 제38조 (신고납부)** - 조문 발췌 헤더
+ * 패턴 2: - 관세법 제38조 (신고납부) - 관련 법령 리스트
  */
 export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
-  const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
-  const match = markdown.match(relatedLawsPattern)
-
-  if (!match) {
-    debugLogger.info('관련 법령 섹션 없음')
-    return []
-  }
-
-  const section = match[0]
-  const h3Pattern = /###\s+([^\n]+)/g
   const laws: ParsedRelatedLaw[] = []
-  let titleMatch
 
-  while ((titleMatch = h3Pattern.exec(section)) !== null) {
-    let title = titleMatch[1].trim()
+  // 패턴 1: 조문 발췌 헤더 (볼드 + 이모지)
+  // 예: **📜 관세법 제38조 (신고납부)**
+  const headerPattern = /\*\*📜\s*([^*]+?)\*\*/g
+  let match
 
-    // 다음 줄 괄호 병합 (file-search-answer-display.tsx와 동일 로직)
-    const nextLineStart = titleMatch.index + titleMatch[0].length
-    const remainingText = section.substring(nextLineStart)
-    const nextLineMatch = remainingText.match(/^\s*(\([^)]+\))/)
-
-    if (nextLineMatch) {
-      title += ' ' + nextLineMatch[1]
-    }
-
-    const parsed = parseRelatedLawTitle(title)
+  while ((match = headerPattern.exec(markdown)) !== null) {
+    const title = match[1].trim()
+    const parsed = parseRelatedLawTitle(title, 'excerpt')
     if (parsed) {
       laws.push(parsed)
     }
   }
 
-  debugLogger.success('관련 법령 추출 완료', { count: laws.length, laws })
-  return laws
+  debugLogger.info('발췌조문 헤더 추출', { count: laws.length })
+
+  // 패턴 2: 관련 법령 섹션의 리스트
+  // "## 📖 관련 법령" 섹션 찾기
+  const relatedSectionPattern = /## 📖 관련\s*법령([\s\S]*?)(?=##|$)/
+  const sectionMatch = markdown.match(relatedSectionPattern)
+
+  if (sectionMatch) {
+    const section = sectionMatch[1]
+
+    // 리스트 아이템 파싱: - 법령명 제N조 (제목)
+    const listPattern = /-\s*([^\n]+)/g
+    let listMatch
+
+    while ((listMatch = listPattern.exec(section)) !== null) {
+      const title = listMatch[1].trim()
+      const parsed = parseRelatedLawTitle(title, 'related')
+      if (parsed) {
+        laws.push(parsed)
+      }
+    }
+
+    debugLogger.info('관련법령 리스트 추출', {
+      relatedCount: laws.filter(l => l.source === 'related').length
+    })
+  } else {
+    debugLogger.info('관련 법령 섹션 없음')
+  }
+
+  // 중복 제거 (법령명 + JO 코드 기준)
+  const uniqueLaws = Array.from(
+    new Map(laws.map(law => [`${law.lawName}-${law.jo}`, law])).values()
+  )
+
+  debugLogger.success('전체 법령 추출 완료', {
+    total: uniqueLaws.length,
+    excerpt: uniqueLaws.filter(l => l.source === 'excerpt').length,
+    related: uniqueLaws.filter(l => l.source === 'related').length,
+    laws: uniqueLaws.map(l => `${l.lawName} ${l.article}`)
+  })
+
+  return uniqueLaws
 }
