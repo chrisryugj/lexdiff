@@ -352,9 +352,18 @@ export async function* queryFileSearchStream(
             const finishReason = candidate.finishReason
             lastFinishReason = finishReason  // 저장
 
+            // 토큰 사용량 출력
+            const usageMetadata = data.usageMetadata
+            console.log('[File Search] Token Usage:', {
+              promptTokens: usageMetadata?.promptTokenCount || 'unknown',
+              candidatesTokens: usageMetadata?.candidatesTokenCount || 'unknown',
+              totalTokens: usageMetadata?.totalTokenCount || 'unknown'
+            })
+
             if (finishReason === 'MAX_TOKENS') {
               console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
               console.error('[File Search] 현재 max_output_tokens:', 8192)
+              console.error('[File Search] 실제 사용된 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
               console.error('[File Search] 해결: max_output_tokens 값을 증가시키거나 프롬프트를 간소화하세요.')
             } else if (finishReason === 'SAFETY') {
               console.error('[File Search] ❌ 안전 필터에 의해 차단되었습니다.')
@@ -364,6 +373,7 @@ export async function* queryFileSearchStream(
               console.warn('[File Search] ⚠️  비정상 종료:', finishReason)
             } else {
               console.log('[File Search] ✅ 정상 완료 (STOP)')
+              console.log('[File Search] 출력 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
             }
           }
 
@@ -542,7 +552,12 @@ export async function* queryFileSearchStream(
     chunksCount: groundingChunks.length,
     supportsCount: supports.length,
     lawsFound: [...new Set(citations.map((c: any) => c.lawName))],
-    finishReason: lastFinishReason
+    finishReason: lastFinishReason,
+    chunkSamples: groundingChunks.slice(0, 3).map((chunk: any, idx: number) => ({
+      index: idx,
+      textLength: chunk.retrievedContext?.text?.length || 0,
+      textPreview: (chunk.retrievedContext?.text || '').substring(0, 100) + '...'
+    }))
   })
 
   yield {
