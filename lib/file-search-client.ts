@@ -271,7 +271,8 @@ export async function* queryFileSearchStream(
     generation_config: {
       temperature: 0,  // 완전 결정적 출력
       top_p: 0.95,
-      top_k: 40
+      top_k: 40,
+      max_output_tokens: 8192  // 답변 잘림 방지
     }
   }
 
