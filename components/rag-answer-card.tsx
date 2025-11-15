@@ -1,18 +1,18 @@
 /**
  * RAG Answer Card Component
  *
- * AI가 생성한 답변을 표시
+ * AI가 생성한 답변을 표시 (HTML 기반 렌더링)
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Sparkles, AlertCircle, CheckCircle2, Copy, Check, ZoomIn, ZoomOut, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import ReactMarkdown from 'react-markdown'
+import { parseRelatedLawTitle } from '@/lib/law-parser'
 
 interface RagAnswerCardProps {
   answer: {
@@ -32,6 +32,7 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
   const [fontSize, setFontSize] = useState(14) // 기본 14px
   const [copied, setCopied] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // 신뢰도 아이콘 및 색상 (다크 테마)
   const getConfidenceDisplay = (level: string) => {
@@ -83,6 +84,226 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
   const toggleSection = (sectionKey: string) => {
     setExpandedSections(prev => ({ ...prev, [sectionKey]: !prev[sectionKey] }))
   }
+
+  // HTML 변환
+  const convertToHTML = (markdown: string): string => {
+    if (!markdown) return ''
+
+    const lines = markdown.split('\n')
+    const html: string[] = []
+
+    let inCodeBlock = false
+    let codeContent: string[] = []
+    let codeBlockIndex = 0
+    let inList = false
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i]
+
+      // 코드 블록 시작/종료
+      if (line.trim().startsWith('```')) {
+        if (inCodeBlock) {
+          // 코드 블록 종료
+          const codeKey = `code_${codeBlockIndex}`
+          const codeText = codeContent.join('\n')
+          const isExpanded = expandedSections[codeKey] ?? false
+
+          html.push(`
+            <div class="my-1 border border-border rounded-lg overflow-hidden">
+              <div
+                class="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border cursor-pointer hover:bg-muted code-block-toggle"
+                data-code-key="${codeKey}"
+              >
+                <span class="text-sm font-semibold text-foreground" style="font-size: ${fontSize}px">
+                  📜 관련 조문 (원문)
+                </span>
+                <span class="code-block-icon">
+                  ${isExpanded ? '▲' : '▼'}
+                </span>
+              </div>
+              <code
+                class="block p-4 bg-muted/30 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto code-block-content ${isExpanded ? '' : 'hidden'}"
+                style="font-size: ${fontSize}px"
+              >${escapeHtml(codeText)}</code>
+            </div>
+          `)
+
+          inCodeBlock = false
+          codeContent = []
+          codeBlockIndex++
+        } else {
+          // 코드 블록 시작
+          inCodeBlock = true
+          if (inList) {
+            html.push('</ul>')
+            inList = false
+          }
+        }
+        continue
+      }
+
+      // 코드 블록 내부
+      if (inCodeBlock) {
+        codeContent.push(line)
+        continue
+      }
+
+      // 빈 줄
+      if (!line.trim()) {
+        if (inList) {
+          html.push('</ul>')
+          inList = false
+        }
+        html.push('<br />')
+        continue
+      }
+
+      // 헤더
+      if (line.startsWith('###')) {
+        if (inList) {
+          html.push('</ul>')
+          inList = false
+        }
+        const headerText = line.replace(/^###\s*/, '')
+        html.push(`<h3 class="text-base font-semibold mt-4 mb-2 border-b border-border/50 pb-1" style="font-size: ${fontSize + 2}px">${escapeHtml(headerText)}</h3>`)
+        continue
+      }
+
+      if (line.startsWith('##')) {
+        if (inList) {
+          html.push('</ul>')
+          inList = false
+        }
+        const headerText = line.replace(/^##\s*/, '')
+        html.push(`<h2 class="text-lg font-bold mt-6 mb-3 border-b border-border pb-1" style="font-size: ${fontSize + 4}px">${escapeHtml(headerText)}</h2>`)
+        continue
+      }
+
+      // 리스트 아이템 (이모지 감지하여 불릿 제거)
+      const listMatch = line.match(/^(\s*)[-*]\s+(.+)/)
+      if (listMatch) {
+        const [, indent, content] = listMatch
+        const hasEmoji = /^[\u{1F300}-\u{1F9FF}]/u.test(content.trim())
+
+        if (!inList) {
+          // 이모지가 있으면 불릿 없는 리스트, 없으면 불릿 있는 리스트
+          const listClass = hasEmoji ? 'list-none' : 'list-disc list-inside'
+          html.push(`<ul class="${listClass} space-y-0 my-1.5 ml-4" style="font-size: ${fontSize}px">`)
+          inList = true
+        }
+
+        const processedContent = processInlineFormatting(content)
+        html.push(`<li class="leading-snug">${processedContent}</li>`)
+        continue
+      }
+
+      // 리스트 종료
+      if (inList && !line.match(/^\s*[-*]\s+/)) {
+        html.push('</ul>')
+        inList = false
+      }
+
+      // HR
+      if (line.trim() === '---' || line.trim() === '***') {
+        html.push('<hr class="my-3 border-border" />')
+        continue
+      }
+
+      // 일반 단락
+      const processedLine = processInlineFormatting(line)
+      html.push(`<p class="my-1 leading-relaxed" style="font-size: ${fontSize}px">${processedLine}</p>`)
+    }
+
+    // 열린 태그 닫기
+    if (inList) html.push('</ul>')
+
+    return html.join('\n')
+  }
+
+  // 인라인 포맷팅 처리
+  function processInlineFormatting(text: string): string {
+    let result = escapeHtml(text)
+
+    // 볼드
+    result = result.replace(/\*\*([^*]+?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>')
+
+    // 이탤릭
+    result = result.replace(/\*([^*]+?)\*/g, '<em>$1</em>')
+
+    // 코드 (인라인)
+    result = result.replace(/`([^`]+?)`/g, `<code class="px-1.5 py-0.5 bg-muted rounded font-mono" style="font-size: ${fontSize - 2}px">$1</code>`)
+
+    // 법령 링크 감지 (예: "관세법 제38조", "관세법 제10조의2")
+    result = result.replace(
+      /([가-힣()]+(?:법|령|규칙|조례))\s*(제\d+조(?:의\d+)?)/g,
+      (match, lawName, article) => {
+        const parsed = parseRelatedLawTitle(`${lawName} ${article}`, 'rag')
+        if (parsed) {
+          return `<a href="#" class="law-link text-blue-400 hover:text-blue-300 underline cursor-pointer" data-law="${escapeHtml(parsed.lawName)}" data-jo="${escapeHtml(parsed.jo)}" data-article="${escapeHtml(parsed.article)}" data-source="rag">🔗 ${escapeHtml(match)}</a>`
+        }
+        return escapeHtml(match)
+      }
+    )
+
+    return result
+  }
+
+  // HTML 이스케이프
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  // 링크 클릭 핸들러 설정
+  useEffect(() => {
+    const handleLinkClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const link = target.closest('.law-link')
+
+      if (link) {
+        e.preventDefault()
+        const lawName = link.getAttribute('data-law')
+        const article = link.getAttribute('data-article')
+
+        if (lawName && article && onCitationClick) {
+          console.log('📍 RAG 답변 링크 클릭:', { lawName, article })
+          onCitationClick(lawName, article)
+        }
+      }
+    }
+
+    // 코드 블록 토글 핸들러
+    const handleCodeBlockToggle = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const toggle = target.closest('.code-block-toggle')
+
+      if (toggle) {
+        e.stopPropagation()
+        const codeKey = toggle.getAttribute('data-code-key')
+        if (codeKey) {
+          toggleSection(codeKey)
+        }
+      }
+    }
+
+    const contentEl = contentRef.current
+    if (contentEl) {
+      contentEl.addEventListener('click', handleLinkClick)
+      contentEl.addEventListener('click', handleCodeBlockToggle)
+
+      return () => {
+        contentEl.removeEventListener('click', handleLinkClick)
+        contentEl.removeEventListener('click', handleCodeBlockToggle)
+      }
+    }
+  }, [onCitationClick, expandedSections])
+
+  // HTML 생성 (expandedSections 변경 시 재생성)
+  const htmlContent = convertToHTML(content)
 
   return (
     <Card className="border-border bg-card">
@@ -147,91 +368,16 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* AI 답변 내용 */}
+        {/* AI 답변 내용 (HTML 렌더링) */}
         <div
-          className="text-foreground leading-relaxed break-words whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert"
+          ref={contentRef}
+          className="text-foreground leading-relaxed break-words prose prose-sm max-w-none dark:prose-invert"
           style={{
-            fontSize: `${fontSize}px`,
-            lineHeight: "1.6",
             overflowWrap: "break-word",
             wordBreak: "break-word",
           }}
-        >
-          <ReactMarkdown
-            components={{
-              // 코드 블록 스타일링 (법령 원문) - 접기/펼치기
-              code: ({ node, inline, className, children, ...props }) => {
-                if (inline) {
-                  return <code className="px-1.5 py-0.5 bg-muted rounded font-mono" style={{ fontSize: `${fontSize - 2}px` }} {...props}>{children}</code>
-                }
-
-                // ✅ Content-based key (re-render 시에도 유지)
-                const content = String(children).trim()
-                const codeKey = `code_${content.substring(0, 100).replace(/[^a-zA-Z0-9가-힣]/g, '_')}`
-                const isExpanded = expandedSections[codeKey] ?? false
-
-                return (
-                  <div className="my-1 border border-border rounded-lg overflow-hidden">
-                    <div
-                      className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border cursor-pointer hover:bg-muted"
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                        toggleSection(codeKey)
-                      }}
-                    >
-                      <span className="text-sm font-semibold text-foreground" style={{ fontSize: `${fontSize}px` }}>
-                        📜 관련 조문 (원문)
-                      </span>
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    {isExpanded && (
-                      <code
-                        className="block p-4 bg-muted/30 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto"
-                        style={{ fontSize: `${fontSize}px` }}
-                        {...props}
-                      >
-                        {children}
-                      </code>
-                    )}
-                  </div>
-                )
-              },
-              // 단락 간격 - 최소화
-              p: ({ node, ...props }) => <p className="my-1" style={{ fontSize: `${fontSize}px` }} {...props} />,
-              // 헤딩 스타일 - 구조화 문구 (크고 굵게, 구분선)
-              h3: ({ node, children, ...props }) => (
-                <div className="mt-2 mb-1">
-                  <h3 className="font-bold text-foreground flex items-center gap-2" style={{ fontSize: `${fontSize + 2}px` }} {...props}>
-                    {children}
-                  </h3>
-                  <div className="h-px bg-border/50 mt-1" />
-                </div>
-              ),
-              h4: ({ node, children, ...props }) => (
-                <div className="mt-3 mb-1.5">
-                  <h4 className="font-semibold text-foreground" style={{ fontSize: `${fontSize + 1}px` }} {...props}>
-                    {children}
-                  </h4>
-                  <div className="h-px bg-border/30 mt-0.5" />
-                </div>
-              ),
-              // 리스트 스타일 - 불릿 간결하게
-              ul: ({ node, ...props }) => <ul className="my-1.5 ml-4 space-y-0" style={{ fontSize: `${fontSize}px` }} {...props} />,
-              ol: ({ node, ...props }) => <ol className="my-1.5 ml-4 space-y-0" style={{ fontSize: `${fontSize}px` }} {...props} />,
-              li: ({ node, ...props }) => <li className="leading-snug" style={{ fontSize: `${fontSize}px` }} {...props} />,
-              // 강조 텍스트
-              strong: ({ node, ...props }) => <strong className="font-bold text-foreground" style={{ fontSize: `${fontSize}px` }} {...props} />,
-              // HR - 구분선
-              hr: ({ node, ...props }) => <hr className="my-3 border-border" {...props} />,
-            }}
-          >
-            {content}
-          </ReactMarkdown>
-        </div>
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
 
         {/* 주의사항 - 다크 테마 */}
         <div className="flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded">
