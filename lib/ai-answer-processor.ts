@@ -14,10 +14,10 @@ export function convertAIAnswerToHTML(markdown: string): string {
   // 1단계: 마크다운 문법 제거
   let text = removeMarkdownSyntax(markdown)
 
-  // 2단계: HTML 이스케이프
+  // 2단계: HTML 이스케이프 (링크 생성 전에 먼저!)
   text = escapeHtml(text)
 
-  // 3단계: 법령 링크 생성 (기본 법령뷰와 동일)
+  // 3단계: 법령 링크 생성 (이스케이프된 텍스트에 HTML 태그 직접 삽입)
   text = linkifyLawReferences(text)
 
   // 4단계: 줄바꿈 및 포맷팅
@@ -69,69 +69,43 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * 법령 링크 생성 (linkifyRefsB 기반, AI 답변용 확장)
- *
- * 순서 중요: 긴 패턴부터 짧은 패턴 순으로 처리하여 중복 방지
+ * 법령 링크 생성 (linkifyRefsB와 동일 - 이스케이프된 텍스트에 HTML 직접 삽입)
  */
 function linkifyLawReferences(text: string): string {
   let t = text
 
-  // 플레이스홀더로 이미 처리된 부분 표시
-  const PLACEHOLDER_PREFIX = '___LINK_'
-  const placeholders: string[] = []
-
-  function addPlaceholder(html: string): string {
-    const id = placeholders.length
-    placeholders.push(html)
-    return PLACEHOLDER_PREFIX + id + '___'
-  }
-
-  // 1. 「법령명」 제X조 패턴 (가장 긴 패턴 먼저)
-  t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (_m, lawName, art, _p2, branch) => {
+  // 1. 「법령명」 제X조 패턴
+  t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?/g, (_m, lawName, art, _p2, branch) => {
     const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
     const label = '「' + lawName + '」 ' + joLabel
-    const html = '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName + '" data-article="' + joLabel + '">' + label + '</a>'
-    return addPlaceholder(html)
+    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + label + '</a>'
   })
 
   // 2. 「법령명」 단독
-  t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
-    const html = '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
-    return addPlaceholder(html)
+  t = t.replace(/「([^」]+)」/g, (match, lawName) => {
+    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
   })
 
-  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전)
-  t = t.replace(/([가-힣A-Za-z\d·]+(?:법|령|규칙|조례))\s+제\s*(\d+)\s*조(의\s*(\d+))?/g, (match, lawName, art, _p2, branch) => {
+  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 이미 링크된 부분 제외
+  t = t.replace(/(?<!">)([가-힣A-Za-z\d·]+(?:법|령|규칙|조례))\s+제(\d+)조(의(\d+))?(?!<\/a>)/g, (match, lawName, art, _p2, branch) => {
     const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-    const html = '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName + '" data-article="' + joLabel + '">' + match + '</a>'
-    return addPlaceholder(html)
+    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + match + '</a>'
   })
 
   // 4. 제X조 패턴 (현재 법령) - 이미 링크된 부분 제외
-  t = t.replace(/제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?/g, (m) => {
-    const label = m
+  t = t.replace(/(?<!">)제(\d{1,4})조(의(\d{1,2}))?(?!<\/a>)/g, (m) => {
     const data = m.replace(/\s+/g, '')
-    const html = '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + '</a>'
-    return addPlaceholder(html)
+    return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + m + '</a>'
   })
 
   // 5. 대통령령, 시행령
   t = t.replace(/(대통령령|시행령)(?![으로로이가])/g, (m) => {
-    const html = '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + '</a>'
-    return addPlaceholder(html)
+    return '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + '</a>'
   })
 
   // 6. 부령, 시행규칙
   t = t.replace(/((?:[가-힣]+)?부령|시행규칙)(?![으로로이가])/g, (m) => {
-    const html = '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + '</a>'
-    return addPlaceholder(html)
-  })
-
-  // 플레이스홀더를 실제 HTML로 복원
-  placeholders.forEach((html, id) => {
-    t = t.replace(PLACEHOLDER_PREFIX + id + '___', html)
+    return '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + '</a>'
   })
 
   return t
