@@ -78,7 +78,7 @@ ${contextText}
       model: 'gemini-2.0-flash-exp',
       generationConfig: {
         temperature: options.temperature || 0.3,
-        maxOutputTokens: options.maxTokens || 2048,
+        maxOutputTokens: options.maxTokens || 8192, // 답변 잘림 방지를 위해 증가
       },
     })
 
@@ -88,28 +88,23 @@ ${contextText}
 
     console.log(`  ✓ Answer generated: ${response.usageMetadata?.totalTokenCount || 0} tokens`)
 
-    // 5. 인용 조문 추출 (간단한 휴리스틱)
-    const citations = context
-      .filter((c) => {
-        // 답변에 법령명이 언급되었는지 확인
-        return answerText.includes(c.lawName) || answerText.includes(c.articleDisplay)
-      })
-      .map((c) => ({
-        lawName: c.lawName,
-        articleDisplay: c.articleDisplay,
-        relevance: (c.similarity > 0.85 ? 'high' : c.similarity > 0.7 ? 'medium' : 'low') as
-          | 'high'
-          | 'medium'
-          | 'low',
-      }))
+    // 5. 인용 조문 추출 (모든 context를 citation으로 반환)
+    const citations = context.map((c) => ({
+      lawName: c.lawName,
+      articleDisplay: c.articleDisplay,
+      relevance: (c.similarity > 0.85 ? 'high' : c.similarity > 0.7 ? 'medium' : 'low') as
+        | 'high'
+        | 'medium'
+        | 'low',
+    }))
 
-    // 6. 신뢰도 평가
-    const avgSimilarity = context.reduce((sum, c) => sum + c.similarity, 0) / context.length
-    const confidence = (avgSimilarity > 0.85
-      ? 'high'
-      : avgSimilarity > 0.7
-        ? 'medium'
-        : 'low') as 'high' | 'medium' | 'low'
+    // 6. 신뢰도 평가 (citation이 없으면 무조건 low)
+    let confidence: 'high' | 'medium' | 'low' = 'low'
+
+    if (citations.length > 0) {
+      const avgSimilarity = context.reduce((sum, c) => sum + c.similarity, 0) / context.length
+      confidence = avgSimilarity > 0.85 ? 'high' : avgSimilarity > 0.7 ? 'medium' : 'low'
+    }
 
     console.log(`  ✓ Confidence: ${confidence}, Citations: ${citations.length}`)
 
