@@ -79,12 +79,17 @@ export function convertAIAnswerToHTML(markdown: string): string {
 
     // 리스트 아이템
     if (line.startsWith('- ')) {
+      let content = line.substring(2).trim()
+
+      // 이모지 감지 (리스트 시작 시 체크)
+      const hasEmoji = /^[\u{1F300}-\u{1F9FF}]/u.test(content)
+
       if (!inList) {
-        html.push('<ul class="list-disc list-inside space-y-1.5 my-3">')
+        // 이모지가 있으면 불릿 없는 리스트, 없으면 불릿 있는 리스트
+        const listClass = hasEmoji ? 'list-none' : 'list-disc list-inside'
+        html.push(`<ul class="${listClass} space-y-1.5 my-3">`)
         inList = true
       }
-
-      let content = line.substring(2).trim()
 
       // 관련 법령 섹션에서만 링크 처리
       if (inRelatedSection && content.match(/^.+?\s+제\d+조/)) {
@@ -92,10 +97,10 @@ export function convertAIAnswerToHTML(markdown: string): string {
         if (parsed) {
           content = `<a href="#" class="law-link text-blue-400 hover:text-blue-300 underline cursor-pointer" data-law="${escapeHtml(parsed.lawName)}" data-jo="${escapeHtml(parsed.jo)}" data-article="${escapeHtml(parsed.article)}" data-source="related">🔗 ${escapeHtml(content)}</a>`
         } else {
-          content = escapeHtml(content)
+          content = processInlineFormatting(content, false)
         }
       } else {
-        content = processInlineFormatting(content, false)
+        content = processInlineFormatting(content, inDetailSection)
       }
 
       html.push(`<li>${content}</li>`)
@@ -142,30 +147,43 @@ export function convertAIAnswerToHTML(markdown: string): string {
  * 인라인 포맷팅 처리 (볼드, 이탤릭, 발췌조문 링크)
  */
 function processInlineFormatting(text: string, isDetailSection: boolean): string {
-  let result = escapeHtml(text)
+  let result = text
 
-  // 발췌조문 링크 처리 (상세내용 섹션에서만)
+  // 발췌조문 링크 처리 (상세내용 섹션에서만) - HTML 이스케이프 전에 처리
   if (isDetailSection) {
     result = result.replace(
       /\*\*📜\s*([^*]+?)\*\*/g,
       (match, lawText) => {
         const parsed = parseRelatedLawTitle(lawText.trim(), 'excerpt')
         if (parsed) {
-          return `<a href="#" class="law-link text-blue-400 hover:text-blue-300 underline cursor-pointer font-bold" data-law="${escapeHtml(parsed.lawName)}" data-jo="${escapeHtml(parsed.jo)}" data-article="${escapeHtml(parsed.article)}" data-source="excerpt">🔗 📜 ${escapeHtml(lawText)}</a>`
+          return `{{EXCERPT_LINK::${escapeHtml(parsed.lawName)}::${escapeHtml(parsed.jo)}::${escapeHtml(parsed.article)}::${escapeHtml(lawText)}}}`
         }
-        return `<strong>📜 ${escapeHtml(lawText)}</strong>`
+        return `{{BOLD::📜 ${lawText}}}`
       }
     )
   }
 
-  // 일반 볼드 (발췌조문 아닌 것)
-  result = result.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
+  // 일반 볼드 (발췌조문 아닌 것) - HTML 이스케이프 전에 처리
+  result = result.replace(/\*\*([^*]+?)\*\*/g, '{{BOLD::$1}}')
 
-  // 이탤릭
-  result = result.replace(/\*([^*]+?)\*/g, '<em>$1</em>')
+  // 이탤릭 - HTML 이스케이프 전에 처리
+  result = result.replace(/\*([^*]+?)\*/g, '{{ITALIC::$1}}')
 
-  // 코드
-  result = result.replace(/`([^`]+?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">$1</code>')
+  // 코드 - HTML 이스케이프 전에 처리
+  result = result.replace(/`([^`]+?)`/g, '{{CODE::$1}}')
+
+  // HTML 이스케이프
+  result = escapeHtml(result)
+
+  // 플레이스홀더를 실제 HTML로 변환
+  result = result.replace(/\{\{EXCERPT_LINK::([^:]+)::([^:]+)::([^:]+)::([^}]+)\}\}/g,
+    (match, law, jo, article, lawText) => {
+      return `<a href="#" class="law-link text-blue-400 hover:text-blue-300 underline cursor-pointer font-bold" data-law="${law}" data-jo="${jo}" data-article="${article}" data-source="excerpt">🔗 📜 ${lawText}</a>`
+    }
+  )
+  result = result.replace(/\{\{BOLD::([^}]+)\}\}/g, '<strong>$1</strong>')
+  result = result.replace(/\{\{ITALIC::([^}]+)\}\}/g, '<em>$1</em>')
+  result = result.replace(/\{\{CODE::([^}]+)\}\}/g, '<code class="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">$1</code>')
 
   return result
 }
