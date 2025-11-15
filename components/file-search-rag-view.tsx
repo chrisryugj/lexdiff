@@ -139,6 +139,36 @@ export function FileSearchRAGView({
         }
       }
 
+      // ✅ 루프 종료 후 남은 buffer 처리 (마지막 청크 누락 방지)
+      if (buffer.trim()) {
+        debugLogger.info('SSE 스트림 종료 후 남은 버퍼 처리', { bufferLength: buffer.length })
+
+        if (buffer.startsWith('data: ')) {
+          const data = buffer.slice(6)
+
+          if (data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data)
+
+              if (parsed.type === 'text') {
+                setAnalysis(prev => prev + parsed.text)
+                debugLogger.success('남은 버퍼에서 텍스트 추가', { length: parsed.text.length })
+              } else if (parsed.type === 'warning') {
+                setWarning(parsed.message)
+                debugLogger.warning('AI 답변 경고 (버퍼)', { message: parsed.message })
+              } else if (parsed.type === 'citations') {
+                debugLogger.info('Citations 수신 (버퍼)', {
+                  count: parsed.citations?.length || 0,
+                  finishReason: parsed.finishReason
+                })
+              }
+            } catch (e) {
+              debugLogger.error('남은 버퍼 파싱 실패', { error: e, buffer })
+            }
+          }
+        }
+      }
+
       setIsAnalyzing(false)
 
     } catch (err) {
@@ -157,34 +187,74 @@ export function FileSearchRAGView({
       setIsLoadingLaw(true)
       debugLogger.info('관련 법령 클릭', { lawName, jo, article })
 
-      // 1. 법령 검색 (lawId 획득)
+      // 1. 법령 검색 (lawId 획득) - XML 파싱
       const searchRes = await fetch(`/api/law-search?query=${encodeURIComponent(lawName)}`)
       if (!searchRes.ok) {
         throw new Error('법령 검색 실패')
       }
 
-      const searchData = await searchRes.json()
-      if (!searchData.success || !searchData.data || searchData.data.length === 0) {
+      const searchXml = await searchRes.text()
+
+      // XML 파싱
+      const parser = new DOMParser()
+      const searchDoc = parser.parseFromString(searchXml, 'text/xml')
+      const lawNode = searchDoc.querySelector('law')
+
+      if (!lawNode) {
         throw new Error('법령을 찾을 수 없습니다')
       }
 
-      const law = searchData.data[0]
-      const lawId = law.lawId || law.mst
+      const lawId = lawNode.querySelector('법령ID')?.textContent || undefined
+      const mst = lawNode.querySelector('법령일련번호')?.textContent || undefined
+      const lawTitle = lawNode.querySelector('법령명한글')?.textContent || lawName
 
-      debugLogger.success('법령 검색 성공', { lawId, lawTitle: law.lawTitle })
+      if (!lawId && !mst) {
+        throw new Error('법령 ID를 찾을 수 없습니다')
+      }
 
-      // 2. 법령 전문 로드
-      const eflawRes = await fetch(`/api/eflaw?lawId=${lawId}`)
+      debugLogger.success('법령 검색 성공', { lawId, mst, lawTitle })
+
+      // 2. 법령 전문 로드 - 원본 JSON 스키마 사용
+      const eflawRes = await fetch(`/api/eflaw?${lawId ? `lawId=${lawId}` : `mst=${mst}`}`)
       if (!eflawRes.ok) {
         throw new Error('법령 전문 로드 실패')
       }
 
-      const eflawData = await eflawRes.json()
-      if (!eflawData.success) {
-        throw new Error(eflawData.error || '법령 전문 로드 실패')
+      const eflawJson = await eflawRes.json()
+      const lawData = eflawJson?.법령
+
+      if (!lawData) {
+        throw new Error('법령 데이터가 없습니다')
       }
 
-      const { meta, articles } = eflawData
+      // 조문 파싱 (기본 법령뷰 방식)
+      const rawArticleUnits = lawData?.조문?.조문단위
+      const articleUnits = Array.isArray(rawArticleUnits)
+        ? rawArticleUnits
+        : rawArticleUnits
+        ? [rawArticleUnits]
+        : []
+
+      if (articleUnits.length === 0) {
+        throw new Error('조문을 찾을 수 없습니다')
+      }
+
+      // LawMeta 구성
+      const meta: LawMeta = {
+        lawId: lawId || '',
+        lawTitle: lawData.기본정보?.법령명_한글 || lawTitle,
+        promulgationDate: lawData.기본정보?.공포일자 || '',
+        lawType: lawData.기본정보?.법종구분 || ''
+      }
+
+      // LawArticle[] 구성
+      const articles: LawArticle[] = articleUnits.map((unit: any) => ({
+        jo: (unit.조문키 || '').slice(0, 6),
+        joNum: unit.조문번호 || '',
+        title: unit.조문제목 || '',
+        content: unit.조문내용 || '',
+        isPreamble: false
+      }))
 
       debugLogger.success('법령 전문 로드 성공', {
         lawTitle: meta.lawTitle,
@@ -216,10 +286,10 @@ export function FileSearchRAGView({
   }, [initialQuery])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Loading State */}
-      {isAnalyzing && !analysis ? (
-        <div className="flex items-center justify-center h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Loading Overlay - 스트리밍 중에도 유지 */}
+      {isAnalyzing && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="w-full max-w-md px-6">
             {/* Progress Steps */}
             <div className="space-y-4 mb-8">
@@ -288,12 +358,14 @@ export function FileSearchRAGView({
             </div>
 
             <p className="text-center text-sm text-muted-foreground mt-6">
-              전체 법령에서 관련 내용을 검색하고 있습니다
+              {!analysis ? '전체 법령에서 관련 내용을 검색하고 있습니다' : 'AI 답변을 생성하고 있습니다...'}
             </p>
           </div>
         </div>
-      ) : error ? (
-        /* Error State */
+      )}
+
+      {/* Error State */}
+      {error && (
         <div className="flex items-center justify-center h-full p-6">
           <div className="bg-destructive/10 border border-destructive rounded-lg p-4 max-w-md">
             <div className="flex items-start gap-2">
@@ -305,8 +377,10 @@ export function FileSearchRAGView({
             </div>
           </div>
         </div>
-      ) : analysis ? (
-        /* Analysis Result - LawViewer AI Mode */
+      )}
+
+      {/* Analysis Result - LawViewer AI Mode */}
+      {analysis && !error && (
         <>
           {/* Warning Banner */}
           {warning && (
@@ -343,7 +417,7 @@ export function FileSearchRAGView({
             </div>
           )}
         </>
-      ) : null}
+      )}
     </div>
   )
 }
