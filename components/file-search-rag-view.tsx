@@ -319,9 +319,9 @@ export function FileSearchRAGView({
           )}
 
           <LawViewer
-            meta={selectedLawMeta || dummyMeta}
-            articles={selectedLawArticles.length > 0 ? selectedLawArticles : dummyArticles}
-            selectedJo={selectedJo}
+            meta={dummyMeta}
+            articles={dummyArticles}
+            selectedJo={undefined}
             favorites={new Set()}
             isOrdinance={false}
             viewMode="single"
@@ -329,6 +329,10 @@ export function FileSearchRAGView({
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
             onRelatedArticleClick={handleRelatedArticleClick}
+            comparisonLawMeta={selectedLawMeta || undefined}
+            comparisonLawArticles={selectedLawArticles}
+            comparisonLawSelectedJo={selectedJo}
+            isLoadingComparison={isLoadingLaw}
           />
 
           {/* Loading Law Indicator */}
