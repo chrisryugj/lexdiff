@@ -39,7 +39,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]">
         <DialogHeader>
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-base font-semibold truncate">{title}</DialogTitle>
@@ -63,12 +63,16 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
           <ScrollArea className="max-h-[65vh]">
             <div
               ref={contentRef}
-              className={`prose prose-sm whitespace-pre-wrap leading-relaxed ${
+              className={`prose prose-sm max-w-none whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere ${
                 forceWhiteTheme
                   ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
                   : "dark:prose-invert"
               }`}
-              style={forceWhiteTheme ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem' } : undefined}
+              style={
+                forceWhiteTheme
+                  ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem', overflowWrap: 'anywhere', wordBreak: 'break-word' }
+                  : { overflowWrap: 'anywhere', wordBreak: 'break-word' }
+              }
               dangerouslySetInnerHTML={{ __html: html || "연결된 본문을 불러올 수 없습니다." }}
             />
           </ScrollArea>

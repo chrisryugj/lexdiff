@@ -565,29 +565,9 @@ export function LawViewer({
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
 
-        // ✅ AI 모드에서는 2단 뷰로 열기 (모달 대신)
-        if (aiAnswerMode && onRelatedArticleClick) {
-          debugLogger.info('🔗 [AI 모드] 법령 링크 클릭 - 2단 뷰로 열기', {
-            lawName,
-            articleLabel
-          })
-
-          // JO 코드 계산
-          let joCode = ""
-          try {
-            const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
-            joCode = buildJO(articleOnly)
-          } catch (err) {
-            console.error("Failed to build JO code:", err)
-          }
-
-          onRelatedArticleClick(lawName, joCode, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-        } else {
-          // 일반 모드에서는 모달 열기
-          await openExternalLawArticleModal(lawName, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-        }
+        // ✅ 모든 모드에서 모달로 열기
+        await openExternalLawArticleModal(lawName, articleLabel)
+        setLastExternalRef({ lawName, joLabel: articleLabel })
       } else if (refType === "same") {
         // Use last external reference law + current article, change to requested part
         if (lastExternalRef && lastExternalRef.joLabel) {
@@ -1226,23 +1206,17 @@ export function LawViewer({
                       })
 
                       return Array.from(grouped.values()).map(({ law, sources }, idx) => {
-                        const handleClick = () => {
-                          debugLogger.info('🔗 [사이드바] 법령 링크 클릭', {
+                        const handleClick = async () => {
+                          debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
                             lawName: law.lawName,
                             jo: law.jo,
                             article: law.article,
-                            sources: Array.from(sources),
-                            hasClickHandler: !!onRelatedArticleClick
+                            sources: Array.from(sources)
                           })
 
-                          if (onRelatedArticleClick) {
-                            onRelatedArticleClick(law.lawName, law.jo, law.article)
-                          } else {
-                            toast({
-                              title: "기능 준비 중",
-                              description: `${law.lawName} ${law.article} 조회 기능을 준비 중입니다.`,
-                            })
-                          }
+                          // ✅ 모달로 법령 조문 열기
+                          await openExternalLawArticleModal(law.lawName, law.article)
+                          setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
                         }
 
                         return (
