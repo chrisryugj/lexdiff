@@ -70,62 +70,69 @@ function escapeHtml(text: string): string {
 
 /**
  * 법령 링크 생성 (linkifyRefsB 기반, AI 답변용 확장)
+ *
+ * 순서 중요: 긴 패턴부터 짧은 패턴 순으로 처리하여 중복 방지
  */
 function linkifyLawReferences(text: string): string {
   let t = text
 
-  // 1. 「법령명」 제X조 패턴
+  // 플레이스홀더로 이미 처리된 부분 표시
+  const PLACEHOLDER_PREFIX = '___LINK_'
+  const placeholders: string[] = []
+
+  function addPlaceholder(html: string): string {
+    const id = placeholders.length
+    placeholders.push(html)
+    return PLACEHOLDER_PREFIX + id + '___'
+  }
+
+  // 1. 「법령명」 제X조 패턴 (가장 긴 패턴 먼저)
   t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?/g, (_m, lawName, art, _p2, branch) => {
     const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
     const label = '「' + lawName + '」 ' + joLabel
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +
-      '">' +
-      label +
-      '</a>'
-    )
+    const html = '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
+      lawName + '" data-article="' + joLabel + '">' + label + '</a>'
+    return addPlaceholder(html)
   })
 
   // 2. 「법령명」 단독
   t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
-    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
+    const html = '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
+    return addPlaceholder(html)
   })
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전)
-  t = t.replace(/(?<!">)([가-힣A-Za-z\d·]+(?:법|령|규칙|조례))\s+제\s*(\d+)\s*조(의\s*(\d+))?(?!<\/a>)/g, (match, lawName, art, _p2, branch) => {
+  t = t.replace(/([가-힣A-Za-z\d·]+(?:법|령|규칙|조례))\s+제\s*(\d+)\s*조(의\s*(\d+))?/g, (match, lawName, art, _p2, branch) => {
     const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +
-      '">' +
-      match +
-      '</a>'
-    )
+    const html = '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
+      lawName + '" data-article="' + joLabel + '">' + match + '</a>'
+    return addPlaceholder(html)
   })
 
-  // 4. 제X조 패턴 (현재 법령)
+  // 4. 제X조 패턴 (현재 법령) - 이미 링크된 부분 제외
   t = t.replace(/제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?/g, (m) => {
     const label = m
     const data = m.replace(/\s+/g, '')
-    return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + '</a>'
+    const html = '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + '</a>'
+    return addPlaceholder(html)
   })
 
   // 5. 대통령령, 시행령
-  t = t.replace(
-    /(대통령령|시행령)(?![으로로이가])/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + '</a>'
-  )
+  t = t.replace(/(대통령령|시행령)(?![으로로이가])/g, (m) => {
+    const html = '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + '</a>'
+    return addPlaceholder(html)
+  })
 
   // 6. 부령, 시행규칙
-  t = t.replace(
-    /((?:[가-힣]+)?부령|시행규칙)(?![으로로이가])/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + '</a>'
-  )
+  t = t.replace(/((?:[가-힣]+)?부령|시행규칙)(?![으로로이가])/g, (m) => {
+    const html = '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + '</a>'
+    return addPlaceholder(html)
+  })
+
+  // 플레이스홀더를 실제 HTML로 복원
+  placeholders.forEach((html, id) => {
+    t = t.replace(PLACEHOLDER_PREFIX + id + '___', html)
+  })
 
   return t
 }
