@@ -1206,7 +1206,7 @@ export function LawViewer({
                       })
 
                       return Array.from(grouped.values()).map(({ law, sources }, idx) => {
-                        const handleClick = async () => {
+                        const handleClick = () => {
                           debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
                             lawName: law.lawName,
                             jo: law.jo,
@@ -1214,9 +1214,18 @@ export function LawViewer({
                             sources: Array.from(sources)
                           })
 
-                          // ✅ 모달로 법령 조문 열기
-                          await openExternalLawArticleModal(law.lawName, law.article)
-                          setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
+                          // 사이드바 닫기 (모바일)
+                          setIsArticleListExpanded(false)
+
+                          // ✅ 모달로 법령 조문 열기 (async 호출)
+                          openExternalLawArticleModal(law.lawName, law.article)
+                            .then(() => {
+                              setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
+                              debugLogger.success('모달 열기 성공', { lawName: law.lawName, article: law.article })
+                            })
+                            .catch((err) => {
+                              debugLogger.error('모달 열기 실패', err)
+                            })
                         }
 
                         return (
