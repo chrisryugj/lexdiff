@@ -211,19 +211,14 @@ export async function* queryFileSearchStream(
 **각 조문마다 다음 형식으로 표시:**
 
 **📜 [법령명] [조문번호] [(조문제목)]**
-> 조문 전문을 빠짐없이 인용 (모든 항, 호 포함)
+> 핵심 문장 1~2개만 인용 (장문 인용 금지)
 
 **예시:**
 **📜 관세법 제38조 (신고납부)**
-> ① 수입신고를 하는 자는 해당 물품에 대한 관세를 납부하여야 한다.
-> ② 제1항에 따른 납부는 다음 각 호의 방법으로 한다.
-> 1. 현금납부
-> 2. 은행납부
-> ③ 세관장은 필요하다고 인정하는 경우 납부기한을 연장할 수 있다.
+> 수입신고를 하는 자는 해당 물품에 대한 관세를 납부하여야 한다.
 
 **📜 관세법 시행령 제22조 (신고납부의 절차)**
-> ① 법 제38조에 따라 관세를 납부하려는 자는 세관장에게 신고서를 제출하여야 한다.
-> ② 신고서에는 다음 각 호의 사항을 기재하여야 한다.
+> 법 제38조에 따라 관세를 납부하려는 자는 세관장에게 신고서를 제출하여야 한다.
 
 ### 2️⃣ 상황별 해석
 - 📖 **핵심 용어 설명**: [질문에 나온 용어 중심으로 정의]
@@ -255,7 +250,7 @@ export async function* queryFileSearchStream(
 # 작성 원칙
 - ✅ 모든 내용에 **불릿 포인트 사용** (가독성 최우선)
 - 📜 조문 인용 시 **반드시 법령명+조문번호+제목** 헤더 표시
-- 📄 조문은 **전문(全文) 발췌** (모든 항, 호, 부칙 포함 - 절대 생략 금지)
+- 📄 조문은 **핵심 문장 1~2개만 발췌** (전문 인용 금지)
 - 🎯 **구체적 예시** 필수 (추상적 설명 지양)
 - 💼 **실무 용어** 사용 (예: 납세신고, 세액심사, 수입신고 수리)
 - ⚠️ **경고/주의 이모지** 적극 활용 (중요 정보 강조)`
@@ -317,6 +312,7 @@ export async function* queryFileSearchStream(
   const decoder = new TextDecoder()
   let buffer = ''
   let lastGroundingMetadata: any = null
+  let lastFinishReason: string | null = null
   let chunkCount = 0
 
   while (true) {
@@ -351,6 +347,24 @@ export async function* queryFileSearchStream(
           // 마지막 청크 전체 출력
           if (candidate?.finishReason) {
             console.log('[File Search] Full last chunk:', JSON.stringify(data, null, 2))
+
+            // ⚠️ finishReason 검증
+            const finishReason = candidate.finishReason
+            lastFinishReason = finishReason  // 저장
+
+            if (finishReason === 'MAX_TOKENS') {
+              console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
+              console.error('[File Search] 현재 max_output_tokens:', 8192)
+              console.error('[File Search] 해결: max_output_tokens 값을 증가시키거나 프롬프트를 간소화하세요.')
+            } else if (finishReason === 'SAFETY') {
+              console.error('[File Search] ❌ 안전 필터에 의해 차단되었습니다.')
+            } else if (finishReason === 'RECITATION') {
+              console.error('[File Search] ❌ 저작권 문제로 차단되었습니다.')
+            } else if (finishReason !== 'STOP') {
+              console.warn('[File Search] ⚠️  비정상 종료:', finishReason)
+            } else {
+              console.log('[File Search] ✅ 정상 완료 (STOP)')
+            }
           }
 
           // 텍스트 추출
@@ -527,13 +541,15 @@ export async function* queryFileSearchStream(
     hasSupports: supports.length > 0,
     chunksCount: groundingChunks.length,
     supportsCount: supports.length,
-    lawsFound: [...new Set(citations.map((c: any) => c.lawName))]
+    lawsFound: [...new Set(citations.map((c: any) => c.lawName))],
+    finishReason: lastFinishReason
   })
 
   yield {
     text: '',
     done: true,
-    citations
+    citations,
+    finishReason: lastFinishReason
   }
 }
 
