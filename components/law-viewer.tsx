@@ -500,32 +500,37 @@ export function LawViewer({
   // Handle clicks on linkified references inside article content
   const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
     const target = e.target as HTMLElement
-    if (target && target.tagName === "A") {
+
+    // AI 답변 링크 처리 (law-link 클래스) - closest로 부모 요소까지 검색
+    const lawLink = target.closest('.law-link')
+    if (lawLink) {
       e.preventDefault()
 
-      // AI 답변 링크 처리 (law-link 클래스)
-      if (target.classList.contains('law-link')) {
-        const lawName = target.getAttribute('data-law') || ''
-        const jo = target.getAttribute('data-jo') || ''
-        const article = target.getAttribute('data-article') || ''
-        const source = target.getAttribute('data-source') || 'related'
+      const lawName = lawLink.getAttribute('data-law') || ''
+      const jo = lawLink.getAttribute('data-jo') || ''
+      const article = lawLink.getAttribute('data-article') || ''
+      const source = lawLink.getAttribute('data-source') || 'related'
 
-        debugLogger.info(`🔗 [AI 답변] ${source === 'excerpt' ? '발췌조문' : '관련법령'} 링크 클릭`, {
-          lawName,
-          jo,
-          article
+      debugLogger.info(`🔗 [AI 답변] ${source === 'excerpt' ? '발췌조문' : '관련법령'} 링크 클릭`, {
+        lawName,
+        jo,
+        article,
+        source
+      })
+
+      if (onRelatedArticleClick) {
+        onRelatedArticleClick(lawName, jo, article)
+      } else {
+        toast({
+          title: "기능 준비 중",
+          description: `${lawName} ${article} 조회 기능을 준비 중입니다.`,
         })
-
-        if (onRelatedArticleClick) {
-          onRelatedArticleClick(lawName, jo, article)
-        } else {
-          toast({
-            title: "기능 준비 중",
-            description: `${lawName} ${article} 조회 기능을 준비 중입니다.`,
-          })
-        }
-        return
       }
+      return
+    }
+
+    if (target && target.tagName === "A") {
+      e.preventDefault()
 
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
