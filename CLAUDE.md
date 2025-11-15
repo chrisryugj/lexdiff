@@ -4,22 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LexDiff is a Korean legal statute comparison system that enables professionals to search laws, compare old/new versions, and generate AI summaries. The system integrates with the Korean Ministry of Government Legislation API (law.go.kr) and uses Gemini 2.5 Flash for AI-powered change analysis.
+LexDiff is a Korean legal statute comparison system with **Google File Search RAG** for natural language AI search. The system integrates with the Korean Ministry of Government Legislation API (law.go.kr) and uses Gemini 2.0 Flash for AI-powered search and Gemini 2.5 Flash for change analysis.
+
+**Current Main Feature**: Google File Search RAG (자연어 질문 → 실시간 AI 답변 + 법령 인용)
 
 ## Development Commands
 
 ### Setup
 ```bash
-# Copy environment variables (Windows PowerShell)
-Copy-Item .env.local.example .env.local
-
-# Copy environment variables (macOS/Linux)
-cp .env.local.example .env.local
+# Copy environment variables
+Copy-Item .env.local.example .env.local  # Windows PowerShell
+cp .env.local.example .env.local         # macOS/Linux
 
 # Install dependencies
-npm install
-# or
-pnpm install
+npm install    # or pnpm install
 ```
 
 ### Development
@@ -46,51 +44,127 @@ npm start
 node reset-all-learning.mjs
 ```
 
-### RAG Vector Search (Phase 0-3)
-```bash
-# Phase 0: Build embedding database (requires local environment)
-npm run build-embeddings              # Build all (30 laws + 30 ordinances)
-npm run build-embeddings:laws         # Laws only
-npm run build-embeddings:ordinances   # Ordinances only
-npm run build-embeddings:test         # Test with 2 laws (dry-run)
-
-# Note: Embedding DB construction requires:
-# - Local environment (law.go.kr API not accessible from web/cloud)
-# - ~1-2 hours processing time
-# - ~$0.04 cost (Voyage AI 3 Lite)
-```
-
-**RAG System Status**:
-- ✅ Phase 1-3 완료: API 엔드포인트, UI 컴포넌트, 기존 시스템 통합
-- ⚠️ Phase 0 대기: 임베딩 DB 구축 (로컬 환경 필요)
-- 📚 상세 가이드: `docs/RAG_INTEGRATION_GUIDE.md`
-
 ### Environment Variables
 Required in `.env.local`:
 - `LAW_OC`: law.go.kr DRF API authentication key (required)
-- `GEMINI_API_KEY`: Google Gemini API key (required for AI summaries)
+- `GEMINI_API_KEY`: Google Gemini API key (required for AI features)
 
 ## Core Architecture
 
+### Google File Search RAG System
+
+**Current Primary Feature** - Natural language AI search:
+
+**Architecture**:
+```
+User Natural Language Query
+    ↓
+[Google File Search] Gemini 2.0 Flash
+    ↓
+[SSE Streaming] Real-time answer generation
+    ↓
+[Citations] Law article references + confidence
+    ↓
+[Modal Display] Click citation → Show full article
+```
+
+**Key Components**:
+- `app/api/file-search-rag/route.ts`: SSE streaming endpoint
+- `components/file-search-rag-view.tsx`: UI with streaming + modal
+- `lib/file-search-client.ts`: Gemini File Search integration
+- `lib/ai-answer-processor.ts`: HTML conversion (markdown → linkified HTML)
+- `components/reference-modal.tsx`: Law article modal display
+
+**Critical Implementation Patterns**:
+
+1. **SSE Buffer Handling** (`file-search-rag-view.tsx:142-172`):
+```typescript
+// CRITICAL: Process remaining buffer after while loop ends
+if (buffer.trim()) {
+  if (buffer.startsWith('data: ')) {
+    const parsed = JSON.parse(buffer.slice(6))
+    // Process text/warning/citations
+  }
+}
+```
+
+2. **Overlay Progress Display** (`file-search-rag-view.tsx:288-365`):
+```typescript
+// Use single condition: isAnalyzing (not isAnalyzing && !analysis)
+{isAnalyzing && (
+  <div className="absolute inset-0 bg-background/95 backdrop-blur-sm">
+    {/* Progress steps remain visible during streaming */}
+  </div>
+)}
+```
+
+3. **API Response Parsing** (`file-search-rag-view.tsx:155-249`):
+```typescript
+// XML parsing for /api/law-search
+const searchXml = await searchRes.text()
+const parser = new DOMParser()
+const searchDoc = parser.parseFromString(searchXml, 'text/xml')
+const lawId = searchDoc.querySelector('법령ID')?.textContent
+
+// Direct JSON schema for /api/eflaw
+const eflawJson = await eflawRes.json()
+const lawData = eflawJson?.법령  // No wrapper .success field
+const articleUnits = lawData?.조문?.조문단위
+```
+
+4. **Modal Link Handling** (`law-viewer.tsx:564-570, 1209-1229`):
+```typescript
+// All law-article links open in modal (not 2-tier view)
+await openExternalLawArticleModal(lawName, articleLabel)
+setLastExternalRef({ lawName, joLabel: articleLabel })
+
+// Sidebar: Close on mobile + async handling
+const handleClick = () => {
+  setIsArticleListExpanded(false)  // Close sidebar
+  openExternalLawArticleModal(law.lawName, law.article)
+    .then(() => debugLogger.success('모달 열기 성공'))
+    .catch((err) => debugLogger.error('모달 열기 실패', err))
+}
+```
+
+5. **AI Answer HTML Processing** (`lib/ai-answer-processor.ts`):
+```typescript
+// Pipeline: Markdown removal → HTML escape → Linkify → Line breaks
+export function convertAIAnswerToHTML(markdown: string): string {
+  let text = removeMarkdownSyntax(markdown)  // Remove **, *, `, #, -, >
+  text = escapeHtml(text)                    // Escape <>&"'
+  text = linkifyRefsB(text)                  // Create law links
+  text = text.replace(/\n/g, '<br>\n')       // Line breaks
+  return text
+}
+```
+
 ### API Endpoints Pattern
 
-The application uses a **server-side proxy architecture** to call external APIs:
+**Server-side proxy architecture**: Client → Next.js API Route → External API
 
-1. **Client → Next.js API Route → External API**
-   - All external API calls are proxied through Next.js API routes in `app/api/`
-   - This protects API keys and enables caching
-   - Each route follows the pattern: validate → fetch → parse → cache
+**Key API Routes**:
+- `/api/file-search-rag`: Google File Search RAG (SSE streaming)
+- `/api/law-search`: Search for laws by name (XML)
+- `/api/eflaw`: Fetch current law text (JSON)
+- `/api/ordin-search`: Search for local ordinances (XML)
+- `/api/ordin`: Fetch ordinance text (JSON)
+- `/api/oldnew`: Fetch old/new comparison data (XML)
+- `/api/three-tier`: Fetch 3-tier comparison (law-decree-rule) (JSON)
+- `/api/hierarchy`: Fetch law hierarchy including admin rules (XML)
+- `/api/admrul`: Fetch administrative rule content (XML)
+- `/api/summarize`: Generate AI summary using Gemini 2.5 Flash (JSON)
 
-2. **Key API Routes**:
-   - `/api/law-search`: Search for laws by name
-   - `/api/ordin-search`: Search for local ordinances
-   - `/api/eflaw`: Fetch current law text (JSON format)
-   - `/api/ordin`: Fetch ordinance text
-   - `/api/oldnew`: Fetch old/new comparison data (XML format)
-   - `/api/three-tier`: Fetch 3-tier comparison (law-decree-rule) (JSON format)
-   - `/api/hierarchy`: Fetch law hierarchy including admin rules (XML format)
-   - `/api/admrul`: Fetch administrative rule content (XML format)
-   - `/api/summarize`: Generate AI summary using Gemini 2.5 Flash
+**Response Format Patterns**:
+- **XML APIs**: `/api/law-search`, `/api/oldnew`, `/api/hierarchy`, `/api/admrul`
+  - Parse with DOMParser: `new DOMParser().parseFromString(xml, 'text/xml')`
+  - Query with: `querySelector()`, `querySelectorAll()`
+- **JSON APIs**: `/api/eflaw`, `/api/three-tier`, `/api/summarize`
+  - Direct schema access (no wrapper fields like `.success`)
+  - Example: `eflawJson?.법령?.조문?.조문단위`
+- **SSE APIs**: `/api/file-search-rag`
+  - Server-Sent Events with `data: ` prefix
+  - Buffer processing after stream ends
 
 ### JO Code System
 
@@ -136,18 +210,34 @@ The app uses **React state + localStorage** (no global state library):
   - Captures API errors with context for user reporting
   - Includes API logs, request/response data
 
-### XML vs JSON Parsing
+### Multi-Phase Search System
 
-The law.go.kr API returns different formats:
-- **JSON**:
-  - Current law text (`/api/eflaw`) → parsed by `parseLawJSON()` in `app/page.tsx`
-  - 3-tier comparison (`/api/three-tier`) → parsed by `parseThreeTierDelegation()` in `lib/three-tier-parser.ts`
-- **XML**:
-  - Old/new comparison (`/api/oldnew`), search results, ordinances
-  - Law hierarchy (`/api/hierarchy`) → parsed by `parseHierarchyXML()` in `lib/hierarchy-parser.ts`
-  - Admin rules (`/api/admrul`) → parsed by `parseAdminRulePurposeOnly()` in `lib/admrul-parser.ts`
-  - Use DOMParser to parse XML
-  - Extract specific nodes with `querySelector()`/`querySelectorAll()`
+**Current Active Systems**:
+
+**Phase 7: IndexedDB Query Cache** (ACTIVE)
+- Browser-side caching using IndexedDB (database: `LexDiffCache`)
+- Keyed by full query string (law name + article)
+- ~25ms retrieval time for cached queries
+- 7-day cache expiry
+- Implementation: `lib/law-content-cache.ts`
+- **Critical**: Article validation must check actual article existence before setting `selectedJo`
+
+**Basic Search** (ACTIVE - Primary Path)
+- Direct `/api/law-search` calls to law.go.kr
+- Similarity-based law name matching using Levenshtein distance
+- Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
+- Implementation: `lib/text-similarity.ts`
+
+**Phase 5: Intelligent Search** (CURRENTLY DISABLED)
+- Learning-based law name mapping using Turso DB
+- Stores search queries and results for pattern matching
+- L1-L4 cache layers for progressive fallback
+- **Status**: Temporarily disabled due to data corruption issues (see 2025-11-11 changelog)
+
+**Phase 6: Vector Search** (CURRENTLY DISABLED)
+- Voyage AI embeddings for semantic similarity
+- `search_query_embeddings` table in Turso DB
+- **Status**: Temporarily disabled along with Phase 5
 
 ### 3-Tier Comparison System
 
@@ -181,6 +271,14 @@ if (rawArticle.시행규칙조문) {
 - **2-tier**: Law + Decree (side-by-side)
 - **3-tier**: Law + Decree + Rule (3 columns)
 - Auto-switches based on data availability
+
+**Independent Scrolling**:
+```typescript
+// Fixed viewport height for each column
+<div style={{ height: 'calc(100vh - 250px)', overflowY: 'auto' }}>
+  {/* Column content */}
+</div>
+```
 
 ### Administrative Rules System
 
@@ -225,12 +323,22 @@ app/page.tsx (main state container)
 ├── components/header.tsx
 ├── components/search-bar.tsx
 │   └── Uses lib/law-parser.ts to parse queries
+├── components/file-search-rag-view.tsx
+│   ├── AI natural language search
+│   ├── SSE streaming with buffer handling
+│   ├── Overlay progress display
+│   ├── Citation modal links
+│   └── Uses lib/file-search-client.ts
 ├── components/law-viewer.tsx
 │   ├── Tree navigation of articles
 │   ├── Article display with change highlighting
 │   ├── 3-tier view (1-tier / 2-tier / 3-tier modes)
 │   ├── Uses lib/three-tier-parser.ts
 │   └── Independent scrolling for each column
+├── components/reference-modal.tsx
+│   ├── Law article modal display
+│   ├── Mobile-responsive (max-w-[95vw])
+│   └── Word wrapping (overflow-wrap-anywhere, break-words)
 ├── components/admin-rules-section.tsx
 │   ├── Uses lib/use-admin-rules.ts hook
 │   ├── Displays matched administrative rules
@@ -287,278 +395,15 @@ headers: {
 }
 ```
 
-### Multi-Phase Search System
-
-The application originally implemented a multi-layer caching and learning system:
-
-**Phase 5: Intelligent Search** (CURRENTLY DISABLED)
-- Learning-based law name mapping using Turso DB
-- Stores search queries and results for pattern matching
-- L1-L4 cache layers for progressive fallback
-- **Status**: Temporarily disabled due to data corruption issues (see 2025-11-11 changelog)
-
-**Phase 6: Vector Search** (CURRENTLY DISABLED)
-- Voyage AI embeddings for semantic similarity
-- `search_query_embeddings` table in Turso DB
-- **Status**: Temporarily disabled along with Phase 5
-
-**Phase 7: IndexedDB Query Cache** (ACTIVE)
-- Browser-side caching using IndexedDB (database: `LexDiffCache`)
-- Keyed by full query string (law name + article)
-- ~25ms retrieval time for cached queries
-- 7-day cache expiry
-- Implementation: `lib/law-content-cache.ts`
-- **Critical**: Article validation must check actual article existence before setting `selectedJo`
-
-**Basic Search** (ACTIVE - Primary Path)
-- Direct `/api/law-search` calls to law.go.kr
-- Similarity-based law name matching using Levenshtein distance
-- Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
-- Implementation: `lib/text-similarity.ts`
-
----
-
-## RAG Vector Search System (2025-11-11)
-
-### Overview
-
-The RAG (Retrieval Augmented Generation) system enables **natural language question-based search** instead of requiring exact law names and article numbers.
-
-**Example Queries**:
-- "수출통관 시 필요한 서류는?" (What documents are needed for export customs clearance?)
-- "청년 창업 지원 내용은?" (What are the youth startup support programs?)
-- "관세 환급 신청 조건은?" (What are the tariff refund application conditions?)
-
-### Architecture
-
-```
-User Natural Language Query
-    ↓
-[Phase 0] Embedding Generation (Voyage AI 3 Lite, 512-dim)
-    ↓
-[Vector Search] Turso DB (LibSQL vector_distance_cos)
-    ↓
-[Top-K Results] Similar Articles (similarity > threshold)
-    ↓
-[AI Answer] Gemini 2.0 Flash Experimental
-    ↓
-Answer + Citations + Confidence Score
-```
-
-### Implementation Status
-
-**✅ Phase 1: API Endpoints** (`app/api/rag-*`)
-- `/api/rag-search`: Vector similarity search
-  - Input: Natural language query + options (limit, threshold, lawFilter)
-  - Output: Array of similar articles with similarity scores
-  - Caching: Embedding cache for identical queries
-
-- `/api/rag-answer`: AI answer generation
-  - Input: Query + context articles
-  - Output: AI-generated answer + citations + confidence
-  - Model: Gemini 2.0 Flash Experimental (temperature=0.3)
-
-**✅ Phase 2: UI Components** (`components/rag-*`)
-- `RagSearchPanel`: Natural language input + search options
-- `RagResultCard`: Search results with similarity visualization
-- `RagAnswerCard`: AI answer with citation buttons
-
-**✅ Phase 3: Integration** (`app/page.tsx`)
-- Search mode toggle (Basic vs RAG)
-- Independent state management (no conflict with existing search)
-- Citation click → Auto-switch to basic mode + show article
-
-**⚠️ Phase 0: Embedding DB** (Pending - Requires Local Environment)
-- Status: Not executed yet (web environment cannot access law.go.kr)
-- Command: `npm run build-embeddings`
-- Target: 30 priority laws + 30 Gwangjin-gu ordinances
-- Cost: ~$0.04 (Voyage AI 3 Lite: $0.05/1M tokens)
-- Time: ~1-2 hours
-- Documents: `docs/PRIORITY_LAWS_LIST.md`, `docs/GWANGJIN_ACTUAL_DATA.md`
-
-### Key Files
-
-**API Routes**:
-- `app/api/rag-search/route.ts`: Vector search endpoint
-- `app/api/rag-answer/route.ts`: AI answer generation endpoint
-
-**UI Components**:
-- `components/rag-search-panel.tsx`: Search interface
-- `components/rag-result-card.tsx`: Result display
-- `components/rag-answer-card.tsx`: AI answer display
-
-**Shared Libraries** (Already Existed):
-- `lib/embedding.ts`: Voyage AI integration, vector conversion
-- `lib/vector-search.ts`: Turso DB vector search queries
-- `db/migrations/003_vector_schema.sql`: DB schema
-
-**Documentation**:
-- `docs/RAG_INTEGRATION_GUIDE.md`: Complete implementation guide (785 lines)
-- `docs/RAG_VECTOR_DETAILED_GUIDE.md`: Step-by-step examples (1,655 lines)
-- `docs/RAG_VECTOR_IMPLEMENTATION_PLAN.md`: High-level plan (785 lines)
-- `docs/PRIORITY_LAWS_LIST.md`: 30 priority laws for embedding
-- `docs/GWANGJIN_ACTUAL_DATA.md`: Gwangjin-gu ordinances data
-
-**Scripts**:
-- `scripts/build-article-embeddings.mjs`: Main embedding builder
-- `scripts/build-embeddings-simple.mjs`: Standalone version
-
-### Database Schema
-
-**Tables** (Already Created in Phase 6):
-```sql
--- Article embeddings
-CREATE TABLE law_article_embeddings (
-  id INTEGER PRIMARY KEY,
-  law_id TEXT NOT NULL,
-  law_name TEXT NOT NULL,
-  article_jo TEXT NOT NULL,           -- 6-digit JO code
-  article_display TEXT,               -- "제38조"
-  article_title TEXT,
-  article_content TEXT NOT NULL,
-  content_embedding F32_BLOB(512),    -- Voyage 3 Lite vectors
-  embedding_model TEXT,
-  keywords TEXT,
-  created_at DATETIME DEFAULT (datetime('now')),
-  updated_at DATETIME DEFAULT (datetime('now')),
-  UNIQUE(law_id, article_jo)
-);
-
--- Embedding cache (to avoid regenerating same embeddings)
-CREATE TABLE embedding_cache (
-  id INTEGER PRIMARY KEY,
-  text_hash TEXT UNIQUE NOT NULL,
-  original_text TEXT NOT NULL,
-  embedding F32_BLOB(512) NOT NULL,
-  embedding_model TEXT NOT NULL,
-  hit_count INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT (datetime('now')),
-  last_accessed_at DATETIME DEFAULT (datetime('now'))
-);
-
--- Vector index for fast similarity search
-CREATE INDEX idx_law_article_embeddings
-  ON law_article_embeddings(libsql_vector_idx(content_embedding));
-```
-
-### Search Flow
-
-**Basic Search (Existing)**:
-1. User: "관세법 38조"
-2. Parse law name + article number
-3. Direct DB/API lookup
-4. Display exact article
-
-**RAG Search (New)**:
-1. User: "수출통관 시 필요한 서류는?"
-2. Generate query embedding (Voyage AI)
-3. Vector search in DB: `SELECT ... ORDER BY vector_distance_cos(...) LIMIT 5`
-4. Get top-5 similar articles
-5. Pass to Gemini with prompt
-6. Return AI answer + citations
-7. User clicks citation → Switch to basic mode + show article
-
-### Performance
-
-**Embedding Generation**:
-- Query embedding: ~100ms (with cache: ~10ms)
-- Tokens: ~10-50 per query
-- Cost: ~$0.0001 per query
-
-**Vector Search**:
-- LibSQL cosine distance: ~50-100ms
-- Returns top-K results with similarity scores
-
-**AI Answer Generation**:
-- Gemini 2.0 Flash: ~1-2 seconds
-- Tokens: ~500-2000 (depends on context)
-- Cost: ~$0.0001-0.0005 per query
-
-**Total Latency**: ~2-3 seconds for full RAG flow
-
-### Cost Analysis
-
-**One-time Setup** (Phase 0):
-- 30 laws × ~100 articles/law × ~200 tokens/article = ~600,000 tokens
-- 30 ordinances × ~50 articles × ~200 tokens = ~300,000 tokens
-- **Total**: ~900,000 tokens × $0.05/1M = **$0.045**
-
-**Per-User Query**:
-- Query embedding: $0.0001
-- AI answer: $0.0001-0.0005
-- **Total per query**: $0.0002-0.0006
-
-**Monthly Cost** (1,000 users, 10 queries/user):
-- 10,000 queries × $0.0004 (avg) = **$4/month**
-
-### Compatibility with Existing System
-
-**Zero Breaking Changes**:
-- Search mode toggle allows switching between basic and RAG
-- Basic search functionality 100% preserved
-- All existing components (LawViewer, ComparisonModal, etc.) work identically
-- RAG state is completely independent
-
-**Shared Components**:
-- Debug logger: RAG searches also log to debug console
-- Favorites: Can favorite articles found via RAG
-- Comparison modal: Works with RAG-found articles
-- AI summary: Works with RAG-found articles
-
-### Rollback Strategy
-
-If RAG causes issues:
-
-1. **UI Disable** (instant):
-   ```typescript
-   // app/page.tsx
-   const RAG_ENABLED = false // Hide RAG mode toggle
-   ```
-
-2. **API Disable** (instant):
-   ```typescript
-   // app/api/rag-search/route.ts
-   return NextResponse.json(
-     { success: false, error: 'RAG 검색은 현재 점검 중입니다.' },
-     { status: 503 }
-   )
-   ```
-
-3. **Complete Removal**:
-   ```bash
-   rm -rf app/api/rag-*
-   rm components/rag-*.tsx
-   # Restore app/page.tsx from git history
-   ```
-
-### Next Steps
-
-1. **Phase 0 Execution** (Local Environment):
-   - Set up local development environment
-   - Run `npm run build-embeddings`
-   - Verify DB population: `SELECT COUNT(*) FROM law_article_embeddings`
-
-2. **Testing**:
-   - Test natural language queries
-   - Verify citation links work
-   - Check answer quality and relevance
-
-3. **Optimization** (Future):
-   - Streaming responses (show answer as it's generated)
-   - Answer caching (reuse answers for similar queries)
-   - Hybrid search (keyword 30% + vector 70%)
-   - User feedback collection
-
----
-
 ## Common Debugging
 
 ### Debug Console Usage
 
-The app has a built-in debug console (bottom of page) that logs:
+The app has a built-in debug console (bottom of page, starts minimized) that logs:
 - All API calls with URLs and parameters
 - Parsing steps and results
 - Errors with stack traces
+- AI streaming (chunk samples, token usage, finishReason)
 
 Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` throughout the codebase to add entries.
 
@@ -575,17 +420,164 @@ Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` through
    - Verify JO code is 6-digit format
    - Check if article exists in both old and new versions
 
+4. **Modal opens but empty**: API response parsing mismatch
+   - `/api/law-search` returns XML → Use DOMParser
+   - `/api/eflaw` returns raw JSON → Direct schema access (no `.success` field)
+
+5. **AI answer truncated**: SSE buffer not processed after loop
+   - Ensure buffer is processed after `while (true)` loop ends
+   - Check `file-search-rag-view.tsx:142-172`
+
+6. **Progress disappears immediately**: Wrong condition for overlay
+   - Use `isAnalyzing` only (not `isAnalyzing && !analysis`)
+   - Check `file-search-rag-view.tsx:288-365`
+
+7. **Sidebar buttons unresponsive**: Async function in onClick
+   - Use regular function with `.then()/.catch()` pattern
+   - Check `law-viewer.tsx:1209-1229`
+
+### Troubleshooting XML/JSON Parsing
+
+**Pattern: XML Response (DOMParser)**:
+```typescript
+const xml = await response.text()
+const parser = new DOMParser()
+const doc = parser.parseFromString(xml, 'text/xml')
+const lawId = doc.querySelector('법령ID')?.textContent
+```
+
+**Pattern: JSON Response (Direct Schema)**:
+```typescript
+const json = await response.json()
+const lawData = json?.법령  // No wrapper
+const articles = lawData?.조문?.조문단위
+```
+
+**Pattern: SSE Streaming (Buffer Handling)**:
+```typescript
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  buffer += decoder.decode(value, { stream: true })
+  // Process complete lines
+}
+// CRITICAL: Process remaining buffer
+if (buffer.trim() && buffer.startsWith('data: ')) {
+  // Parse final chunk
+}
+```
+
 ## Technology Notes
 
 - **Next.js 16 / React 19**: Uses App Router (not Pages Router)
 - **TypeScript**: Strict mode enabled, but build errors ignored in `next.config.mjs`
 - **Tailwind CSS v4**: Uses new `@tailwindcss/postcss` plugin
 - **UI Components**: shadcn/ui + Radix UI primitives
-- **AI**: Google Gemini via `@google/genai` (not Vercel AI SDK despite being installed)
+- **AI**:
+  - Google Gemini 2.0 Flash: File Search RAG
+  - Google Gemini 2.5 Flash: Change summaries
+  - Uses `@google/genai` (not Vercel AI SDK despite being installed)
 - **Node.js**: Requires Node.js 20+
 - **Package Manager**: Supports npm or pnpm
 
 ## 변경 이력 (Change Log)
+
+### 2025-11-15: AI 검색 시스템 3대 핵심 수정
+
+#### 발견된 문제들
+
+1. **사이드바 버튼 완전 무반응**
+   - 원인: async function을 onClick에 직접 사용
+   - 영향: 관련 법령 클릭 시 모달 미표시, 로그 없음
+
+2. **모달 열리지만 빈 화면**
+   - 원인: API 응답 형식 불일치 (XML vs JSON)
+   - /api/law-search: XML 응답 → .json() 시도 → SyntaxError
+   - /api/eflaw: 원본 JSON → .success 필드 확인 → undefined
+
+3. **AI 답변 중간 잘림**
+   - 원인: SSE 스트림 종료 후 남은 buffer 미처리
+   - 영향: 특정 조문(관세법 38조 등) 답변 400자 내외로 짤림
+
+4. **진행 상태 표시 즉시 사라짐**
+   - 원인: `isAnalyzing && !analysis` 조건이 첫 청크에서 false
+   - 영향: 로딩 피드백 부족으로 UX 저하
+
+5. **모바일 모달 우측 잘림**
+   - 원인: 모달 너비 고정, overflow 처리 부족
+   - 영향: 모바일에서 법령 내용 일부 보이지 않음
+
+#### 적용된 해결책
+
+1. **사이드바 클릭 핸들러 수정** (`law-viewer.tsx:1209-1229`)
+   ```typescript
+   // BEFORE (버그):
+   const handleClick = async () => {
+     await openExternalLawArticleModal(law.lawName, law.article)
+   }
+
+   // AFTER (수정):
+   const handleClick = () => {
+     setIsArticleListExpanded(false)  // 사이드바 닫기
+     openExternalLawArticleModal(law.lawName, law.article)
+       .then(() => debugLogger.success('모달 열기 성공'))
+       .catch((err) => debugLogger.error('모달 열기 실패', err))
+   }
+   ```
+
+2. **API 응답 파싱 완전 재작성** (`file-search-rag-view.tsx:155-249`)
+   ```typescript
+   // XML 파싱 (law-search)
+   const searchXml = await searchRes.text()
+   const parser = new DOMParser()
+   const searchDoc = parser.parseFromString(searchXml, 'text/xml')
+   const lawId = searchDoc.querySelector('법령ID')?.textContent
+
+   // JSON 원본 스키마 사용 (eflaw)
+   const eflawJson = await eflawRes.json()
+   const lawData = eflawJson?.법령  // No wrapper
+   const articleUnits = lawData?.조문?.조문단위
+   ```
+
+3. **SSE 버퍼 처리 추가** (`file-search-rag-view.tsx:142-172`)
+   ```typescript
+   // ✅ 루프 종료 후 남은 buffer 처리
+   if (buffer.trim()) {
+     if (buffer.startsWith('data: ')) {
+       const parsed = JSON.parse(buffer.slice(6))
+       // 텍스트/경고/citations 처리
+     }
+   }
+   ```
+
+4. **오버레이 진행 표시 수정** (`file-search-rag-view.tsx:288-365`)
+   ```typescript
+   // BEFORE (버그):
+   {isAnalyzing && !analysis && (<div>Progress</div>)}
+
+   // AFTER (수정):
+   {isAnalyzing && (
+     <div className="absolute inset-0 bg-background/95 backdrop-blur-sm">
+       {/* 진행 상태 - 스트리밍 중에도 유지 */}
+     </div>
+   )}
+   ```
+
+5. **모바일 모달 반응형 개선** (`reference-modal.tsx:42, 66-75`)
+   ```typescript
+   <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]">
+     <div
+       className="prose prose-sm max-w-none break-words overflow-wrap-anywhere"
+       style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+     >
+   ```
+
+#### 영향을 받는 파일
+
+- `components/file-search-rag-view.tsx`: API 파싱, SSE 버퍼, 오버레이
+- `components/law-viewer.tsx`: 사이드바 클릭 핸들러
+- `components/reference-modal.tsx`: 모바일 반응형
+- `lib/file-search-client.ts`: 토큰 사용량 로깅, finishReason 분석
 
 ### 2025-11-11: 긴급 수정 - Phase 5/6 비활성화 및 Phase 7 버그 수정
 
@@ -612,85 +604,16 @@ Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` through
 #### 적용된 해결책
 
 1. **Phase 5/6 완전 비활성화** (`app/page.tsx:627-793`)
-   ```typescript
-   // ⚠️ Phase 5/6 (Intelligent Search) 일시 비활성화
-   // 학습 시스템이 잘못된 법령을 반환하는 문제 때문에 기본 검색으로 복귀
-   console.log('⚠️ Phase 5/6 비활성화 - 기본 검색 사용')
-
-   /* ===== Phase 5 비활성화 =====
-   [157 lines of intelligent-search logic commented out]
-   ===== Phase 5 비활성화 끝 ===== */
-   ```
-
 2. **Phase 7 조문 검증 버그 수정** (`app/page.tsx:572-603`)
-   ```typescript
-   // BEFORE (버그):
-   const parsedData = {
-     selectedJo: query.jo,  // ← 무조건 설정
-   }
-
-   // AFTER (수정):
-   let selectedJo: string | undefined = undefined
-
-   if (query.jo) {
-     const targetArticle = cachedContent.articles.find(a => a.jo === query.jo)
-     if (targetArticle) {
-       selectedJo = targetArticle.jo
-     } else {
-       // 조문 없음 → 가장 유사한 조문 자동 선택
-       const nearestArticles = findNearestArticles(query.jo, cachedContent.articles)
-       if (nearestArticles.length > 0) {
-         selectedJo = nearestArticles[0].jo
-       }
-       setArticleNotFound({...})  // 배너로 안내
-     }
-   }
-   ```
-
-3. **조문 없음 UX 개선** (`app/page.tsx:402-425, 582-603`)
-   - 변경 전: 빈 화면 + 에러 메시지만 표시
-   - 변경 후: 가장 유사한 조문 자동 선택 + 배너로 대안 제시
-   - 적용 경로: Phase 7 경로 및 기본 검색 경로 모두
-
-4. **검색 초기화 수정** (`app/page.tsx:545`)
-   ```typescript
-   setArticleNotFound(null)  // 이전 검색의 "조문 없음" 메시지 제거
-   ```
-
-5. **디스플레이 필드 수정** (`app/page.tsx:195, 394, 707`)
-   ```typescript
-   // BEFORE: a.display (undefined)
-   // AFTER: a.joNum (올바른 필드명)
-   ```
-
-6. **법령 매칭 로직 개선** (`app/page.tsx:863-891`)
-   - 레벤슈타인 거리 기반 유사도 계산 도입
-   - 검색어 길이별 적응형 임계값:
-     - ≤2글자: 85% 유사도 필요
-     - 3+글자: 60% 유사도 필요
-   - 새 파일: `lib/text-similarity.ts`
-
-7. **학습 데이터 완전 초기화**
-   - 새 스크립트: `reset-all-learning.mjs`
-   - 삭제 내용:
-     - `search_results`: 80개 행
-     - `search_queries`: 80개 행
-     - `search_query_embeddings`: 8개 행
+3. **조문 없음 UX 개선**: 가장 유사한 조문 자동 선택 + 배너로 대안 제시
+4. **검색 초기화 수정**: `setArticleNotFound(null)`
+5. **법령 매칭 로직 개선**: 레벤슈타인 거리 기반 유사도 계산 (85%/60% 적응형)
+6. **학습 데이터 완전 초기화**: `reset-all-learning.mjs` 스크립트
 
 #### 새로 추가된 파일
 
-1. **`reset-all-learning.mjs`**
-   - 용도: Turso DB의 모든 학습 데이터 완전 삭제
-   - 사용: `node reset-all-learning.mjs`
-
-2. **`lib/text-similarity.ts`**
-   - 레벤슈타인 거리 알고리즘 구현
-   - `calculateSimilarity(a, b)`: 0~1 범위 유사도 반환
-   - `findMostSimilar()`: 후보 중 최적 매칭 검색
-
-3. **`EMERGENCY_FIX_PLAN.md`**
-   - 상세 문제 분석 및 해결 계획 문서
-   - 3가지 해결 방안 비교 (Phase 완전 제거 vs 부분 비활성화 vs 전면 수정)
+1. **`reset-all-learning.mjs`**: Turso DB 학습 데이터 완전 삭제
+2. **`lib/text-similarity.ts`**: 레벤슈타인 거리 알고리즘
 
 #### 현재 시스템 상태
 
@@ -703,94 +626,16 @@ Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` through
 - ❌ Phase 5: Intelligent Search (주석 처리)
 - ❌ Phase 6: Vector Search (주석 처리)
 
-#### 예상 동작
-
-```
-"형법 22조" 검색:
-→ Phase 7 캐시 미스
-→ Phase 5/6 건너뜀 (비활성화)
-→ 기본 검색: "형법" 100% 매칭 ✅
-→ 제22조 내용 표시 ✅
-
-"세법" 검색:
-→ 기본 검색
-→ 정확 매칭 없음
-→ 유사도 < 85% (2글자 임계값)
-→ 사용자 선택 UI 표시 ✅
-
-"형법 999조" 검색 (존재하지 않는 조문):
-→ "형법" 매칭
-→ 999조 없음
-→ 가장 유사한 조문(예: 373조) 자동 선택
-→ 배너: "요청하신 제999조는 없습니다. 유사한 제373조를 표시합니다" ✅
-```
-
-#### 영향을 받는 파일
-
-- `app/page.tsx`: Phase 5/6 비활성화, Phase 7 버그 수정, 매칭 로직 개선
-- `lib/text-similarity.ts`: 신규 파일 - 레벤슈타인 거리 계산
-- `reset-all-learning.mjs`: 신규 파일 - DB 학습 데이터 초기화
-- `EMERGENCY_FIX_PLAN.md`: 신규 문서 - 상세 분석 및 계획
-- `restart-server.cmd`: 기존 파일 - 완전 클린 재시작 스크립트
-
-#### 향후 계획
-
-**단기 (1주일)**:
-- 기본 검색 안정화 모니터링
-- Phase 7만 사용한 성능 검증
-- 사용자 피드백 수집
-
-**중기 (1개월)**:
-- Phase 5 재설계: 신뢰도 점수 시스템 도입
-- 자동 검증 메커니즘 구현
-- Phase 6 벡터 검색 정확도 개선
-
-**장기 (3개월)**:
-- 전체 시스템 안정화
-- 학습 데이터 품질 관리 시스템
-- 모니터링 대시보드 구축
-
 ### 2025-11-05: 행정규칙 시스템 및 3단 비교 완전 구현
 
 #### 주요 구현 사항
 
-1. **시행규칙 파싱 경로 수정 (CRITICAL)**
-   - 문제: API 구조 오해로 `시행규칙조문목록?.시행규칙조문` 경로 사용
-   - 해결: 올바른 경로 `rawArticle.시행규칙조문` 직접 접근
-   - 영향: 3단 비교 기능 완전 동작
-   - 파일: `lib/three-tier-parser.ts:121-150`
-
-2. **행정규칙 중복 제거**
-   - 문제: 같은 행정규칙이 여러 카테고리(훈령, 예규, 고시)에서 중복 표시
-   - 해결: Map 기반 중복 제거 (`serialNumber` 우선, 없으면 `id` 사용)
-   - 영향: 검색 결과 정확도 향상 (예: 관세법 38조 4건 → 2건)
-   - 파일: `lib/hierarchy-parser.ts:106-133`
-
-3. **위임조문 뷰 스크롤 구현**
-   - 문제: 2단/3단 뷰에서 콘텐츠 길이가 길어지면 전체 페이지 스크롤 발생
-   - 해결: `calc(100vh - 250px)` 고정 높이 컨테이너로 각 열 독립 스크롤
-   - 파일: `components/law-viewer.tsx:1595, 1725`
-
-4. **행정규칙 성능 최적화**
-   - **IndexedDB 영구 캐싱**: 이미 구현된 기능 유지
-   - **HTTP 브라우저 캐싱 활성화**:
-     - Hierarchy API: 1시간 revalidate
-     - Admin rule content: 24시간 revalidate
-   - **완전 병렬 API 호출**: Promise.all로 모든 규칙 동시 조회
-   - 영향: 초기 로딩 대기 시간 단축, 재방문 시 즉시 로딩
-   - 파일: `lib/use-admin-rules.ts:67-72, 106-109`
-
-5. **개정 마커 스타일 확장**
-   - 추가 패턴: `[본조신설]`, `[본조삭제]`, `[종전 ~ 이동]`
-   - 기존 패턴: `<개정>`, `＜개정＞`, `＜신설＞` 등
-   - 파일: `lib/law-xml-parser.tsx:359-385`
-
-6. **UI 개선**
-   - 버튼 라벨 변경: "2단 비교" → "시행령", "3단 비교" → "시행규칙"
-   - 위임조문 뷰 간소화: 중복 정보(아이콘, 배지, 조번호 중복) 제거
-   - 제목 표시: `delegation.title`만 사용 (조번호 포함됨)
-   - 디버그 콘솔: 기본 축소 상태로 시작
-   - 파일: `components/law-viewer.tsx:1201-1223, 1659-1707`
+1. **시행규칙 파싱 경로 수정 (CRITICAL)**: `rawArticle.시행규칙조문` 직접 접근
+2. **행정규칙 중복 제거**: Map 기반 중복 제거 (serialNumber/id)
+3. **위임조문 뷰 스크롤 구현**: `calc(100vh - 250px)` 고정 높이
+4. **행정규칙 성능 최적화**: IndexedDB + HTTP 캐싱 + 병렬 API 호출
+5. **개정 마커 스타일 확장**: `[본조신설]`, `[본조삭제]`, `[종전 ~ 이동]`
+6. **UI 개선**: 버튼 라벨 변경, 디버그 콘솔 기본 축소
 
 #### 기술 패턴
 
@@ -799,47 +644,17 @@ Use `debugLogger.info()`, `debugLogger.success()`, `debugLogger.error()` through
 - **HTTP caching**: 데이터 변경 빈도에 따른 적절한 revalidate 시간 설정
 - **Debug logging**: 파싱 단계에서 상세 로깅으로 API 구조 분석
 
-#### 영향 파일
-
-- `lib/hierarchy-parser.ts`: 행정규칙 중복 제거
-- `lib/three-tier-parser.ts`: 시행규칙 파싱 경로 수정 + 디버그 로깅
-- `lib/use-admin-rules.ts`: HTTP 캐싱 활성화
-- `lib/law-xml-parser.tsx`: 개정 마커 패턴 확장
-- `components/law-viewer.tsx`: 스크롤, UI 간소화, 버튼 라벨, 자동 뷰 전환
-- `components/debug-console.tsx`: 기본 축소 상태
-
 ### 2025-11-04: 3단 비교 UI 개선 및 버그 수정
 
 #### 수정된 문제들
-1. **개정 이력 마커 줄바꿈 오류 수정**
-   - 문제: `＜개정 2010. 3. 26.＞` 같은 개정 이력 마커가 날짜 부분에서 줄바꿈되는 현상
-   - 원인: `formatDelegationContent()` 함수의 정규식이 날짜 내 숫자 패턴(예: "2010. ", "3. ")을 항목 번호로 잘못 인식
-   - 해결: 부정형 후방탐색(`(?<!\d\. )`)과 전방탐색(`(?!\d+\.)`)을 사용하여 날짜 패턴 제외
-   - 파일: `lib/law-xml-parser.tsx:339`
 
-2. **인용조문 데이터 로딩 비활성화**
-   - 변경: 인용조문(knd=1) API 호출 완전 제거, 위임조문(knd=2)만 로드
-   - 이유: 현재 위임조문만 필요하므로 불필요한 API 호출 제거
-   - 파일: `app/api/three-tier/route.ts`
-   - 변경사항:
-     - 인용조문 API 요청 제거
-     - 응답에서 `citation: null` 반환
-     - `parseThreeTierCitation` 임포트 제거
+1. **개정 이력 마커 줄바꿈 오류 수정**: 정규식 개선으로 날짜 패턴 제외
+2. **인용조문 데이터 로딩 비활성화**: 위임조문(knd=2)만 로드
+3. **3단 비교 버튼 활성화 로직 개선**: 실제 시행규칙 콘텐츠 유무 확인
 
-3. **3단 비교 버튼 활성화 로직 개선**
-   - 문제: 시행규칙 내용이 없는데도 3단 비교 버튼이 활성화됨
-   - 해결:
-     - `hasValidSihyungkyuchik` 체크 추가: 실제 시행규칙 콘텐츠가 있는지 확인
-     - 3단 버튼 표시 조건: `threeTierDataType === "delegation" && hasValidSihyungkyuchik`
-     - 자동 뷰 모드 전환: 시행규칙이 없는 조문으로 이동 시 자동으로 2단 또는 1단 뷰로 전환
-   - 파일: `components/law-viewer.tsx:117, 960, 275-283`
+## Documentation Structure
 
-#### 기술적 세부사항
-- **정규식 개선**: 날짜 패턴(`\d+\. \d+\. \d+\.`)과 항목 번호(`1. `, `2. `)를 구분하는 정규식 패턴 구현
-- **타입 필터링**: `validDelegations.some((d) => d.type === "시행규칙")`로 시행규칙 존재 여부 확인
-- **자동 뷰 전환**: useEffect를 통해 현재 조문의 데이터에 따라 tierViewMode를 자동으로 조정
-
-#### 영향을 받는 파일
-- `lib/law-xml-parser.tsx`: formatDelegationContent() 함수 수정
-- `app/api/three-tier/route.ts`: 인용조문 API 호출 제거
-- `components/law-viewer.tsx`: 3단 버튼 활성화 로직 및 자동 전환 로직 추가
+- `docs/archived/`: Completed implementation documents
+- `docs/future/`: Future reference documents
+- `CLAUDE.md`: This file - development guidance
+- `README.md`: User-facing project documentation
