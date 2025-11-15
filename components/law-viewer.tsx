@@ -500,35 +500,6 @@ export function LawViewer({
   // Handle clicks on linkified references inside article content
   const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
     const target = e.target as HTMLElement
-
-    // AI 답변 링크 처리 (law-link 클래스) - closest로 부모 요소까지 검색
-    const lawLink = target.closest('.law-link')
-    if (lawLink) {
-      e.preventDefault()
-
-      const lawName = lawLink.getAttribute('data-law') || ''
-      const jo = lawLink.getAttribute('data-jo') || ''
-      const article = lawLink.getAttribute('data-article') || ''
-      const source = lawLink.getAttribute('data-source') || 'related'
-
-      debugLogger.info(`🔗 [AI 답변] ${source === 'excerpt' ? '발췌조문' : '관련법령'} 링크 클릭`, {
-        lawName,
-        jo,
-        article,
-        source
-      })
-
-      if (onRelatedArticleClick) {
-        onRelatedArticleClick(lawName, jo, article)
-      } else {
-        toast({
-          title: "기능 준비 중",
-          description: `${lawName} ${article} 조회 기능을 준비 중입니다.`,
-        })
-      }
-      return
-    }
-
     if (target && target.tagName === "A") {
       e.preventDefault()
 
@@ -1210,34 +1181,31 @@ export function LawViewer({
                         }
                       })
 
-                      return Array.from(grouped.values()).map(({ law, sources }, idx) => (
+                      return Array.from(grouped.values()).map(({ law, sources }, idx) => {
+                        const handleClick = () => {
+                          debugLogger.info('🔗 [사이드바] 법령 링크 클릭', {
+                            lawName: law.lawName,
+                            jo: law.jo,
+                            article: law.article,
+                            sources: Array.from(sources),
+                            hasClickHandler: !!onRelatedArticleClick
+                          })
+
+                          if (onRelatedArticleClick) {
+                            onRelatedArticleClick(law.lawName, law.jo, law.article)
+                          } else {
+                            toast({
+                              title: "기능 준비 중",
+                              description: `${law.lawName} ${law.article} 조회 기능을 준비 중입니다.`,
+                            })
+                          }
+                        }
+
+                        return (
                         <button
                           key={`${law.lawName}-${law.jo}-${idx}`}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            debugLogger.info('🔗 [사이드바] 법령 링크 클릭', {
-                              lawName: law.lawName,
-                              jo: law.jo,
-                              article: law.article,
-                              sources: Array.from(sources),
-                              hasClickHandler: !!onRelatedArticleClick
-                            })
-                            if (onRelatedArticleClick) {
-                              onRelatedArticleClick(law.lawName, law.jo, law.article)
-                            } else {
-                              toast({
-                                title: "기능 준비 중",
-                                description: `${law.lawName} ${law.article} 조회 기능을 준비 중입니다.`,
-                              })
-                            }
-                          }}
-                          className="w-full text-left px-3 py-2.5 rounded-md text-sm
-                                     border border-blue-800/20 hover:border-blue-600/40
-                                     bg-gradient-to-r from-blue-950/20 to-purple-950/20
-                                     hover:from-blue-900/40 hover:to-purple-900/40
-                                     transition-all duration-200 group"
-                          type="button"
+                          onClick={handleClick}
+                          className="w-full text-left px-3 py-2.5 rounded-md text-sm border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-1.5 flex-1">
@@ -1263,7 +1231,8 @@ export function LawViewer({
                             )}
                           </div>
                         </button>
-                      ))
+                        )
+                      })
                     })()
                   ) : (
                     <div className="text-sm text-muted-foreground text-center py-8">
