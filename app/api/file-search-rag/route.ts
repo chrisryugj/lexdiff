@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder()
     let fullResponse = ''
     let citations: any[] = []
+    let finishReason: string | null = null
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -27,14 +28,26 @@ export async function POST(request: NextRequest) {
           // File Search 스트리밍 쿼리
           for await (const chunk of queryFileSearchStream(query, { metadataFilter })) {
             if (chunk.done) {
-              // 마지막 청크 - citation 포함
+              // 마지막 청크 - citation + finishReason 포함
               citations = chunk.citations || []
+              finishReason = chunk.finishReason || null
+
+              // ⚠️ MAX_TOKENS 경고 전송
+              if (finishReason === 'MAX_TOKENS') {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: 'warning',
+                    message: '⚠️ 답변이 길어서 중간에 잘렸을 수 있습니다. 더 구체적인 질문을 해보세요.'
+                  })}\n\n`)
+                )
+              }
 
               // Citation 전송
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({
                   type: 'citations',
-                  citations
+                  citations,
+                  finishReason
                 })}\n\n`)
               )
             } else {
