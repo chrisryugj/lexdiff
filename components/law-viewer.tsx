@@ -564,8 +564,30 @@ export function LawViewer({
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
-        await openExternalLawArticleModal(lawName, articleLabel)
-        setLastExternalRef({ lawName, joLabel: articleLabel })
+
+        // ✅ AI 모드에서는 2단 뷰로 열기 (모달 대신)
+        if (aiAnswerMode && onRelatedArticleClick) {
+          debugLogger.info('🔗 [AI 모드] 법령 링크 클릭 - 2단 뷰로 열기', {
+            lawName,
+            articleLabel
+          })
+
+          // JO 코드 계산
+          let joCode = ""
+          try {
+            const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
+            joCode = buildJO(articleOnly)
+          } catch (err) {
+            console.error("Failed to build JO code:", err)
+          }
+
+          onRelatedArticleClick(lawName, joCode, articleLabel)
+          setLastExternalRef({ lawName, joLabel: articleLabel })
+        } else {
+          // 일반 모드에서는 모달 열기
+          await openExternalLawArticleModal(lawName, articleLabel)
+          setLastExternalRef({ lawName, joLabel: articleLabel })
+        }
       } else if (refType === "same") {
         // Use last external reference law + current article, change to requested part
         if (lastExternalRef && lastExternalRef.joLabel) {
@@ -822,6 +844,19 @@ export function LawViewer({
           : []
         const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
 
+        // 🔍 디버깅: 조문 검색 상세 로그
+        debugLogger.info('[citation] Article search details', {
+          lawName,
+          articleLabel,
+          joCode,
+          normalizedJo,
+          totalArticles: articleUnits.length,
+          firstArticle: articleUnits[0] ? {
+            조문키: articleUnits[0]?.조문키,
+            조문번호: articleUnits[0]?.조문번호
+          } : null
+        })
+
         const targetUnit =
           articleUnits.find((unit: any) => typeof unit?.조문키 === "string" && unit.조문키.startsWith(normalizedJo)) ||
           articleUnits.find((unit: any) => {
@@ -831,7 +866,16 @@ export function LawViewer({
           })
 
         if (!targetUnit) {
-          console.warn("[citation] Article not found in JSON response", { lawName, articleLabel, joCode })
+          console.warn("[citation] Article not found in JSON response", {
+            lawName,
+            articleLabel,
+            joCode,
+            normalizedJo,
+            availableArticles: articleUnits.slice(0, 5).map((u: any) => ({
+              조문키: u?.조문키,
+              조문번호: u?.조문번호
+            }))
+          })
           setRefModal({
             open: true,
             title: `${lawName} ${articleLabel}`,
