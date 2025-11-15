@@ -1,225 +1,90 @@
-# 검색 피드백 학습 시스템 문서
+# LexDiff 문서 폴더
 
-> LexDiff 검색 품질 향상을 위한 완전한 구현 가이드
+## 📁 폴더 구조
 
----
+### `/docs` (현재 폴더)
+**현재 개발에 필요한 참고 문서**
 
-## 📚 문서 구조
+- `GEMINI_FILE_SEARCH_GUIDE.md` - Google File Search API 가이드 (현재 사용 중)
+- `API_INTEGRATION.md` - 외부 API 연동 가이드
+- `CODE_EXAMPLES.md` - 코드 예제 모음
+- `DATABASE_SCHEMA.md` - Turso DB 스키마 정의
+- `DEPLOYMENT_GUIDE.md` - 배포 가이드
+- `START_PROMPT.md` - 프로젝트 시작 프롬프트
 
-### 1. [구현 계획 (메인)](./SEARCH_FEEDBACK_IMPLEMENTATION_PLAN.md)
-**읽기 순서: 1번째**
+### `/docs/archived`
+**구현 완료된 문서 (참고용)**
 
-전체 프로젝트 개요, 아키텍처, 로드맵을 포함한 메인 문서
+- **Phase 완료 문서**: PHASE1, PHASE2-4, PHASE5, PHASE6 구현 가이드
+- **버그 수정 문서**: 긴급 수정, Phase 7 수정, 검색 시스템 수정
+- **구현 완료 기능**: 3단 비교, 조례/규칙 파싱, File Search 구현 등
 
-**포함 내용**:
-- 프로젝트 목표 및 현재 문제점
-- 5단계 Fallback 검색 전략
-- 기술 스택 선정 이유
-- Phase별 구현 로드맵 (11단계)
-- 성능 목표 및 비용 분석
-- 위험 요소 및 대응 방안
+### `/docs/future`
+**미래 참고 문서 (구현되지 않음)**
 
-**이 문서부터 읽으세요!**
+- 학습 시스템 개선 계획
+- 성능 최적화 계획
+- Phase 9 계획 (Pro/Small RAG)
+- 향후 로드맵
 
----
+## 🎯 현재 주요 기술
 
-### 2. [데이터베이스 스키마](./DATABASE_SCHEMA.md)
-**읽기 순서: 2번째**
+### AI 검색 시스템
+- **Google File Search RAG** (Gemini 2.0 Flash)
+  - 자연어 질문으로 법령 검색
+  - 실시간 SSE 스트리밍 답변
+  - 인용 출처 자동 링크
 
-전체 데이터베이스 테이블 정의 및 마이그레이션 SQL
+### 검색 시스템
+- **Phase 7**: IndexedDB 쿼리 캐시 (7일, ~25ms)
+- **기본 검색**: 레벤슈타인 거리 유사도 매칭 (85%/60% 적응형)
 
-**포함 내용**:
-- 14개 테이블 스키마 (SQL)
-- 인덱스 및 트리거 정의
-- 마이그레이션 파일 구조
-- 데이터 검증 쿼리
+### 비활성화된 시스템
+- ~~Phase 5: Intelligent Search~~ (학습 데이터 오염으로 비활성화)
+- ~~Phase 6: Vector Search~~ (Phase 5와 함께 비활성화)
 
-**Phase 1 시작 전 필독**
+## 📚 주요 문서 가이드
 
----
+### 처음 시작하는 경우
+1. 프로젝트 루트의 `README.md` - 프로젝트 개요
+2. 프로젝트 루트의 `CLAUDE.md` - 개발 가이드
+3. `GEMINI_FILE_SEARCH_GUIDE.md` - AI 검색 시스템 구현 방법
 
-### 3. [코드 예시](./CODE_EXAMPLES.md)
-**읽기 순서: 3번째**
+### API 연동이 필요한 경우
+- `API_INTEGRATION.md` - law.go.kr, Gemini API 연동
 
-각 Phase별 핵심 구현 코드
+### 배포가 필요한 경우
+- `DEPLOYMENT_GUIDE.md` - Vercel 배포 가이드
 
-**포함 내용**:
-- `lib/db.ts` - Turso 클라이언트
-- `lib/search-feedback-db.ts` - 쿼리 함수
-- `lib/search-strategy.ts` - 통합 검색 전략
-- `lib/variant-generator.ts` - 유사 검색어 생성
-- `lib/embedding.ts` - 벡터 임베딩
-- `components/search-feedback-button.tsx` - 피드백 UI
-- `app/api/feedback/route.ts` - 피드백 API
+### 코드 참고가 필요한 경우
+- `CODE_EXAMPLES.md` - 주요 패턴 및 예제
 
-**코딩 시작 시 참고**
+## 🗂️ 문서 관리 원칙
 
----
+### archived로 이동하는 문서
+- 구현이 완료된 Phase 문서
+- 해결된 버그 수정 문서
+- 완료된 기능 구현 계획
 
-### 4. [API 연동 가이드](./API_INTEGRATION.md)
-**읽기 순서: 4번째**
+### future로 이동하는 문서
+- 현재 방향과 다른 기술 문서 (예: Voyage AI 임베딩)
+- 미래 구현 예정 기능
+- 아이디어 및 개선 계획
 
-Turso, Voyage AI 설정 방법
+### docs 루트에 유지하는 문서
+- 현재 사용 중인 기술 가이드
+- 현재 참고가 필요한 문서
+- 개발/배포에 필수적인 문서
 
-**포함 내용**:
-- Turso CLI 설치 및 DB 생성
-- Voyage AI API 키 발급
-- 환경변수 설정
-- 연결 테스트 방법
-- Edge Replicas 설정 (선택)
-- 트러블슈팅
+## 📅 최근 업데이트
 
-**Phase 1, 6 시작 전 필독**
+### 2025-11-15
+- docs 폴더 구조 정리 완료
+- Voyage AI 임베딩 관련 문서 삭제 (현재 방향과 상이)
+- Phase 완료 문서 archived로 이동
+- README.md 현재 구조 반영
 
----
+## 🔗 관련 문서
 
-### 5. [배포 가이드](./DEPLOYMENT_GUIDE.md)
-**읽기 순서: 5번째**
-
-실제 배포 및 운영 가이드
-
-**포함 내용**:
-- Phase별 배포 절차
-- 로컬 테스트 방법
-- Vercel 프로덕션 배포
-- 모니터링 및 최적화
-- 백업 및 롤백 계획
-- 문제 해결 가이드
-
-**배포 직전 필독**
-
----
-
-## 🚀 빠른 시작
-
-### 1. 전체 계획 파악 (30분)
-
-```bash
-# 메인 문서 읽기
-cat docs/SEARCH_FEEDBACK_IMPLEMENTATION_PLAN.md
-```
-
-주요 확인 사항:
-- ✅ 5단계 검색 전략 이해
-- ✅ Phase별 로드맵 확인
-- ✅ 무료 운영 가능 여부 확인
-
----
-
-### 2. Phase 1 시작 (1일)
-
-**A. 환경 설정**
-```bash
-# API_INTEGRATION.md 참고
-curl -sSfL https://get.tur.so/install.sh | bash
-turso auth login
-turso db create lexdiff-feedback
-```
-
-**B. 스키마 마이그레이션**
-```bash
-# DATABASE_SCHEMA.md 참고
-turso db shell lexdiff-feedback < db/migrations/001_basic_schema.sql
-turso db shell lexdiff-feedback < db/migrations/002_mapping_schema.sql
-```
-
-**C. 코드 구현**
-```bash
-# CODE_EXAMPLES.md 참고
-# lib/db.ts 생성
-# lib/search-feedback-db.ts 생성
-```
-
-**D. 배포 및 테스트**
-```bash
-# DEPLOYMENT_GUIDE.md 참고
-pnpm dev
-# 검색 테스트
-```
-
----
-
-### 3. Phase 2-5 진행 (1주)
-
-각 Phase별로 위 과정 반복:
-1. 구현 계획 확인
-2. 코드 작성
-3. 테스트
-4. 배포
-
----
-
-## 📊 진행 상황 체크리스트
-
-### Phase 1: Turso 기본 설정
-- [ ] Turso 계정 생성
-- [ ] DB 생성 및 연결
-- [ ] 기본 스키마 마이그레이션
-- [ ] `lib/db.ts` 구현
-- [ ] 연결 테스트 성공
-
-### Phase 2-4: 검색 전략
-- [ ] API 매핑 테이블 생성
-- [ ] 유사 검색어 생성 로직
-- [ ] 5단계 fallback 구현
-- [ ] 기존 검색 흐름 통합
-- [ ] 전략별 성능 로깅
-
-### Phase 5: 피드백 UI
-- [ ] SearchFeedbackButton 컴포넌트
-- [ ] `/api/feedback` 엔드포인트
-- [ ] law-viewer 통합
-- [ ] 품질 점수 자동 업데이트
-- [ ] 피드백 수집 확인
-
-### Phase 6-8: 벡터 DB (선택)
-- [ ] Voyage AI 계정 생성
-- [ ] 벡터 스키마 마이그레이션
-- [ ] 임베딩 생성 시스템
-- [ ] L0 벡터 검색 레이어
-- [ ] 법령 조문 임베딩
-- [ ] RAG 파이프라인
-- [ ] 자연어 검색 UI
-
----
-
-## 🎯 성공 기준
-
-### 기본 목표 (Phase 1-5)
-- ✅ 검색 속도 < 50ms (캐시 히트 시)
-- ✅ API 호출 50% 이하
-- ✅ 피드백 수집 작동
-- ✅ 무료 운영
-
-### 최종 목표 (Phase 6-8)
-- ✅ 검색 속도 < 10ms (벡터 히트 시)
-- ✅ API 호출 5% 이하
-- ✅ 자연어 검색 지원
-- ✅ RAG 질의응답
-
----
-
-## 📞 지원
-
-### 문서 관련
-- 각 문서 하단의 "참고 자료" 섹션 확인
-- 구현 중 막히면 CODE_EXAMPLES.md의 전체 코드 참고
-
-### 기술 지원
-- Turso: https://docs.turso.tech/
-- Voyage AI: https://docs.voyageai.com/
-- LibSQL Vector: https://turso.tech/vector
-
----
-
-## 📝 업데이트 이력
-
-- **2025-11-05**: 초기 문서 작성
-  - 전체 구현 계획 완성
-  - 14개 테이블 스키마 정의
-  - Phase 1-8 코드 예시 작성
-  - 배포 가이드 완성
-
----
-
-**시작하기**: [SEARCH_FEEDBACK_IMPLEMENTATION_PLAN.md](./SEARCH_FEEDBACK_IMPLEMENTATION_PLAN.md)를 먼저 읽으세요!
+- `/README.md` - 프로젝트 메인 README
+- `/CLAUDE.md` - Claude Code용 개발 가이드
