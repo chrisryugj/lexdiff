@@ -25,6 +25,7 @@ export function FileSearchRAGView({
   const [relatedLaws, setRelatedLaws] = useState<ParsedRelatedLaw[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   const [progressStage, setProgressStage] = useState(0)
 
   // 선택된 관련 법령 데이터 (Phase 4)
@@ -72,6 +73,7 @@ export function FileSearchRAGView({
   async function handleFileSearchQuery(searchQuery: string) {
     try {
       setError(null)
+      setWarning(null)
       setIsAnalyzing(true)
       setAnalysis('')
       setRelatedLaws([])
@@ -121,6 +123,14 @@ export function FileSearchRAGView({
 
               if (parsed.type === 'text') {
                 setAnalysis(prev => prev + parsed.text)
+              } else if (parsed.type === 'warning') {
+                setWarning(parsed.message)
+                debugLogger.warning('AI 답변 경고', { message: parsed.message })
+              } else if (parsed.type === 'citations') {
+                debugLogger.info('Citations 수신', {
+                  count: parsed.citations?.length || 0,
+                  finishReason: parsed.finishReason
+                })
               }
             } catch (e) {
               // Ignore parsing errors
@@ -298,6 +308,16 @@ export function FileSearchRAGView({
       ) : analysis ? (
         /* Analysis Result - LawViewer AI Mode */
         <>
+          {/* Warning Banner */}
+          {warning && (
+            <div className="mx-4 mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-600 dark:text-yellow-500">⚠️</span>
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
+              </div>
+            </div>
+          )}
+
           <LawViewer
             meta={selectedLawMeta || dummyMeta}
             articles={selectedLawArticles.length > 0 ? selectedLawArticles : dummyArticles}
