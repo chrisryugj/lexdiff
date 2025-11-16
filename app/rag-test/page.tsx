@@ -25,7 +25,8 @@ export default function RAGTestPage() {
   function handleCitationClick(lawName: string, articleNum: string) {
     const searchQuery = `${lawName} ${articleNum}`.trim()
     console.log('[RAG Test] Citation clicked:', { lawName, articleNum, searchQuery })
-    router.push(`/?query=${encodeURIComponent(searchQuery)}`)
+    // 페이지 이동 (강제 리로드로 프로그레스 다이얼로그 제거)
+    window.location.href = `/?query=${encodeURIComponent(searchQuery)}`
   }
 
   function handleSubmit(e: React.FormEvent) {

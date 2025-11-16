@@ -878,10 +878,9 @@ export function LawViewer({
       } else if (mst) {
         identifierParams.append("mst", mst)
       }
-      if (joCode) {
-        identifierParams.append("jo", joCode)
-        console.log("[citation] Fetching specific article:", { lawName, articleLabel, joCode })
-      }
+      // ⚠️ jo 파라미터 제거 - API가 잘못된 조문을 반환하는 버그 방지
+      // 전체 법령을 가져온 후 클라이언트에서 필터링
+      console.log("[citation] Fetching full law, will filter on client:", { lawName, articleLabel, joCode })
       // ⚠️ efYd를 사용하지 않음 - 최신 시행 버전 조회
       // 타법개정으로 인한 조문 누락 방지
 
@@ -935,14 +934,32 @@ export function LawViewer({
         })))
 
         // ⚠️ 조문여부가 "조문"인 것만 찾기 (전문 제외)
+        console.log('[Citation] Searching with normalizedJo:', normalizedJo, 'articleLabel:', articleLabel)
+
         const targetUnit =
-          articleUnits.find((unit: any) =>
-            unit?.조문여부 === "조문" &&
-            typeof unit?.조문키 === "string" && unit.조문키.startsWith(normalizedJo)
-          ) ||
+          articleUnits.find((unit: any) => {
+            const isArticle = unit?.조문여부 === "조문"
+            const hasKey = typeof unit?.조문키 === "string"
+            const matches = hasKey && unit.조문키.startsWith(normalizedJo)
+            console.log('[Citation] Check unit:', {
+              조문키: unit?.조문키,
+              조문번호: unit?.조문번호,
+              조문여부: unit?.조문여부,
+              isArticle,
+              hasKey,
+              matches
+            })
+            return isArticle && hasKey && matches
+          }) ||
           articleUnits.find((unit: any) => {
             const num = typeof unit?.조문번호 === "string" ? unit.조문번호.replace(/\D/g, "") : ""
             const targetNum = articleLabel.replace(/\D/g, "")
+            console.log('[Citation] Fallback check:', {
+              조문번호: unit?.조문번호,
+              num,
+              targetNum,
+              matches: num === targetNum
+            })
             return unit?.조문여부 === "조문" && num !== "" && targetNum !== "" && num === targetNum
           })
 
@@ -974,23 +991,56 @@ export function LawViewer({
           return
         }
 
+        // ⚠️ 조문내용이 제목만 있는 경우가 많으므로 항 배열을 텍스트로 변환
+        let rawContent = targetUnit.조문내용 || ""
+        const title = targetUnit.조문제목 || ""
+
+        console.log('[Citation] Raw unit data:', {
+          조문내용_length: rawContent.length,
+          조문제목: title,
+          항_exists: !!targetUnit.항,
+          항_isArray: Array.isArray(targetUnit.항),
+          항_length: Array.isArray(targetUnit.항) ? targetUnit.항.length : 0
+        })
+
+        // 항 배열을 텍스트로 변환 (번호는 내용에 이미 포함되어 있음)
+        if (Array.isArray(targetUnit.항) && targetUnit.항.length > 0) {
+          const paragraphsText = targetUnit.항.map((hang: any) => {
+            const hangContent = hang?.항내용 || ""
+
+            // 호 배열 처리
+            if (Array.isArray(hang?.호) && hang.호.length > 0) {
+              const itemsText = hang.호.map((ho: any) => {
+                const hoContent = ho?.호내용 || ""
+                return hoContent
+              }).join('\n')
+              return hangContent ? `${hangContent}\n${itemsText}` : itemsText
+            }
+
+            return hangContent
+          }).join('\n\n')
+
+          console.log('[Citation] Converted from 항 array:', paragraphsText.length, 'chars')
+          rawContent = paragraphsText
+        } else {
+          console.log('[Citation] Using 조문내용 directly, before title removal:', rawContent.length)
+          // 조문내용에서 제목 부분만 제거 (단, 한 줄에 모든 내용이 있는 경우 제목만 제거)
+          if (rawContent && title) {
+            // 제1조(목적) 이 법은... → 이 법은...
+            const titlePattern = new RegExp(`^제${targetUnit.조문번호}조(?:의\\d+)?\\s*\\(${title}\\)\\s*`, 'i')
+            if (titlePattern.test(rawContent)) {
+              rawContent = rawContent.replace(titlePattern, '')
+              console.log('[Citation] After title pattern removal:', rawContent.length)
+            }
+          }
+        }
+
         const lawArticle: LawArticle = {
           jo: normalizedJo,
           joNum: articleLabel,
-          title: targetUnit.조문제목 || "",
-          content: targetUnit.조문내용 || "",
-          paragraphs: Array.isArray(targetUnit.항)
-            ? targetUnit.항.map((hang: any) => ({
-                num: typeof hang?.항번호 === "string" ? hang.항번호.trim() : "",
-                content: typeof hang?.항내용 === "string" ? hang.항내용 : "",
-                items: Array.isArray(hang?.호)
-                  ? hang.호.map((item: any) => ({
-                      num: typeof item?.호번호 === "string" ? item.호번호.trim() : "",
-                      content: typeof item?.호내용 === "string" ? item.호내용 : "",
-                    }))
-                  : undefined,
-              }))
-            : undefined,
+          title,
+          content: rawContent,
+          isPreamble: false
         }
 
         const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
@@ -999,7 +1049,8 @@ export function LawViewer({
           jo: lawArticle.jo,
           joNum: lawArticle.joNum,
           title: lawArticle.title,
-          contentLength: lawArticle.content?.length || 0
+          rawContentLength: (targetUnit.조문내용 || "").length,
+          processedContentLength: lawArticle.content?.length || 0
         })
 
         const htmlContent = extractArticleText(lawArticle)
