@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { LawViewer } from './law-viewer'
 import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
@@ -31,6 +31,10 @@ export function FileSearchRAGView({
   const [confidenceLevel, setConfidenceLevel] = useState<'high' | 'medium' | 'low'>('high')
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
+  const [currentQuery, setCurrentQuery] = useState(initialQuery) // 현재 검색 중인 질의
+
+  // 프로그레스에 표시할 질의 (ref로 즉시 업데이트)
+  const searchingQueryRef = useRef(initialQuery)
 
   // 선택된 관련 법령 데이터 (Phase 4)
   const [selectedLawMeta, setSelectedLawMeta] = useState<LawMeta | null>(null)
@@ -76,6 +80,11 @@ export function FileSearchRAGView({
    */
   async function handleFileSearchQuery(searchQuery: string) {
     try {
+      // ⚠️ CRITICAL: ref로 즉시 업데이트 (state는 비동기)
+      console.log('[FileSearchRAG] handleFileSearchQuery called with:', searchQuery)
+      searchingQueryRef.current = searchQuery
+      setCurrentQuery(searchQuery)
+
       setError(null)
       setWarning(null)
       setIsAnalyzing(true)
@@ -287,13 +296,26 @@ export function FileSearchRAGView({
       }
 
       // LawArticle[] 구성
-      const articles: LawArticle[] = articleUnits.map((unit: any) => ({
-        jo: (unit.조문키 || '').slice(0, 6),
-        joNum: unit.조문번호 || '',
-        title: unit.조문제목 || '',
-        content: unit.조문내용 || '',
-        isPreamble: false
-      }))
+      const articles: LawArticle[] = articleUnits.map((unit: any) => {
+        let content = unit.조문내용 || ''
+        const title = unit.조문제목 || ''
+
+        // 조문내용에서 첫 줄이 제목과 같으면 제거
+        if (content && title) {
+          const lines = content.split('\n')
+          if (lines[0].includes(title) || lines[0].includes(unit.조문번호)) {
+            content = lines.slice(1).join('\n')
+          }
+        }
+
+        return {
+          jo: (unit.조문키 || '').slice(0, 6),
+          joNum: unit.조문번호 || '',
+          title,
+          content,
+          isPreamble: false
+        }
+      })
 
       debugLogger.success('법령 전문 로드 성공', {
         lawTitle: meta.lawTitle,
@@ -317,6 +339,12 @@ export function FileSearchRAGView({
     }
   }
 
+  // initialQuery가 변경되면 ref도 함께 업데이트
+  useEffect(() => {
+    searchingQueryRef.current = initialQuery
+    setCurrentQuery(initialQuery)
+  }, [initialQuery])
+
   // 초기 쿼리가 있고 아직 분석 안 했으면 자동 실행
   useEffect(() => {
     if (initialQuery && !analysis && !isAnalyzing) {
@@ -328,11 +356,12 @@ export function FileSearchRAGView({
     <div className="flex flex-col h-full relative">
       {/* 프로그레스 Dialog */}
       <SearchProgressDialog
+        key={searchingQueryRef.current}
         isOpen={isAnalyzing}
         mode="ai"
         stage={searchStage}
         progress={searchProgress}
-        lawName={initialQuery}
+        lawName={searchingQueryRef.current}
       />
 
       {/* Loading Overlay - 스트리밍 중에도 유지 */}
@@ -472,7 +501,6 @@ export function FileSearchRAGView({
             aiAnswerMode={true}
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
-            onRelatedArticleClick={handleRelatedArticleClick}
             comparisonLawMeta={selectedLawMeta || undefined}
             comparisonLawArticles={selectedLawArticles}
             comparisonLawSelectedJo={selectedJo}

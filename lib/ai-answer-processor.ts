@@ -108,36 +108,40 @@ function markLawQuotes(text: string): string {
       continue
     }
 
-    // "📜 조문 발췌"인 경우 (관련 법령 섹션이 아닐 때만)
-    if (trimmed === '📜 조문 발췌' && !inRelatedLawSection) {
+    // 📜로 시작하는 법령 조문 인용 (관련 법령 섹션이 아닐 때만)
+    // ⚠️ "📖 조문 발췌"는 하위 섹션 제목이므로 제외
+    if (trimmed.startsWith('📜') && trimmed !== '📖 조문 발췌' && !inRelatedLawSection) {
+      // 📜로 시작하는 줄을 마커로 감싸기
+      result.push('<<<QUOTE_START>>>')
       result.push(line)
       i++
 
-      // 다음 줄부터 조문 전체 수집 (다음 하위 섹션이나 주요 섹션 전까지)
+      // 다음 줄부터 조문 내용 수집 (빈 줄이나 다음 섹션 전까지)
       const quoteLines: string[] = []
+      let collectedCount = 0
       while (i < lines.length) {
         const nextLine = lines[i]
         const nextTrimmed = nextLine.trim()
 
-        // 빈 줄, 하위 섹션, 주요 섹션이면 종료
+        // 빈 줄, 주요 섹션, 하위 섹션이면 종료
         if (
           nextTrimmed === '' ||
-          /^(📖 핵심 해석|📝 실무 적용|🔴 조건·예외)$/.test(nextTrimmed) ||
-          /^(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)$/.test(nextTrimmed)
+          /^(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)$/.test(nextTrimmed) ||
+          /^(📖 조문 발췌|📖 핵심 해석|📝 실무 적용|🔴 조건·예외)$/.test(nextTrimmed)
         ) {
+          console.log('[markLawQuotes] 조문 수집 종료:', { reason: nextTrimmed || '빈 줄', collectedCount })
           break
         }
 
         quoteLines.push(nextLine)
+        collectedCount++
         i++
       }
 
-      // 조문 전체를 마커로 감싸기
-      if (quoteLines.length > 0) {
-        result.push('<<<QUOTE_START>>>')
-        result.push(...quoteLines)
-        result.push('<<<QUOTE_END>>>')
-      }
+      // 조문 내용을 마커 안에 포함
+      result.push(...quoteLines)
+      result.push('<<<QUOTE_END>>>')
+      console.log('[markLawQuotes] 마커 추가 완료:', { quoteLineCount: quoteLines.length })
       continue
     }
 
@@ -348,7 +352,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
       }
 
       // 하위 섹션 제목 감지
-      if (trimmed === '📜 조문 발췌') {
+      if (trimmed === '📖 조문 발췌') {
         currentSub = 'none'
         contentLines.push(
           `<div style="font-weight: bold; margin-left: 1rem;">${trimmed}</div>`
@@ -418,9 +422,17 @@ function linkifyRefsB(text: string): string {
   })
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 이미 링크된 부분 제외
-  t = t.replace(/(?<!="|\/">)([가-힣A-Za-z\d·]+(?:법|령|규칙|조례))\s+제(\d+)조(의(\d+))?(?!<\/a>)/g, (match, lawName, art, _p2, branch) => {
+  // ⚠️ 긴 법령명 지원: 띄어쓰기 포함한 모든 문자 매칭
+  // ⚠️ 링크: 법령명 + 조문번호만, 제목: 링크 밖에 표시 & 대괄호 제거
+  t = t.replace(/(?<!="|\/">)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s]+\))?(?!<\/a>)/g, (_match, lawName, art, _p2, branch, title) => {
+    // 법령명 앞뒤 공백 제거
+    const cleanLawName = lawName.trim()
     const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + match + '</a>'
+    // 링크 부분 (법령명 + 조문번호)
+    const linkPart = cleanLawName + ' ' + joLabel
+    // 제목 부분 (대괄호 제거)
+    const titlePart = title ? ' ' + title.replace(/\[([^\]]+)\]/g, '$1') : ''
+    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + cleanLawName + '" data-article="' + joLabel + '">' + linkPart + '</a>' + titlePart
   })
 
   // 4. 제X조 패턴 (현재 법령) - 이미 링크된 부분 제외

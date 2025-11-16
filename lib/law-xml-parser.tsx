@@ -273,6 +273,13 @@ export function extractArticleText(article: LawArticle): string {
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
     content = linkifyRefsB(content)
+
+    // Replace 2+ newlines before paragraph markers with single newline
+    content = content.replace(/\n{2,}\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
+
+    // Convert all newlines to <br>
+    content = content.replace(/\n/g, '<br>')
+
     // Add spacing for paragraph markers (①②③) - skip first occurrence
     let isFirst = true
     content = content.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
