@@ -95,8 +95,9 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
   debugLogger.debug("검색어 파싱 시작", { query })
 
   const normalizedQuery = normalizeLawSearchText(query)
+  // 법령명과 조문 사이 공백 선택적 (행정법2조, 행정법 2조 둘 다 지원)
   const articlePattern =
-    /(?:\s|^)(제?\d+(?:조)?(?:[-의]\d+)?)(?:\s*제?\d+항)?(?:\s*제?\d+호)?(?:\s*제?\d+목)?$/u
+    /\s*(제?\d+(?:조)?(?:[-의]\d+)?)(?:\s*제?\d+항)?(?:\s*제?\d+호)?(?:\s*제?\d+목)?$/u
   const match = articlePattern.exec(normalizedQuery)
 
   if (match && match.index !== undefined) {

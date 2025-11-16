@@ -58,6 +58,8 @@ interface LawViewerProps {
   relatedArticles?: ParsedRelatedLaw[]
   onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
   fileSearchFailed?: boolean  // 검색 실패 여부
+  aiCitations?: any[]  // File Search Citations
+  userQuery?: string   // 사용자 질의
 
   // AI 모드 - 관련 법령 2단 비교
   comparisonLawMeta?: LawMeta | null
@@ -85,6 +87,8 @@ export function LawViewer({
   comparisonLawArticles = [],
   comparisonLawSelectedJo,
   isLoadingComparison = false,
+  aiCitations = [],
+  userQuery = '',
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -526,10 +530,45 @@ export function LawViewer({
           return
         }
 
-        // AI 답변 모드에서는 현재 법령이 없으므로 lastExternalRef 사용
-        if (aiAnswerMode && lastExternalRef?.lawName) {
-          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
-          setLastExternalRef({ ...lastExternalRef, joLabel: articleLabel })
+        // AI 답변 모드에서는 법령명을 자동으로 추론
+        if (aiAnswerMode) {
+          const { inferLawNameFromArticle } = await import('@/lib/ai-law-inference')
+
+          const inferred = inferLawNameFromArticle(articleLabel, {
+            userQuery,
+            relatedLaws: relatedArticles,
+            aiAnswerContent,
+            citations: aiCitations,
+          })
+
+          if (inferred) {
+            console.log('[AI 법령 추론] 조문:', articleLabel, '→ 법령:', inferred.lawName, '(신뢰도:', inferred.confidence, ', 근거:', inferred.reason, ')')
+            debugLogger.info('법령명 자동 추론', {
+              article: articleLabel,
+              lawName: inferred.lawName,
+              confidence: inferred.confidence,
+              reason: inferred.reason
+            })
+
+            await openExternalLawArticleModal(inferred.lawName, articleLabel)
+            setLastExternalRef({ lawName: inferred.lawName, joLabel: articleLabel })
+            return
+          }
+
+          // 추론 실패 시 lastExternalRef 사용 (fallback)
+          if (lastExternalRef?.lawName) {
+            console.log('[AI 법령 추론] 실패 → lastExternalRef 사용:', lastExternalRef.lawName)
+            await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
+            setLastExternalRef({ ...lastExternalRef, joLabel: articleLabel })
+            return
+          }
+
+          // 둘 다 실패 시 에러 메시지
+          toast({
+            title: "법령명을 찾을 수 없습니다",
+            description: `"${articleLabel}"의 법령명을 자동으로 찾을 수 없습니다. 법령명과 함께 명시된 링크를 클릭해주세요.`,
+            variant: "destructive"
+          })
           return
         }
 

@@ -12,6 +12,7 @@ import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
+import { SearchProgressDialog } from './search-progress-dialog'
 
 
 export function FileSearchRAGView({
@@ -27,6 +28,9 @@ export function FileSearchRAGView({
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [progressStage, setProgressStage] = useState(0)
+  const [confidenceLevel, setConfidenceLevel] = useState<'high' | 'medium' | 'low'>('high')
+  const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
+  const [searchProgress, setSearchProgress] = useState(0)
 
   // 선택된 관련 법령 데이터 (Phase 4)
   const [selectedLawMeta, setSelectedLawMeta] = useState<LawMeta | null>(null)
@@ -78,6 +82,11 @@ export function FileSearchRAGView({
       setAnalysis('')
       setRelatedLaws([])
       setProgressStage(0)
+      setConfidenceLevel('high') // 초기값은 높음으로 가정
+
+      // 프로그레스 초기화
+      setSearchStage('searching')
+      setSearchProgress(10)
 
       const response = await fetch('/api/file-search-rag', {
         method: 'POST',
@@ -89,6 +98,10 @@ export function FileSearchRAGView({
         throw new Error(`API error: ${response.status}`)
       }
 
+      // 검색 완료 → 파싱 단계
+      setSearchStage('parsing')
+      setSearchProgress(30)
+
       // SSE 스트리밍 읽기
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
@@ -97,7 +110,12 @@ export function FileSearchRAGView({
         throw new Error('No response body')
       }
 
+      // 스트리밍 시작
+      setSearchStage('streaming')
+      setSearchProgress(50)
+
       let buffer = ''
+      let streamChunkCount = 0
 
       while (true) {
         const { done, value } = await reader.read()
@@ -123,13 +141,23 @@ export function FileSearchRAGView({
 
               if (parsed.type === 'text') {
                 setAnalysis(prev => prev + parsed.text)
+                streamChunkCount++
+                // 프로그레스: 50% → 95% (청크 수에 따라)
+                const progress = Math.min(50 + streamChunkCount * 5, 95)
+                setSearchProgress(progress)
               } else if (parsed.type === 'warning') {
                 setWarning(parsed.message)
                 debugLogger.warning('AI 답변 경고', { message: parsed.message })
               } else if (parsed.type === 'citations') {
+                // ✅ 신뢰도 레벨 업데이트
+                if (parsed.confidenceLevel) {
+                  setConfidenceLevel(parsed.confidenceLevel)
+                  debugLogger.info('신뢰도 레벨 수신', { level: parsed.confidenceLevel })
+                }
                 debugLogger.info('Citations 수신', {
                   count: parsed.citations?.length || 0,
-                  finishReason: parsed.finishReason
+                  finishReason: parsed.finishReason,
+                  confidenceLevel: parsed.confidenceLevel
                 })
               }
             } catch (e) {
@@ -157,9 +185,15 @@ export function FileSearchRAGView({
                 setWarning(parsed.message)
                 debugLogger.warning('AI 답변 경고 (버퍼)', { message: parsed.message })
               } else if (parsed.type === 'citations') {
+                // ✅ 신뢰도 레벨 업데이트 (버퍼)
+                if (parsed.confidenceLevel) {
+                  setConfidenceLevel(parsed.confidenceLevel)
+                  debugLogger.info('신뢰도 레벨 수신 (버퍼)', { level: parsed.confidenceLevel })
+                }
                 debugLogger.info('Citations 수신 (버퍼)', {
                   count: parsed.citations?.length || 0,
-                  finishReason: parsed.finishReason
+                  finishReason: parsed.finishReason,
+                  confidenceLevel: parsed.confidenceLevel
                 })
               }
             } catch (e) {
@@ -169,12 +203,17 @@ export function FileSearchRAGView({
         }
       }
 
+      // 완료
+      setSearchStage('complete')
+      setSearchProgress(100)
       setIsAnalyzing(false)
 
     } catch (err) {
       console.error('File Search error:', err)
       setError(err instanceof Error ? err.message : '분석 중 오류가 발생했습니다.')
       setIsAnalyzing(false)
+      setSearchStage('complete')
+      setSearchProgress(0)
     }
   }
 
@@ -287,8 +326,17 @@ export function FileSearchRAGView({
 
   return (
     <div className="flex flex-col h-full relative">
+      {/* 프로그레스 Dialog */}
+      <SearchProgressDialog
+        isOpen={isAnalyzing}
+        mode="ai"
+        stage={searchStage}
+        progress={searchProgress}
+        lawName={initialQuery}
+      />
+
       {/* Loading Overlay - 스트리밍 중에도 유지 */}
-      {isAnalyzing && (
+      {isAnalyzing && false && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="w-full max-w-md px-6">
             {/* Progress Steps */}
@@ -382,9 +430,31 @@ export function FileSearchRAGView({
       {/* Analysis Result - LawViewer AI Mode */}
       {analysis && !error && (
         <>
+          {/* Confidence Badge */}
+          <div className="mx-4 mt-4 flex items-center gap-2">
+            {confidenceLevel === 'high' && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">신뢰도 높음</span>
+              </div>
+            )}
+            {confidenceLevel === 'medium' && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-full">
+                <span className="text-yellow-600 dark:text-yellow-500">⚠️</span>
+                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">신뢰도 보통</span>
+              </div>
+            )}
+            {confidenceLevel === 'low' && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full">
+                <span className="text-red-600 dark:text-red-500">❌</span>
+                <span className="text-sm font-medium text-red-700 dark:text-red-300">신뢰도 낮음</span>
+              </div>
+            )}
+          </div>
+
           {/* Warning Banner */}
           {warning && (
-            <div className="mx-4 mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+            <div className="mx-4 mt-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
               <div className="flex items-start gap-2">
                 <span className="text-yellow-600 dark:text-yellow-500">⚠️</span>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>

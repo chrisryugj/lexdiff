@@ -32,6 +32,19 @@ export async function POST(request: NextRequest) {
               citations = chunk.citations || []
               finishReason = chunk.finishReason || null
 
+              // ✅ 신뢰도 계산 (groundingChunks 개수 기반)
+              const confidenceLevel = citations.length >= 3 ? 'high' : citations.length >= 1 ? 'medium' : 'low'
+
+              // ⚠️ 신뢰도 낮음 경고
+              if (citations.length === 0) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: 'warning',
+                    message: '⚠️ File Search Store에서 관련 조문을 찾지 못했습니다. 답변이 일반 지식에 기반할 수 있습니다.'
+                  })}\n\n`)
+                )
+              }
+
               // ⚠️ MAX_TOKENS 경고 전송
               if (finishReason === 'MAX_TOKENS') {
                 controller.enqueue(
@@ -42,12 +55,13 @@ export async function POST(request: NextRequest) {
                 )
               }
 
-              // Citation 전송
+              // Citation + Confidence 전송
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({
                   type: 'citations',
                   citations,
-                  finishReason
+                  finishReason,
+                  confidenceLevel
                 })}\n\n`)
               )
             } else {

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot } from "lucide-react"
+import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot, Brain } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { parseSearchQuery } from "@/lib/law-parser"
@@ -25,8 +25,12 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [searchType, setSearchType] = useState<"law" | "ordinance" | "ai" | null>(null)
   const [isNaturalQuery, setIsNaturalQuery] = useState(false)
+  const [forceAiMode, setForceAiMode] = useState(false)  // NEW: 수동 AI 모드 전환
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // 자동 감지 + 수동 전환 병합
+  const isAiMode = forceAiMode || (searchMode === 'rag') || (searchType === 'ai')
 
   useEffect(() => {
     if (!query.trim()) {
@@ -139,9 +143,24 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-3xl relative">
       <div className="flex gap-2">
+        {/* AI 모드 전환 버튼 (NEW) */}
+        <Button
+          type="button"
+          variant={forceAiMode ? "default" : "outline"}
+          size="icon"
+          onClick={() => setForceAiMode(!forceAiMode)}
+          className={cn(
+            "h-12 w-12 transition-all duration-300",
+            forceAiMode && "bg-gradient-to-br from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
+          )}
+          title={forceAiMode ? "기본 검색으로 전환" : "AI 검색으로 전환"}
+        >
+          <Brain className={cn("h-5 w-5", forceAiMode && "animate-pulse")} />
+        </Button>
+
         <div className="relative flex-1">
-          {searchMode === 'rag' ? (
-            <Sparkles className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
+          {isAiMode ? (
+            <Brain className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
           ) : searchType === "ordinance" ? (
             <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
           ) : searchType === "law" ? (
@@ -152,13 +171,20 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           <Input
             ref={inputRef}
             type="text"
-            placeholder={searchMode === 'rag' ? '✨ 자연어로 질문해보세요 (예: "수입 관세는 언제 납부하나요?")' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
+            placeholder={isAiMode ? '🤖 AI에게 물어보세요... 예: "FTA 특혜 관세는 어떻게 받나요?"' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
             className={cn(
               "pl-11 h-12 text-base transition-all duration-500",
-              searchMode === 'rag' && "ring-2 ring-purple-500/70 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)] animate-pulse-slow bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20"
+              isAiMode && [
+                "ring-2 ring-purple-500/70 border-purple-400",
+                "shadow-[0_0_30px_rgba(168,85,247,0.5)]",
+                "bg-gradient-to-r from-purple-900/90 to-blue-900/90",
+                "dark:from-purple-900/90 dark:to-blue-900/90",
+                "text-purple-50 placeholder:text-purple-200",
+                "animate-glow-pulse"
+              ]
             )}
             disabled={isLoading}
           />
@@ -193,19 +219,25 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           disabled={isLoading || !query.trim()}
           className={cn(
             "h-12 px-6 sm:px-8 transition-all duration-300",
-            searchMode === 'rag' && "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/50 animate-pulse-slow"
+            isAiMode && [
+              "bg-gradient-to-r from-purple-600 to-blue-600",
+              "hover:from-purple-700 hover:to-blue-700",
+              "shadow-lg shadow-purple-500/50",
+              "font-semibold",
+              "text-white"
+            ]
           )}
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span className="hidden sm:inline">{searchMode === 'rag' ? 'AI 검색 중' : '검색 중'}</span>
+              <span className="hidden sm:inline">{isAiMode ? 'AI 검색 중' : '검색 중'}</span>
               <span className="sm:hidden">검색</span>
             </>
           ) : (
             <>
-              {searchMode === 'rag' && <Sparkles className="mr-2 h-4 w-4" />}
-              <span className="hidden sm:inline">{searchMode === 'rag' ? 'AI 검색' : '검색'}</span>
+              {isAiMode && <Brain className="mr-2 h-4 w-4" />}
+              <span className="hidden sm:inline">{isAiMode ? 'AI 검색' : '검색'}</span>
               <span className="sm:hidden">검색</span>
             </>
           )}
