@@ -159,13 +159,24 @@
   .rev-mark {
     color: rgb(147, 197, 253) !important;
     font-weight: 600 !important;
-    font-size: 0.875rem !important;
+    font-size: 0.95em !important;
   }
 
   .prose .rev-mark {
     color: rgb(147, 197, 253) !important;
     font-weight: 600 !important;
-    font-size: 0.875rem !important;
+    font-size: 0.95em !important;
+  }
+
+  /* 법령 조문 내용에서 항 사이 간격 추가 */
+  .law-article-content {
+    white-space: pre-wrap !important;
+  }
+
+  /* 항 마커(①②③) 앞 간격 조절 - 첫 번째 항 제외 */
+  .para-marker {
+    display: inline-block;
+    margin-top: 0.5em;
   }
 
   a.law-ref {

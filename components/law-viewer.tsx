@@ -27,6 +27,8 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  Copy,
+  Check,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -112,10 +114,11 @@ export function LawViewer({
 
   const [activeJo, setActiveJo] = useState<string>(selectedJo || actualArticles[0]?.jo || "")
   const [fontSize, setFontSize] = useState<number>(14)
+  const [copied, setCopied] = useState(false)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
-  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string; forceWhiteTheme?: boolean }>({ open: false })
+  const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string; forceWhiteTheme?: boolean; lawName?: string; articleNumber?: string }>({ open: false })
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -473,6 +476,17 @@ export function LawViewer({
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 2, 10))
   const resetFontSize = () => setFontSize(14)
 
+  const handleCopy = async () => {
+    if (!contentRef.current) return
+    const textContent = contentRef.current.innerText
+    const title = activeArticle
+      ? `${meta.lawTitle} ${formatJO(activeArticle.jo)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`
+      : meta.lawTitle
+    await navigator.clipboard.writeText(`${title}\n\n${textContent}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const openLawCenter = () => {
     const lawTitle = meta.lawTitle
 
@@ -581,6 +595,8 @@ export function LawViewer({
               open: true,
               title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
               html: extractArticleText(found),
+              lawName: meta.lawTitle,
+              articleNumber: formatJO(found.jo),
             })
             return
           }
@@ -1005,6 +1021,8 @@ export function LawViewer({
           open: true,
           title: articleTitle,
           html: htmlContent,
+          lawName: lawName,
+          articleNumber: articleLabel,
         })
       } catch (fetchErr: any) {
         console.error("[citation] Failed to fetch/parse article:", { lawName, articleLabel, joCode, error: fetchErr.message })
@@ -1305,7 +1323,7 @@ export function LawViewer({
 
             <div className="flex-1 min-h-0">
               <ScrollArea className="h-full">
-                <div className="space-y-2 pr-4">
+                <div className="space-y-2 pr-0">
                   {relatedArticles.length > 0 ? (
                     (() => {
                       // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
@@ -1348,7 +1366,7 @@ export function LawViewer({
                         <button
                           key={`${law.lawName}-${law.jo}-${idx}`}
                           onClick={handleClick}
-                          className="w-full text-left px-3 py-2.5 rounded-md text-sm border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                          className="w-full text-left pl-4 pr-5 py-2.5 rounded-md text-sm border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-1.5 flex-1">
@@ -1632,6 +1650,22 @@ export function LawViewer({
                   </>
                 )}
               </Button>
+              {/* 글자 크기 조절 및 복사 */}
+              <div className="flex items-center gap-1 ml-2">
+                <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
+                  <RotateCcw className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
+                <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -2798,6 +2832,8 @@ export function LawViewer({
         html={refModal.html}
         onContentClick={handleContentClick}
         forceWhiteTheme={refModal.forceWhiteTheme}
+        lawName={refModal.lawName}
+        articleNumber={refModal.articleNumber}
       />
     </div>
   )

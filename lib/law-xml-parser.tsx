@@ -273,6 +273,15 @@ export function extractArticleText(article: LawArticle): string {
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
     content = linkifyRefsB(content)
+    // Add spacing for paragraph markers (①②③) - skip first occurrence
+    let isFirst = true
+    content = content.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
+      if (isFirst) {
+        isFirst = false
+        return match
+      }
+      return '<span class="para-marker">' + match + '</span>'
+    })
     text += content + "\n"
   }
 
@@ -286,7 +295,7 @@ export function extractArticleText(article: LawArticle): string {
       const styledParaContent = linkifyRefsB(applyRevisionStyling(escapeHtml(paraContent)))
 
       if (startsWithNumber) {
-        text += "\n" + styledParaContent + "\n"
+        text += "<br><br>" + styledParaContent + "<br>"
       } else if (paraNum) {
         text += "\n" + paraNum + ". " + styledParaContent + "\n"
       } else {
@@ -330,19 +339,21 @@ export function formatDelegationContent(content: string): string {
   text = applyRevisionStyling(text)
   text = linkifyRefsB(text)
 
-  // Replace paragraph markers with line breaks
-  text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br>$1 ')
+  // Add line break + spacing for paragraph markers (①②③) - skip first occurrence
+  let isFirst = true
+  text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
+    if (isFirst) {
+      isFirst = false
+      return match
+    }
+    return '<br><span class="para-marker">' + match + '</span>'
+  })
 
-  // Replace numbered items with line breaks, but NOT dates in revision markers
-  // Negative lookbehind: not preceded by "digit. " (to skip "3. " in "2010. 3. 26.")
-  // Negative lookahead: not followed by "digit(s)." (to skip "2010. " in "2010. 3.")
+  // Add line break for numbered items (1., 2., 3.) - but NOT dates
   text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
 
-  // Replace sub-items (가., 나., 다., etc.) with indented line breaks
+  // Add line break for sub-items (가., 나., 다.)
   text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
-
-  // Clean up any leading <br> tags
-  text = text.replace(/^(<br>)+/, '')
 
   return text
 }
@@ -370,7 +381,18 @@ function applyRevisionStyling(text: string): string {
     '<span class="rev-mark">＜$1 $2＞</span>',
   )
 
-  // [본조신설], [종전 ~ 이동] 형식
+  // "삭제<날짜>" 또는 "삭제 <날짜>" 형식
+  styled = styled.replace(
+    /(삭제)\s*&lt;([0-9., ]+)&gt;/g,
+    '<span class="rev-mark">$1 ＜$2＞</span>',
+  )
+
+  styled = styled.replace(
+    /(삭제)\s*＜([0-9., ]+)＞/g,
+    '<span class="rev-mark">$1 ＜$2＞</span>',
+  )
+
+  // [본조신설], [종전 ~ 이동], [제X조에서 이동] 형식
   styled = styled.replace(
     /\[(본조신설|본조삭제)[^\]]*\]/g,
     '<span class="rev-mark">$&</span>',
@@ -378,6 +400,11 @@ function applyRevisionStyling(text: string): string {
 
   styled = styled.replace(
     /\[종전[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
+  )
+
+  styled = styled.replace(
+    /\[제\d+조[^\]]*에서 이동[^\]]*\]/g,
     '<span class="rev-mark">$&</span>',
   )
 

@@ -17,7 +17,7 @@ import { AISummaryDialog } from "@/components/ai-summary-dialog"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
-import { FeedbackButtons } from "@/components/feedback-buttons"
+// import { FeedbackButtons } from "@/components/feedback-buttons" // 미사용으로 제거
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
 import { RagResultCard } from "@/components/rag-result-card"
@@ -2033,32 +2033,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                         onDismiss={() => setArticleNotFound(null)}
                       />
                     )}
-                    {(() => {
-                      const shouldShow = !!lawData.searchResultId && !isAiMode
-
-                      // 디버그 로거에만 표시 (렌더링마다 찍히지 않도록 useEffect 대신 여기서 한번만)
-                      if (typeof window !== 'undefined') {
-                        debugLogger.info('👁️ 피드백 버튼 렌더링 체크', {
-                          searchResultId: lawData.searchResultId || '없음',
-                          searchQueryId: lawData.searchQueryId || '없음',
-                          isAiMode: isAiMode ? '예' : '아니오',
-                          shouldShow: shouldShow ? '예' : '아니오',
-                          lawTitle: lawData.meta.lawTitle,
-                        })
-                      }
-
-                      return shouldShow ? (
-                        <div className="px-4 py-3 bg-muted/50 rounded-lg border">
-                          <FeedbackButtons
-                            searchQueryId={lawData.searchQueryId}
-                            searchResultId={lawData.searchResultId}
-                            lawId={lawData.meta.lawId}
-                            lawTitle={lawData.meta.lawTitle}
-                            articleNumber={lawData.selectedJo}
-                          />
-                        </div>
-                      ) : null
-                    })()}
+                    {/* 피드백 버튼 제거됨 - 미사용 */}
                     <LawViewer
                       meta={lawData.meta}
                       articles={lawData.articles}
@@ -2102,17 +2077,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                     onDismiss={() => setArticleNotFound(null)}
                   />
                 )}
-                {lawData.searchResultId && !isAiMode && (
-                  <div className="px-4 py-3 bg-muted/50 rounded-lg border">
-                    <FeedbackButtons
-                      searchQueryId={lawData.searchQueryId}
-                      searchResultId={lawData.searchResultId}
-                      lawId={lawData.meta.lawId}
-                      lawTitle={lawData.meta.lawTitle}
-                      articleNumber={lawData.selectedJo}
-                    />
-                  </div>
-                )}
+                {/* 피드백 버튼 제거됨 - Phase 5/6 비활성화로 미사용 */}
                 <LawViewer
                   meta={lawData.meta}
                   articles={lawData.articles}
