@@ -9,9 +9,9 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "LexDiff — See the Difference in Law.",
-  description: "LexDiff: See the Difference in Law.",
-  generator: "v0.app",
+  title: "LexDiff — Your AI-Powered Legal Companion.",
+  description: "LexDiff: Your AI-Powered Legal Companion",
+  generator: "Chris Ryu",
 }
 
 export default function RootLayout({
