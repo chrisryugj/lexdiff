@@ -82,7 +82,8 @@ function linkifyRefsB(text: string): string {
   })
 
   // 4. 제X조 패턴 (현재 법령) - 이미 링크된 부분 제외
-  t = t.replace(/(?<!="|\/">)제(\d{1,4})조(의(\d{1,2}))?(?!<\/a>)/g, (m) => {
+  // ⚠️ 법령명 바로 뒤에 있는 조문은 건너뛰기 (이미 3번에서 처리됨)
+  t = t.replace(/(?<!="|\/">|[가-힣A-Za-z\d·]+(?:법|령|규칙|조례)\s+)제(\d{1,4})조(의(\d{1,2}))?(?!<\/a>)/g, (m) => {
     const data = m.replace(/\s+/g, '')
     return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + m + '</a>'
   })

@@ -39,6 +39,7 @@ import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
+import { debugLogger } from '@/lib/debug-logger'
 
 interface LawViewerProps {
   meta: LawMeta
@@ -317,6 +318,11 @@ export function LawViewer({
   // Fetch 3-tier comparison data when law is loaded
   useEffect(() => {
     const fetchThreeTierData = async () => {
+      if (aiAnswerMode) {
+        console.log("[v0] [3단비교] AI 답변 모드 - 3단비교 비활성화")
+        return
+      }
+
       if (isOrdinance) {
         console.log("[v0] [3단비교] 조례는 3단비교 미지원 - 종료")
         return
@@ -361,7 +367,7 @@ export function LawViewer({
     }
 
     fetchThreeTierData()
-  }, [meta.lawId, meta.mst, isOrdinance])
+  }, [meta.lawId, meta.mst, isOrdinance, aiAnswerMode])
 
   // Auto-reset tier view mode if the current article doesn't support it
   useEffect(() => {
@@ -519,6 +525,15 @@ export function LawViewer({
           setLastExternalRef({ lawName, joLabel: articleLabel })
           return
         }
+
+        // AI 답변 모드에서는 현재 법령이 없으므로 lastExternalRef 사용
+        if (aiAnswerMode && lastExternalRef?.lawName) {
+          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
+          setLastExternalRef({ ...lastExternalRef, joLabel: articleLabel })
+          return
+        }
+
+        // 일반 모드: 현재 법령에서 검색
         try {
           const joCode = buildJO(articleLabel)
           const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
@@ -565,7 +580,7 @@ export function LawViewer({
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
 
-        // ✅ 모든 모드에서 모달로 열기
+        // 모든 법령 링크는 모달로 열기 (사이드바 방식과 동일)
         await openExternalLawArticleModal(lawName, articleLabel)
         setLastExternalRef({ lawName, joLabel: articleLabel })
       } else if (refType === "same") {
@@ -763,9 +778,13 @@ export function LawViewer({
   // Helper: fetch external law article and show in modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
     try {
+      console.log('[Citation] Opening modal for:', { lawName, articleLabel })
+
       const qs = new URLSearchParams({ query: lawName })
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
+
+      console.log('[Citation] Law search response length:', searchXml.length)
 
       const parser = new DOMParser()
       const searchDoc = parser.parseFromString(searchXml, "text/xml")
@@ -774,7 +793,11 @@ export function LawViewer({
       const lawId = lawNode?.querySelector("법령ID")?.textContent || undefined
       const mst = lawNode?.querySelector("법령일련번호")?.textContent || undefined
       const effectiveDate = lawNode?.querySelector("시행일자")?.textContent || undefined
+
+      console.log('[Citation] Law identifiers:', { lawId, mst, effectiveDate })
+
       if (!lawId && !mst) {
+        console.log('[Citation] No law ID found')
         setRefModal({
           open: true,
           title: lawName,
@@ -789,8 +812,9 @@ export function LawViewer({
       try {
         const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
         joCode = buildJO(articleOnly)
+        console.log('[Citation] JO code built:', { articleOnly, joCode })
       } catch (err) {
-        console.error("Failed to build JO code:", err)
+        console.error("[Citation] Failed to build JO code:", err)
       }
 
       const identifierParams = new URLSearchParams()
@@ -803,26 +827,37 @@ export function LawViewer({
         identifierParams.append("jo", joCode)
         console.log("[citation] Fetching specific article:", { lawName, articleLabel, joCode })
       }
-      if (effectiveDate) {
-        identifierParams.append("efYd", effectiveDate)
-      }
+      // ⚠️ efYd를 사용하지 않음 - 최신 시행 버전 조회
+      // 타법개정으로 인한 조문 누락 방지
 
       try {
+        console.log('[Citation] Fetching eflaw API:', identifierParams.toString())
         const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
 
         if (!eflawRes.ok) {
+          console.error('[Citation] Eflaw API error:', eflawRes.status)
           throw new Error(`HTTP ${eflawRes.status}`)
         }
 
         const eflawJson = await eflawRes.json()
+        console.log('[Citation] Eflaw JSON keys:', Object.keys(eflawJson))
+
         const lawData = eflawJson?.법령
+        console.log('[Citation] Law data exists:', !!lawData)
+
         const rawArticleUnits = lawData?.조문?.조문단위
+        console.log('[Citation] Raw article units type:', Array.isArray(rawArticleUnits) ? 'array' : typeof rawArticleUnits)
+
         const articleUnits = Array.isArray(rawArticleUnits)
           ? rawArticleUnits
           : rawArticleUnits
           ? [rawArticleUnits]
           : []
+
+        console.log('[Citation] Article units count:', articleUnits.length)
+
         const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
+        console.log('[Citation] Normalized JO:', normalizedJo)
 
         // 🔍 디버깅: 조문 검색 상세 로그
         debugLogger.info('[citation] Article search details', {
@@ -837,13 +872,33 @@ export function LawViewer({
           } : null
         })
 
+        console.log('[Citation] Searching for article with normalizedJo:', normalizedJo)
+        console.log('[Citation] All articles:', articleUnits.map((u: any) => ({
+          조문키: u?.조문키,
+          조문번호: u?.조문번호,
+          조문제목: u?.조문제목?.substring(0, 30)
+        })))
+
+        // ⚠️ 조문여부가 "조문"인 것만 찾기 (전문 제외)
         const targetUnit =
-          articleUnits.find((unit: any) => typeof unit?.조문키 === "string" && unit.조문키.startsWith(normalizedJo)) ||
+          articleUnits.find((unit: any) =>
+            unit?.조문여부 === "조문" &&
+            typeof unit?.조문키 === "string" && unit.조문키.startsWith(normalizedJo)
+          ) ||
           articleUnits.find((unit: any) => {
             const num = typeof unit?.조문번호 === "string" ? unit.조문번호.replace(/\D/g, "") : ""
             const targetNum = articleLabel.replace(/\D/g, "")
-            return num !== "" && targetNum !== "" && num === targetNum
+            return unit?.조문여부 === "조문" && num !== "" && targetNum !== "" && num === targetNum
           })
+
+        console.log('[Citation] Target unit found:', !!targetUnit)
+        if (targetUnit) {
+          console.log('[Citation] Found unit:', {
+            조문키: targetUnit.조문키,
+            조문번호: targetUnit.조문번호,
+            조문제목: targetUnit.조문제목?.substring(0, 50)
+          })
+        }
 
         if (!targetUnit) {
           console.warn("[citation] Article not found in JSON response", {
@@ -885,10 +940,32 @@ export function LawViewer({
 
         const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
 
+        console.log('[Citation] Creating modal with article:', {
+          jo: lawArticle.jo,
+          joNum: lawArticle.joNum,
+          title: lawArticle.title,
+          contentLength: lawArticle.content?.length || 0
+        })
+
+        const htmlContent = extractArticleText(lawArticle)
+        console.log('[Citation] Extracted HTML length:', htmlContent.length)
+        console.log('[Citation] HTML preview:', htmlContent.substring(0, 200))
+
+        // ⚠️ 조문 내용이 비어있는 경우 에러 메시지 표시
+        if (!htmlContent || htmlContent.trim().length === 0) {
+          console.warn('[Citation] Empty article content - possibly deleted or not yet effective')
+          setRefModal({
+            open: true,
+            title: articleTitle,
+            html: `<div class="space-y-3"><p>⚠️ 조문 내용을 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground">이 조문은 최근 개정으로 인해 내용이 변경되었거나 삭제되었을 수 있습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기</a></div></div>`,
+          })
+          return
+        }
+
         setRefModal({
           open: true,
           title: articleTitle,
-          html: extractArticleText(lawArticle),
+          html: htmlContent,
         })
       } catch (fetchErr: any) {
         console.error("[citation] Failed to fetch/parse article:", { lawName, articleLabel, joCode, error: fetchErr.message })
@@ -1217,7 +1294,7 @@ export function LawViewer({
                           // 사이드바 닫기 (모바일)
                           setIsArticleListExpanded(false)
 
-                          // ✅ 모달로 법령 조문 열기 (async 호출)
+                          // ✅ 모달로 법령 조문 열기
                           openExternalLawArticleModal(law.lawName, law.article)
                             .then(() => {
                               setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
