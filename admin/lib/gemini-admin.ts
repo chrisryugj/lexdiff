@@ -220,10 +220,28 @@ export class GeminiAdmin {
   }
 
   /**
-   * 파일 삭제
+   * 파일 삭제 (일반 Files API)
    */
   async deleteFile(fileName: string): Promise<void> {
     await this.ai.files.delete({ name: fileName });
+  }
+
+  /**
+   * Store에서 Document 삭제
+   * @param documentName Document의 full name (e.g., fileSearchStores/xxx/documents/yyy)
+   * @param force true이면 indexed 데이터도 강제 삭제 (기본값: true)
+   */
+  async deleteDocument(documentName: string, force = true): Promise<void> {
+    // CRITICAL: force must be passed in config object for indexed documents
+    const config: { force?: boolean } = {};
+    if (force) {
+      config.force = true;
+    }
+
+    await this.ai.fileSearchStores.documents.delete({
+      name: documentName,
+      ...(force && { config }),
+    });
   }
 
   /**
