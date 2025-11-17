@@ -11,6 +11,7 @@ interface SearchProgressDialogProps {
   stage: 'searching' | 'parsing' | 'streaming' | 'complete'
   progress: number
   lawName?: string
+  isCacheHit?: boolean  // 캐시 히트 여부
 }
 
 /**
@@ -23,7 +24,8 @@ export function SearchProgressDialogImproved({
   mode,
   stage,
   progress,
-  lawName
+  lawName,
+  isCacheHit = false
 }: SearchProgressDialogProps) {
   const isAI = mode === 'ai'
   const isComplete = stage === 'complete'
@@ -174,24 +176,28 @@ export function SearchProgressDialogImproved({
           {!isComplete && (
             <div className={cn(
               "mx-4 p-4 rounded-xl border-2",
-              isAI
+              isCacheHit
+                ? "bg-green-950/20 border-green-600/30"
+                : isAI
                 ? "bg-blue-950/20 border-blue-600/30"
                 : "bg-indigo-950/20 border-indigo-600/30"
             )}>
               <div className="flex items-start gap-3">
                 <Zap className={cn(
                   "h-5 w-5 flex-shrink-0 mt-0.5",
-                  isAI ? "text-blue-400" : "text-indigo-400"
+                  isCacheHit ? "text-green-400" : isAI ? "text-blue-400" : "text-indigo-400"
                 )} />
                 <div className="space-y-1">
                   <p className={cn(
                     "text-sm font-bold",
-                    isAI ? "text-blue-300" : "text-indigo-300"
+                    isCacheHit ? "text-green-300" : isAI ? "text-blue-300" : "text-indigo-300"
                   )}>
-                    {isAI ? '최고 품질의 AI 답변 생성 중' : '빠르고 정확한 법령 검색'}
+                    {isCacheHit ? '💾 캐시에서 빠르게 로드 중' : isAI ? '최고 품질의 AI 답변 생성 중' : '빠르고 정확한 법령 검색'}
                   </p>
                   <p className="text-xs text-foreground/80">
-                    {isAI
+                    {isCacheHit
+                      ? '이전에 검색한 데이터를 불러오는 중입니다 (초고속)'
+                      : isAI
                       ? 'Gemini 2.5 Flash가 최적의 답변을 생성하고 있습니다'
                       : '법제처 공식 데이터를 실시간으로 가져오고 있습니다'
                     }

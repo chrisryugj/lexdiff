@@ -354,6 +354,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isCacheHit, setIsCacheHit] = useState(false)  // 캐시 히트 여부
 
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -409,6 +410,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             articles: cached.lawData.articles.length,
           })
 
+          // ⚡ 캐시 로딩 표시 (0.3초만 표시)
+          setIsCacheHit(true)
+          setIsSearching(true)
+          updateProgress('parsing', 90)
+
           setLawData({
             meta: {
               lawId: cached.lawData.meta.lawId || '',
@@ -433,8 +439,12 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             searchResultId: cached.lawData.searchResultId,
           })
 
-          setIsSearching(false)
-          updateProgress('complete', 100)
+          // ⚡ 즉시 완료 (캐시 히트는 빠르게)
+          setTimeout(() => {
+            setIsCacheHit(false)
+            setIsSearching(false)
+            updateProgress('complete', 100)
+          }, 300)
         } else {
           // lawData가 없으면 검색 실행
           debugLogger.info('📡 lawData 없음 - 검색 시작', cached.query)
@@ -1939,6 +1949,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         stage={searchStage}
         progress={searchProgress}
         lawName={searchQuery}
+        isCacheHit={isCacheHit}
       />
 
       <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
