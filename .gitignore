@@ -30,3 +30,6 @@ next-env.d.ts
 lexdiff-local.db
 NUL
 %programdata%
+
+# data folder (ordinances storage)
+/data/

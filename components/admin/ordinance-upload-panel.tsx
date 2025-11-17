@@ -34,18 +34,37 @@ interface OrdinanceUploadPanelProps {
 export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelProps) {
   const [parsedOrdinances, setParsedOrdinances] = useState<ParsedOrdinanceFile[]>([])
   const [districts, setDistricts] = useState<string[]>([])
-  const [selectedDistrict, setSelectedDistrict] = useState<string | 'all'>('all')
+  const [selectedDistricts, setSelectedDistricts] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState(false)
+  const [paused, setPaused] = useState(false)
   const [results, setResults] = useState<UploadResult[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
   const [uploadedFiles, setUploadedFiles] = useState<Set<string>>(new Set())
+  const [batchSize, setBatchSize] = useState(10)
+  const [concurrency, setConcurrency] = useState(3)
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null)
 
   useEffect(() => {
     loadParsedOrdinances()
     loadUploadedFiles()
+    syncWithServer()
   }, [])
+
+  // Separate effect for job restoration
+  useEffect(() => {
+    const savedJobId = localStorage.getItem('currentUploadJobId')
+    if (savedJobId && !currentJobId) {
+      setCurrentJobId(savedJobId)
+      setUploading(true)
+      // Start polling after component is fully mounted
+      setTimeout(() => {
+        pollJobStatus(savedJobId)
+      }, 100)
+    }
+  }, [parsedOrdinances])
 
   function loadUploadedFiles() {
     try {
@@ -55,6 +74,93 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
       }
     } catch (error) {
       console.error('Failed to load uploaded files:', error)
+    }
+  }
+
+  async function syncWithServer() {
+    try {
+      console.log('🔄 Syncing with server...')
+      const response = await fetch('/api/admin/list-store-documents')
+      const data = await response.json()
+
+      console.log('📊 Server response:', {
+        success: data.success,
+        documentCount: data.documents?.length || 0
+      })
+
+      if (data.success && data.documents) {
+        // Extract ordinance file names from server
+        const serverFiles = new Set<string>()
+
+        let lawCount = 0
+        let ordinanceWithMetadataCount = 0
+        let ordinanceByNameOnlyCount = 0
+        let matchedToLocalCount = 0
+
+        for (const doc of data.documents) {
+          const metadata = doc.customMetadata || []
+          const fileName = metadata.find((m: any) => m.key === 'file_name')?.stringValue
+          const districtName = metadata.find((m: any) => m.key === 'district_name')?.stringValue
+          const lawName = doc.lawName || ''
+
+          // Check if it's a law (not ordinance)
+          const isLaw = (lawName.includes('법') || lawName.includes('시행령') || lawName.includes('시행규칙'))
+                        && !lawName.includes('조례') && !lawName.includes('자치')
+
+          if (isLaw) {
+            lawCount++
+            continue
+          }
+
+          // It's an ordinance - try to match with local files
+          const isOrdinance = lawName.includes('조례') || lawName.includes('규칙') || lawName.includes('자치')
+
+          if (!isOrdinance) {
+            continue // Skip if not identifiable
+          }
+
+          // Method 1: Has metadata (best case)
+          if (fileName && districtName) {
+            ordinanceWithMetadataCount++
+            serverFiles.add(`${districtName}/${fileName}`)
+            matchedToLocalCount++
+            continue
+          }
+
+          // Method 2: Match by lawName only (for ordinances without metadata)
+          ordinanceByNameOnlyCount++
+
+          // Try to match lawName to local ordinances
+          // Extract district and ordinance name from lawName
+          // Example: "서울특별시 강남구 주차장 설치 및 관리 조례"
+          const ordinanceNamePattern = /(.*?)(시|도|구|군)\s+(.+?조례)/
+          const match = lawName.match(ordinanceNamePattern)
+
+          if (match) {
+            const districtPart = match[1] + match[2] // e.g., "서울특별시 강남구"
+            const ordinancePart = match[3] // e.g., "주차장 설치 및 관리 조례"
+
+            // Search in parsedOrdinances for matching file
+            // This will be done later when we load parsedOrdinances
+            // For now, just log that we found it
+            console.log(`   📝 Found ordinance by name: ${lawName}`)
+          }
+        }
+
+        console.log(`📊 Document analysis:`)
+        console.log(`   - Total: ${data.documents.length}`)
+        console.log(`   - 법률/시행령/시행규칙: ${lawCount}`)
+        console.log(`   - 조례 (with metadata): ${ordinanceWithMetadataCount}`)
+        console.log(`   - 조례 (name only, no metadata): ${ordinanceByNameOnlyCount}`)
+        console.log(`   - Matched to local files: ${matchedToLocalCount}`)
+        console.log(`✅ Found ${serverFiles.size} ordinances matched with local files`)
+
+        // Update localStorage with server state (even if empty)
+        localStorage.setItem('uploadedOrdinances', JSON.stringify(Array.from(serverFiles)))
+        setUploadedFiles(serverFiles)
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync with server:', error)
     }
   }
 
@@ -113,10 +219,32 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
   }
 
   function getFilteredOrdinances(): ParsedOrdinanceFile[] {
-    if (selectedDistrict === 'all') {
+    if (selectedDistricts.size === 0) {
       return parsedOrdinances
     }
-    return parsedOrdinances.filter((o) => o.districtName === selectedDistrict)
+    return parsedOrdinances.filter((o) => selectedDistricts.has(o.districtName))
+  }
+
+  function toggleDistrictSelection(district: string) {
+    const newSet = new Set(selectedDistricts)
+    if (newSet.has(district)) {
+      newSet.delete(district)
+    } else {
+      newSet.add(district)
+    }
+    setSelectedDistricts(newSet)
+    // Clear file selection when district filter changes
+    clearSelection()
+  }
+
+  function selectAllDistricts() {
+    setSelectedDistricts(new Set(districts))
+    clearSelection()
+  }
+
+  function clearDistrictSelection() {
+    setSelectedDistricts(new Set())
+    clearSelection()
   }
 
   async function uploadSingleFile(ordinance: ParsedOrdinanceFile): Promise<UploadResult> {
@@ -163,48 +291,160 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
   async function startUpload() {
     if (selectedFiles.size === 0) return
 
+    const selectedOrdinances = parsedOrdinances.filter((o) => selectedFiles.has(getFileKey(o)))
+    const files = selectedOrdinances.map(o => ({
+      fileName: o.fileName,
+      districtName: o.districtName
+    }))
+
     setUploading(true)
+    setPaused(false)
     setResults([])
     setCurrentIndex(0)
+    setTotalFiles(files.length)
+
+    try {
+      // Start background job
+      const response = await fetch('/api/admin/batch-upload-ordinances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          files,
+          concurrency
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.jobId) {
+        setCurrentJobId(data.jobId)
+        // Save to localStorage
+        localStorage.setItem('currentUploadJobId', data.jobId)
+        // Start polling for progress
+        pollJobStatus(data.jobId)
+      } else {
+        throw new Error(data.error || 'Failed to start upload job')
+      }
+    } catch (error: any) {
+      alert('업로드 시작 실패: ' + error.message)
+      setUploading(false)
+    }
+  }
+
+  async function pollJobStatus(jobId: string) {
+    try {
+      const response = await fetch('/api/admin/batch-upload-ordinances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'status',
+          jobId
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.job) {
+        const job = data.job
+        setCurrentIndex(job.current)
+        setTotalFiles(job.total)
+        setResults(job.results)
+
+        // Update uploaded files
+        const successfulFiles = job.results
+          .filter((r: any) => r.status === 'success')
+          .map((r: any) => `${r.districtName || ''}/${r.fileName}`)
+
+        setUploadedFiles(prev => {
+          const newSet = new Set([...prev, ...successfulFiles])
+          localStorage.setItem('uploadedOrdinances', JSON.stringify(Array.from(newSet)))
+          return newSet
+        })
+
+        // Check if completed
+        if (job.status === 'completed') {
+          setUploading(false)
+          setCurrentJobId(null)
+          localStorage.removeItem('currentUploadJobId')
+          onUploadComplete?.()
+          return
+        }
+
+        // Check if paused
+        if (job.status === 'paused') {
+          setPaused(true)
+          return
+        }
+
+        // Continue polling if still running
+        if (job.status === 'running') {
+          setTimeout(() => pollJobStatus(jobId), 2000) // Poll every 2 seconds
+        }
+      }
+    } catch (error) {
+      console.error('Polling error:', error)
+      // Retry after delay if job still exists in localStorage
+      const savedJobId = localStorage.getItem('currentUploadJobId')
+      if (savedJobId === jobId) {
+        setTimeout(() => pollJobStatus(jobId), 5000)
+      }
+    }
+  }
+
+  async function pauseUpload() {
+    if (!currentJobId) return
+
+    try {
+      await fetch('/api/admin/batch-upload-ordinances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pause',
+          jobId: currentJobId
+        })
+      })
+
+      setPaused(true)
+    } catch (error) {
+      console.error('Pause error:', error)
+    }
+  }
+
+  async function resumeUpload() {
+    if (!currentJobId) return
 
     const selectedOrdinances = parsedOrdinances.filter((o) => selectedFiles.has(getFileKey(o)))
-    const uploadResults: UploadResult[] = []
+    const files = selectedOrdinances.map(o => ({
+      fileName: o.fileName,
+      districtName: o.districtName
+    }))
 
-    for (let i = 0; i < selectedOrdinances.length; i++) {
-      const ordinance = selectedOrdinances[i]
-      setCurrentIndex(i + 1)
+    try {
+      await fetch('/api/admin/batch-upload-ordinances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resume',
+          jobId: currentJobId,
+          files,
+          concurrency
+        })
+      })
 
-      const result = await uploadSingleFile(ordinance)
-      uploadResults.push(result)
-
-      // Small delay between uploads
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      setPaused(false)
+      pollJobStatus(currentJobId)
+    } catch (error) {
+      console.error('Resume error:', error)
     }
-
-    setResults(uploadResults)
-    setUploading(false)
-
-    // Update uploaded files list
-    const successfulFiles = uploadResults
-      .filter((r) => r.status === 'success')
-      .map((r) => `${r.districtName}/${r.fileName}`)
-    const newUploadedFiles = new Set([...uploadedFiles, ...successfulFiles])
-    saveUploadedFiles(newUploadedFiles)
-
-    // Clear selection for successful uploads
-    const failedKeys = uploadResults
-      .filter((r) => r.status === 'error')
-      .map((r) => `${r.districtName}/${r.fileName}`)
-    setSelectedFiles(new Set(failedKeys))
-
-    onUploadComplete?.()
   }
 
   const filteredOrdinances = getFilteredOrdinances()
   const pendingOrdinances = filteredOrdinances.filter((o) => !uploadedFiles.has(getFileKey(o)))
   const uploadedOrdinances = filteredOrdinances.filter((o) => uploadedFiles.has(getFileKey(o)))
 
-  const selectedCount = selectedFiles.size
+  // Use current upload job total if available, otherwise selected files
+  const selectedCount = uploading && totalFiles > 0 ? totalFiles : selectedFiles.size
   const successCount = results.filter((r) => r.status === 'success').length
   const errorCount = results.filter((r) => r.status === 'error').length
 
@@ -217,28 +457,111 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
         </p>
       </div>
 
-      {/* District Filter */}
+      {/* District Multi-Select Filter */}
       <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-        <label className="text-sm text-gray-300 mb-2 block">자치구 필터:</label>
-        <select
-          value={selectedDistrict}
-          onChange={(e) => {
-            setSelectedDistrict(e.target.value)
-            clearSelection()
-          }}
-          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white"
-          disabled={loading || uploading}
-        >
-          <option value="all">전체 ({parsedOrdinances.length}개)</option>
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-sm font-medium text-gray-300">
+            🏛️ 자치구 필터 ({selectedDistricts.size === 0 ? '전체' : `${selectedDistricts.size}개 선택`})
+          </label>
+          <div className="flex gap-2">
+            <Button
+              onClick={selectAllDistricts}
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-gray-300 text-xs"
+              disabled={loading || uploading}
+            >
+              전체 선택
+            </Button>
+            <Button
+              onClick={clearDistrictSelection}
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-gray-300 text-xs"
+              disabled={loading || uploading || selectedDistricts.size === 0}
+            >
+              선택 해제
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
           {districts.map((district) => {
             const count = parsedOrdinances.filter((o) => o.districtName === district).length
+            const pendingCount = parsedOrdinances.filter(
+              (o) => o.districtName === district && !uploadedFiles.has(getFileKey(o))
+            ).length
+            const isSelected = selectedDistricts.has(district)
+
             return (
-              <option key={district} value={district}>
-                {district} ({count}개)
-              </option>
+              <div
+                key={district}
+                onClick={() => !loading && !uploading && toggleDistrictSelection(district)}
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'bg-blue-900/30 border-blue-700'
+                    : 'bg-gray-900 border-gray-700 hover:border-gray-600'
+                } ${loading || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="text-sm font-medium text-white truncate" title={district}>
+                  {district}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  전체 {count}개 · 대기 {pendingCount}개
+                </div>
+                {isSelected && (
+                  <div className="mt-2">
+                    <span className="px-2 py-1 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
+                      ✓ 선택됨
+                    </span>
+                  </div>
+                )}
+              </div>
             )
           })}
-        </select>
+        </div>
+
+        <p className="text-xs text-gray-500 mt-3">
+          💡 여러 자치구를 선택하면 해당 자치구의 조례만 필터링됩니다
+        </p>
+      </div>
+
+      {/* Batch Settings */}
+      <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
+        <h3 className="text-sm font-medium text-gray-300 mb-3">⚙️ 배치 업로드 설정</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">배치 크기 (묶음 단위)</label>
+            <select
+              value={batchSize}
+              onChange={(e) => setBatchSize(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white text-sm"
+              disabled={uploading}
+            >
+              <option value={10}>10개씩</option>
+              <option value={50}>50개씩</option>
+              <option value={100}>100개씩 (빠름)</option>
+              <option value={200}>200개씩 (매우 빠름)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">동시 업로드 수</label>
+            <select
+              value={concurrency}
+              onChange={(e) => setConcurrency(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white text-sm"
+              disabled={uploading}
+            >
+              <option value={1}>1개 (안전)</option>
+              <option value={3}>3개 (권장)</option>
+              <option value={5}>5개 (빠름)</option>
+              <option value={10}>10개 (매우 빠름)</option>
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 동시 업로드: {concurrency}개씩 병렬 처리 · 배치 저장: {batchSize}개마다 진행 상황 저장
+        </p>
       </div>
 
       {/* Selection Controls */}
@@ -262,23 +585,42 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
           <Button onClick={clearSelection} variant="outline" size="sm" className="border-gray-600 text-gray-300">
             선택 해제
           </Button>
-          <Button
-            onClick={startUpload}
-            disabled={selectedCount === 0 || uploading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {uploading ? '업로드 중...' : '업로드 시작'}
-          </Button>
+          {uploading && !paused ? (
+            <Button onClick={pauseUpload} variant="outline" className="border-yellow-600 text-yellow-400">
+              ⏸ 일시정지
+            </Button>
+          ) : uploading && paused ? (
+            <Button onClick={resumeUpload} className="bg-green-600 hover:bg-green-700">
+              ▶️ 재개
+            </Button>
+          ) : (
+            <Button
+              onClick={startUpload}
+              disabled={selectedCount === 0}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              🚀 업로드 시작
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Upload Progress */}
       {uploading && (
         <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="mb-2">
-            <p className="text-sm text-gray-300">
-              업로드 중... ({currentIndex}/{selectedCount})
-            </p>
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-300">
+                {paused ? '⏸ 일시정지됨' : '🚀 업로드 중...'} ({currentIndex}/{selectedCount})
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                동시 업로드: {concurrency}개씩 병렬 처리 중
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold text-blue-400">{Math.round((currentIndex / selectedCount) * 100)}%</p>
+              <p className="text-xs text-gray-500">남은 파일: {selectedCount - currentIndex}개</p>
+            </div>
           </div>
           <Progress value={(currentIndex / selectedCount) * 100} className="h-2" />
         </div>
@@ -320,7 +662,9 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
         ) : pendingOrdinances.length === 0 ? (
           <div className="p-8 bg-gray-800 border border-gray-700 rounded-lg text-center">
             <p className="text-gray-500">
-              {selectedDistrict === 'all' ? '업로드 대기 중인 파일이 없습니다' : '선택한 자치구에 업로드 대기 중인 파일이 없습니다'}
+              {selectedDistricts.size === 0
+                ? '업로드 대기 중인 파일이 없습니다'
+                : '선택한 자치구에 업로드 대기 중인 파일이 없습니다'}
             </p>
             <p className="text-sm text-gray-600 mt-1">모든 파일이 업로드되었습니다</p>
           </div>

@@ -114,6 +114,8 @@ export async function POST(request: NextRequest) {
         customMetadata: [
           { key: 'ordinance_name', stringValue: ordinanceName },
           { key: 'district_name', stringValue: districtName },
+          { key: 'law_type', stringValue: '조례' },
+          { key: 'file_name', stringValue: fileName },
           { key: 'source', stringValue: 'parsed-ordinances' },
           { key: 'uploaded_at', stringValue: new Date().toISOString() }
         ]

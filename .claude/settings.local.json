@@ -86,7 +86,16 @@
       "Bash(\".skills/pdf/SKILL.md\")",
       "Bash(\".skills/xlsx/SKILL.md\")",
       "Bash(\".skills/webapp-testing/SKILL.md\")",
-      "Bash(\".skills/artifacts-builder/SKILL.md\")"
+      "Bash(\".skills/artifacts-builder/SKILL.md\")",
+      "Bash(sort:*)",
+      "Bash(node scripts/upload-file-search.mjs:*)",
+      "Bash(npm run file-search:monitor:*)",
+      "Bash(timeout 8 npm run file-search:monitor:*)",
+      "Bash(node scripts/list-file-search-files.mts:*)",
+      "Bash(set GEMINI_FILE_SEARCH_STORE_ID=fileSearchStores/lexdiff251117-upoqmkxiqfyy)",
+      "Bash(cmd.exe /c \"dir /b .env*\")",
+      "Bash(node scripts/check-ordinances.mjs:*)",
+      "Bash(node scripts/sync-ordinances-with-server.mjs:*)"
     ],
     "deny": [],
     "ask": []

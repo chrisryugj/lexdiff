@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Update localStorage</title>
+</head>
+<body>
+  <h1>Upload Progress Sync</h1>
+  <p>Click the button below to sync uploaded ordinances to localStorage:</p>
+  <button onclick="updateLocalStorage()">Update localStorage</button>
+  <pre id="result"></pre>
+
+  <script>
+    async function updateLocalStorage() {
+      try {
+        // Fetch the sync file
+        const response = await fetch('/uploaded-ordinances-sync.json')
+        const uploadedOrdinances = await response.json()
+
+        // Update localStorage
+        localStorage.setItem('uploadedOrdinances', JSON.stringify(uploadedOrdinances))
+
+        document.getElementById('result').textContent =
+          `✅ Success!\n\nUpdated ${uploadedOrdinances.length} ordinances in localStorage.\n\n` +
+          `Now reload the admin page to see the updated count.`
+      } catch (error) {
+        document.getElementById('result').textContent =
+          `❌ Error: ${error.message}`
+      }
+    }
+  </script>
+</body>
+</html>
