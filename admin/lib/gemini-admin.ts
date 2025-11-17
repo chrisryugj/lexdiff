@@ -98,10 +98,52 @@ export class GeminiAdmin {
    * @param force true이면 파일이 있어도 강제 삭제
    */
   async deleteStore(storeName: string, force = false): Promise<void> {
+    // CRITICAL: force must be passed in config object
+    const config: { force?: boolean } = {};
+    if (force) {
+      config.force = true;
+    }
+
     await this.ai.fileSearchStores.delete({
       name: storeName,
-      config: { force },
+      ...(force && { config }),
     });
+  }
+
+  /**
+   * Store의 모든 Documents 목록 조회 (페이지네이션 처리)
+   */
+  async listDocuments(storeName: string): Promise<any[]> {
+    const documents: any[] = [];
+
+    try {
+      const pager = await this.ai.fileSearchStores.documents.list({
+        fileSearchStoreName: storeName,
+        config: { pageSize: 20 }, // max 20
+      });
+
+      let page = pager.page;
+
+      while (true) {
+        for (const doc of page) {
+          documents.push({
+            name: doc.name,
+            displayName: doc.displayName,
+            createTime: doc.createTime,
+            updateTime: doc.updateTime,
+            customMetadata: doc.customMetadata || [],
+          });
+        }
+
+        if (!pager.hasNextPage()) break;
+        page = await pager.nextPage();
+      }
+    } catch (error: any) {
+      // If store doesn't exist or no permission, return empty array
+      console.error(`Failed to list documents for store ${storeName}:`, error.message);
+    }
+
+    return documents;
   }
 
   // ==================== Files ====================
