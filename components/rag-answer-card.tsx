@@ -306,13 +306,29 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
   const htmlContent = convertToHTML(content)
 
   return (
-    <Card className="border-border bg-card">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between mb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            AI 답변
-          </CardTitle>
+    <div className="relative overflow-hidden">
+      {/* 🎨 배경 애니메이션 그라데이션 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none" />
+
+      <Card className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20">
+        <CardHeader className="pb-3 border-b border-purple-500/20">
+          {/* 🎨 AI 헤더 with Glow Effect */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              {/* Glowing AI Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-2 rounded-xl shadow-lg">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  AI 답변
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Gemini 2.5 Flash 분석 결과</p>
+              </div>
+            </div>
           <div className="flex items-center gap-2">
             {/* 글자 크기 조절 */}
             <div className="flex items-center gap-1">
@@ -385,6 +401,7 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
           <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   )
 }
