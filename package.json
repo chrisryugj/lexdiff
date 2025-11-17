@@ -16,7 +16,8 @@
     "download:ordinances:fast": "node scripts/download-all-ordinances.mjs 500",
     "file-search:upload": "tsx scripts/upload-laws-to-file-search.mts",
     "file-search:upload-with-ids": "tsx scripts/upload-laws-with-ids.mts",
-    "file-search:list": "tsx scripts/list-file-search-files.mts"
+    "file-search:list": "tsx scripts/list-file-search-files.mts",
+    "file-search:monitor": "node scripts/monitor-file-search.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

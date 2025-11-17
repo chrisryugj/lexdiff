@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
         fileName: uploadedFileName,
         customMetadata: [
           { key: 'law_name', stringValue: lawName },
+          { key: 'law_type', stringValue: '법률' },
+          { key: 'file_name', stringValue: fileName },
           { key: 'source', stringValue: 'parsed-laws' },
           { key: 'uploaded_at', stringValue: new Date().toISOString() }
         ]

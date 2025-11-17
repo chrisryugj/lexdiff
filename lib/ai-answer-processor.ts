@@ -110,8 +110,12 @@ function markLawQuotes(text: string): string {
 
     // 📜로 시작하는 법령 조문 인용 (관련 법령 섹션이 아닐 때만)
     // ⚠️ "📖 조문 발췌"는 하위 섹션 제목이므로 제외
-    if (trimmed.startsWith('📜') && trimmed !== '📖 조문 발췌' && !inRelatedLawSection) {
-      // 📜로 시작하는 줄을 마커로 감싸기
+    // ⚠️ 파일서치 데이터 형식: "## 제1조 목적", "## 제26조의2 담보의 해제" 등도 지원
+    if (
+      (trimmed.startsWith('📜') && trimmed !== '📖 조문 발췌' && !inRelatedLawSection) ||
+      (/^##\s+제\d+조(의\d+)?/.test(trimmed) && !inRelatedLawSection)
+    ) {
+      // 조문 발췌 시작 마커
       result.push('<<<QUOTE_START>>>')
       result.push(line)
       i++
@@ -123,11 +127,13 @@ function markLawQuotes(text: string): string {
         const nextLine = lines[i]
         const nextTrimmed = nextLine.trim()
 
-        // 빈 줄, 주요 섹션, 하위 섹션이면 종료
+        // 종료 조건: 빈 줄, 주요 섹션, 하위 섹션, 다음 조문(## 제N조)
         if (
           nextTrimmed === '' ||
           /^(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)$/.test(nextTrimmed) ||
-          /^(📖 조문 발췌|📖 핵심 해석|📝 실무 적용|🔴 조건·예외)$/.test(nextTrimmed)
+          /^(📖 조문 발췌|📖 핵심 해석|📝 실무 적용|🔴 조건·예외)$/.test(nextTrimmed) ||
+          /^##\s+제\d+조(의\d+)?/.test(nextTrimmed) ||
+          trimmed.startsWith('📜')
         ) {
           console.log('[markLawQuotes] 조문 수집 종료:', { reason: nextTrimmed || '빈 줄', collectedCount })
           break
@@ -409,9 +415,9 @@ function styleDetailSection(text: string, sectionTitle: string): string {
 function linkifyRefsB(text: string): string {
   let t = text
 
-  // 1. 「법령명」 제X조 패턴
-  t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?/g, (_m, lawName, art, _p2, branch) => {
-    const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
+  // 1. 「법령명」 제X조 패턴 (항, 호 포함)
+  t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+    const joLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
     const label = '「' + lawName + '」 ' + joLabel
     return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + label + '</a>'
   })
@@ -421,23 +427,26 @@ function linkifyRefsB(text: string): string {
     return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
   })
 
-  // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 이미 링크된 부분 제외
-  // ⚠️ 긴 법령명 지원: 띄어쓰기 포함한 모든 문자 매칭
-  // ⚠️ 링크: 법령명 + 조문번호만, 제목: 링크 밖에 표시 & 대괄호 제거
-  t = t.replace(/(?<!="|\/">)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s]+\))?(?!<\/a>)/g, (_match, lawName, art, _p2, branch, title) => {
-    // 법령명 앞뒤 공백 제거
-    const cleanLawName = lawName.trim()
-    const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-    // 링크 부분 (법령명 + 조문번호)
-    const linkPart = cleanLawName + ' ' + joLabel
-    // 제목 부분 (대괄호 제거)
-    const titlePart = title ? ' ' + title.replace(/\[([^\]]+)\]/g, '$1') : ''
-    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + cleanLawName + '" data-article="' + joLabel + '">' + linkPart + '</a>' + titlePart
-  })
+  // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 조례 지원 강화
+  // ⚠️ 조례 패턴: "서울특별시 강남구 XXX 조례", "XXX에 관한 조례" 등
+  // ⚠️ 법령 패턴: "관세법", "관세법 시행령", "관세법 시행규칙" 등
+  t = t.replace(
+    /(?<!="|\/">)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?(?!<\/a>)/g,
+    (_match, lawName, art, _p2, branch, title) => {
+      // 법령명 앞뒤 공백 제거
+      const cleanLawName = lawName.trim()
+      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
+      // 링크 부분 (법령명 + 조문번호)
+      const linkPart = cleanLawName + ' ' + joLabel
+      // 제목 부분 (대괄호 제거)
+      const titlePart = title ? ' ' + title.replace(/\[([^\]]+)\]/g, '$1') : ''
+      return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + cleanLawName + '" data-article="' + joLabel + '">' + linkPart + '</a>' + titlePart
+    }
+  )
 
   // 4. 제X조 패턴 (현재 법령) - 이미 링크된 부분 제외
   // ⚠️ 법령명 바로 뒤에 있는 조문은 건너뛰기 (이미 3번에서 처리됨)
-  t = t.replace(/(?<!="|\/">|[가-힣A-Za-z\d·]+(?:법|령|규칙|조례)\s+)제(\d{1,4})조(의(\d{1,2}))?(?!<\/a>)/g, (m) => {
+  t = t.replace(/(?<!="|\/">|[가-힣A-Za-z\d·\s]+(?:법|령|규칙|조례)\s+)제(\d{1,4})조(의(\d{1,2}))?(?!<\/a>)/g, (m) => {
     const data = m.replace(/\s+/g, '')
     return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + m + '</a>'
   })

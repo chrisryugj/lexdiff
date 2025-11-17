@@ -86,22 +86,26 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
   }
 
   function calculateCost(docs: StoreDocument[]) {
-    // Estimate: Average 50KB per document
-    const avgCharsPerDoc = 50000
+    // More accurate estimate based on actual Korean legal documents
+    // Law files: ~30-100KB, Ordinance files: ~10-30KB
+    // Average: ~40KB per document
+    const avgCharsPerDoc = 40000
     const totalChars = docs.length * avgCharsPerDoc
 
-    // Gemini tokenization: ~4 chars per token (conservative estimate)
-    const totalTokens = Math.ceil(totalChars / 4)
+    // Gemini tokenization for Korean: ~2.5 chars per token (more accurate for Korean)
+    const totalTokens = Math.ceil(totalChars / 2.5)
 
     // File Search pricing (as of 2025):
     // - Storage: Free for first 20GB
-    // - Retrieval: $0.05 per 1M tokens (input)
-    // - Model usage: Gemini 2.5 Flash pricing applies
-
-    // Estimated cost for retrieval (assuming 100 queries, 5 chunks per query)
-    const avgTokensPerQuery = 500 * 5 // 5 chunks * ~500 tokens each
-    const avgQueries = 100
-    const retrievalCost = (avgQueries * avgTokensPerQuery * 0.05) / 1000000
+    // - Retrieval: $0.05 per 1M tokens
+    //
+    // Actual retrieval cost calculation:
+    // Each query retrieves ~5-10 document chunks
+    // Each chunk is ~1000 tokens
+    const avgTokensPerQuery = 1000 * 7 // 7 chunks * ~1000 tokens each
+    const avgQueries = 100 // Monthly estimated queries
+    const retrievalTokens = avgQueries * avgTokensPerQuery
+    const retrievalCost = (retrievalTokens * 0.05) / 1000000
 
     setCostEstimate({
       totalDocuments: docs.length,

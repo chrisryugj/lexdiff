@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
     const formattedDocuments = allDocuments.map((doc) => {
       const metadata = doc.customMetadata || []
       const lawName =
-        metadata.find((m: any) => m.key === 'law_name')?.stringValue || doc.displayName || 'Unknown'
+        metadata.find((m: any) => m.key === 'law_name')?.stringValue ||
+        metadata.find((m: any) => m.key === 'ordinance_name')?.stringValue ||
+        doc.displayName ||
+        'Unknown'
 
       return {
         id: doc.name,
@@ -75,7 +78,8 @@ export async function GET(request: NextRequest) {
         lawName,
         state: doc.state,
         createTime: doc.createTime,
-        updateTime: doc.updateTime
+        updateTime: doc.updateTime,
+        customMetadata: doc.customMetadata // Include metadata for sync
       }
     })
 
