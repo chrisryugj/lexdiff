@@ -93,7 +93,10 @@ export default function FileList() {
   }
 
   function extractFileId(fileName: string): string {
-    return fileName.replace('files/', '');
+    // Extract document ID from full name
+    // Format: fileSearchStores/{storeId}/documents/{docId}
+    const parts = fileName.split('/');
+    return parts[parts.length - 1]; // Return last part (docId)
   }
 
   function formatBytes(bytes?: number): string {
