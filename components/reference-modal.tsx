@@ -27,11 +27,14 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   const canShowOriginal = !!originalUrl
 
-  // 법제처 링크 생성 (법령뷰와 동일한 방식)
+  // 법령 이름으로 조례 여부 판단 (조례, 규칙, 지방자치단체명 포함)
+  const isOrdinanceLaw = lawName && /조례|규칙|특별시|광역시|[가-힣]+도|[가-힣]+시|[가-힣]+군|[가-힣]+구/.test(lawName)
+
+  // 법제처 링크 생성 (조례와 법령 자동 구분)
   const molegUrl = lawName && articleNumber
-    ? `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${articleNumber}`
+    ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}/${articleNumber}`
     : lawName
-    ? `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+    ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}`
     : null
 
   // 폰트 크기 조절

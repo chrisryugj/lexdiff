@@ -266,13 +266,20 @@ function extractRevisionMarks(
   return uniqueRevisions
 }
 
-export function extractArticleText(article: LawArticle): string {
+export function extractArticleText(article: LawArticle, isOrdinance = false): string {
   let text = ""
 
   if (article.content) {
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
-    content = linkifyRefsB(content)
+
+    // For ordinances, make article number and title bold BEFORE linkifying
+    // This catches patterns like "제1조(목적)" or "제1조" at the start
+    if (isOrdinance) {
+      content = content.replace(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)/, '<strong>$1</strong>')
+    }
+
+    content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content)
 
     // Replace 2+ newlines before paragraph markers with single newline
     content = content.replace(/\n{2,}\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
@@ -474,7 +481,8 @@ function linkifyRefsB(text: string): string {
   })
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 항/호까지 포함, 이미 링크되지 않은 경우만
-  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+  // Lookahead to avoid breaking mid-attribute
+  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
     const joLabel = "제" + art + "조" +
       (branch ? "의" + branch : "") +
       (para ? "제" + para + "항" : "") +
@@ -526,6 +534,57 @@ function linkifyRefsB(text: string): string {
     const data = m.replace(/\s+/g, "")
     return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + "</a>"
   })
+
+  return t
+}
+
+// Ordinance-specific linkify function (removes internal article links)
+function linkifyOrdinanceRefs(text: string): string {
+  let t = text
+
+  // 1. 「법령명」 제X조 패턴 - 외부 법령 참조만 링크
+  t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+    const joLabel = "제" + art + "조" +
+      (branch ? "의" + branch : "") +
+      (para ? "제" + para + "항" : "") +
+      (item ? "제" + item + "호" : "")
+    return (
+      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
+      lawName +
+      '" data-article="' +
+      joLabel +
+      '">「' +
+      lawName +
+      '」 ' +
+      joLabel +
+      "</a>"
+    )
+  })
+
+  // 2. 「법령명」 단독 패턴
+  t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
+    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
+  })
+
+  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 이미 링크되지 않은 경우만
+  // Lookahead to avoid breaking mid-attribute
+  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+    const joLabel = "제" + art + "조" +
+      (branch ? "의" + branch : "") +
+      (para ? "제" + para + "항" : "") +
+      (item ? "제" + item + "호" : "")
+    return (
+      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
+      lawName +
+      '" data-article="' +
+      joLabel +
+      '">' +
+      match +
+      "</a>"
+    )
+  })
+
+  // NOTE: 조례 자체 조문 (제X조)은 링크하지 않음
 
   return t
 }

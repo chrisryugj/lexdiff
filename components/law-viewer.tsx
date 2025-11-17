@@ -113,7 +113,7 @@ export function LawViewer({
   const [loadingJo, setLoadingJo] = useState<string | null>(null)
 
   const [activeJo, setActiveJo] = useState<string>(selectedJo || actualArticles[0]?.jo || "")
-  const [fontSize, setFontSize] = useState<number>(14)
+  const [fontSize, setFontSize] = useState<number>(15)
   const [copied, setCopied] = useState(false)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
@@ -276,7 +276,14 @@ export function LawViewer({
       const response = await fetch(`/api/article-history?${params.toString()}`)
 
       if (!response.ok) {
-        console.error("[v0] Failed to fetch revision history:", response.status)
+        const contentType = response.headers.get("content-type")
+        if (contentType?.includes("application/json")) {
+          const errorData = await response.json()
+          console.warn("[v0] Article history API returned error:", errorData)
+          // Silently fail - this is expected for some laws
+        } else {
+          console.error("[v0] Failed to fetch revision history:", response.status)
+        }
         setRevisionHistory([])
         return
       }
@@ -289,7 +296,7 @@ export function LawViewer({
 
       setRevisionHistory(history)
     } catch (error) {
-      console.error("[v0] Error fetching revision history:", error)
+      console.warn("[v0] Revision history not available for this article:", error)
       setRevisionHistory([])
     } finally {
       setIsLoadingHistory(false)
@@ -489,37 +496,70 @@ export function LawViewer({
 
   const openLawCenter = () => {
     const lawTitle = meta.lawTitle
+    console.log('[원문 보기] isOrdinance:', isOrdinance, 'lawTitle:', lawTitle)
 
-    if (isFullView || !activeArticle) {
+    if (isOrdinance) {
+      // 조례는 다른 URL 형식 사용
+      const url = `https://www.law.go.kr/자치법규/${encodeURIComponent(lawTitle)}`
+      console.log('[원문 보기] 조례 URL:', url)
+      window.open(url, "_blank", "noopener,noreferrer")
+    } else if (isFullView || !activeArticle) {
       const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawTitle)}`
+      console.log('[원문 보기] 법령 URL (전체):', url)
       window.open(url, "_blank", "noopener,noreferrer")
     } else {
       const articleNum = formatJO(activeArticle.jo)
       const url = `https://www.law.go.kr/법령/${encodeURIComponent(lawTitle)}/${articleNum}`
+      console.log('[원문 보기] 법령 URL (조문):', url)
       window.open(url, "_blank", "noopener,noreferrer")
     }
   }
 
   const formatSimpleJo = useMemo(() => {
-    return (jo: string): string => {
-      if (jo.length === 6) {
+    return (jo: string, forceOrdinance = false): string => {
+      // Already formatted (e.g., "제1조", "제10조의2")
+      if (jo.startsWith("제") && jo.includes("조")) {
+        return jo
+      }
+
+      // Ordinance format: 6-digit AABBCC (AA = article, BB = branch, CC = sub)
+      // Example: "010000" = 제1조, "010100" = 제1조의1
+      if ((isOrdinance || forceOrdinance) && jo.length === 6 && /^\d{6}$/.test(jo)) {
+        const articleNum = Number.parseInt(jo.substring(0, 2), 10)
+        const branchNum = Number.parseInt(jo.substring(2, 4), 10)
+        const subNum = Number.parseInt(jo.substring(4, 6), 10)
+
+        let result = `제${articleNum}조`
+        if (branchNum > 0) result += `의${branchNum}`
+        if (subNum > 0) result += `-${subNum}`
+
+        return result
+      }
+
+      // Law format: 6-digit AAAABB (AAAA = article, BB = branch)
+      if (!isOrdinance && jo.length === 6 && /^\d{6}$/.test(jo)) {
         const articleNum = Number.parseInt(jo.substring(0, 4), 10)
         const branchNum = Number.parseInt(jo.substring(4, 6), 10)
         return branchNum === 0 ? `제${articleNum}조` : `제${articleNum}조의${branchNum}`
       }
 
-      if (jo.length === 8) {
+      // 8-digit code format (fallback)
+      if (jo.length === 8 && /^\d{8}$/.test(jo)) {
         const articleNum = Number.parseInt(jo.substring(0, 4), 10)
-        return `제${articleNum}조`
+        const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+        const subNum = Number.parseInt(jo.substring(6, 8), 10)
+
+        let result = `제${articleNum}조`
+        if (branchNum > 0) result += `의${branchNum}`
+        if (subNum > 0) result += `-${subNum}`
+
+        return result
       }
 
-      if (jo.startsWith("제") && jo.includes("조")) {
-        return jo
-      }
-
+      // Fallback: return as-is
       return jo
     }
-  }, [])
+  }, [isOrdinance])
 
   // Handle clicks on linkified references inside article content
   const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
@@ -1281,43 +1321,6 @@ export function LawViewer({
 
   return (
     <>
-      {/* 🎨 히어로 섹션 - 법령 제목 및 메타 정보 */}
-      {!aiAnswerMode && (
-        <div className="relative overflow-hidden bg-card/30 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-border/50 mb-6">
-          {/* 배경 그라데이션 (미묘하게) */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-
-          <div className="relative">
-            {/* 법령 제목 */}
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-              {meta.lawTitle}
-            </h1>
-
-            {/* 메타 배지들 */}
-            <div className="flex flex-wrap gap-2">
-              {meta.latestEffectiveDate && (
-                <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
-                  📅 {meta.latestEffectiveDate}
-                </Badge>
-              )}
-              <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
-                📋 {articles.length}개 조문
-              </Badge>
-              {favorites.size > 0 && (
-                <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
-                  ⭐ {favorites.size}개
-                </Badge>
-              )}
-              {isOrdinance && (
-                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
-                  🏛️ 자치법규
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]" style={{ fontFamily: "Pretendard, sans-serif" }}>
         {/* Mobile overlay backdrop */}
         {isArticleListExpanded && (
@@ -1508,16 +1511,20 @@ export function LawViewer({
           </Button>
         )}
 
-        <div className="mb-4 flex-shrink-0">
-          <h3 className="text-sm font-semibold text-foreground mb-2">조문 목록</h3>
-          <Badge variant="secondary" className="text-xs">
-            {actualArticles.length}개 조문
+        {/* 헤더 - 본문 헤더와 동일한 디자인 */}
+        <div className="border-b border-border p-4 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            📋 {actualArticles.length}개 조문
           </Badge>
         </div>
-        <Separator className="mb-4 flex-shrink-0" />
+
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full">
-            <div className="space-y-1 pr-4">
+            <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
             {actualArticles.map((article, index) => {
               const isLoading = loadingJo === article.jo
               const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
@@ -1527,55 +1534,59 @@ export function LawViewer({
                   key={`${article.jo}-${index}`}
                   onClick={() => handleArticleClick(article.jo)}
                   disabled={isLoading}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
                     activeJo === article.jo
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "hover:bg-secondary text-foreground"
+                      ? "bg-primary text-primary-foreground font-bold"
+                      : "hover:bg-secondary text-foreground font-medium"
                   } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex-1">
-                      {formatSimpleJo(article.jo)}
-                      {article.title && <span className="text-xs ml-1 block mt-0.5 opacity-80">({article.title})</span>}
-                      {isLoading && <span className="text-xs ml-1 opacity-60">로딩중...</span>}
-                    </span>
+                    <div className="flex-1">
+                      <div className="text-base font-bold">
+                        {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
+                      </div>
+                      {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
+                      {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
+                    </div>
+
+                    {/* 아이콘 영역 */}
                     <div className="flex items-center gap-1 shrink-0">
                       {activeJo === article.jo ? (
                         <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
                       ) : (
                         <Bookmark className="h-3.5 w-3.5 opacity-40" />
                       )}
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onToggleFavorite?.(article.jo)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault()
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
                           event.stopPropagation()
                           onToggleFavorite?.(article.jo)
-                        }
-                      }}
-                      className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-                        favorites.has(article.jo)
-                          ? "text-[var(--color-warning)]"
-                          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-                      }`}
-                      aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                      aria-pressed={favorites.has(article.jo)}
-                      title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                    >
-                      <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
-                    </span>
-                    {article.hasChanges && (
-                      <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
-                    )}
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            onToggleFavorite?.(article.jo)
+                          }
+                        }}
+                        className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                          favorites.has(article.jo)
+                            ? "text-[var(--color-warning)]"
+                            : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                        }`}
+                        aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                        aria-pressed={favorites.has(article.jo)}
+                        title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                      >
+                        <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
+                      </span>
+                      {article.hasChanges && (
+                        <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
               )
             })}
             </div>
@@ -1625,32 +1636,29 @@ export function LawViewer({
 
         {/* Header - Hidden in AI Answer Mode */}
         {!aiAnswerMode && (
-          <div className="border-b border-border p-4">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
-                  {!isOrdinance && viewMode === "full" && (
-                    <Badge variant="outline" className="text-xs">
-                      전체 조문
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {!isOrdinance && viewMode === "full" && activeArticle && (
-                <p className="text-sm text-muted-foreground">
-                  현재 선택: {formatSimpleJo(activeArticle.jo)}
-                  {activeArticle.title && <span> ({activeArticle.title})</span>}
-                </p>
+          <div className="border-b border-border px-4 pt-2 pb-5">
+            <div className="flex items-center gap-2 mb-1">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
+              {!isOrdinance && viewMode === "full" && (
+                <Badge variant="outline" className="text-xs">
+                  전체 조문
+                </Badge>
               )}
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
               {meta.latestEffectiveDate && (
                 <Badge variant="outline" className="text-xs">
-                  시행: {meta.latestEffectiveDate}
+                  📅 시행: {meta.latestEffectiveDate}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                📋 {articles.length}개 조문
+              </Badge>
+           
+              {isOrdinance && (
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                  🏛️ 자치법규
                 </Badge>
               )}
               {meta.revisionType && (
@@ -1658,29 +1666,47 @@ export function LawViewer({
                   {meta.revisionType}
                 </Badge>
               )}
+              {!isOrdinance && viewMode === "full" && activeArticle && (
+                <Badge variant="outline" className="text-xs">
+                  현재: {formatSimpleJo(activeArticle.jo)}
+                  {activeArticle.title && ` (${activeArticle.title})`}
+                </Badge>
+              )}
+              {(() => {
+                const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
+                return currentLawFavorites > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    ⭐ {currentLawFavorites}개
+                  </Badge>
+                )
+              })()}
             </div>
           </div>
+        )}
 
-          {!isOrdinance && activeArticle && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)}>
-                <GitCompare className="h-4 w-4 mr-2" />
+        {/* Action Buttons */}
+        {!aiAnswerMode && !isOrdinance && activeArticle && (
+          <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+            <div className="flex flex-wrap gap-1.5">
+              <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
+                <GitCompare className="h-3.5 w-3.5 mr-1" />
                 신·구법 비교
               </Button>
-              <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)}>
-                <Sparkles className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
+                <Sparkles className="h-3.5 w-3.5 mr-1" />
                 AI 요약
               </Button>
               <Button
                 variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
                 size="sm"
                 onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                className="h-7 px-2"
               >
-                <Star className={`h-4 w-4 mr-2 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
+                <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
                 즐겨찾기
               </Button>
-              <Button variant="outline" size="sm" onClick={openLawCenter}>
-                <ExternalLink className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
+                <ExternalLink className="h-3.5 w-3.5 mr-1" />
                 원문 보기
               </Button>
               {/* Show 2-tier and 3-tier view buttons if valid 3-tier data exists */}
@@ -1691,11 +1717,12 @@ export function LawViewer({
                     size="sm"
                     onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
                     title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
+                    className="h-7 px-2"
                   >
                     {threeTierDataType === "delegation" ? (
-                      <FileText className="h-4 w-4 mr-2" />
+                      <FileText className="h-3.5 w-3.5 mr-1" />
                     ) : (
-                      <Link2 className="h-4 w-4 mr-2" />
+                      <Link2 className="h-3.5 w-3.5 mr-1" />
                     )}
                     시행령
                   </Button>
@@ -1705,8 +1732,9 @@ export function LawViewer({
                       size="sm"
                       onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
                       title="시행규칙 보기"
+                      className="h-7 px-2"
                     >
-                      <FileText className="h-4 w-4 mr-2" />
+                      <FileText className="h-3.5 w-3.5 mr-1" />
                       시행규칙
                     </Button>
                   )}
@@ -1726,52 +1754,68 @@ export function LawViewer({
                 }}
                 disabled={loadingAdminRules}
                 title="행정규칙 보기"
+                className="h-7 px-2"
               >
                 {loadingAdminRules ? (
                   <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-2"></div>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
                     {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total}` : "로딩 중"}
                   </>
                 ) : (
                   <>
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-3.5 w-3.5 mr-1" />
                     행정규칙 {adminRules.length > 0 && `(${adminRules.length})`}
                   </>
                 )}
               </Button>
             </div>
-          )}
+          </div>
+        )}
 
-          {isOrdinance && (
+        {isOrdinance && (
+          <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent">
-                <ExternalLink className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
+                <ExternalLink className="h-3.5 w-3.5 mr-1" />
                 원문 보기
               </Button>
-              <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
-                <ZoomOut className="h-4 w-4" />
+              
+              <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                <ZoomOut className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
+              <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
                 <RotateCcw className="h-3 w-3" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
-                <ZoomIn className="h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                <ZoomIn className="h-3.5 w-3.5" />
               </Button>
               <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
+                  navigator.clipboard.writeText(content)
+                  toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
+                }}
+                title="전체 복사"
+                className="h-7 px-2"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
             </div>
-          )}
           </div>
         )}
 
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full" ref={contentRef}>
-            <div className="p-6">
+            <div className="px-6 pt-0 pb-0">
               {isOrdinance ? (
-                <div className="space-y-8">
+                <div className="space-y-2">
                   {preambles.map((preamble, index) => (
                     <div
                       key={`preamble-${index}`}
-                      className="mb-6"
+                      className="mb-2"
                       dangerouslySetInnerHTML={{ __html: preamble.content }}
                     />
                   ))}
@@ -1785,16 +1829,7 @@ export function LawViewer({
                       }}
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
                     >
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-                          {formatSimpleJo(article.jo)}
-                          {article.title && <span className="text-muted-foreground"> ({article.title})</span>}
-                          {activeJo === article.jo && (
-                            <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
-                          )}
-                        </h3>
-                      </div>
-
+                      {/* Header removed for ordinances - article number already in content */}
                       <div
                         className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
                         style={{
@@ -1804,9 +1839,9 @@ export function LawViewer({
                           wordBreak: "break-word",
                         }}
                         onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance) }}
                       />
-                      <Separator className="my-6" />
+                      <Separator className="my-1" />
                     </div>
                   ))}
                 </div>
@@ -2725,14 +2760,25 @@ export function LawViewer({
                 comparisonLawMeta && comparisonLawArticles.length > 0 ? (
                   // 2단 비교 뷰: AI 답변 (좌) + 관련 법령 (우)
                   <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: AI Answer */}
-                    <div className="overflow-y-auto pr-2">
-                      <div className="mb-3 pb-2 border-b border-border flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-blue-500" />
-                        <Badge variant="secondary" className="text-xs">
-                          File Search RAG
-                        </Badge>
-                      </div>
+                    {/* Left: AI Answer with Glassmorphism */}
+                    <div className="overflow-y-auto pr-2 relative">
+                      {/* 🎨 배경 그라데이션 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none rounded-lg" />
+
+                      <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-4">
+                        <div className="mb-3 pb-2 border-b border-purple-500/20 flex items-center gap-2">
+                          {/* Glowing AI Icon */}
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                            <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
+                              <Sparkles className="h-4 w-4 text-white" />
+                            </div>
+                          </div>
+                          <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
+                          <Badge variant="secondary" className="text-xs">
+                            File Search RAG
+                          </Badge>
+                        </div>
 
                       {/* 검색 실패 경고 메시지 */}
                       {fileSearchFailed && (
@@ -2763,10 +2809,11 @@ export function LawViewer({
                         dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
                       />
 
-                      {/* AI 답변 주의사항 */}
-                      <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                        <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                        {/* AI 답변 주의사항 */}
+                        <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                          <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                          <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                        </div>
                       </div>
                     </div>
 
@@ -2810,32 +2857,42 @@ export function LawViewer({
                     </div>
                   </div>
                 ) : (
-                  // 기본 AI 답변 (비교 법령 없음)
-                  <>
-                    {/* 검색 실패 경고 메시지 */}
-                    {fileSearchFailed && (
-                      <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
-                            <p className="text-xs text-red-200/80">
-                              File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
-                            </p>
+                  // 기본 AI 답변 (비교 법령 없음) with Glassmorphism
+                  <div className="relative overflow-hidden">
+                    {/* 🎨 배경 그라데이션 */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none" />
+
+                    <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-6">
+                      {/* 검색 실패 경고 메시지 */}
+                      {fileSearchFailed && (
+                        <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
+                              <p className="text-xs text-red-200/80">
+                                File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="mb-4 pb-3 border-b border-border">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-6 w-6 text-blue-500" />
-                          <h2 className="text-xl font-bold text-foreground">AI 답변</h2>
-                          <Badge variant="secondary" className="text-xs ml-2">
-                            File Search RAG
-                          </Badge>
-                        </div>
+                      <div className="mb-4 pb-3 border-b border-purple-500/20">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            {/* Glowing AI Icon */}
+                            <div className="relative">
+                              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                              <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-2 rounded-xl shadow-lg">
+                                <Sparkles className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <h2 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</h2>
+                            <Badge variant="secondary" className="text-xs">
+                              File Search RAG
+                            </Badge>
+                          </div>
 
                         {/* AI 답변 컨트롤 */}
                         <div className="flex items-center gap-2 flex-wrap">
@@ -2892,12 +2949,13 @@ export function LawViewer({
                       dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
                     />
 
-                    {/* AI 답변 주의사항 */}
-                    <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                      <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                      <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                      {/* AI 답변 주의사항 */}
+                      <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                      </div>
                     </div>
-                  </>
+                  </div>
                 )
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

@@ -56,7 +56,7 @@ export function SearchViewImproved({
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="hero-gradient border-b border-border/50">
+        <section className="relative hero-gradient border-b border-border/50 z-50">
           <div className="container mx-auto px-6 py-16 md:py-24">
             <div className="flex flex-col items-center text-center space-y-8">
               {/* Title & Subtitle */}

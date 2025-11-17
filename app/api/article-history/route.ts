@@ -36,13 +36,23 @@ export async function GET(request: Request) {
       next: { revalidate: 3600 },
     })
 
+    const text = await response.text()
+    console.log("[v0] [조문이력 API] Response status:", response.status)
+    console.log("[v0] [조문이력 API] Response length:", text.length)
+    console.log("[v0] [조문이력 API] XML sample (first 2000 chars):", text.substring(0, 2000))
+
+    // Check if it's an error HTML response
+    if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
+      console.error("[v0] [조문이력 API] Received HTML error page")
+      return NextResponse.json({
+        error: "법제처 API가 HTML 오류 페이지를 반환했습니다 (조문별 이력 API 미지원 가능성)",
+        details: "이 법령은 조문별 개정이력 조회를 지원하지 않을 수 있습니다"
+      }, { status: 503 })
+    }
+
     if (!response.ok) {
       throw new Error(`API 응답 오류: ${response.status}`)
     }
-
-    const text = await response.text()
-    console.log("[v0] [조문이력 API] Response length:", text.length)
-    console.log("[v0] [조문이력 API] XML sample (first 2000 chars):", text.substring(0, 2000))
 
     debugLogger.success("조문별 변경이력 조회 완료", { length: text.length })
 

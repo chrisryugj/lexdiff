@@ -190,7 +190,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           {showRecent && recentSearches.length > 0 && (
             <div
               ref={dropdownRef}
-              className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto"
+              className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-xl z-[100] max-h-60 overflow-y-auto"
             >
               <div className="p-2">
                 <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
@@ -240,26 +240,6 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           )}
         </Button>
       </div>
-      {query.trim() && searchType && (
-        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5" style={{ fontFamily: "Pretendard, sans-serif" }}>
-          {searchType === "ai" ? (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300/30 rounded-full">
-              <Bot className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
-              <span className="font-medium text-blue-700">AI 검색 모드</span>
-            </div>
-          ) : searchType === "ordinance" ? (
-            <>
-              <Building2 className="h-3.5 w-3.5 text-blue-500" />
-              <span>조례/규칙 검색</span>
-            </>
-          ) : (
-            <>
-              <Scale className="h-3.5 w-3.5 text-amber-500" />
-              <span>법령 검색</span>
-            </>
-          )}
-        </div>
-      )}
     </form>
   )
 }
