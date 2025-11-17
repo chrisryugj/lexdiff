@@ -28,7 +28,70 @@ const stats = {
   success: 0,
   errors: 0,
   skipped: 0,
+  duplicates: 0,
   startTime: Date.now(),
+}
+
+// Cache for existing documents in store
+let existingLawIds: Set<string> | null = null
+
+/**
+ * Fetch all existing documents from the File Search Store
+ * and extract their law_id metadata
+ */
+async function loadExistingDocuments(): Promise<Set<string>> {
+  if (existingLawIds !== null) {
+    return existingLawIds
+  }
+
+  console.log('🔍 Loading existing documents from store...')
+  existingLawIds = new Set<string>()
+
+  try {
+    let pageToken: string | undefined = undefined
+    let pageCount = 0
+
+    do {
+      const url = new URL(`https://generativelanguage.googleapis.com/v1beta/${STORE_ID}/documents`)
+      url.searchParams.set('pageSize', '20') // Max 20 per page
+      if (pageToken) {
+        url.searchParams.set('pageToken', pageToken)
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: { 'x-goog-api-key': API_KEY! }
+      })
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.warn(`⚠️  Failed to list documents (${response.status}): ${error}`)
+        break
+      }
+
+      const data = await response.json()
+      const documents = data.documents || []
+
+      for (const doc of documents) {
+        // Extract law_id from customMetadata
+        const lawIdMeta = (doc.customMetadata || []).find((m: any) => m.key === 'law_id')
+        if (lawIdMeta?.stringValue) {
+          existingLawIds.add(lawIdMeta.stringValue)
+        }
+      }
+
+      pageCount++
+      pageToken = data.nextPageToken
+
+    } while (pageToken)
+
+    console.log(`✅ Loaded ${existingLawIds.size} existing documents from ${pageCount} pages\n`)
+
+  } catch (error) {
+    console.warn('⚠️  Failed to load existing documents:', error instanceof Error ? error.message : error)
+    console.log('   Continuing without duplicate detection...\n')
+  }
+
+  return existingLawIds
 }
 
 async function fetchLawDataById(lawId: string, lawName: string) {
@@ -223,6 +286,14 @@ async function uploadLaw(lawName: string, lawId: string, index: number, total: n
     stats.total++
     console.log(`\n[${index + 1}/${total}] 🔍 ${lawName} (ID: ${lawId})`)
 
+    // Check if already uploaded
+    const existing = await loadExistingDocuments()
+    if (existing.has(lawId)) {
+      console.log(`  ⏭️  Already exists in store, skipping...`)
+      stats.duplicates++
+      return
+    }
+
     const { lawName: fetchedName, data } = await fetchLawDataById(lawId, lawName)
     const actualLawName = data.법령?.법령명_한글 || fetchedName
     console.log(`  ✓ Found: ${actualLawName}`)
@@ -252,6 +323,11 @@ async function uploadLaw(lawName: string, lawId: string, index: number, total: n
     stats.success++
     console.log(`  ✅ Uploaded successfully (${category})`)
 
+    // Add to existing documents cache to prevent re-upload in same session
+    if (existingLawIds) {
+      existingLawIds.add(lawId)
+    }
+
   } catch (error) {
     console.error(`  ❌ Failed:`, error instanceof Error ? error.message : error)
     stats.errors++
@@ -275,6 +351,9 @@ async function main() {
   console.log(`📋 Store ID: ${STORE_ID}`)
   console.log(`📊 Uploading ${Object.keys(lawIdsMapping).length} laws\n`)
 
+  // Pre-load existing documents to prevent duplicates
+  await loadExistingDocuments()
+
   const lawEntries = Object.entries(lawIdsMapping)
 
   for (let i = 0; i < lawEntries.length; i++) {
@@ -294,6 +373,7 @@ async function main() {
   console.log('═'.repeat(64))
   console.log(`Total:         ${stats.total}`)
   console.log(`Success:       ${stats.success}`)
+  console.log(`Duplicates:    ${stats.duplicates}`)
   console.log(`Skipped:       ${stats.skipped}`)
   console.log(`Errors:        ${stats.errors}`)
   console.log(`Time:          ${elapsed.toFixed(1)}s`)
@@ -303,6 +383,8 @@ async function main() {
     console.log('⚠️  Some uploads failed. Check the logs above.')
   } else if (stats.skipped > 0) {
     console.log(`⚠️  ${stats.skipped} laws skipped due to name mismatch.`)
+  } else if (stats.duplicates > 0) {
+    console.log(`✅ Upload completed! ${stats.duplicates} duplicates were skipped.`)
   } else {
     console.log('✅ All uploads completed successfully!')
   }
