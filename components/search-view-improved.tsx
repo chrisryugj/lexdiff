@@ -83,13 +83,6 @@ export function SearchViewImproved({
                   searchMode={searchMode}
                 />
               </div>
-
-              {/* Favorites Panel (Basic Mode Only) */}
-              {searchMode === 'basic' && (
-                <div className="w-full max-w-3xl animate-fade-in" style={{ animationDelay: "200ms" }}>
-                  <FavoritesPanel onSelect={onFavoriteSelect} />
-                </div>
-              )}
             </div>
           </div>
         </section>

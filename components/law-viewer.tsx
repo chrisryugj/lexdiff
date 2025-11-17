@@ -1283,33 +1283,33 @@ export function LawViewer({
     <>
       {/* 🎨 히어로 섹션 - 법령 제목 및 메타 정보 */}
       {!aiAnswerMode && (
-        <div className="relative overflow-hidden bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-yellow-500/10 rounded-3xl p-6 md:p-8 border border-amber-500/20 mb-6">
-          {/* 배경 패턴 */}
-          <div className="absolute inset-0 opacity-5 bg-[linear-gradient(45deg,transparent_25%,rgba(251,191,36,0.2)_25%,rgba(251,191,36,0.2)_50%,transparent_50%,transparent_75%,rgba(251,191,36,0.2)_75%,rgba(251,191,36,0.2))] bg-[length:20px_20px]" />
+        <div className="relative overflow-hidden bg-card/30 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-border/50 mb-6">
+          {/* 배경 그라데이션 (미묘하게) */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
 
           <div className="relative">
             {/* 법령 제목 */}
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
               {meta.lawTitle}
             </h1>
 
             {/* 메타 배지들 */}
             <div className="flex flex-wrap gap-2">
               {meta.latestEffectiveDate && (
-                <Badge variant="outline" className="bg-background/80 backdrop-blur-sm border-amber-500/30">
-                  📅 시행일: {meta.latestEffectiveDate}
+                <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
+                  📅 {meta.latestEffectiveDate}
                 </Badge>
               )}
-              <Badge variant="outline" className="bg-background/80 backdrop-blur-sm border-amber-500/30">
+              <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
                 📋 {articles.length}개 조문
               </Badge>
               {favorites.size > 0 && (
-                <Badge variant="outline" className="bg-background/80 backdrop-blur-sm border-amber-500/30">
-                  ⭐ 즐겨찾기 {favorites.size}개
+                <Badge variant="outline" className="bg-background/50 backdrop-blur-sm">
+                  ⭐ {favorites.size}개
                 </Badge>
               )}
               {isOrdinance && (
-                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
                   🏛️ 자치법규
                 </Badge>
               )}

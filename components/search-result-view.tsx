@@ -439,12 +439,12 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             searchResultId: cached.lawData.searchResultId,
           })
 
-          // ⚡ 즉시 완료 (캐시 히트는 빠르게)
+          // ⚡ 캐시 로딩 표시 (0.8초)
           setTimeout(() => {
             setIsCacheHit(false)
             setIsSearching(false)
             updateProgress('complete', 100)
-          }, 300)
+          }, 800)
         } else {
           // lawData가 없으면 검색 실행
           debugLogger.info('📡 lawData 없음 - 검색 시작', cached.query)

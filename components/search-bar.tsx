@@ -176,14 +176,12 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
             className={cn(
-              "pl-11 h-12 text-base transition-all duration-500",
+              "pl-11 h-12 text-base transition-all duration-300",
               isAiMode && [
-                "ring-2 ring-purple-500/70 border-purple-400",
-                "shadow-[0_0_30px_rgba(168,85,247,0.5)]",
-                "bg-gradient-to-r from-purple-900/90 to-blue-900/90",
-                "dark:from-purple-900/90 dark:to-blue-900/90",
-                "text-purple-50 placeholder:text-purple-200",
-                "animate-glow-pulse"
+                "ring-1 ring-purple-500/30 border-purple-500/50",
+                "shadow-[0_0_15px_rgba(139,92,246,0.15)]",
+                "bg-gradient-to-r from-purple-950/50 to-blue-950/50",
+                "text-foreground placeholder:text-muted-foreground"
               ]
             )}
             disabled={isLoading}
@@ -221,11 +219,9 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           className={cn(
             "h-12 px-6 sm:px-8 transition-all duration-300",
             isAiMode && [
-              "bg-gradient-to-r from-purple-600 to-blue-600",
-              "hover:from-purple-700 hover:to-blue-700",
-              "shadow-lg shadow-purple-500/50",
-              "font-semibold",
-              "text-white"
+              "bg-purple-600/80",
+              "hover:bg-purple-600",
+              "border-purple-500/50"
             ]
           )}
         >
