@@ -12,7 +12,7 @@ import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
-import { SearchProgressDialog } from './search-progress-dialog'
+import { SearchProgressDialogImproved as SearchProgressDialog } from './search-progress-dialog-improved'
 
 
 export function FileSearchRAGView({
@@ -353,7 +353,7 @@ export function FileSearchRAGView({
   }, [initialQuery])
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
       {/* 프로그레스 Dialog */}
       <SearchProgressDialog
         key={searchingQueryRef.current}

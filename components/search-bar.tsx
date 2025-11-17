@@ -141,7 +141,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-3xl relative">
+    <form onSubmit={handleSubmit} className="w-full max-w-3xl relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
       <div className="flex gap-2">
         {/* AI 모드 전환 버튼 (NEW) */}
         <Button
@@ -171,7 +171,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           <Input
             ref={inputRef}
             type="text"
-            placeholder={isAiMode ? '🤖 AI에게 물어보세요... 예: "FTA 특혜 관세는 어떻게 받나요?"' : '예: "민법 제1조", "관세법", "서울특별시 청소년 조례"'}
+            placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
@@ -195,7 +195,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
               className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto"
             >
               <div className="p-2">
-                <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
                   <Clock className="h-3 w-3" />
                   <span>최근 검색</span>
                 </div>
@@ -205,6 +205,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                     type="button"
                     onClick={() => handleRecentClick(search)}
                     className="w-full text-left px-3 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
+                    style={{ fontFamily: "Pretendard, sans-serif" }}
                   >
                     {search}
                   </button>
@@ -244,7 +245,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         </Button>
       </div>
       {query.trim() && searchType && (
-        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
+        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5" style={{ fontFamily: "Pretendard, sans-serif" }}>
           {searchType === "ai" ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300/30 rounded-full">
               <Bot className="h-3.5 w-3.5 text-blue-600 animate-pulse" />

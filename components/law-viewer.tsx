@@ -1280,7 +1280,7 @@ export function LawViewer({
   })
 
   return (
-    <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]">
+    <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]" style={{ fontFamily: "Pretendard, sans-serif" }}>
       {/* Mobile overlay backdrop */}
       {isArticleListExpanded && (
         <div
@@ -1701,22 +1701,6 @@ export function LawViewer({
                   </>
                 )}
               </Button>
-              {/* 글자 크기 조절 및 복사 */}
-              <div className="flex items-center gap-1 ml-2">
-                <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
-                <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
             </div>
           )}
 
@@ -2647,10 +2631,28 @@ export function LawViewer({
                   // 1-tier view: Normal single article view
                   <div className="prose prose-sm max-w-none dark:prose-invert">
                     <div className="mb-6 pb-4 border-b border-border">
-                      <h3 className="text-lg font-bold text-foreground mb-2">
-                        {formatSimpleJo(activeArticle.jo)}
-                        {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
-                      </h3>
+                      <div className="flex items-center justify-between gap-4">
+                        <h3 className="text-lg font-bold text-foreground mb-0">
+                          {formatSimpleJo(activeArticle.jo)}
+                          {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                        </h3>
+                        {/* 글자 크기 조절 및 복사 */}
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
+                            <ZoomOut className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
+                            <ZoomIn className="h-4 w-4" />
+                          </Button>
+                          <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
+                          <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
+                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
 
                     <div

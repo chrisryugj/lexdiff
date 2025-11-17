@@ -79,7 +79,14 @@
       "Bash(cmd.exe /c \"if exist .next rmdir /s /q .next\")",
       "Bash(cmd.exe /c \"taskkill /F /IM node.exe & timeout /T 1 /NOBREAK >nul 2>&1 & if exist .next rmdir /s /q .next & npm run dev\")",
       "Bash(cmd.exe /c \"taskkill /F /IM node.exe & timeout /T 2 /NOBREAK >nul 2>&1 & if exist .next rmdir /s /q .next & npm run dev\")",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(if not exist .skills mkdir .skills)",
+      "Bash(cmd.exe /c \"if not exist .skills mkdir .skills\")",
+      "Bash(cmd.exe /c \"mkdir .skills\\pdf 2>nul & mkdir .skills\\xlsx 2>nul & mkdir .skills\\webapp-testing 2>nul\")",
+      "Bash(\".skills/pdf/SKILL.md\")",
+      "Bash(\".skills/xlsx/SKILL.md\")",
+      "Bash(\".skills/webapp-testing/SKILL.md\")",
+      "Bash(\".skills/artifacts-builder/SKILL.md\")"
     ],
     "deny": [],
     "ask": []

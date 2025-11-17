@@ -22,7 +22,7 @@ import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
 import { RagResultCard } from "@/components/rag-result-card"
 import { RagAnswerCard } from "@/components/rag-answer-card"
-import { SearchProgressDialog } from "@/components/search-progress-dialog"
+import { SearchProgressDialogImproved as SearchProgressDialog } from "@/components/search-progress-dialog-improved"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -40,6 +40,25 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
+
+// 법령 타입별 Badge 색상 클래스 반환
+function getLawTypeBadgeClass(lawType: string): string {
+  const normalizedType = lawType.toLowerCase()
+
+  if (normalizedType.includes('법률')) {
+    return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+  } else if (normalizedType.includes('시행령')) {
+    return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+  } else if (normalizedType.includes('시행규칙')) {
+    return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+  } else if (normalizedType.includes('대통령령')) {
+    return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+  } else if (normalizedType.includes('총리령') || normalizedType.includes('부령')) {
+    return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20'
+  } else {
+    return 'bg-secondary text-secondary-foreground'
+  }
+}
 
 function convertArticleNumberToCode(
   articleNum: string | number,
@@ -1926,78 +1945,220 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       <main className="flex-1">
         <div className="container mx-auto p-6">
           {lawSelectionState ? (
-            <div className="flex flex-col items-center justify-center py-4 md:py-12 gap-4 md:gap-8">
-              <div className="w-full max-w-3xl space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl md:text-2xl font-bold">
-                    법령 검색 결과 ({lawSelectionState.results.length}건)
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={() => setLawSelectionState(null)}>
+            <div className="py-4 md:py-8">
+              {/* 헤더 섹션 - Glassmorphism */}
+              <div className="sticky top-0 z-10 -mx-6 px-6 py-4 mb-8 bg-background/80 backdrop-blur-xl border-b border-border/50">
+                <div className="max-w-6xl mx-auto flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                      법령 검색 결과
+                    </h2>
+                    <Badge
+                      variant="secondary"
+                      className="h-7 px-3 bg-primary/10 text-primary border border-primary/20 font-bold"
+                      style={{ fontFamily: "Pretendard, sans-serif" }}
+                    >
+                      {lawSelectionState.results.length}건
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setLawSelectionState(null)
+                      setIsSearching(false)
+                      updateProgress('complete', 0)
+                    }}
+                    className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
                     취소
                   </Button>
                 </div>
+              </div>
 
-                {lawSelectionState.results.map((law) => (
+              {/* 검색 결과 그리드 - 애니메이션 적용 */}
+              <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                {lawSelectionState.results.map((law, index) => (
                   <button
                     key={law.lawId || law.mst}
                     onClick={() => handleLawSelect(law)}
-                    className="w-full p-3 md:p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
+                    className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden animate-fade-in"
+                    style={{
+                      animationDelay: `${index * 50}ms`,
+                      fontFamily: "Pretendard, sans-serif"
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-base md:text-lg">{String(law.lawName)}</h4>
-                          <Badge variant="secondary">{String(law.lawType)}</Badge>
+                    {/* 그라데이션 배경 (hover 시 나타남) */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                    {/* 콘텐츠 */}
+                    <div className="relative flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        {/* 법령명 + 타입 */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-base md:text-lg leading-snug mb-2 group-hover:text-primary transition-colors">
+                              {String(law.lawName)}
+                            </h4>
+                            <Badge
+                              variant="secondary"
+                              className={`
+                                text-xs font-semibold px-3 py-1
+                                ${getLawTypeBadgeClass(String(law.lawType))}
+                              `}
+                            >
+                              {String(law.lawType)}
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
-                          {law.promulgationDate && <span>공포: {String(law.promulgationDate)}</span>}
-                          {law.effectiveDate && <span>시행: {String(law.effectiveDate)}</span>}
+
+                        {/* 메타 정보 */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
+                          {law.promulgationDate && (
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              공포: {String(law.promulgationDate)}
+                            </span>
+                          )}
+                          {law.effectiveDate && (
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              시행: {String(law.effectiveDate)}
+                            </span>
+                          )}
                         </div>
                       </div>
+
+                      {/* 화살표 아이콘 (hover 시 이동) */}
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
+                        <ChevronLeft className="w-5 h-5 rotate-180 text-primary group-hover:text-primary-foreground transition-colors" />
+                      </div>
                     </div>
+
+                    {/* 하단 글로우 효과 */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </button>
                 ))}
               </div>
             </div>
           ) : ordinanceSelectionState ? (
-            <div className="flex flex-col items-center justify-center py-4 md:py-12 gap-4 md:gap-8">
-              <div className="w-full max-w-3xl space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl md:text-2xl font-bold">
-                    조례 검색 결과 ({ordinanceSelectionState.results.length}건)
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={() => setOrdinanceSelectionState(null)}>
+            <div className="py-4 md:py-8">
+              {/* 헤더 섹션 - Glassmorphism */}
+              <div className="sticky top-0 z-10 -mx-6 px-6 py-4 mb-8 bg-background/80 backdrop-blur-xl border-b border-border/50">
+                <div className="max-w-6xl mx-auto flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                      조례 검색 결과
+                    </h2>
+                    <Badge
+                      variant="secondary"
+                      className="h-7 px-3 bg-blue-500/10 text-blue-600 border border-blue-500/20 font-bold"
+                      style={{ fontFamily: "Pretendard, sans-serif" }}
+                    >
+                      {ordinanceSelectionState.results.length}건
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setOrdinanceSelectionState(null)
+                      setIsSearching(false)
+                      updateProgress('complete', 0)
+                    }}
+                    className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
                     취소
                   </Button>
                 </div>
+              </div>
 
-                {ordinanceSelectionState.results.map((ordinance) => (
+              {/* 검색 결과 그리드 - 애니메이션 적용 */}
+              <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                {ordinanceSelectionState.results.map((ordinance, index) => (
                   <button
                     key={ordinance.ordinSeq}
                     onClick={() => handleOrdinanceSelect(ordinance)}
-                    className="w-full p-3 md:p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
+                    className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden animate-fade-in"
+                    style={{
+                      animationDelay: `${index * 50}ms`,
+                      fontFamily: "Pretendard, sans-serif"
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-base md:text-lg mb-1">{String(ordinance.ordinName)}</h4>
-                        <div className="flex flex-wrap gap-2 text-xs md:text-sm text-muted-foreground">
-                          {ordinance.orgName && <span>{String(ordinance.orgName)}</span>}
-                          {ordinance.ordinKind && (
-                            <Badge variant="secondary" className="text-xs">
-                              {String(ordinance.ordinKind)}
-                            </Badge>
+                    {/* 그라데이션 배경 (hover 시 나타남) */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                    {/* 콘텐츠 */}
+                    <div className="relative flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        {/* 조례명 + 타입 */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-base md:text-lg leading-snug mb-2 group-hover:text-blue-600 transition-colors">
+                              {String(ordinance.ordinName)}
+                            </h4>
+                            {ordinance.ordinKind && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs font-semibold px-3 py-1 bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                              >
+                                {String(ordinance.ordinKind)}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 메타 정보 */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
+                          {ordinance.orgName && (
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                              {String(ordinance.orgName)}
+                            </span>
                           )}
-                          {ordinance.effectiveDate && <span>시행: {String(ordinance.effectiveDate)}</span>}
+                          {ordinance.effectiveDate && (
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              시행: {String(ordinance.effectiveDate)}
+                            </span>
+                          )}
                         </div>
                       </div>
+
+                      {/* 화살표 아이콘 (hover 시 이동) */}
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 group-hover:scale-110 transition-all duration-300">
+                        <ChevronLeft className="w-5 h-5 rotate-180 text-blue-600 group-hover:text-white transition-colors" />
+                      </div>
                     </div>
+
+                    {/* 하단 글로우 효과 */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </button>
                 ))}
               </div>
             </div>
           ) : !lawData ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground">검색 데이터를 불러오는 중...</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-6">
+              {/* 로딩 애니메이션 */}
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-r-accent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+              </div>
+
+              {/* 로딩 텍스트 */}
+              <div className="text-center space-y-2" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                <p className="text-lg font-semibold text-foreground">검색 데이터를 불러오는 중</p>
+                <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
+              </div>
+
+              {/* 애니메이션 도트 */}
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

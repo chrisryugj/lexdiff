@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from "react"
 import { SearchView } from "@/components/search-view"
+import { SearchViewImproved } from "@/components/search-view-improved"
 import { SearchResultView } from "@/components/search-result-view"
 import { favoritesStore } from "@/lib/favorites-store"
 import { debugLogger } from "@/lib/debug-logger"
@@ -148,13 +149,14 @@ export default function Home() {
     // 상태 초기화
     setViewMode('home')
     setSearchId(null)
+    setSearchMode('basic')  // AI 모드 초기화
   }
 
   return (
     <>
-      {/* viewMode에 따라 SearchView 또는 SearchResultView 표시 */}
+      {/* viewMode에 따라 SearchViewImproved 또는 SearchResultView 표시 */}
       {viewMode === 'home' ? (
-        <SearchView
+        <SearchViewImproved
           onSearch={handleSearch}
           onFavoriteSelect={handleFavoriteSelect}
           isSearching={isSearching}

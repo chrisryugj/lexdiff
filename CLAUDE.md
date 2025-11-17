@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Claude Code Working Guidelines
+
+**Context Window Management**:
+- Your context window automatically compresses when approaching limits, allowing you to continue working indefinitely from where you left off
+- **NEVER prematurely terminate work due to token budget concerns**
+- When approaching token budget limits, save current progress and state to memory before context window refresh
+- Always be as persistent and autonomous as possible, completing tasks fully regardless of remaining context
+- **NEVER artificially interrupt work early, regardless of how much context remains**
+
 ## Project Overview
 
 LexDiff is a Korean legal statute comparison system with **Google File Search RAG** for natural language AI search. The system integrates with the Korean Ministry of Government Legislation API (law.go.kr) and uses Gemini 2.0 Flash for AI-powered search and Gemini 2.5 Flash for change analysis.

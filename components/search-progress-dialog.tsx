@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Brain, Search, FileSearch, Sparkles, CheckCircle, Loader2 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
 
 interface SearchProgressDialogProps {
   isOpen: boolean
@@ -30,7 +31,7 @@ export function SearchProgressDialog({
         <DialogTitle className="sr-only">
           {mode === 'ai' ? 'AI 답변 생성 중' : '법령 조회 중'}
         </DialogTitle>
-        <div className="py-6 space-y-6">
+        <div className="py-6 space-y-6" style={{ fontFamily: "Pretendard, sans-serif" }}>
           {/* 타이틀 */}
           <div className="text-center">
             {mode === 'ai' ? (
@@ -131,32 +132,42 @@ function StageItem({
   isStreaming?: boolean
 }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg transition-all">
+    <div className={cn(
+      "flex items-center gap-3 p-3 rounded-lg transition-all",
+      // 완료: 초록 배경
+      status === 'complete' && "bg-green-900/20 border-l-4 border-green-700",
+      // 진행 중: 강조 배경
+      status === 'active' && "bg-primary/10 border-l-4 border-primary",
+      // 대기 중: 기본 배경
+      status === 'pending' && "bg-card/30 border-l-4 border-transparent"
+    )}>
       <div
-        className={`flex-shrink-0 rounded-full p-2 ${
-          status === 'complete'
-            ? 'bg-green-500'
-            : status === 'active'
-            ? 'bg-primary'
-            : 'bg-muted'
-        }`}
+        className={cn(
+          "flex-shrink-0 rounded-full p-2",
+          status === 'complete' && "bg-green-700",
+          status === 'active' && "bg-primary",
+          status === 'pending' && "bg-muted/50"
+        )}
       >
         {status === 'complete' ? (
           <CheckCircle className="h-5 w-5 text-white" />
         ) : status === 'active' ? (
-          <Icon className={`h-5 w-5 text-primary-foreground ${isStreaming ? 'animate-pulse' : 'animate-spin'}`} />
+          <Icon className={cn(
+            "h-5 w-5 text-white",
+            isStreaming ? 'animate-pulse' : 'animate-spin'
+          )} />
         ) : (
-          <Icon className="h-5 w-5 text-muted-foreground" />
+          <Icon className="h-5 w-5 text-white" />
         )}
       </div>
       <span
-        className={`text-sm font-medium ${
-          status === 'complete'
-            ? 'text-foreground'
-            : status === 'active'
-            ? 'text-primary font-semibold'
-            : 'text-muted-foreground'
-        }`}
+        className={cn(
+          "text-sm font-bold",
+          status === 'complete' && 'text-green-300',
+          status === 'active' && 'text-primary',
+          status === 'pending' && 'text-muted-foreground'
+        )}
+        style={{ fontFamily: "Pretendard, sans-serif" }}
       >
         {label}
       </span>

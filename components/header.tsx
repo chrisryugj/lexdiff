@@ -45,10 +45,10 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
             <Scale className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="flex flex-col items-start">
-            <h1 className="text-lg font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
+            <h1 className="text-lg font-bold text-foreground mb-0" style={{ fontFamily: "GiantsInline, sans-serif" }}>
               LexDiff
             </h1>
-            <p className="text-xs text-muted-foreground">Your AI-Powered Legal Companion</p>
+            <p className="text-md text-muted-foreground font-bold -mt-1" style={{ fontFamily: "InkLiquid, sans-serif" }}>Your AI-Powered Legal Companion</p>
           </div>
         </button>
 
