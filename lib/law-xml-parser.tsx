@@ -273,11 +273,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
 
-    // For ordinances, make article number and title bold BEFORE linkifying
+    // Make article number and title bold BEFORE linkifying (for both laws and ordinances)
     // This catches patterns like "제1조(목적)" or "제1조" at the start
-    if (isOrdinance) {
-      content = content.replace(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)/, '<strong>$1</strong>')
-    }
+    content = content.replace(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)/, '<strong>$1</strong>')
 
     content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content)
 

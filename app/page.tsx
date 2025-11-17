@@ -120,9 +120,10 @@ export default function Home() {
       // History 추가
       pushSearchHistory(newSearchId)
 
-      // 검색 결과 화면으로 전환
+      // 화면 전환 (프로그레스는 SearchResultView에서 관리)
       setSearchId(newSearchId)
       setViewMode('search-result')
+      // isSearching은 SearchResultView의 onProgressUpdate에서 complete 시 false로 변경됨
 
     } catch (error) {
       debugLogger.error('❌ 검색 실패', error)
@@ -170,9 +171,11 @@ export default function Home() {
           onProgressUpdate={(stage, progress) => {
             setSearchStage(stage)
             setSearchProgress(progress)
-            // 완료 시 isSearching 해제
+            // 완료 시 약간의 딜레이 후 프로그레스 숨김
             if (stage === 'complete') {
-              setIsSearching(false)
+              setTimeout(() => {
+                setIsSearching(false)
+              }, 500)
             }
           }}
           onModeChange={(mode) => {

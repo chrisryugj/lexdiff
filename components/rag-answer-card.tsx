@@ -108,6 +108,11 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
           const codeText = codeContent.join('\n')
           const isExpanded = expandedSections[codeKey] ?? false
 
+          // 발췌조문 내용에서 조문 제목을 <strong>으로 감싸기
+          let formattedCodeText = escapeHtml(codeText)
+          // 조문 번호와 제목을 굵게 처리 (예: "제35조(협정관세의 적용제한)" → "<strong>제35조(협정관세의 적용제한)</strong>")
+          formattedCodeText = formattedCodeText.replace(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)/, '<strong>$1</strong>')
+
           html.push(`
             <div class="my-1 border border-border rounded-lg overflow-hidden">
               <div
@@ -115,7 +120,7 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
                 data-code-key="${codeKey}"
               >
                 <span class="text-sm font-semibold text-foreground" style="font-size: ${fontSize}px">
-                  📜 관련 조문 (원문)
+                  📜 발췌 조문
                 </span>
                 <span class="code-block-icon">
                   ${isExpanded ? '▲' : '▼'}
@@ -124,7 +129,7 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
               <code
                 class="block p-4 bg-muted/30 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto code-block-content ${isExpanded ? '' : 'hidden'}"
                 style="font-size: ${fontSize}px"
-              >${escapeHtml(codeText)}</code>
+              >${formattedCodeText}</code>
             </div>
           `)
 
@@ -306,12 +311,8 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
   const htmlContent = convertToHTML(content)
 
   return (
-    <div className="relative overflow-hidden">
-      {/* 🎨 배경 애니메이션 그라데이션 */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none" />
-
-      <Card className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20">
-        <CardHeader className="pb-3 border-b border-purple-500/20">
+    <div className="border-2 border-purple-500/30 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 bg-card/50 backdrop-blur-xl">
+      <div className="pb-3 px-6 pt-6 border-b border-border/50">
           {/* 🎨 AI 헤더 with Glow Effect */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -374,16 +375,16 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
           </div>
         </div>
 
-        {/* 시테이션 없을 때 경고 */}
-        {citations.length === 0 && (
-          <div className="flex items-start gap-2 text-xs text-red-200/80 bg-red-950/20 border border-red-800/30 p-2 rounded">
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <p>⚠️ 이 답변은 법령 데이터베이스에서 관련 조문을 찾지 못했습니다. 내용이 부정확할 수 있으니 주의하세요.</p>
-          </div>
-        )}
-      </CardHeader>
+      {/* 시테이션 없을 때 경고 */}
+      {citations.length === 0 && (
+        <div className="flex items-start gap-2 text-xs text-red-200/80 bg-red-950/20 border border-red-800/30 p-2 rounded mx-6 mb-3">
+          <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+          <p>⚠️ 이 답변은 법령 데이터베이스에서 관련 조문을 찾지 못했습니다. 내용이 부정확할 수 있으니 주의하세요.</p>
+        </div>
+      )}
+    </div>
 
-      <CardContent className="space-y-3">
+    <div className="space-y-3 px-6 pb-6">
         {/* AI 답변 내용 (HTML 렌더링) */}
         <div
           ref={contentRef}
@@ -395,13 +396,12 @@ export function RagAnswerCard({ answer, onCitationClick }: RagAnswerCardProps) {
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
 
-        {/* 주의사항 - 다크 테마 */}
-        <div className="flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded">
-          <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-          <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
-        </div>
-      </CardContent>
-      </Card>
+    {/* 주의사항 - 다크 테마 */}
+    <div className="flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded">
+      <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+      <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
     </div>
+    </div>
+  </div>
   )
 }

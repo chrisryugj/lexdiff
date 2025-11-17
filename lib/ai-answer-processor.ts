@@ -41,8 +41,8 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = text.replace(/<\/blockquote>\n+<div/g, '</blockquote><div')
   text = text.replace(/<\/div>\n+<blockquote/g, '</div><blockquote')
 
-  // 주요 섹션 제목 뒤에만 줄바꿈 추가 (시각적 구분)
-  text = text.replace(/(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)<\/div>/g, '$1</div><br>')
+  // 주요 섹션 제목 뒤 줄바꿈 제거 (구분선 아래 padding으로 대체)
+  // text = text.replace(/(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)<\/div>/g, '$1</div><br>')
 
   // 남은 줄바꿈을 <br>로 변환
   text = text.replace(/\n/g, '<br>\n')
@@ -80,79 +80,51 @@ function escapeHtml(text: string): string {
 
 /**
  * 📜 조문 발췌 마커 추가 (HTML 이스케이프 전에 실행)
- * 조문 내용을 특수 마커로 감싸서 나중에 blockquote로 변환
+ * "📖 조문 발췌"와 "📖 핵심 해석" 사이의 모든 내용을 blockquote로 감싸기
  */
 function markLawQuotes(text: string): string {
   const lines = text.split('\n')
   const result: string[] = []
   let i = 0
-  let inRelatedLawSection = false
+  let inQuoteSection = false
 
   while (i < lines.length) {
     const line = lines[i]
     const trimmed = line.trim()
 
-    // 📖 관련 법령 섹션 감지
-    if (/📖 관련 법령/.test(trimmed)) {
-      inRelatedLawSection = true
+    // "📖 조문 발췌" 시작
+    if (trimmed === '📖 조문 발췌') {
       result.push(line)
-      i++
-      continue
-    }
-
-    // 다른 주요 섹션이 나오면 관련 법령 섹션 종료
-    if (/📋 핵심 요약|📄 상세 내용|💡 추가 참고/.test(trimmed)) {
-      inRelatedLawSection = false
-      result.push(line)
-      i++
-      continue
-    }
-
-    // 📜로 시작하는 법령 조문 인용 (관련 법령 섹션이 아닐 때만)
-    // ⚠️ "📖 조문 발췌"는 하위 섹션 제목이므로 제외
-    // ⚠️ 파일서치 데이터 형식: "## 제1조 목적", "## 제26조의2 담보의 해제" 등도 지원
-    if (
-      (trimmed.startsWith('📜') && trimmed !== '📖 조문 발췌' && !inRelatedLawSection) ||
-      (/^##\s+제\d+조(의\d+)?/.test(trimmed) && !inRelatedLawSection)
-    ) {
-      // 조문 발췌 시작 마커
       result.push('<<<QUOTE_START>>>')
-      result.push(line)
+      inQuoteSection = true
       i++
-
-      // 다음 줄부터 조문 내용 수집 (빈 줄이나 다음 섹션 전까지)
-      const quoteLines: string[] = []
-      let collectedCount = 0
-      while (i < lines.length) {
-        const nextLine = lines[i]
-        const nextTrimmed = nextLine.trim()
-
-        // 종료 조건: 빈 줄, 주요 섹션, 하위 섹션, 다음 조문(## 제N조)
-        if (
-          nextTrimmed === '' ||
-          /^(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)$/.test(nextTrimmed) ||
-          /^(📖 조문 발췌|📖 핵심 해석|📝 실무 적용|🔴 조건·예외)$/.test(nextTrimmed) ||
-          /^##\s+제\d+조(의\d+)?/.test(nextTrimmed) ||
-          trimmed.startsWith('📜')
-        ) {
-          console.log('[markLawQuotes] 조문 수집 종료:', { reason: nextTrimmed || '빈 줄', collectedCount })
-          break
-        }
-
-        quoteLines.push(nextLine)
-        collectedCount++
-        i++
-      }
-
-      // 조문 내용을 마커 안에 포함
-      result.push(...quoteLines)
-      result.push('<<<QUOTE_END>>>')
-      console.log('[markLawQuotes] 마커 추가 완료:', { quoteLineCount: quoteLines.length })
       continue
     }
 
+    // "📖 핵심 해석" 종료
+    if (inQuoteSection && trimmed === '📖 핵심 해석') {
+      result.push('<<<QUOTE_END>>>')
+      result.push(line)
+      inQuoteSection = false
+      i++
+      continue
+    }
+
+    // 조문 발췌 섹션 내부 - 모든 내용 수집
+    if (inQuoteSection) {
+      result.push(line)
+      i++
+      continue
+    }
+
+    // 그 외 일반 텍스트
     result.push(line)
     i++
+  }
+
+  // 섹션이 끝까지 열려있으면 닫기
+  if (inQuoteSection) {
+    result.push('<<<QUOTE_END>>>')
   }
 
   return result.join('\n')
@@ -220,12 +192,12 @@ function styleLawQuotes(text: string): string {
         i++
       }
 
-      // blockquote 생성
+      // blockquote 생성 (스타일은 law-viewer.tsx의 prose 클래스에서 적용)
       if (quoteLines.length > 0) {
-        const quoteContent = quoteLines.join('<br>')
-        result.push(
-          `<blockquote style="border-left: 3px solid #cbd5e1; padding-left: 1rem; margin: 0.5rem 0 0.5rem 1rem; color: #64748b; font-style: italic;">${quoteContent}</blockquote>`
-        )
+        let quoteContent = quoteLines.join('<br>')
+        // blockquote 내부에서 <strong> 태그 제거 (이탤릭은 prose 클래스에서 자동 적용)
+        quoteContent = quoteContent.replace(/<strong>([^<]+)<\/strong>/g, '$1')
+        result.push(`<blockquote>${quoteContent}</blockquote>`)
       }
       continue
     }
@@ -250,7 +222,7 @@ function styleMainSectionHeadings(text: string): string {
     const regex = new RegExp(`^(${escaped})$`, 'gm')
     result = result.replace(
       regex,
-      `<div style="font-size: 1.1rem; font-weight: bold; margin-top: 1.9rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1f2937;">$1</div>`
+      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1f2937;">$1</div>`
     )
   })
 
@@ -361,7 +333,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
       if (trimmed === '📖 조문 발췌') {
         currentSub = 'none'
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 1rem;">${trimmed}</div>`
         )
         return
       }

@@ -73,7 +73,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]">
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]" style={{ fontFamily: 'Pretendard, sans-serif' }}>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle className="text-base font-semibold truncate flex-1 pr-2">{title}</DialogTitle>

@@ -22,7 +22,7 @@ import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
 import { RagResultCard } from "@/components/rag-result-card"
 import { RagAnswerCard } from "@/components/rag-answer-card"
-import { SearchProgressDialogImproved as SearchProgressDialog } from "@/components/search-progress-dialog-improved"
+import { SearchProgressModern as SearchProgressDialog } from "@/components/search-progress-modern"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -363,7 +363,9 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   const updateProgress = useCallback((stage: 'searching' | 'parsing' | 'streaming' | 'complete', progress: number) => {
     setSearchStage(stage)
     setSearchProgress(progress)
-    onProgressUpdate?.(stage, progress) // 부모에게도 알림 (isSearching 해제용)
+
+    // complete 상태는 즉시 부모에게 알리되, 부모의 timeout이 처리하도록 함
+    onProgressUpdate?.(stage, progress)
   }, [onProgressUpdate])
 
   useEffect(() => {
@@ -410,10 +412,10 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             articles: cached.lawData.articles.length,
           })
 
-          // ⚡ 캐시 로딩 표시 (0.3초만 표시)
+          // ⚡ 캐시 로딩 표시
           setIsCacheHit(true)
           setIsSearching(true)
-          updateProgress('parsing', 90)
+          updateProgress('parsing', 95)
 
           setLawData({
             meta: {
@@ -439,12 +441,12 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             searchResultId: cached.lawData.searchResultId,
           })
 
-          // ⚡ 캐시 로딩 표시 (0.8초)
+          // ⚡ 캐시 로딩 표시 - complete 후 닫기
+          updateProgress('complete', 100)
           setTimeout(() => {
             setIsCacheHit(false)
             setIsSearching(false)
-            updateProgress('complete', 100)
-          }, 800)
+          }, 500)
         } else {
           // lawData가 없으면 검색 실행
           debugLogger.info('📡 lawData 없음 - 검색 시작', cached.query)
@@ -2151,26 +2153,29 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               </div>
             </div>
           ) : !lawData ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-6">
-              {/* 로딩 애니메이션 */}
-              <div className="relative">
-                <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-r-accent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-              </div>
+            // 로딩 화면 - 프로그레스 다이얼로그가 있을 때는 숨김
+            !isSearching ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-6">
+                {/* 로딩 애니메이션 */}
+                <div className="relative">
+                  <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-r-accent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+                </div>
 
-              {/* 로딩 텍스트 */}
-              <div className="text-center space-y-2" style={{ fontFamily: "Pretendard, sans-serif" }}>
-                <p className="text-lg font-semibold text-foreground">검색 데이터를 불러오는 중</p>
-                <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
-              </div>
+                {/* 로딩 텍스트 */}
+                <div className="text-center space-y-2" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                  <p className="text-lg font-semibold text-foreground">검색 데이터를 불러오는 중</p>
+                  <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
+                </div>
 
-              {/* 애니메이션 도트 */}
-              <div className="flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                {/* 애니메이션 도트 */}
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
-            </div>
+            ) : null
           ) : (
             <div className="space-y-4">
               <div className="md:hidden">

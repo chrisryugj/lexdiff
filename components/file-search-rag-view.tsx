@@ -12,7 +12,7 @@ import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
-import { SearchProgressDialogImproved as SearchProgressDialog } from './search-progress-dialog-improved'
+import { SearchProgressModern as SearchProgressDialog } from './search-progress-modern'
 
 
 export function FileSearchRAGView({
@@ -212,10 +212,14 @@ export function FileSearchRAGView({
         }
       }
 
-      // 완료
+      // 완료 - 프로그레스 완료 표시 후 딜레이
       setSearchStage('complete')
       setSearchProgress(100)
-      setIsAnalyzing(false)
+
+      // 완료 상태 표시 후 프로그레스 닫기
+      setTimeout(() => {
+        setIsAnalyzing(false)
+      }, 600)
 
     } catch (err) {
       console.error('File Search error:', err)
@@ -507,13 +511,8 @@ export function FileSearchRAGView({
             isLoadingComparison={isLoadingLaw}
           />
 
-          {/* Loading Law Indicator */}
-          {isLoadingLaw && (
-            <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />
-              <span className="text-sm">법령 전문 로딩 중...</span>
-            </div>
-          )}
+          {/* Loading Law Indicator - 프로그레스 다이얼로그와 겹치지 않도록 제거 */}
+          {/* isLoadingLaw는 LawViewer의 isLoadingComparison으로 전달되어 내부에서 처리됨 */}
         </>
       )}
     </div>

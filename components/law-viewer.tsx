@@ -1351,10 +1351,10 @@ export function LawViewer({
               </Button>
             )}
 
-            <div className="mb-4 flex-shrink-0">
+            <div className="border-b border-border p-4 flex-shrink-0">
               <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-semibold text-foreground">답변 속 법령 조문</h3>
+                <BookOpen className="h-5 w-5 text-primary" />
+                <h3 className="text-xl font-bold text-foreground">관련 법령 목록</h3>
               </div>
               {(() => {
                 // 중복 제거를 위한 그룹화 (카운트 계산용)
@@ -1411,11 +1411,10 @@ export function LawViewer({
                 )
               })()}
             </div>
-            <Separator className="mb-4 flex-shrink-0" />
 
             <div className="flex-1 min-h-0">
               <ScrollArea className="h-full">
-                <div className="space-y-2 pr-0">
+                <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
                   {relatedArticles.length > 0 ? (
                     (() => {
                       // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
@@ -2799,7 +2798,7 @@ export function LawViewer({
                         className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
@@ -2857,39 +2856,32 @@ export function LawViewer({
                     </div>
                   </div>
                 ) : (
-                  // 기본 AI 답변 (비교 법령 없음) with Glassmorphism
-                  <div className="relative overflow-hidden">
-                    {/* 🎨 배경 그라데이션 */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none" />
-
-                    <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-6">
-                      {/* 검색 실패 경고 메시지 */}
+                  // 기본 AI 답변 (비교 법령 없음) - Editorial Clean Design
+                  <div className="animate-fade-in-up">
+                      {/* 검색 실패 경고 메시지 - 간소화 */}
                       {fileSearchFailed && (
-                        <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
+                        <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
                           <div className="flex items-start gap-2">
-                            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                            <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
-                              <p className="text-xs text-red-200/80">
-                                File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
+                              <p className="text-sm font-medium text-destructive">검색 결과 없음</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                관련 법령을 찾지 못했습니다. 검색어를 확인해주세요.
                               </p>
                             </div>
                           </div>
                         </div>
                       )}
 
-                      <div className="mb-4 pb-3 border-b border-purple-500/20">
+                      <div className="mb-5 pb-4 border-b border-border">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            {/* Glowing AI Icon */}
-                            <div className="relative">
-                              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                              <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-2 rounded-xl shadow-lg">
-                                <Sparkles className="h-5 w-5 text-white" />
-                              </div>
+                            {/* Simple AI Icon - No Glow */}
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <Sparkles className="h-5 w-5 text-primary" />
                             </div>
-                            <h2 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</h2>
-                            <Badge variant="secondary" className="text-xs">
+                            <h2 className="text-lg font-semibold text-foreground">AI 답변</h2>
+                            <Badge variant="outline" className="text-xs font-normal">
                               File Search RAG
                             </Badge>
                           </div>
@@ -2927,9 +2919,9 @@ export function LawViewer({
                             <FileText className="h-4 w-4" />
                           </Button>
                           <Separator orientation="vertical" className="h-5 hidden sm:block" />
-                          <div className="flex items-center gap-1.5 px-2 bg-green-950/30 rounded-md" title="답변 신뢰도">
-                            <ShieldCheck className="h-4 w-4 text-green-400" />
-                            <span className="text-xs font-medium text-green-400">신뢰도 높음</span>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            <span>검증된 출처</span>
                           </div>
                         </div>
                       </div>
@@ -2939,7 +2931,7 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-400 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
@@ -2954,7 +2946,6 @@ export function LawViewer({
                         <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                         <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                       </div>
-                    </div>
                   </div>
                 )
               ) : (
