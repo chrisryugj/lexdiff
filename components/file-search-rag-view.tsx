@@ -205,118 +205,6 @@ export function FileSearchRAGView({
     }
   }
 
-  /**
-   * 관련 법령 클릭 핸들러
-   * API 호출하여 조문 전문 로드
-   */
-  async function handleRelatedArticleClick(lawName: string, jo: string, article: string) {
-    try {
-      setIsLoadingLaw(true)
-      debugLogger.info('관련 법령 클릭', { lawName, jo, article })
-
-      // 1. 법령 검색 (lawId 획득) - XML 파싱
-      const searchRes = await fetch(`/api/law-search?query=${encodeURIComponent(lawName)}`)
-      if (!searchRes.ok) {
-        throw new Error('법령 검색 실패')
-      }
-
-      const searchXml = await searchRes.text()
-
-      // XML 파싱
-      const parser = new DOMParser()
-      const searchDoc = parser.parseFromString(searchXml, 'text/xml')
-      const lawNode = searchDoc.querySelector('law')
-
-      if (!lawNode) {
-        throw new Error('법령을 찾을 수 없습니다')
-      }
-
-      const lawId = lawNode.querySelector('법령ID')?.textContent || undefined
-      const mst = lawNode.querySelector('법령일련번호')?.textContent || undefined
-      const lawTitle = lawNode.querySelector('법령명한글')?.textContent || lawName
-
-      if (!lawId && !mst) {
-        throw new Error('법령 ID를 찾을 수 없습니다')
-      }
-
-      debugLogger.success('법령 검색 성공', { lawId, mst, lawTitle })
-
-      // 2. 법령 전문 로드 - 원본 JSON 스키마 사용
-      const eflawRes = await fetch(`/api/eflaw?${lawId ? `lawId=${lawId}` : `mst=${mst}`}`)
-      if (!eflawRes.ok) {
-        throw new Error('법령 전문 로드 실패')
-      }
-
-      const eflawJson = await eflawRes.json()
-      const lawData = eflawJson?.법령
-
-      if (!lawData) {
-        throw new Error('법령 데이터가 없습니다')
-      }
-
-      // 조문 파싱 (기본 법령뷰 방식)
-      const rawArticleUnits = lawData?.조문?.조문단위
-      const articleUnits = Array.isArray(rawArticleUnits)
-        ? rawArticleUnits
-        : rawArticleUnits
-        ? [rawArticleUnits]
-        : []
-
-      if (articleUnits.length === 0) {
-        throw new Error('조문을 찾을 수 없습니다')
-      }
-
-      // LawMeta 구성
-      const meta: LawMeta = {
-        lawId: lawId || '',
-        lawTitle: lawData.기본정보?.법령명_한글 || lawTitle,
-        promulgationDate: lawData.기본정보?.공포일자 || '',
-        lawType: lawData.기본정보?.법종구분 || ''
-      }
-
-      // LawArticle[] 구성
-      const articles: LawArticle[] = articleUnits.map((unit: any) => {
-        let content = unit.조문내용 || ''
-        const title = unit.조문제목 || ''
-
-        // 조문내용에서 첫 줄이 제목과 같으면 제거
-        if (content && title) {
-          const lines = content.split('\n')
-          if (lines[0].includes(title) || lines[0].includes(unit.조문번호)) {
-            content = lines.slice(1).join('\n')
-          }
-        }
-
-        return {
-          jo: (unit.조문키 || '').slice(0, 6),
-          joNum: unit.조문번호 || '',
-          title,
-          content,
-          isPreamble: false
-        }
-      })
-
-      debugLogger.success('법령 전문 로드 성공', {
-        lawTitle: meta.lawTitle,
-        articleCount: articles.length
-      })
-
-      // 3. 상태 업데이트
-      setSelectedLawMeta(meta)
-      setSelectedLawArticles(articles)
-      setSelectedJo(jo)
-      setIsLoadingLaw(false)
-
-      // 외부 콜백 호출
-      onCitationClick?.(lawName, article)
-
-    } catch (err) {
-      debugLogger.error('관련 법령 로드 실패', err)
-      console.error('Failed to load related law:', err)
-      setIsLoadingLaw(false)
-      alert(err instanceof Error ? err.message : '법령 로드 중 오류가 발생했습니다')
-    }
-  }
 
   // initialQuery가 변경되면 ref도 함께 업데이트
   useEffect(() => {
@@ -406,8 +294,8 @@ export function FileSearchRAGView({
           )}
 
           <LawViewer
-            meta={dummyMeta}
-            articles={dummyArticles}
+            meta={{ lawId: '', lawTitle: 'AI 답변', promulgationDate: '', lawType: '' }}
+            articles={[]}
             selectedJo={undefined}
             favorites={new Set()}
             isOrdinance={false}
@@ -415,14 +303,7 @@ export function FileSearchRAGView({
             aiAnswerMode={true}
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
-            comparisonLawMeta={selectedLawMeta || undefined}
-            comparisonLawArticles={selectedLawArticles}
-            comparisonLawSelectedJo={selectedJo}
-            isLoadingComparison={isLoadingLaw}
           />
-
-          {/* Loading Law Indicator - 프로그레스 다이얼로그와 겹치지 않도록 제거 */}
-          {/* isLoadingLaw는 LawViewer의 isLoadingComparison으로 전달되어 내부에서 처리됨 */}
         </>
       )}
     </div>

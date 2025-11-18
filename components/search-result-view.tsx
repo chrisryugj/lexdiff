@@ -19,9 +19,9 @@ import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 // import { FeedbackButtons } from "@/components/feedback-buttons" // 미사용으로 제거
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
-import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
-import { RagResultCard } from "@/components/rag-result-card"
-import { RagAnswerCard } from "@/components/rag-answer-card"
+// import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel" // 미사용으로 제거
+// import { RagResultCard } from "@/components/rag-result-card" // 미사용으로 제거
+// import { RagAnswerCard } from "@/components/rag-answer-card" // 미사용으로 제거
 import { ModernProgressBar } from "@/components/ui/modern-progress-bar"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
