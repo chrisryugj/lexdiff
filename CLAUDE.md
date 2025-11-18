@@ -2,6 +2,76 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 🔴 Quick Reference (Most Critical Patterns)
+
+When working on this codebase, **always check these patterns first**:
+
+### 1. SSE Buffer Handling (AI Search)
+```typescript
+// CRITICAL: Process remaining buffer after while loop ends
+if (buffer.trim()) {
+  if (buffer.startsWith('data: ')) {
+    const parsed = JSON.parse(buffer.slice(6))
+    // Process text/warning/citations
+  }
+}
+```
+📍 `file-search-rag-view.tsx:142-172`
+
+### 2. API Response Parsing (XML vs JSON)
+```typescript
+// XML: /api/law-search, /api/oldnew, /api/hierarchy
+const xml = await response.text()
+const doc = new DOMParser().parseFromString(xml, 'text/xml')
+
+// JSON: /api/eflaw, /api/three-tier (NO wrapper fields)
+const json = await response.json()
+const lawData = json?.법령  // Direct access
+```
+
+### 3. JO Code System (6-digit format)
+```typescript
+// Always use internally: "제38조" → "003800"
+// "제10조의2" → "001002"
+// Convert only for display
+```
+📍 `lib/law-parser.ts`: `buildJO()`, `formatJO()`
+
+### 4. Async onClick Pattern (Mobile)
+```typescript
+// ❌ WRONG: Direct async in onClick
+const handleClick = async () => { await foo() }
+
+// ✅ CORRECT: Regular function + .then/.catch
+const handleClick = () => {
+  foo()
+    .then(() => debugLogger.success('성공'))
+    .catch((err) => debugLogger.error('실패', err))
+}
+```
+
+### 5. Law vs Ordinance Detection
+```typescript
+// Keywords first, then regional pattern
+const isOrdinance = /조례|규칙/.test(lawName) ||
+  /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+```
+📍 `reference-modal.tsx:30-33`
+
+### 6. Complex Law Name Link Pattern
+```typescript
+// Negative lookahead to prevent "법률 시행령" split
+/([가-힣a-zA-Z0-9·]+(?:법률|법|령))(?!\s+[가-힣]+령)\s+제(\d+)조/
+
+// Negative lookbehind to prevent duplicate "시행령" link
+/(?<![가-힣]\s)(시행령|시행규칙)(?![으로로이가>])/
+```
+📍 `lib/ai-answer-processor.ts:425`, `lib/law-xml-parser.tsx`
+
+---
+
 ## Claude Code Working Guidelines
 
 **Context Window Management**:
@@ -11,11 +81,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Always be as persistent and autonomous as possible, completing tasks fully regardless of remaining context
 - **NEVER artificially interrupt work early, regardless of how much context remains**
 
+---
+
 ## Project Overview
 
 LexDiff is a Korean legal statute comparison system with **Google File Search RAG** for natural language AI search. The system integrates with the Korean Ministry of Government Legislation API (law.go.kr) and uses Gemini 2.0 Flash for AI-powered search and Gemini 2.5 Flash for change analysis.
 
 **Current Main Feature**: Google File Search RAG (자연어 질문 → 실시간 AI 답변 + 법령 인용)
+
+---
 
 ## Development Commands
 
@@ -58,9 +132,11 @@ Required in `.env.local`:
 - `LAW_OC`: law.go.kr DRF API authentication key (required)
 - `GEMINI_API_KEY`: Google Gemini API key (required for AI features)
 
-## Core Architecture
+---
 
-### Google File Search RAG System
+## 🔴 Core Architecture (Most Referenced)
+
+### Google File Search RAG System 🔴
 
 **Current Primary Feature** - Natural language AI search:
 
@@ -148,7 +224,17 @@ export function convertAIAnswerToHTML(markdown: string): string {
 }
 ```
 
-### API Endpoints Pattern
+6. **Complex Law Name Link Pattern** (`lib/ai-answer-processor.ts:425`):
+```typescript
+// Pattern 3: Prevent "법률 시행령" split (negative lookahead)
+/([가-힣a-zA-Z0-9·]+(?:법률|법|령))(?!\s+[가-힣]+령)\s+제(\d+)조/
+
+// Pattern 5/6: Prevent duplicate "시행령" link (negative lookbehind)
+/(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가>])/
+/(?<![가-힣]\s)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가>])/
+```
+
+### API Endpoints Pattern 🔴
 
 **Server-side proxy architecture**: Client → Next.js API Route → External API
 
@@ -175,7 +261,7 @@ export function convertAIAnswerToHTML(markdown: string): string {
   - Server-Sent Events with `data: ` prefix
   - Buffer processing after stream ends
 
-### JO Code System
+### JO Code System 🔴
 
 The codebase uses a **6-digit JO code** to uniquely identify law articles:
 - Format: `AAAABB` where `AAAA` = article number (padded), `BB` = branch number
@@ -184,7 +270,7 @@ The codebase uses a **6-digit JO code** to uniquely identify law articles:
 
 **Critical**: Always use the 6-digit JO code when referencing articles internally. Only convert to readable format (제N조/제N조의M) for display.
 
-### Search Query Parsing Flow
+### Search Query Parsing Flow 🔴
 
 Search queries go through normalization and parsing:
 
@@ -202,7 +288,50 @@ Search queries go through normalization and parsing:
    - For laws: Use `lawId` (preferred) or `mst` as identifiers
    - For ordinances: Use `ordinSeq` or `ordinId`
 
-### State Management
+### Component Architecture 🔴
+
+```
+app/page.tsx (main state container)
+├── components/header.tsx
+├── components/search-bar.tsx
+│   └── Uses lib/law-parser.ts to parse queries
+├── components/file-search-rag-view.tsx
+│   ├── AI natural language search
+│   ├── SSE streaming with buffer handling
+│   ├── Overlay progress display
+│   ├── Citation modal links
+│   └── Uses lib/file-search-client.ts
+├── components/law-viewer.tsx
+│   ├── Tree navigation of articles
+│   ├── Article display with change highlighting
+│   ├── 3-tier view (1-tier / 2-tier / 3-tier modes)
+│   ├── Uses lib/three-tier-parser.ts
+│   └── Independent scrolling for each column
+├── components/reference-modal.tsx
+│   ├── Law article modal display
+│   ├── Mobile-responsive (max-w-[95vw])
+│   └── Word wrapping (overflow-wrap-anywhere, break-words)
+├── components/admin-rules-section.tsx
+│   ├── Uses lib/use-admin-rules.ts hook
+│   ├── Displays matched administrative rules
+│   └── Shows progress during loading
+├── components/comparison-modal.tsx
+│   ├── Fetches /api/oldnew
+│   ├── Side-by-side diff view
+│   └── Calls components/ai-summary-dialog.tsx
+├── components/ai-summary-dialog.tsx
+│   └── Calls /api/summarize (Gemini 2.5 Flash)
+├── components/favorites-panel.tsx
+│   └── Uses lib/favorites-store.ts
+└── components/debug-console.tsx
+    └── Uses lib/debug-logger.ts (starts minimized)
+```
+
+---
+
+## 🟡 Important Implementation Details
+
+### State Management 🟡
 
 The app uses **React state + localStorage** (no global state library):
 
@@ -219,36 +348,22 @@ The app uses **React state + localStorage** (no global state library):
   - Captures API errors with context for user reporting
   - Includes API logs, request/response data
 
-### Multi-Phase Search System
+### Law vs Ordinance Detection 🟡
 
-**Current Active Systems**:
+The app auto-detects whether a search is for a law or local ordinance:
 
-**Phase 7: IndexedDB Query Cache** (ACTIVE)
-- Browser-side caching using IndexedDB (database: `LexDiffCache`)
-- Keyed by full query string (law name + article)
-- ~25ms retrieval time for cached queries
-- 7-day cache expiry
-- Implementation: `lib/law-content-cache.ts`
-- **Critical**: Article validation must check actual article existence before setting `selectedJo`
+```typescript
+// Keywords first (조례, 규칙), then regional pattern
+const isOrdinanceLaw = lawName && (
+  /조례|규칙/.test(lawName) ||
+  /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+)
+```
+📍 `reference-modal.tsx:30-33`
 
-**Basic Search** (ACTIVE - Primary Path)
-- Direct `/api/law-search` calls to law.go.kr
-- Similarity-based law name matching using Levenshtein distance
-- Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
-- Implementation: `lib/text-similarity.ts`
+If detected as ordinance, use `/api/ordin-search` and `/api/ordin` instead of law endpoints.
 
-**Phase 5: Intelligent Search** (CURRENTLY DISABLED)
-- Learning-based law name mapping using Turso DB
-- Stores search queries and results for pattern matching
-- L1-L4 cache layers for progressive fallback
-- **Status**: Temporarily disabled due to data corruption issues (see 2025-11-11 changelog)
-
-**Phase 6: Vector Search** (CURRENTLY DISABLED)
-- Voyage AI embeddings for semantic similarity
-- `search_query_embeddings` table in Turso DB
-- **Status**: Temporarily disabled along with Phase 5
-
-### 3-Tier Comparison System
+### 3-Tier Comparison System 🟡
 
 The 3-tier system shows law-decree-rule relationships:
 
@@ -289,7 +404,88 @@ if (rawArticle.시행규칙조문) {
 </div>
 ```
 
-### Administrative Rules System
+### Article Structure Handling 🟡
+
+**항 (Paragraph) without 항내용 (content) but with 호 (items)** (`law-viewer.tsx`):
+
+```typescript
+// Normalize 항: handle both array and single object
+const hangs = rawArticle.항
+  ? Array.isArray(rawArticle.항) ? rawArticle.항 : [rawArticle.항]
+  : []
+
+// Check if ANY 항 has content
+const hasHangContent = hangs.some(h => h.항내용?.trim())
+
+if (!hasHangContent && hangs.length > 0) {
+  // Keep main content + append all 호 items
+  // Don't replace main content
+}
+```
+📍 `components/law-viewer.tsx` (도로법 시행령 제55조 case)
+
+### Article Comparison Logic 🟡
+
+When comparing old/new versions:
+1. Fetch both versions via `/api/oldnew`
+2. Parse XML to extract old/new content for specific JO
+3. Pass both contents to Gemini API with structured prompt
+4. Gemini returns analysis in specific format (see `app/api/summarize/route.ts` for prompt)
+
+### Date Formatting 🟡
+
+The law.go.kr API expects dates in `YYYYMMDD` format:
+- Normalize input dates in API routes before calling external API
+- Display dates as `YYYY-MM-DD` in UI
+- See `normalizeDateFormat()` in `app/api/eflaw/route.ts`
+
+### Caching Strategy 🟡
+
+All API routes use Next.js caching:
+```typescript
+fetch(url, {
+  next: { revalidate: 3600 }, // 1 hour cache
+})
+
+headers: {
+  'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+}
+```
+
+---
+
+## 🟢 Reference (Less Frequently Used)
+
+### Multi-Phase Search System 🟢
+
+**Current Active Systems**:
+
+**Phase 7: IndexedDB Query Cache** (ACTIVE)
+- Browser-side caching using IndexedDB (database: `LexDiffCache`)
+- Keyed by full query string (law name + article)
+- ~25ms retrieval time for cached queries
+- 7-day cache expiry
+- Implementation: `lib/law-content-cache.ts`
+- **Critical**: Article validation must check actual article existence before setting `selectedJo`
+
+**Basic Search** (ACTIVE - Primary Path)
+- Direct `/api/law-search` calls to law.go.kr
+- Similarity-based law name matching using Levenshtein distance
+- Adaptive thresholds: 85% for queries ≤2 chars, 60% for 3+ chars
+- Implementation: `lib/text-similarity.ts`
+
+**Phase 5: Intelligent Search** (CURRENTLY DISABLED)
+- Learning-based law name mapping using Turso DB
+- Stores search queries and results for pattern matching
+- L1-L4 cache layers for progressive fallback
+- **Status**: Temporarily disabled due to data corruption issues (see 2025-11-11 changelog)
+
+**Phase 6: Vector Search** (CURRENTLY DISABLED)
+- Voyage AI embeddings for semantic similarity
+- `search_query_embeddings` table in Turso DB
+- **Status**: Temporarily disabled along with Phase 5
+
+### Administrative Rules System 🟢
 
 The admin rules feature searches related administrative rules for each article:
 
@@ -325,84 +521,7 @@ adminRulesMap.set(uniqueKey, rule)
   - Admin rule purpose content
 - Return matchType: "title" or "content"
 
-### Component Architecture
-
-```
-app/page.tsx (main state container)
-├── components/header.tsx
-├── components/search-bar.tsx
-│   └── Uses lib/law-parser.ts to parse queries
-├── components/file-search-rag-view.tsx
-│   ├── AI natural language search
-│   ├── SSE streaming with buffer handling
-│   ├── Overlay progress display
-│   ├── Citation modal links
-│   └── Uses lib/file-search-client.ts
-├── components/law-viewer.tsx
-│   ├── Tree navigation of articles
-│   ├── Article display with change highlighting
-│   ├── 3-tier view (1-tier / 2-tier / 3-tier modes)
-│   ├── Uses lib/three-tier-parser.ts
-│   └── Independent scrolling for each column
-├── components/reference-modal.tsx
-│   ├── Law article modal display
-│   ├── Mobile-responsive (max-w-[95vw])
-│   └── Word wrapping (overflow-wrap-anywhere, break-words)
-├── components/admin-rules-section.tsx
-│   ├── Uses lib/use-admin-rules.ts hook
-│   ├── Displays matched administrative rules
-│   └── Shows progress during loading
-├── components/comparison-modal.tsx
-│   ├── Fetches /api/oldnew
-│   ├── Side-by-side diff view
-│   └── Calls components/ai-summary-dialog.tsx
-├── components/ai-summary-dialog.tsx
-│   └── Calls /api/summarize (Gemini 2.5 Flash)
-├── components/favorites-panel.tsx
-│   └── Uses lib/favorites-store.ts
-└── components/debug-console.tsx
-    └── Uses lib/debug-logger.ts (starts minimized)
-```
-
-## Critical Implementation Details
-
-### Law vs Ordinance Detection
-
-The app auto-detects whether a search is for a law or local ordinance:
-
-```typescript
-const isOrdinanceQuery = /조례|규칙|특별시|광역시|도|시|군|구/.test(query.lawName)
-```
-
-If detected as ordinance, use `/api/ordin-search` and `/api/ordin` instead of law endpoints.
-
-### Article Comparison Logic
-
-When comparing old/new versions:
-1. Fetch both versions via `/api/oldnew`
-2. Parse XML to extract old/new content for specific JO
-3. Pass both contents to Gemini API with structured prompt
-4. Gemini returns analysis in specific format (see `app/api/summarize/route.ts` for prompt)
-
-### Date Formatting
-
-The law.go.kr API expects dates in `YYYYMMDD` format:
-- Normalize input dates in API routes before calling external API
-- Display dates as `YYYY-MM-DD` in UI
-- See `normalizeDateFormat()` in `app/api/eflaw/route.ts`
-
-### Caching Strategy
-
-All API routes use Next.js caching:
-```typescript
-fetch(url, {
-  next: { revalidate: 3600 }, // 1 hour cache
-})
-
-headers: {
-  'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-}
-```
+---
 
 ## Common Debugging
 
@@ -476,6 +595,8 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 }
 ```
 
+---
+
 ## Technology Notes
 
 - **Next.js 16 / React 19**: Uses App Router (not Pages Router)
@@ -489,7 +610,56 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 - **Node.js**: Requires Node.js 20+
 - **Package Manager**: Supports npm or pnpm
 
+---
+
 ## 변경 이력 (Change Log)
+
+### 2025-11-18: 법령명 링크 및 조례 판단 로직 개선
+
+#### 1. 복합 법령명 링크 생성 정규식 수정 (fd78b36)
+
+**문제**: "국토의 계획 및 이용에 관한 법률 시행령"이 "법률"과 "시행령" 두 개의 링크로 분리됨
+
+**해결**:
+- Pattern 3: 부정 전방탐색 추가 `(?!\s+[가-힣]+령)`
+  - "법률 시행령" 복합어를 하나의 링크로 유지
+- Pattern 5/6: 부정 후방탐색 추가 `(?<![가-힣]\s)`
+  - "법률 시행령"에서 "시행령"만 별도 링크 생성 방지
+
+**수정 파일**:
+- `lib/law-xml-parser.tsx`: 법령 뷰어용 linkifyRefsB
+- `lib/ai-answer-processor.ts`: AI 모달용 linkifyRefsB
+
+#### 2. 조례 여부 판단 로직 개선 (772812b)
+
+**문제**: 지방자치단체명 패턴만으로 오판 발생
+
+**해결**:
+```typescript
+// BEFORE: 지방자치단체명 포함 시 무조건 조례로 판단
+const isOrdinanceLaw = /조례|규칙|특별시|광역시|도|시|군|구/.test(lawName)
+
+// AFTER: 키워드 우선 + 지방자치단체명 공백 패턴 정밀화
+const isOrdinanceLaw = lawName && (
+  /조례|규칙/.test(lawName) ||  // 키워드 우선
+  /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)  // 공백 포함
+)
+```
+📍 `components/reference-modal.tsx:30-33`
+
+#### 3. 항내용 없고 호만 있는 조문 표시 버그 수정 (4e1d0bf)
+
+**문제**: 도로법 시행령 제55조처럼 항 객체는 있지만 항내용이 비어있고 호만 있는 경우, 본문이 제거됨
+
+**해결**:
+- 항 정규화: 배열/단일 객체 모두 처리
+- 항내용 존재 여부 선확인 (`hasHangContent`)
+- 항내용 없고 호만 있는 경우: 본문 + 호 합치기
+
+**수정 전 → 후**:
+- ❌ 본문 완전 제거 → ✅ 본문 (제목 제거됨) + 전체 호 내용
+
+📍 `components/law-viewer.tsx` (+62 lines)
 
 ### 2025-11-15: AI 검색 시스템 3대 핵심 수정
 
@@ -661,9 +831,81 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 2. **인용조문 데이터 로딩 비활성화**: 위임조문(knd=2)만 로드
 3. **3단 비교 버튼 활성화 로직 개선**: 실제 시행규칙 콘텐츠 유무 확인
 
+---
+
 ## Documentation Structure
 
 - `docs/archived/`: Completed implementation documents
 - `docs/future/`: Future reference documents
 - `CLAUDE.md`: This file - development guidance
 - `README.md`: User-facing project documentation
+
+---
+
+## 🤖 CLAUDE.md 관리 가이드
+
+### 이 문서는 살아있는 문서입니다
+
+CLAUDE.md는 프로젝트와 함께 진화합니다. 정기적으로 다음 작업을 수행하세요:
+
+#### 1. 변경사항 체크 (커밋마다)
+
+```prompt
+이전 커밋의 변경사항을 확인해서 CLAUDE.md에 추가할 내용이 있으면 제시해줘
+```
+
+Claude Code가 자동으로:
+- 새로운 패턴 발견
+- 일관성 깨진 부분 식별
+- 개선할 규칙 제안
+
+#### 2. 규칙 사용 빈도 분석 (스프린트마다)
+
+```prompt
+CLAUDE.md에서 가장 많이 참조된 규칙과 가장 참조되지 않는 규칙을 알려줘
+```
+
+**주의**: 적게 참조되는 규칙도 중요할 수 있습니다 (예: 인증, 보안)
+- 제거보다는 섹션별 구조화 권장
+- 🔴 CRITICAL / 🟡 IMPORTANT / 🟢 REFERENCE 우선순위 사용
+
+#### 3. 문서 최적화 (월 1회)
+
+```prompt
+CLAUDE.md를 다시 스캔하고 최적화해줘. 중복 제거, 구조 개선, 최신 패턴 반영
+```
+
+### 작성 베스트 프랙티스
+
+1. **Claude Code에게 초안 작성 시키기** (30분 → 3분)
+   ```prompt
+   프로젝트 전체를 스캔하고 패턴을 분석해서 CLAUDE.md 초안을 만들어줘
+   ```
+
+2. **우선순위 표시 활용**
+   - 🔴 CRITICAL: 매일 참조되는 필수 패턴
+   - 🟡 IMPORTANT: 주기적으로 필요한 패턴
+   - 🟢 REFERENCE: 특정 상황에서만 필요
+
+3. **Quick Reference 섹션 유지**
+   - 가장 자주 찾는 5-10개 패턴
+   - 파일 경로 포함
+   - Before/After 코드 예시
+
+4. **변경 이력 상세 기록**
+   - 문제 → 해결책 → 파일 경로
+   - 커밋 해시 참조
+   - 재발 방지 가이드
+
+### 팀과 함께 관리하기
+
+- 초안: Claude Code 생성 (3분)
+- 리뷰: 팀 토론 (30분)
+- 수정: Claude Code에게 지시 (5분)
+- 반복: 커밋/스프린트마다
+
+**예시 수정 지시**:
+```prompt
+성능 기준 Lighthouse 90점 이상으로 설정해
+보안 규칙 섹션을 CRITICAL로 변경해
+```
