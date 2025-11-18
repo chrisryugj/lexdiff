@@ -144,13 +144,11 @@ export default function Home() {
   const handleBack = () => {
     debugLogger.info('🏠 홈으로 돌아가기')
 
-    // History 추가
-    pushHomeHistory()
+    // History.back() 사용 (pushHomeHistory 대신)
+    // 이렇게 하면 뒤로가기 시 검색 결과로 복원 가능
+    window.history.back()
 
-    // 상태 초기화
-    setViewMode('home')
-    setSearchId(null)
-    setSearchMode('basic')  // AI 모드 초기화
+    // popstate 이벤트에서 상태 업데이트가 처리됨
   }
 
   return (
