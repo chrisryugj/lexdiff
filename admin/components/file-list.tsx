@@ -9,6 +9,9 @@ export default function FileList() {
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [showScrollButtons, setShowScrollButtons] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -21,6 +24,24 @@ export default function FileList() {
   useEffect(() => {
     fetchFiles();
   }, [currentPage, search]);
+
+  useEffect(() => {
+    // Track scroll position
+    const handleScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+
+      setIsAtTop(scrollTop < 100);
+      setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 100);
+      setShowScrollButtons(scrollTop > 300 || scrollTop + clientHeight < scrollHeight - 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial position
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   async function fetchFiles() {
     try {
@@ -164,6 +185,14 @@ export default function FileList() {
       newSelected.add(fileName);
     }
     setSelectedFiles(newSelected);
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function scrollToBottom() {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
   }
 
   if (loading) {
@@ -425,6 +454,54 @@ export default function FileList() {
             </div>
           )}
         </>
+      )}
+
+      {/* Floating Scroll Buttons */}
+      {showScrollButtons && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
+          {!isAtTop && (
+            <button
+              onClick={scrollToTop}
+              className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+              aria-label="Scroll to top"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 10l7-7m0 0l7 7m-7-7v18"
+                />
+              </svg>
+            </button>
+          )}
+          {!isAtBottom && (
+            <button
+              onClick={scrollToBottom}
+              className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+              aria-label="Scroll to bottom"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
