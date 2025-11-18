@@ -146,13 +146,13 @@ function styleStructuredSections(text: string): string {
   // 2. 주요 섹션 제목 스타일링 (📋 📄 💡 📖)
   result = styleMainSectionHeadings(result)
 
-  // 3. 📋 핵심 요약: 들여쓰기만
+  // 3. 📋 핵심 요약: 들여쓰기만 + 상단 여백
   result = indentSection(result, '📋 핵심 요약', { indent: '1rem', bullet: false })
 
-  // 4. 💡 추가 참고: 불릿 + 들여쓰기
+  // 4. 💡 추가 참고: 불릿 + 들여쓰기 + 상단 여백
   result = indentSection(result, '💡 추가 참고', { indent: '1rem', bullet: true })
 
-  // 5. 📖 관련 법령: 들여쓰기만
+  // 5. 📖 관련 법령: 들여쓰기만 + 상단 여백
   result = indentSection(result, '📖 관련 법령', { indent: '1rem', bullet: false })
 
   // 6. 📄 상세 내용: 하위 섹션(📖/📝/🔴) 스타일링 + 내용 들여쓰기
@@ -222,7 +222,7 @@ function styleMainSectionHeadings(text: string): string {
     const regex = new RegExp(`^(${escaped})$`, 'gm')
     result = result.replace(
       regex,
-      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1f2937;">$1</div>`
+      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border));">$1</div>`
     )
   })
 
@@ -235,6 +235,7 @@ function styleMainSectionHeadings(text: string): string {
 type IndentOptions = {
   indent: string
   bullet: boolean
+  topMargin?: string
 }
 
 /**
@@ -252,6 +253,7 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
     const lines = match.split('\n')
     const [titleLine, ...rest] = lines
     const contentLines: string[] = []
+    let isFirstContent = true
 
     rest.forEach((line) => {
       const trimmed = line.trim()
@@ -269,10 +271,14 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
         return
       }
 
+      // 상단 여백 스타일 (첫 번째 내용에만 적용)
+      const marginTop = isFirstContent && options.topMargin ? `margin-top: ${options.topMargin}; ` : ''
+      isFirstContent = false
+
       // ✅ 📌 🔔 이모지가 있는 경우 → hanging indent (핵심 요약 섹션 전용)
       if (sectionTitle === '📋 핵심 요약' && /^[✅📌🔔]/.test(trimmed)) {
         contentLines.push(
-          `<div style="margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${trimmed}</div>`
         )
         return
       }
@@ -283,11 +289,11 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
       // 💡 추가 참고 섹션의 불릿 → hanging indent
       if (options.bullet) {
         contentLines.push(
-          `<div style="margin-left: ${options.indent}; text-indent: -0.7em; padding-left: 1em;">${prefix}${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -0.7em; padding-left: 1em;">${prefix}${trimmed}</div>`
         )
       } else {
         contentLines.push(
-          `<div style="margin-left: ${options.indent};">${prefix}${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent};">${prefix}${trimmed}</div>`
         )
       }
     })
@@ -314,6 +320,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
     const contentLines: string[] = []
 
     let currentSub: 'none' | 'core' | 'practice' | 'condition' = 'none'
+    let isFirstContentInSub = false
 
     rest.forEach((line) => {
       const trimmed = line.trim()
@@ -325,6 +332,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         // blockquote 이후에는 currentSub을 none으로 리셋
         if (trimmed.startsWith('<blockquote')) {
           currentSub = 'none'
+          isFirstContentInSub = false
         }
         return
       }
@@ -332,40 +340,46 @@ function styleDetailSection(text: string, sectionTitle: string): string {
       // 하위 섹션 제목 감지
       if (trimmed === '📖 조문 발췌') {
         currentSub = 'none'
+        isFirstContentInSub = false
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 1rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem;">${trimmed}</div>`
         )
         return
       }
 
       if (trimmed.startsWith('📖 핵심 해석')) {
         currentSub = 'core'
+        isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
         )
         return
       }
 
       if (trimmed.startsWith('📝 실무 적용')) {
         currentSub = 'practice'
+        isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
         )
         return
       }
 
       if (trimmed.startsWith('🔴 조건·예외')) {
         currentSub = 'condition'
+        isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
         )
         return
       }
 
-      // 하위 섹션 내부 텍스트 → 추가 들여쓰기 (2rem → 3rem)
+      // 하위 섹션 내부 텍스트 → 추가 들여쓰기 + 첫 내용에 상단 여백
       if (currentSub !== 'none') {
+        const marginTop = isFirstContentInSub ? 'margin-top: 0.0rem; ' : ''
+        isFirstContentInSub = false
         contentLines.push(
-          `<div style="margin-left: 2.3rem;">${trimmed}</div>`
+          `<div style="${marginTop}margin-left: 2.3rem;">${trimmed}</div>`
         )
         return
       }

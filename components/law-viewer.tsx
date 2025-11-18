@@ -2895,7 +2895,16 @@ export function LawViewer({
                             className="h-7 px-2"
                             title="글자 작게"
                           >
-                            <ZoomOut className="h-4 w-4" />
+                            <ZoomOut className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFontSize(14)}
+                            className="h-7 px-2"
+                            title="기본 크기"
+                          >
+                            <RotateCcw className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -2904,8 +2913,9 @@ export function LawViewer({
                             className="h-7 px-2"
                             title="글자 크게"
                           >
-                            <ZoomIn className="h-4 w-4" />
+                            <ZoomIn className="h-3.5 w-3.5" />
                           </Button>
+                          <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2916,7 +2926,7 @@ export function LawViewer({
                             className="h-7 px-2"
                             title="복사"
                           >
-                            <FileText className="h-4 w-4" />
+                            <Copy className="h-3.5 w-3.5" />
                           </Button>
                           <Separator orientation="vertical" className="h-5 hidden sm:block" />
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -2931,7 +2941,7 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
