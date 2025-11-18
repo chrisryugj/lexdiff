@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FileSearchStore, GeminiFile } from '@/lib/types';
+import LogImport from './log-import';
 
 interface FileUploadItem {
   id: string;
@@ -160,6 +161,29 @@ export default function FileUploadForm() {
 
   function clearCompleted() {
     setUploads((prev) => prev.filter((u) => u.status !== 'completed'));
+  }
+
+  function handleLogImport(uploadedFiles: string[]) {
+    // 로그에서 가져온 파일들을 completed 상태로 추가
+    const newUploads: FileUploadItem[] = uploadedFiles.map((filename, i) => {
+      // Create a mock File object for display
+      const mockFile = new File([''], filename, { type: 'text/markdown' });
+
+      return {
+        id: `log-import-${Date.now()}-${i}`,
+        file: mockFile,
+        progress: 100,
+        status: 'completed' as const,
+        result: {
+          name: `fileSearchStores/${process.env.NEXT_PUBLIC_STORE_ID || 'unknown'}/documents/${filename}`,
+          displayName: filename,
+          mimeType: 'text/markdown',
+          state: 'ACTIVE',
+        } as GeminiFile,
+      };
+    });
+
+    setUploads((prev) => [...newUploads, ...prev]);
   }
 
   function handleDragEnter(e: React.DragEvent) {
@@ -328,6 +352,7 @@ export default function FileUploadForm() {
               {failedCount > 0 && ` - ${failedCount} failed`}
             </h3>
             <div className="flex gap-2">
+              <LogImport onImport={handleLogImport} />
               {completedCount > 0 && (
                 <button
                   onClick={clearCompleted}

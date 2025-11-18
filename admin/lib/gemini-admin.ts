@@ -233,14 +233,9 @@ export class GeminiAdmin {
    */
   async deleteDocument(documentName: string, force = true): Promise<void> {
     // CRITICAL: force must be passed in config object for indexed documents
-    const config: { force?: boolean } = {};
-    if (force) {
-      config.force = true;
-    }
-
     await this.ai.fileSearchStores.documents.delete({
       name: documentName,
-      ...(force && { config }),
+      config: { force },
     });
   }
 

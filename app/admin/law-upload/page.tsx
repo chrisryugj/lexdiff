@@ -48,6 +48,11 @@ export default function AdminLawUploadPage() {
     loadSavedLaws()
   }, [])
 
+  // Reload saved laws when switching tabs
+  useEffect(() => {
+    loadSavedLaws()
+  }, [activeTab])
+
   async function loadSavedLaws() {
     try {
       const response = await fetch('/api/admin/list-parsed')
@@ -216,13 +221,13 @@ export default function AdminLawUploadPage() {
           </div>
         )}
 
-        {activeTab === 'enforcement' && <EnforcementDownloadPanel />}
+        {activeTab === 'enforcement' && <EnforcementDownloadPanel refreshTrigger={Date.now()} />}
 
         {activeTab === 'upload' && (
           <UploadProgressPanel savedLaws={savedLaws} onUploadComplete={handleUploadComplete} />
         )}
 
-        {activeTab === 'ordinance' && <OrdinanceUploadPanel />}
+        {activeTab === 'ordinance' && <OrdinanceUploadPanel refreshTrigger={Date.now()} />}
 
         {activeTab === 'manage' && <StoreManagerPanel onRefresh={loadSavedLaws} />}
       </div>

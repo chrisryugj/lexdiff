@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import LogImport from '@/admin/components/log-import'
 
 interface ParsedOrdinanceFile {
   fileName: string
@@ -29,9 +30,10 @@ interface UploadResult {
 
 interface OrdinanceUploadPanelProps {
   onUploadComplete?: () => void
+  refreshTrigger?: number // Optional prop to trigger refresh
 }
 
-export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelProps) {
+export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: OrdinanceUploadPanelProps) {
   const [parsedOrdinances, setParsedOrdinances] = useState<ParsedOrdinanceFile[]>([])
   const [districts, setDistricts] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<Set<string>>(new Set())
@@ -46,12 +48,20 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
   const [batchSize, setBatchSize] = useState(10)
   const [concurrency, setConcurrency] = useState(3)
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+  const [currentStoreId, setCurrentStoreId] = useState<string | null>(null)
 
   useEffect(() => {
     loadParsedOrdinances()
-    loadUploadedFiles()
-    syncWithServer()
+    checkStoreIdAndSync()
   }, [])
+
+  // Reload when refreshTrigger changes (tab switch)
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      loadParsedOrdinances()
+      checkStoreIdAndSync()
+    }
+  }, [refreshTrigger])
 
   // Separate effect for job restoration
   useEffect(() => {
@@ -66,22 +76,70 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
     }
   }, [parsedOrdinances])
 
-  function loadUploadedFiles() {
+  /**
+   * ENV 스토어 ID 확인 및 동기화
+   * - 스토어 ID가 변경되었으면 localStorage 초기화
+   * - 실제 서버 상태와 동기화
+   */
+  async function checkStoreIdAndSync() {
     try {
-      const stored = localStorage.getItem('uploadedOrdinances')
-      if (stored) {
-        setUploadedFiles(new Set(JSON.parse(stored)))
+      // 1. 현재 ENV 스토어 ID 가져오기
+      const response = await fetch('/api/admin/list-store-documents')
+      const data = await response.json()
+
+      if (!data.success) {
+        console.error('❌ Failed to get store ID:', data.error)
+        return
       }
+
+      const envStoreId = data.storeId
+      const savedStoreId = localStorage.getItem('currentStoreId')
+
+      console.log('🔍 Store ID check:', {
+        env: envStoreId,
+        saved: savedStoreId,
+        changed: envStoreId !== savedStoreId
+      })
+
+      // 2. 스토어 ID가 변경되었으면 localStorage 초기화
+      if (savedStoreId && envStoreId !== savedStoreId) {
+        console.warn('⚠️ Store ID changed! Clearing localStorage...')
+        localStorage.removeItem('uploadedOrdinances')
+        setUploadedFiles(new Set())
+      }
+
+      // 3. 현재 스토어 ID 저장
+      localStorage.setItem('currentStoreId', envStoreId)
+      setCurrentStoreId(envStoreId)
+
+      // 4. 서버와 동기화
+      await syncWithServer(data.documents)
     } catch (error) {
-      console.error('Failed to load uploaded files:', error)
+      console.error('❌ Failed to check store ID:', error)
     }
   }
 
-  async function syncWithServer() {
+  function saveUploadedFiles(files: Set<string>) {
+    try {
+      localStorage.setItem('uploadedOrdinances', JSON.stringify(Array.from(files)))
+      setUploadedFiles(files)
+    } catch (error) {
+      console.error('Failed to save uploaded files:', error)
+    }
+  }
+
+  async function syncWithServer(documents?: any[]) {
     try {
       console.log('🔄 Syncing with server...')
-      const response = await fetch('/api/admin/list-store-documents')
-      const data = await response.json()
+
+      // Use provided documents or fetch fresh
+      let data: any
+      if (documents) {
+        data = { success: true, documents }
+      } else {
+        const response = await fetch('/api/admin/list-store-documents')
+        data = await response.json()
+      }
 
       console.log('📊 Server response:', {
         success: data.success,
@@ -92,84 +150,51 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
         // Extract ordinance file names from server
         const serverFiles = new Set<string>()
 
-        let lawCount = 0
-        let ordinanceWithMetadataCount = 0
-        let ordinanceByNameOnlyCount = 0
+        let ordinanceCount = 0
         let matchedToLocalCount = 0
 
+        // NOTE: All documents in store are ordinances (법률/시행령/시행규칙 not uploaded yet)
         for (const doc of data.documents) {
           const metadata = doc.customMetadata || []
           const fileName = metadata.find((m: any) => m.key === 'file_name')?.stringValue
           const districtName = metadata.find((m: any) => m.key === 'district_name')?.stringValue
-          const lawName = doc.lawName || ''
+          const lawType = metadata.find((m: any) => m.key === 'law_type')?.stringValue
 
-          // Check if it's a law (not ordinance)
-          const isLaw = (lawName.includes('법') || lawName.includes('시행령') || lawName.includes('시행규칙'))
-                        && !lawName.includes('조례') && !lawName.includes('자치')
+          // Future-proof: Skip if it's a law/decree/rule (when uploaded later)
+          if (lawType === 'law' || lawType === 'decree' || lawType === 'rule') {
+            continue // Skip 법률/시행령/시행규칙
+          }
 
-          if (isLaw) {
-            lawCount++
+          // Skip if lawType is explicitly not ordinance
+          if (lawType && lawType !== 'ordinance') {
             continue
           }
 
-          // It's an ordinance - try to match with local files
-          const isOrdinance = lawName.includes('조례') || lawName.includes('규칙') || lawName.includes('자치')
+          // All ordinances have metadata (law_type = 'ordinance')
+          ordinanceCount++
 
-          if (!isOrdinance) {
-            continue // Skip if not identifiable
-          }
-
-          // Method 1: Has metadata (best case)
+          // Try to match with local files if we have both fileName and districtName
           if (fileName && districtName) {
-            ordinanceWithMetadataCount++
             serverFiles.add(`${districtName}/${fileName}`)
             matchedToLocalCount++
-            continue
-          }
-
-          // Method 2: Match by lawName only (for ordinances without metadata)
-          ordinanceByNameOnlyCount++
-
-          // Try to match lawName to local ordinances
-          // Extract district and ordinance name from lawName
-          // Example: "서울특별시 강남구 주차장 설치 및 관리 조례"
-          const ordinanceNamePattern = /(.*?)(시|도|구|군)\s+(.+?조례)/
-          const match = lawName.match(ordinanceNamePattern)
-
-          if (match) {
-            const districtPart = match[1] + match[2] // e.g., "서울특별시 강남구"
-            const ordinancePart = match[3] // e.g., "주차장 설치 및 관리 조례"
-
-            // Search in parsedOrdinances for matching file
-            // This will be done later when we load parsedOrdinances
-            // For now, just log that we found it
-            console.log(`   📝 Found ordinance by name: ${lawName}`)
           }
         }
 
+        const matchPercentage = ordinanceCount > 0
+          ? ((matchedToLocalCount / ordinanceCount) * 100).toFixed(1)
+          : '0.0'
+
         console.log(`📊 Document analysis:`)
-        console.log(`   - Total: ${data.documents.length}`)
-        console.log(`   - 법률/시행령/시행규칙: ${lawCount}`)
-        console.log(`   - 조례 (with metadata): ${ordinanceWithMetadataCount}`)
-        console.log(`   - 조례 (name only, no metadata): ${ordinanceByNameOnlyCount}`)
-        console.log(`   - Matched to local files: ${matchedToLocalCount}`)
+        console.log(`   - Total documents: ${data.documents.length}`)
+        console.log(`   - 조례 (law_type='ordinance'): ${ordinanceCount}`)
+        console.log(`   - 로컬 파일 매칭 성공: ${matchedToLocalCount}/${ordinanceCount} (${matchPercentage}%)`)
         console.log(`✅ Found ${serverFiles.size} ordinances matched with local files`)
 
         // Update localStorage with server state (even if empty)
-        localStorage.setItem('uploadedOrdinances', JSON.stringify(Array.from(serverFiles)))
-        setUploadedFiles(serverFiles)
+        saveUploadedFiles(serverFiles)
       }
     } catch (error) {
       console.error('❌ Failed to sync with server:', error)
-    }
-  }
-
-  function saveUploadedFiles(files: Set<string>) {
-    try {
-      localStorage.setItem('uploadedOrdinances', JSON.stringify(Array.from(files)))
-      setUploadedFiles(files)
-    } catch (error) {
-      console.error('Failed to save uploaded files:', error)
     }
   }
 
@@ -439,6 +464,43 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
     }
   }
 
+  /**
+   * 로그 파일에서 업로드된 파일 목록 import
+   */
+  function handleLogImport(uploadedFileNames: string[]) {
+    console.log('📋 Importing uploaded files from log:', uploadedFileNames.length)
+
+    // Convert log file names to file keys
+    const importedKeys = new Set<string>()
+
+    for (const logFileName of uploadedFileNames) {
+      // Try to match with existing ordinances
+      for (const ordinance of parsedOrdinances) {
+        const key = getFileKey(ordinance)
+        const fullPath = `${ordinance.districtName}/${ordinance.fileName}`
+        const rootPath = ordinance.fileName
+
+        // Match patterns: "districtName/fileName" or just "fileName" for root
+        if (
+          logFileName.includes(ordinance.fileName) ||
+          logFileName.includes(ordinance.ordinanceName) ||
+          logFileName === ordinance.fileName ||
+          logFileName === fullPath ||
+          logFileName === rootPath
+        ) {
+          importedKeys.add(key)
+        }
+      }
+    }
+
+    // Add to uploadedFiles
+    const newUploadedFiles = new Set([...uploadedFiles, ...importedKeys])
+    saveUploadedFiles(newUploadedFiles)
+
+    console.log(`✅ Imported ${importedKeys.size} files from log`)
+    alert(`로그에서 ${importedKeys.size}개 파일을 업로드됨으로 표시했습니다.`)
+  }
+
   const filteredOrdinances = getFilteredOrdinances()
   const pendingOrdinances = filteredOrdinances.filter((o) => !uploadedFiles.has(getFileKey(o)))
   const uploadedOrdinances = filteredOrdinances.filter((o) => uploadedFiles.has(getFileKey(o)))
@@ -569,9 +631,12 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
         <div className="text-sm text-gray-300">
           {selectedCount > 0 ? `${selectedCount}개 선택됨` : '선택된 파일 없음'}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={loadParsedOrdinances}
+            onClick={async () => {
+              await loadParsedOrdinances()
+              await checkStoreIdAndSync()
+            }}
             disabled={loading || uploading}
             variant="outline"
             size="sm"
@@ -579,6 +644,7 @@ export function OrdinanceUploadPanel({ onUploadComplete }: OrdinanceUploadPanelP
           >
             {loading ? '새로고침 중...' : '🔄 새로고침'}
           </Button>
+          <LogImport onImport={handleLogImport} />
           <Button onClick={selectAll} variant="outline" size="sm" className="border-gray-600 text-gray-300">
             전체 선택
           </Button>

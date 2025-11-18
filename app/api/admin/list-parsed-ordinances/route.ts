@@ -37,15 +37,53 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Read all district folders
-    const districtFolders = fs
-      .readdirSync(parsedOrdinancesDir, { withFileTypes: true })
+    // Read all items in parsed-ordinances directory
+    const items = fs.readdirSync(parsedOrdinancesDir, { withFileTypes: true })
+
+    const districtFolders = items
       .filter((dirent) => dirent.isDirectory())
       .map((dirent) => dirent.name)
 
     const ordinances: ParsedOrdinanceFile[] = []
 
-    // Read files from each district folder
+    // 1. Read root-level .md files (no district)
+    const rootFiles = items
+      .filter((dirent) => dirent.isFile() && dirent.name.endsWith('.md'))
+      .map((dirent) => dirent.name)
+
+    for (const fileName of rootFiles) {
+      const filePath = path.join(parsedOrdinancesDir, fileName)
+      const stats = fs.statSync(filePath)
+
+      // Extract ordinance name from filename (remove .md extension)
+      const ordinanceName = fileName.replace(/\.md$/, '')
+
+      // Extract district name from filename pattern: 서울특별시_{구이름}_{조례명}
+      let districtName = '(루트)'
+      const match = ordinanceName.match(/^서울특별시_?([^_]+구|교육청)/)
+      if (match) {
+        const extracted = match[1]
+        // Normalize district name
+        if (extracted.includes('교육청')) {
+          districtName = '서울특별시' // 교육청은 서울시 조례
+        } else if (extracted.endsWith('구')) {
+          districtName = extracted // e.g., "관악구"
+        } else {
+          districtName = '서울특별시'
+        }
+      }
+
+      ordinances.push({
+        fileName,
+        filePath: path.relative(process.cwd(), filePath),
+        ordinanceName,
+        districtName, // Extracted from filename or '(루트)'
+        fileSize: stats.size,
+        lastModified: stats.mtime.toISOString()
+      })
+    }
+
+    // 2. Read files from each district folder
     for (const districtName of districtFolders) {
       const districtDir = path.join(parsedOrdinancesDir, districtName)
       const files = fs.readdirSync(districtDir).filter((f) => f.endsWith('.md'))

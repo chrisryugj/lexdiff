@@ -10,18 +10,37 @@ export default function FileList() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [limit] = useState(100);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [currentPage, search]);
 
   async function fetchFiles() {
     try {
       setLoading(true);
-      const res = await fetch('/api/files');
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: limit.toString(),
+      });
+
+      if (search) {
+        params.set('search', search);
+      }
+
+      const res = await fetch(`/api/files?${params}`);
       const data = await res.json();
 
       if (data.success) {
         setFiles(data.files);
+        setTotal(data.total);
+        setTotalPages(data.totalPages || 1);
       } else {
         setError(data.error || 'Failed to load files');
       }
@@ -30,6 +49,12 @@ export default function FileList() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setCurrentPage(1);
+    setSearch(searchInput);
   }
 
   async function deleteFile(fileName: string) {
@@ -93,10 +118,8 @@ export default function FileList() {
   }
 
   function extractFileId(fileName: string): string {
-    // Extract document ID from full name
-    // Format: fileSearchStores/{storeId}/documents/{docId}
     const parts = fileName.split('/');
-    return parts[parts.length - 1]; // Return last part (docId)
+    return parts[parts.length - 1];
   }
 
   function formatBytes(bytes?: number): string {
@@ -174,10 +197,10 @@ export default function FileList() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
-            Files ({files.length})
+            Documents ({total.toLocaleString()})
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Total: {formatBytes(totalSize)} / 20 GB
+            Page {currentPage} of {totalPages} • Total: {formatBytes(totalSize)} / 20 GB
           </p>
         </div>
         <div className="flex gap-2">
@@ -201,130 +224,207 @@ export default function FileList() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <form onSubmit={handleSearch} className="mb-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search documents..."
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Search
+          </button>
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchInput('');
+                setSearch('');
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
       {/* Files Table */}
       {files.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <p className="text-gray-500 text-lg">No files found</p>
           <p className="text-gray-400 text-sm mt-2">
-            Upload files to get started
+            {search ? 'Try a different search query' : 'Upload files to get started'}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedFiles.size === files.length}
-                      onChange={toggleSelectAll}
-                      className="rounded"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MIME Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Expires
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    State
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {files.map((file) => (
-                  <tr key={file.name} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
+        <>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={selectedFiles.has(file.name)}
-                        onChange={() => toggleSelect(file.name)}
+                        checked={selectedFiles.size === files.length}
+                        onChange={toggleSelectAll}
                         className="rounded"
                       />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {file.displayName || 'Unnamed'}
-                      </div>
-                      <div className="text-xs text-gray-400 font-mono">
-                        {file.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {formatBytes(file.sizeBytes)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      <span className="px-2 py-1 text-xs rounded-full bg-gray-100">
-                        {file.mimeType?.split('/')[1] || 'unknown'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {(() => {
-                        const remaining = formatTimeRemaining(
-                          file.expirationTime
-                        );
-                        const isExpiringSoon =
-                          file.expirationTime &&
-                          new Date(file.expirationTime).getTime() -
-                            new Date().getTime() <
-                            24 * 60 * 60 * 1000;
-
-                        return (
-                          <span
-                            className={
-                              remaining === 'Expired'
-                                ? 'text-red-600'
-                                : isExpiringSoon
-                                ? 'text-orange-600'
-                                : 'text-gray-500'
-                            }
-                          >
-                            {remaining}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          file.state === 'ACTIVE'
-                            ? 'bg-green-100 text-green-800'
-                            : file.state === 'PROCESSING'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : file.state === 'FAILED'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {file.state || 'UNKNOWN'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={() => deleteFile(file.name)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Size
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      MIME Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Expires
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      State
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {files.map((file) => (
+                    <tr key={file.name} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.has(file.name)}
+                          onChange={() => toggleSelect(file.name)}
+                          className="rounded"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {file.displayName || 'Unnamed'}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono">
+                          {file.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {formatBytes(file.sizeBytes)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100">
+                          {file.mimeType?.split('/')[1] || 'unknown'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {(() => {
+                          const remaining = formatTimeRemaining(
+                            file.expirationTime
+                          );
+                          const isExpiringSoon =
+                            file.expirationTime &&
+                            new Date(file.expirationTime).getTime() -
+                              new Date().getTime() <
+                              24 * 60 * 60 * 1000;
+
+                          return (
+                            <span
+                              className={
+                                remaining === 'Expired'
+                                  ? 'text-red-600'
+                                  : isExpiringSoon
+                                  ? 'text-orange-600'
+                                  : 'text-gray-500'
+                              }
+                            >
+                              {remaining}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            file.state === 'ACTIVE'
+                              ? 'bg-green-100 text-green-800'
+                              : file.state === 'PROCESSING'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : file.state === 'FAILED'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {file.state || 'UNKNOWN'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <button
+                          onClick={() => deleteFile(file.name)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-500">
+                Showing {(currentPage - 1) * limit + 1} to{' '}
+                {Math.min(currentPage * limit, total)} of {total.toLocaleString()}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-4 py-2 bg-gray-100 rounded-md">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Last
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

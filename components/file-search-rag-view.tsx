@@ -360,12 +360,11 @@ export function FileSearchRAGView({
     <div className="flex flex-col h-full relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
       {/* 프로그레스 Dialog */}
       <SearchProgressDialog
-        key={searchingQueryRef.current}
         isOpen={isAnalyzing}
         mode="ai"
         stage={searchStage}
         progress={searchProgress}
-        lawName={searchingQueryRef.current}
+        lawName={currentQuery}
       />
 
 

@@ -1457,26 +1457,26 @@ export function LawViewer({
                         <button
                           key={`${law.lawName}-${law.jo}-${idx}`}
                           onClick={handleClick}
-                          className="w-full text-left pl-4 pr-5 py-2.5 rounded-md text-sm border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                          className="w-full text-left pl-4 pr-5 py-3 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
                         >
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex items-center gap-1.5 flex-1">
-                              <ExternalLink className="h-3 w-3 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
-                              <span className="font-medium text-blue-300 group-hover:text-blue-200">
+                              <ExternalLink className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
+                              <span className="font-medium text-blue-300 group-hover:text-blue-200 text-base">
                                 {law.lawName}
                               </span>
                             </div>
                             {/* 출처 아이콘 (중복 시 여러 개 표시) */}
                             <div className="flex items-center gap-1 shrink-0">
                               {sources.has('excerpt') && (
-                                <span className="text-[10px]" title="발췌조문">📜</span>
+                                <span className="text-xs" title="발췌조문">📜</span>
                               )}
                               {sources.has('related') && (
-                                <span className="text-[10px]" title="관련법령">📖</span>
+                                <span className="text-xs" title="관련법령">📖</span>
                               )}
                             </div>
                           </div>
-                          <div className="text-xs text-muted-foreground pl-4">
+                          <div className="text-sm text-muted-foreground pl-5">
                             {law.article}
                             {law.title && (
                               <span className="text-blue-400/70 ml-1">{law.title}</span>
@@ -2873,69 +2873,52 @@ export function LawViewer({
                         </div>
                       )}
 
-                      <div className="mb-5 pb-4 border-b border-border">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            {/* Simple AI Icon - No Glow */}
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                              <Sparkles className="h-5 w-5 text-primary" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-foreground">AI 답변</h2>
-                            <Badge variant="outline" className="text-xs font-normal">
+                      <div className="mb-6 pb-4 border-b border-border">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            <h3 className="text-lg font-bold text-foreground mb-0">AI 답변</h3>
+                            <Badge variant="outline" className="text-xs">
                               File Search RAG
                             </Badge>
                           </div>
 
-                        {/* AI 답변 컨트롤 */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setFontSize((prev) => Math.max(12, prev - 2))}
-                            className="h-7 px-2"
-                            title="글자 작게"
-                          >
-                            <ZoomOut className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setFontSize(14)}
-                            className="h-7 px-2"
-                            title="기본 크기"
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setFontSize((prev) => Math.min(20, prev + 2))}
-                            className="h-7 px-2"
-                            title="글자 크게"
-                          >
-                            <ZoomIn className="h-3.5 w-3.5" />
-                          </Button>
-                          <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(aiAnswerContent)
-                              toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
-                            }}
-                            className="h-7 px-2"
-                            title="복사"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                          <Separator orientation="vertical" className="h-5 hidden sm:block" />
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            <span>검증된 출처</span>
+                          {/* AI 답변 컨트롤 */}
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
+                              <ZoomOut className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setFontSize(14)} title="기본 크기">
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
+                              <ZoomIn className="h-4 w-4" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
+                            <Separator orientation="vertical" className="h-5 mx-1" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(aiAnswerContent)
+                                toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
+                              }}
+                              title="복사"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            {aiCitations && aiCitations.length > 0 && (
+                              <>
+                                <Separator orientation="vertical" className="h-5 mx-1" />
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <ShieldCheck className="h-3.5 w-3.5" />
+                                  <span>검증된 출처</span>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
-                    </div>
 
                     <div
                       className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere

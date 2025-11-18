@@ -15,7 +15,7 @@ export function convertAIAnswerToHTML(markdown: string): string {
   // 1단계: 마크다운 문법 제거 (내용만 남김)
   let text = removeMarkdownSyntax(markdown)
 
-  // 2단계: 📜 조문 발췌 마커 추가 (이스케이프 전에)
+  // 2단계: ⚖️ 조문 발췌 마커 추가 (이스케이프 전에)
   text = markLawQuotes(text)
   debugLogger.info('마커 추가 후', { hasMarker: text.includes('<<<QUOTE_START>>>') })
 
@@ -42,7 +42,7 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = text.replace(/<\/div>\n+<blockquote/g, '</div><blockquote')
 
   // 주요 섹션 제목 뒤 줄바꿈 제거 (구분선 아래 padding으로 대체)
-  // text = text.replace(/(📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령)<\/div>/g, '$1</div><br>')
+  // text = text.replace(/(📋 핵심 요약|📄 상세 내용|💡 추가 참고|🔗 관련 법령)<\/div>/g, '$1</div><br>')
 
   // 남은 줄바꿈을 <br>로 변환
   text = text.replace(/\n/g, '<br>\n')
@@ -79,8 +79,9 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * 📜 조문 발췌 마커 추가 (HTML 이스케이프 전에 실행)
- * "📖 조문 발췌"와 "📖 핵심 해석" 사이의 모든 내용을 blockquote로 감싸기
+ * ⚖️ 조문 발췌 마커 추가 (HTML 이스케이프 전에 실행)
+ * "⚖️ 조문 발췌"와 "📖 핵심 해석" 사이의 모든 내용을 
+ * 로 감싸기
  */
 function markLawQuotes(text: string): string {
   const lines = text.split('\n')
@@ -92,8 +93,8 @@ function markLawQuotes(text: string): string {
     const line = lines[i]
     const trimmed = line.trim()
 
-    // "📖 조문 발췌" 시작
-    if (trimmed === '📖 조문 발췌') {
+    // "⚖️ 조문 발췌" 시작
+    if (trimmed === '⚖️ 조문 발췌') {
       result.push(line)
       result.push('<<<QUOTE_START>>>')
       inQuoteSection = true
@@ -143,7 +144,7 @@ function styleStructuredSections(text: string): string {
   // 1. 📜 법령 조문 인용을 blockquote로 스타일링 (가장 먼저 처리)
   result = styleLawQuotes(result)
 
-  // 2. 주요 섹션 제목 스타일링 (📋 📄 💡 📖)
+  // 2. 주요 섹션 제목 스타일링 (📋 📄 💡 🔗)
   result = styleMainSectionHeadings(result)
 
   // 3. 📋 핵심 요약: 들여쓰기만 + 상단 여백
@@ -152,8 +153,8 @@ function styleStructuredSections(text: string): string {
   // 4. 💡 추가 참고: 불릿 + 들여쓰기 + 상단 여백
   result = indentSection(result, '💡 추가 참고', { indent: '1rem', bullet: true })
 
-  // 5. 📖 관련 법령: 들여쓰기만 + 상단 여백
-  result = indentSection(result, '📖 관련 법령', { indent: '1rem', bullet: false })
+  // 5. 🔗 관련 법령: 들여쓰기만 + 상단 여백
+  result = indentSection(result, '🔗 관련 법령', { indent: '1rem', bullet: false })
 
   // 6. 📄 상세 내용: 하위 섹션(📖/📝/🔴) 스타일링 + 내용 들여쓰기
   result = styleDetailSection(result, '📄 상세 내용')
@@ -210,10 +211,10 @@ function styleLawQuotes(text: string): string {
 }
 
 /**
- * 주요 섹션 헤더 스타일링 (📋/📄/💡/📖)
+ * 주요 섹션 헤더 스타일링 (📋/📄/💡/🔗)
  */
 function styleMainSectionHeadings(text: string): string {
-  const mainSections = ['📋 핵심 요약', '📄 상세 내용', '💡 추가 참고', '📖 관련 법령']
+  const mainSections = ['📋 핵심 요약', '📄 상세 내용', '💡 추가 참고', '🔗 관련 법령']
 
   let result = text
 
@@ -222,7 +223,7 @@ function styleMainSectionHeadings(text: string): string {
     const regex = new RegExp(`^(${escaped})$`, 'gm')
     result = result.replace(
       regex,
-      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border));">$1</div>`
+      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border)); font-size: inherit;">$1</div>`
     )
   })
 
@@ -245,7 +246,7 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
   const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   const sectionRegex = new RegExp(
-    `(${escapedTitle}[\\s\\S]*?)(?=📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령|$)`,
+    `(${escapedTitle}[\\s\\S]*?)(?=📋 핵심 요약|📄 상세 내용|💡 추가 참고|🔗 관련 법령|$)`,
     'g'
   )
 
@@ -310,7 +311,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
   const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   const sectionRegex = new RegExp(
-    `(${escapedTitle}[\\s\\S]*?)(?=📋 핵심 요약|📄 상세 내용|💡 추가 참고|📖 관련 법령|$)`,
+    `(${escapedTitle}[\\s\\S]*?)(?=📋 핵심 요약|📄 상세 내용|💡 추가 참고|🔗 관련 법령|$)`,
     'g'
   )
 
@@ -338,7 +339,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
       }
 
       // 하위 섹션 제목 감지
-      if (trimmed === '📖 조문 발췌') {
+      if (trimmed === '⚖️ 조문 발췌') {
         currentSub = 'none'
         isFirstContentInSub = false
         contentLines.push(

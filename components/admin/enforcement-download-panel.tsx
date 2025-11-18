@@ -27,15 +27,27 @@ interface DownloadStatus {
   error?: string
 }
 
-export function EnforcementDownloadPanel() {
+interface EnforcementDownloadPanelProps {
+  refreshTrigger?: number // Optional prop to trigger refresh
+}
+
+export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownloadPanelProps = {}) {
   const [laws, setLaws] = useState<SavedLaw[]>([])
   const [loading, setLoading] = useState(true)
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DownloadStatus[]>>(new Map())
   const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadLaws()
   }, [])
+
+  // Reload when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      loadLaws()
+    }
+  }, [refreshTrigger])
 
   async function loadLaws() {
     try {
@@ -43,11 +55,75 @@ export function EnforcementDownloadPanel() {
       const data = await response.json()
 
       if (data.success) {
-        // Filter out enforcement decrees/rules
-        const baseLaws = data.laws.filter(
+        const allLaws = data.laws || []
+
+        // Separate base laws and enforcement files
+        const baseLaws = allLaws.filter(
           (law: SavedLaw) => !law.lawName.includes('시행령') && !law.lawName.includes('시행규칙')
         )
+
+        // Track which enforcement files are already downloaded
+        const downloaded = new Set<string>()
+        const enforcementFiles: string[] = []
+
+        allLaws.forEach((law: SavedLaw) => {
+          if (law.lawName.includes('시행령') || law.lawName.includes('시행규칙')) {
+            downloaded.add(law.lawName)
+            enforcementFiles.push(law.lawName)
+          }
+        })
+
         setLaws(baseLaws)
+        setDownloadedFiles(downloaded)
+
+        console.log('📋 All enforcement files found:')
+        enforcementFiles.forEach(name => console.log(`   - ${name}`))
+
+        // Initialize download status based on local files
+        const initialProgress = new Map<string, DownloadStatus[]>()
+        baseLaws.forEach((law: SavedLaw) => {
+          // Try multiple matching patterns
+          const patterns = [
+            `${law.lawName} 시행령`,           // "관세법 시행령"
+            `${law.lawName}시행령`,             // "관세법시행령" (공백 없음)
+            `${law.lawName.trim()} 시행령`,    // 앞뒤 공백 제거
+          ]
+
+          const rulePatterns = [
+            `${law.lawName} 시행규칙`,
+            `${law.lawName}시행규칙`,
+            `${law.lawName.trim()} 시행규칙`,
+          ]
+
+          // Check if any pattern matches
+          const hasDecree = patterns.some(pattern => downloaded.has(pattern))
+          const hasRule = rulePatterns.some(pattern => downloaded.has(pattern))
+
+          // Find exact match for logging
+          const matchedDecree = patterns.find(p => downloaded.has(p))
+          const matchedRule = rulePatterns.find(p => downloaded.has(p))
+
+          console.log(`\n🔍 Checking ${law.lawName}:`)
+          console.log(`   시행령: ${hasDecree ? `✅ 있음 (${matchedDecree})` : '❌ 없음'}`)
+          console.log(`   시행규칙: ${hasRule ? `✅ 있음 (${matchedRule})` : '❌ 없음'}`)
+
+          initialProgress.set(law.lawName, [
+            {
+              lawName: law.lawName,
+              type: '시행령',
+              status: hasDecree ? 'success' : 'pending'
+            },
+            {
+              lawName: law.lawName,
+              type: '시행규칙',
+              status: hasRule ? 'success' : 'pending'
+            }
+          ])
+        })
+
+        setDownloadProgress(initialProgress)
+
+        console.log(`\n✅ Summary: ${baseLaws.length} base laws, ${downloaded.size} enforcement files already downloaded`)
       }
     } catch (error) {
       console.error('Failed to load laws:', error)
@@ -78,6 +154,10 @@ export function EnforcementDownloadPanel() {
         if (p.type !== type) return p
 
         if (result.success) {
+          // Add to downloaded files set
+          const enforcementName = `${lawName} ${type}`
+          setDownloadedFiles(prev => new Set([...prev, enforcementName]))
+
           if (result.skipped) {
             return { ...p, status: 'success' as const }
           }
@@ -183,7 +263,7 @@ export function EnforcementDownloadPanel() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <Card className="p-4 bg-gray-800 border-gray-700">
           <p className="text-sm text-gray-400">총 법령</p>
           <p className="text-2xl font-bold text-white">{laws.length}</p>
@@ -194,12 +274,13 @@ export function EnforcementDownloadPanel() {
           <p className="text-xs text-gray-500">시행령 + 시행규칙</p>
         </Card>
         <Card className="p-4 bg-gray-800 border-gray-700">
-          <p className="text-sm text-gray-400">완료</p>
-          <p className="text-2xl font-bold text-green-400">
-            {Array.from(downloadProgress.values())
-              .flat()
-              .filter((p) => p.status === 'success').length}
-          </p>
+          <p className="text-sm text-gray-400">로컬 MD 파일</p>
+          <p className="text-2xl font-bold text-green-400">{downloadedFiles.size}</p>
+          <p className="text-xs text-gray-500">이미 다운로드됨</p>
+        </Card>
+        <Card className="p-4 bg-gray-800 border-gray-700">
+          <p className="text-sm text-gray-400">남은 파일</p>
+          <p className="text-2xl font-bold text-yellow-400">{laws.length * 2 - downloadedFiles.size}</p>
         </Card>
       </div>
 

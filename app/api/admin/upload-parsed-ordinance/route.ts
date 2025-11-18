@@ -39,12 +39,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Read markdown file from district folder
-    const filePath = path.join(process.cwd(), 'data', 'parsed-ordinances', districtName, fileName)
+    // Read markdown file - try multiple locations
+    const parsedOrdinancesDir = path.join(process.cwd(), 'data', 'parsed-ordinances')
+
+    // Try 1: Root-level file first
+    let filePath = path.join(parsedOrdinancesDir, fileName)
+
+    // Try 2: If not found in root, try district folder
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(parsedOrdinancesDir, districtName, fileName)
+    }
 
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
-        { success: false, error: `파일을 찾을 수 없습니다: ${districtName}/${fileName}` },
+        { success: false, error: `파일을 찾을 수 없습니다: ${fileName} (루트 또는 ${districtName}/ 폴더에서 찾을 수 없음)` },
         { status: 404 }
       )
     }

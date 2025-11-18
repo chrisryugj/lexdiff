@@ -185,8 +185,23 @@ async function uploadSingleOrdinance(fileName: string, districtName: string): Pr
       throw new Error('Missing environment variables')
     }
 
-    // Read file
-    const filePath = path.join(process.cwd(), 'data', 'parsed-ordinances', districtName, fileName)
+    // Read file - try multiple locations
+    const parsedOrdinancesDir = path.join(process.cwd(), 'data', 'parsed-ordinances')
+
+    // Try 1: Root-level file first
+    let filePath = path.join(parsedOrdinancesDir, fileName)
+    let fileExists = await fs.access(filePath).then(() => true).catch(() => false)
+
+    // Try 2: If not found in root, try district folder
+    if (!fileExists) {
+      filePath = path.join(parsedOrdinancesDir, districtName, fileName)
+      fileExists = await fs.access(filePath).then(() => true).catch(() => false)
+    }
+
+    if (!fileExists) {
+      throw new Error(`파일을 찾을 수 없습니다: ${fileName}`)
+    }
+
     const content = await fs.readFile(filePath, 'utf-8')
 
     // Extract ordinance name from first line
