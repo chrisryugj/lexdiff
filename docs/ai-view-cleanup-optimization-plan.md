@@ -587,3 +587,859 @@ components/file-search-rag-view.tsx
 **변경 이력**:
 - v1.0: 초안 작성
 - v1.1: search-result-view.tsx 의존성 발견으로 law-viewer.tsx 제거 계획 취소
+- v1.2: law-viewer.tsx 분할 최적화 계획 추가 (3060줄 → 컴포넌트화)
+
+---
+
+---
+
+# Part 2: law-viewer.tsx 분할 최적화 계획
+
+## 📊 현황 분석
+
+### 기본 통계
+- **총 줄 수**: 3060줄
+- **상태 변수**: 18개 (useState)
+- **React Hooks**: 41개 사용
+- **주요 핸들러**: 5개
+- **JSX 렌더링**: ~1650줄 (전체의 54%)
+
+### 복잡도 지표
+| 지표 | 값 | 평가 |
+|------|-----|------|
+| 파일 크기 | 3060줄 | 🔴 매우 큰 파일 (권장: 300줄 이하) |
+| 상태 변수 | 18개 | 🔴 과다 (권장: 5개 이하) |
+| 조건부 렌더링 | 6단계 중첩 | 🔴 복잡함 (권장: 2단계 이하) |
+| Props 수 | 20개+ | 🔴 과다 (권장: 7개 이하) |
+| 책임 범위 | 9개 기능 | 🔴 SRP 위반 (권장: 1개) |
+
+---
+
+## 🏗️ 구조 분석
+
+### 1. 주요 섹션 분포
+
+```
+law-viewer.tsx (3060줄)
+├── 상태(State) 선언      : 73-410줄   (~340줄, 11%)
+├── 헬퍼 함수             : 482-1410줄 (~930줄, 30%)
+└── 메인 JSX 렌더링       : 1412-3060줄 (~1650줄, 54%)
+```
+
+### 2. JSX 구조 상세
+
+| 영역 | 라인 | 크기 | 설명 |
+|------|------|------|------|
+| **왼쪽 사이드바** | 1412-1690 | 280줄 | AI/일반 모드 조문 목록 |
+| **헤더 + 액션 버튼** | 1700-1900 | 200줄 | 법령명, 버튼바 |
+| **메인 콘텐츠 영역** | 1899-2950+ | 1050줄+ | 6가지 뷰 모드 조건부 렌더링 |
+| **모달 및 다이얼로그** | 2950+ | 110줄 | ReferenceModal, RevisionHistory |
+
+### 3. 뷰 모드 우선순위 (조건부 렌더링)
+
+컴포넌트는 다음 우선순위로 6가지 뷰 모드를 조건부 렌더링:
+
+| 우선순위 | 조건 | 뷰 | 라인 | 크기 |
+|---------|------|-----|------|------|
+| 1 | `isFullView && !showAdminRules` | 전체 조문 리스트 | 1901-1995 | 95줄 |
+| 2 | `showAdminRules && adminRuleViewMode === "detail"` | 행정규칙 상세 (2단) | 2002-2106 | 105줄 |
+| 3 | `showAdminRules && adminRuleViewMode === "list"` | 행정규칙 목록 (2단) | 2107-2226 | 120줄 |
+| 4 | `tierViewMode === "3-tier"` | 3단 비교 (법-령-규) | 2227-2341 | 115줄 |
+| 5 | `tierViewMode === "2-tier"` | 2단 비교 (법-령) | 2342-2847 | 505줄 |
+| 6 | `aiAnswerMode && aiAnswerContent` | AI 답변 (1단/2단) | 2847-3000+ | 150줄+ |
+
+---
+
+## 🔍 문제점 식별
+
+### 1. 단일 책임 원칙(SRP) 위반
+
+**현재 law-viewer.tsx가 담당하는 책임**:
+1. ✅ 조문 표시 및 네비게이션
+2. ❌ 3단 비교 뷰 렌더링
+3. ❌ 행정규칙 검색 및 표시
+4. ❌ 개정 이력 관리
+5. ❌ 참조 모달 처리
+6. ❌ AI 답변 표시
+7. ❌ 즐겨찾기 관리
+8. ❌ 폰트 크기 조절
+9. ❌ 사이드바 관리
+
+**권장**: 컴포넌트는 하나의 책임만 가져야 함
+
+### 2. 코드 중복 패턴
+
+#### 패턴 A: 2단/3단 레이아웃 (3회 반복)
+```typescript
+<div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+  <div className="overflow-y-auto pr-2">{/* Left */}</div>
+  <div className="overflow-y-auto pl-2">{/* Right */}</div>
+</div>
+```
+- 라인 2005 (행정규칙 상세)
+- 라인 2110 (행정규칙 목록)
+- 라인 2851 (AI 답변 비교)
+
+#### 패턴 B: 조문 헤더 (4회 반복)
+```typescript
+<div className="mb-4 pb-3 border-b border-border">
+  <h3>{formatSimpleJo(article.jo)}</h3>
+  <Badge>{lawTitle}</Badge>
+</div>
+```
+
+#### 패턴 C: 조문 콘텐츠 렌더링 (5회 반복)
+```typescript
+<div
+  style={{ fontSize: `${fontSize}px` }}
+  onClick={handleContentClick}
+  dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+/>
+```
+
+### 3. Props Drilling 문제
+
+**현재 Props 전달 깊이**:
+```
+search-result-view.tsx
+  → LawViewer (20+ props)
+     → (내부 JSX에서 props 직접 사용)
+```
+
+**문제가 되는 Props 체인**:
+- `meta`, `articles`, `selectedJo` → 사이드바, 헤더, 콘텐츠 모두에서 사용
+- `fontSize`, `copied` → UI 관련 상태가 최상위 컴포넌트에 존재
+- `showAdminRules`, `adminRuleViewMode` → 행정규칙 관련 상태가 전역 상태처럼 사용됨
+
+### 4. 상태 관리 복잡도
+
+**18개 상태 변수 분류**:
+
+| 카테고리 | 상태 변수 | 개수 | 문제 |
+|---------|----------|------|------|
+| 조문 네비게이션 | `activeJo`, `loadedArticles`, `loadingJo` | 3 | ✅ 적절 |
+| UI 상태 | `fontSize`, `copied`, `isArticleListExpanded` | 3 | ⚠️ 분리 가능 |
+| 모달 | `refModal`, `lastExternalRef` | 2 | ⚠️ 분리 가능 |
+| 개정 이력 | `revisionHistory`, `isLoadingHistory` | 2 | ⚠️ 분리 가능 |
+| 3단 비교 | `threeTierCitation`, `threeTierDelegation`, `isLoadingThreeTier`, `tierViewMode` | 4 | 🔴 **분리 필수** |
+| 행정규칙 | `showAdminRules`, `adminRuleViewMode`, `adminRuleHtml`, `adminRuleTitle`, `adminRuleCache` | 5 | 🔴 **분리 필수** |
+
+**문제**:
+- 3단 비교, 행정규칙 기능은 완전히 독립적인데 상태가 law-viewer에 혼재
+- 상태 업데이트 로직이 복잡하고 추적 어려움
+
+### 5. useEffect 과다 사용
+
+**useEffect 개수**: 10개 이상
+
+**문제가 되는 useEffect**:
+- 라인 164-167: props.articles 동기화
+- 라인 170-173: 디버깅 로그 (불필요)
+- 라인 187-206: 3단 비교 디버깅 (불필요)
+- 라인 235-256: selectedJo 동기화 + 행정규칙 초기화 (책임 혼재)
+
+---
+
+## 🎯 최적화 목표
+
+### Phase 1: 컴포넌트 분할 (우선순위: 높음)
+- **목표**: 3060줄 → 300줄 이하 (10개 이상 컴포넌트로 분할)
+- **기대 효과**: 가독성 10배 향상, 유지보수 비용 50% 감소
+
+### Phase 2: 상태 관리 개선 (우선순위: 중간)
+- **목표**: 18개 상태 → 5개 이하 (코어 상태만 유지)
+- **기대 효과**: 상태 업데이트 로직 단순화, 버그 감소
+
+### Phase 3: Props Drilling 해결 (우선순위: 낮음)
+- **목표**: Props 깊이 3단계 → 1단계
+- **기대 효과**: Props 변경 시 영향 범위 최소화
+
+---
+
+## 📐 컴포넌트 분할 설계
+
+### 1. 추출 가능한 컴포넌트 목록
+
+#### Tier 1: 즉시 추출 가능 (의존성 낮음)
+
+| 컴포넌트 | 현재 라인 | 크기 | Props | 상태 |
+|---------|---------|------|-------|------|
+| **ArticleSidebar** | 1423-1688 | 265줄 | 7개 | 1개 |
+| **ArticleHeader** | 1726-1773 | 50줄 | 5개 | 0개 |
+| **ActionButtonBar** | 1776-1865 | 90줄 | 10개 | 0개 |
+
+#### Tier 2: 뷰 모드 컴포넌트 (독립적)
+
+| 컴포넌트 | 현재 라인 | 크기 | Props | 상태 |
+|---------|---------|------|-------|------|
+| **FullArticleListView** | 1901-1995 | 95줄 | 5개 | 0개 |
+| **AdminRuleDetailView** | 2002-2106 | 105줄 | 8개 | 0개 |
+| **AdminRuleListView** | 2107-2226 | 120줄 | 8개 | 0개 |
+| **ThreeTierView** | 2227-2341 | 115줄 | 10개 | 0개 |
+| **TwoTierView** | 2342-2847 | 505줄 | 12개 | 0개 |
+| **AISummaryView** | 2847-3000+ | 150줄+ | 8개 | 0개 |
+
+#### Tier 3: 재사용 가능 UI 컴포넌트
+
+| 컴포넌트 | 현재 | 설명 |
+|---------|------|------|
+| **TwoColumnLayout** | 중복 패턴 | 2단 레이아웃 래퍼 |
+| **ThreeColumnLayout** | 중복 패턴 | 3단 레이아웃 래퍼 |
+| **ArticleCard** | 중복 패턴 | 조문 헤더 + 콘텐츠 |
+| **ArticleContent** | 중복 패턴 | 조문 본문 렌더링 |
+| **DelegationCard** | 중복 패턴 | 위임조문 카드 |
+
+### 2. 새로운 파일 구조
+
+```
+components/law-viewer/
+├── index.tsx                    (메인 컨테이너, ~200줄)
+├── types.ts                     (타입 정의)
+├── hooks/
+│   ├── use-article-navigation.ts   (조문 네비게이션 로직)
+│   ├── use-three-tier-data.ts      (3단 비교 데이터 관리)
+│   └── use-admin-rules.ts          (이미 존재 - 그대로 사용)
+├── sidebar/
+│   ├── ArticleSidebar.tsx          (265줄 → 독립 파일)
+│   ├── ArticleList.tsx             (조문 목록)
+│   └── RelatedLawsList.tsx         (관련 법령 목록, AI 모드)
+├── header/
+│   ├── ArticleHeader.tsx           (50줄)
+│   └── ActionButtonBar.tsx         (90줄)
+├── views/
+│   ├── ViewModeRenderer.tsx        (라우터 역할, ~50줄)
+│   ├── FullArticleListView.tsx     (95줄)
+│   ├── AdminRuleDetailView.tsx     (105줄)
+│   ├── AdminRuleListView.tsx       (120줄)
+│   ├── ThreeTierView.tsx           (115줄)
+│   ├── TwoTierView.tsx             (505줄 → 추가 분할 필요)
+│   └── AISummaryView.tsx           (150줄)
+├── shared/
+│   ├── TwoColumnLayout.tsx         (레이아웃 래퍼)
+│   ├── ThreeColumnLayout.tsx       (레이아웃 래퍼)
+│   ├── ArticleCard.tsx             (조문 카드)
+│   ├── ArticleContent.tsx          (조문 본문)
+│   └── DelegationCard.tsx          (위임조문 카드)
+└── modals/
+    ├── ReferenceModal.tsx          (이미 존재 - 그대로 사용)
+    └── RevisionHistory.tsx         (이미 존재 - 그대로 사용)
+```
+
+**예상 파일 개수**: 20개
+**평균 파일 크기**: ~150줄
+
+---
+
+## 🔨 상세 리팩토링 계획
+
+### Step 1: ViewModeRenderer 분리 (가장 효과적)
+
+**목표**: 1050줄의 조건부 렌더링 로직을 명확한 라우터로 변환
+
+**Before** (현재, 라인 1899-2950):
+```typescript
+<ScrollArea className="h-full">
+  {isFullView && !showAdminRules ? (
+    // 전체 조문 리스트 (95줄)
+  ) : activeArticle ? (
+    showAdminRules && adminRuleViewMode === "detail" ? (
+      // 행정규칙 상세 (105줄)
+    ) : showAdminRules ? (
+      // 행정규칙 목록 (120줄)
+    ) : tierViewMode === "3-tier" && hasValidSihyungkyuchik ? (
+      // 3단 비교 (115줄)
+    ) : tierViewMode === "2-tier" && validDelegations.length > 0 ? (
+      // 2단 비교 (505줄)
+    ) : aiAnswerMode && aiAnswerContent ? (
+      // AI 답변 (150줄)
+    ) : (
+      // 기본 단일 조문 (200줄)
+    )
+  ) : null}
+</ScrollArea>
+```
+
+**After** (개선안):
+```typescript
+// components/law-viewer/views/ViewModeRenderer.tsx
+export function ViewModeRenderer({ viewMode, ...props }: ViewModeRendererProps) {
+  // 우선순위 기반 렌더링 (명확한 조건문)
+  if (viewMode === 'full-list' && !props.showAdminRules) {
+    return <FullArticleListView {...props} />
+  }
+
+  if (props.showAdminRules) {
+    return props.adminRuleViewMode === 'detail'
+      ? <AdminRuleDetailView {...props} />
+      : <AdminRuleListView {...props} />
+  }
+
+  if (props.tierViewMode === '3-tier' && props.hasValidSihyungkyuchik) {
+    return <ThreeTierView {...props} />
+  }
+
+  if (props.tierViewMode === '2-tier' && props.validDelegations.length > 0) {
+    return <TwoTierView {...props} />
+  }
+
+  if (props.aiAnswerMode && props.aiAnswerContent) {
+    return <AISummaryView {...props} />
+  }
+
+  return <SingleArticleView {...props} />
+}
+```
+
+**영향**:
+- law-viewer/index.tsx: 1050줄 감소 → ~150줄 남음
+- 6개 독립 컴포넌트 생성 (~1100줄 총합)
+
+**장점**:
+- 조건문 중첩 6단계 → 0단계 (flat structure)
+- 각 뷰 모드 독립적으로 테스트 가능
+- 새로운 뷰 모드 추가 시 기존 코드 수정 불필요
+
+---
+
+### Step 2: ArticleSidebar 분리
+
+**파일**: `components/law-viewer/sidebar/ArticleSidebar.tsx`
+
+**Props 인터페이스**:
+```typescript
+interface ArticleSidebarProps {
+  // 모드
+  aiAnswerMode: boolean
+
+  // AI 모드
+  relatedArticles?: ParsedRelatedLaw[]
+  onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
+
+  // 일반 모드
+  articles: LawArticle[]
+  activeJo: string
+  onArticleClick: (jo: string) => void
+  favorites: Set<string>
+  onToggleFavorite: (jo: string) => void
+
+  // 모바일
+  isExpanded: boolean
+  onToggle: () => void
+}
+```
+
+**내부 분할**:
+```typescript
+// ArticleSidebar.tsx (컨테이너)
+export function ArticleSidebar(props: ArticleSidebarProps) {
+  return (
+    <Card>
+      {props.aiAnswerMode ? (
+        <RelatedLawsList
+          relatedArticles={props.relatedArticles}
+          onClick={props.onRelatedArticleClick}
+        />
+      ) : (
+        <ArticleList
+          articles={props.articles}
+          activeJo={props.activeJo}
+          favorites={props.favorites}
+          onArticleClick={props.onArticleClick}
+          onToggleFavorite={props.onToggleFavorite}
+        />
+      )}
+    </Card>
+  )
+}
+```
+
+**장점**:
+- 265줄 분리
+- AI/일반 모드 로직 명확히 분리
+- 모바일 오버레이 로직 독립적으로 관리
+
+---
+
+### Step 3: 상태 관리 개선 - Custom Hooks 활용
+
+#### 3.1 조문 네비게이션 Hook
+
+**파일**: `components/law-viewer/hooks/use-article-navigation.ts`
+
+```typescript
+export function useArticleNavigation(
+  articles: LawArticle[],
+  selectedJo?: string
+) {
+  const [activeJo, setActiveJo] = useState<string>(
+    selectedJo || articles[0]?.jo || ""
+  )
+  const [loadedArticles, setLoadedArticles] = useState<LawArticle[]>(articles)
+  const [loadingJo, setLoadingJo] = useState<string | null>(null)
+
+  const activeArticle = useMemo(
+    () => loadedArticles.find((a) => a.jo === activeJo),
+    [loadedArticles, activeJo]
+  )
+
+  const handleArticleClick = useCallback(async (jo: string) => {
+    // 조문 클릭 로직 (동적 로딩 포함)
+  }, [])
+
+  useEffect(() => {
+    if (selectedJo && selectedJo !== activeJo) {
+      setActiveJo(selectedJo)
+    }
+  }, [selectedJo])
+
+  return {
+    activeJo,
+    activeArticle,
+    loadedArticles,
+    loadingJo,
+    handleArticleClick,
+  }
+}
+```
+
+**사용**:
+```typescript
+// law-viewer/index.tsx
+const {
+  activeJo,
+  activeArticle,
+  loadedArticles,
+  handleArticleClick,
+} = useArticleNavigation(articles, selectedJo)
+```
+
+**장점**:
+- 조문 네비게이션 로직 격리
+- 테스트 용이
+- 재사용 가능
+
+#### 3.2 3단 비교 데이터 Hook
+
+**파일**: `components/law-viewer/hooks/use-three-tier-data.ts`
+
+```typescript
+export function useThreeTierData(
+  lawId: string,
+  activeJo: string,
+  enabled: boolean
+) {
+  const [threeTierCitation, setThreeTierCitation] = useState<ThreeTierData | null>(null)
+  const [threeTierDelegation, setThreeTierDelegation] = useState<ThreeTierData | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier" | "3-tier">("1-tier")
+
+  useEffect(() => {
+    if (!enabled) return
+    // 3단 비교 데이터 로드 로직
+  }, [lawId, activeJo, enabled])
+
+  const currentArticleDelegations = useMemo(() => {
+    return threeTierDelegation?.articles.find((a) => a.jo === activeJo)?.delegations || []
+  }, [threeTierDelegation, activeJo])
+
+  const validDelegations = useMemo(() => {
+    return currentArticleDelegations.filter((d) => d.content && d.content.trim().length > 0)
+  }, [currentArticleDelegations])
+
+  const hasValidSihyungkyuchik = useMemo(() => {
+    return validDelegations.some((d) => d.type === "시행규칙")
+  }, [validDelegations])
+
+  return {
+    tierViewMode,
+    setTierViewMode,
+    validDelegations,
+    hasValidSihyungkyuchik,
+    isLoading,
+  }
+}
+```
+
+**장점**:
+- 3단 비교 관련 상태 4개 + 로직 완전 격리
+- law-viewer에서 제거 가능
+
+---
+
+### Step 4: 중복 패턴 컴포넌트화
+
+#### 4.1 TwoColumnLayout
+
+**파일**: `components/law-viewer/shared/TwoColumnLayout.tsx`
+
+```typescript
+interface TwoColumnLayoutProps {
+  left: React.ReactNode
+  right: React.ReactNode
+  leftClassName?: string
+  rightClassName?: string
+}
+
+export function TwoColumnLayout({
+  left,
+  right,
+  leftClassName = '',
+  rightClassName = ''
+}: TwoColumnLayoutProps) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-4 overflow-hidden"
+      style={{ height: 'calc(100vh - 250px)' }}
+    >
+      <div className={`overflow-y-auto pr-2 ${leftClassName}`}>
+        {left}
+      </div>
+      <div className={`overflow-y-auto pl-2 ${rightClassName}`}>
+        {right}
+      </div>
+    </div>
+  )
+}
+```
+
+**사용 예시**:
+```typescript
+// AdminRuleDetailView.tsx
+<TwoColumnLayout
+  left={<ArticleCard article={activeArticle} />}
+  right={<AdminRuleContent html={adminRuleHtml} />}
+/>
+```
+
+**제거 가능한 중복 코드**: 3개 위치 (라인 2005, 2110, 2851)
+
+#### 4.2 ArticleCard
+
+**파일**: `components/law-viewer/shared/ArticleCard.tsx`
+
+```typescript
+interface ArticleCardProps {
+  article: LawArticle
+  fontSize?: number
+  onContentClick?: React.MouseEventHandler<HTMLDivElement>
+  showTitle?: boolean
+  lawTitle?: string
+}
+
+export function ArticleCard({
+  article,
+  fontSize = 15,
+  onContentClick,
+  showTitle = true,
+  lawTitle
+}: ArticleCardProps) {
+  return (
+    <div className="prose prose-sm max-w-none dark:prose-invert">
+      {showTitle && (
+        <div className="mb-4 pb-3 border-b border-border">
+          <h3 className="text-base font-bold">
+            {formatSimpleJo(article.jo)}
+            {article.title && <span> ({article.title})</span>}
+          </h3>
+          {lawTitle && <Badge variant="secondary">{lawTitle}</Badge>}
+        </div>
+      )}
+
+      <ArticleContent
+        article={article}
+        fontSize={fontSize}
+        onClick={onContentClick}
+      />
+    </div>
+  )
+}
+```
+
+**제거 가능한 중복 코드**: 4개 위치
+
+#### 4.3 ArticleContent
+
+**파일**: `components/law-viewer/shared/ArticleContent.tsx`
+
+```typescript
+interface ArticleContentProps {
+  article: LawArticle
+  fontSize: number
+  onClick?: React.MouseEventHandler<HTMLDivElement>
+}
+
+export function ArticleContent({ article, fontSize, onClick }: ArticleContentProps) {
+  return (
+    <div
+      className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+      style={{
+        fontSize: `${fontSize}px`,
+        lineHeight: "1.8",
+        overflowWrap: "break-word",
+        wordBreak: "break-word",
+      }}
+      onClick={onClick}
+      dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+    />
+  )
+}
+```
+
+**제거 가능한 중복 코드**: 5개 위치
+
+---
+
+### Step 5: Props Drilling 해결 - Context API
+
+**문제**: fontSize, copied, handleContentClick 등이 모든 하위 컴포넌트에 전달됨
+
+**해결안**: LawViewerContext 도입
+
+```typescript
+// components/law-viewer/context/LawViewerContext.tsx
+interface LawViewerContextValue {
+  // UI 상태
+  fontSize: number
+  setFontSize: (size: number) => void
+
+  // 핸들러
+  handleContentClick: React.MouseEventHandler<HTMLDivElement>
+  openExternalLawArticleModal: (lawName: string, joLabel: string) => Promise<void>
+
+  // 메타 정보
+  meta: LawMeta
+  isOrdinance: boolean
+}
+
+const LawViewerContext = createContext<LawViewerContextValue | null>(null)
+
+export function useLawViewer() {
+  const context = useContext(LawViewerContext)
+  if (!context) throw new Error('useLawViewer must be used within LawViewerProvider')
+  return context
+}
+
+// 사용
+export function LawViewer(props: LawViewerProps) {
+  const [fontSize, setFontSize] = useState(15)
+
+  const contextValue: LawViewerContextValue = {
+    fontSize,
+    setFontSize,
+    handleContentClick,
+    openExternalLawArticleModal,
+    meta: props.meta,
+    isOrdinance: props.isOrdinance,
+  }
+
+  return (
+    <LawViewerContext.Provider value={contextValue}>
+      {/* 하위 컴포넌트들 */}
+    </LawViewerContext.Provider>
+  )
+}
+
+// 하위 컴포넌트에서 사용
+function ArticleContent() {
+  const { fontSize, handleContentClick } = useLawViewer()
+  // Props drilling 없이 직접 사용
+}
+```
+
+**장점**:
+- Props 깊이 3단계 → 1단계
+- Props 변경 시 중간 컴포넌트 수정 불필요
+- 타입 안전성 유지
+
+---
+
+## 📊 예상 효과
+
+### 파일 크기 감소
+
+| 컴포넌트 | Before | After | 감소율 |
+|---------|--------|-------|--------|
+| law-viewer/index.tsx | 3060줄 | ~250줄 | 92% ↓ |
+| 새로 생성된 컴포넌트 | - | ~3000줄 (20개 파일) | - |
+| **평균 파일 크기** | 3060줄 | **~150줄** | - |
+
+### 상태 복잡도 감소
+
+| 지표 | Before | After | 개선 |
+|------|--------|-------|------|
+| law-viewer 상태 변수 | 18개 | 5개 | 72% ↓ |
+| Props 깊이 | 3단계 | 1단계 | 67% ↓ |
+| JSX 중첩 깊이 | 6단계 | 1단계 | 83% ↓ |
+| useEffect 개수 | 10개+ | 3개 | 70% ↓ |
+
+### 유지보수 개선
+
+| 작업 | Before | After | 개선 |
+|------|--------|-------|------|
+| 새 뷰 모드 추가 | 3060줄 파일 수정 | 새 파일 생성 (150줄) | 안전 |
+| 버그 수정 | 3000줄 탐색 | 해당 컴포넌트만 (150줄) | 20배 빠름 |
+| 코드 리뷰 | 전체 파일 확인 | 변경된 파일만 | 10배 빠름 |
+| 테스트 작성 | 복잡한 mocking | 독립 컴포넌트 테스트 | 쉬움 |
+
+---
+
+## 🚀 실행 계획
+
+### Phase 1: 뷰 모드 분리 (3-4일)
+
+**Week 1, Day 1-2: ViewModeRenderer 추출**
+- [ ] `ViewModeRenderer.tsx` 생성
+- [ ] `FullArticleListView.tsx` 추출 (95줄)
+- [ ] `AdminRuleDetailView.tsx` 추출 (105줄)
+- [ ] `AdminRuleListView.tsx` 추출 (120줄)
+- [ ] law-viewer/index.tsx에서 조건부 렌더링 제거
+- [ ] 테스트: 모든 뷰 모드 정상 작동
+
+**Week 1, Day 3-4: 대형 뷰 컴포넌트 추출**
+- [ ] `ThreeTierView.tsx` 추출 (115줄)
+- [ ] `TwoTierView.tsx` 추출 (505줄) + 내부 분할
+- [ ] `AISummaryView.tsx` 추출 (150줄)
+- [ ] 테스트: 3단/2단 비교, AI 답변 정상 작동
+
+### Phase 2: 사이드바 및 헤더 분리 (1-2일)
+
+**Week 2, Day 1-2:**
+- [ ] `ArticleSidebar.tsx` 추출 (265줄)
+- [ ] `RelatedLawsList.tsx` 분리
+- [ ] `ArticleList.tsx` 분리
+- [ ] `ArticleHeader.tsx` 추출 (50줄)
+- [ ] `ActionButtonBar.tsx` 추출 (90줄)
+- [ ] 테스트: 사이드바, 헤더, 버튼 바 정상 작동
+
+### Phase 3: 공통 컴포넌트 추출 (1일)
+
+**Week 2, Day 3:**
+- [ ] `TwoColumnLayout.tsx` 생성
+- [ ] `ThreeColumnLayout.tsx` 생성
+- [ ] `ArticleCard.tsx` 생성
+- [ ] `ArticleContent.tsx` 생성
+- [ ] `DelegationCard.tsx` 생성
+- [ ] 기존 중복 코드 제거 (3개 위치)
+- [ ] 테스트: 레이아웃, 카드 정상 렌더링
+
+### Phase 4: Custom Hooks 분리 (1일)
+
+**Week 2, Day 4:**
+- [ ] `use-article-navigation.ts` 생성
+- [ ] `use-three-tier-data.ts` 생성
+- [ ] law-viewer/index.tsx에서 상태 이동
+- [ ] 테스트: 조문 네비게이션, 3단 비교 정상 작동
+
+### Phase 5: Context API 도입 (1일)
+
+**Week 2, Day 5:**
+- [ ] `LawViewerContext.tsx` 생성
+- [ ] `useLawViewer()` hook 구현
+- [ ] Props drilling 제거 (하위 컴포넌트 수정)
+- [ ] 테스트: Context 데이터 정상 전달
+
+### Phase 6: 통합 테스트 및 최적화 (1일)
+
+**Week 3, Day 1:**
+- [ ] 전체 기능 통합 테스트
+- [ ] 성능 측정 (렌더링 시간, 메모리 사용량)
+- [ ] TypeScript 타입 오류 수정
+- [ ] 불필요한 useEffect 제거
+- [ ] 코드 리뷰 및 문서화
+
+---
+
+## ⚠️ 주의사항 및 위험 관리
+
+### 1. 기능 손실 방지
+
+**체크리스트**:
+- [ ] 모든 뷰 모드 정상 작동 확인
+- [ ] 조문 클릭 시 스크롤 동작 확인
+- [ ] 모달 열기/닫기 확인
+- [ ] 즐겨찾기 추가/제거 확인
+- [ ] 복사 기능 확인
+- [ ] 폰트 크기 조절 확인
+- [ ] 3단 비교 데이터 로딩 확인
+- [ ] 행정규칙 검색 확인
+- [ ] AI 답변 표시 확인
+- [ ] 모바일 사이드바 토글 확인
+
+### 2. 성능 저하 방지
+
+**모니터링 지표**:
+- 초기 렌더링 시간: < 500ms (현재 기준 유지)
+- 조문 전환 시간: < 100ms
+- 메모리 사용량: 현재 대비 +10% 이내
+
+**최적화 방안**:
+- React.memo() 적용 (뷰 컴포넌트)
+- useMemo/useCallback 활용
+- 불필요한 re-render 방지
+
+### 3. TypeScript 타입 안전성
+
+**원칙**:
+- 모든 Props 인터페이스 명확히 정의
+- `any` 타입 사용 금지
+- 옵셔널 Props 명확히 표시
+
+### 4. 단계별 커밋
+
+**커밋 전략**:
+- 각 컴포넌트 추출 후 즉시 커밋
+- 커밋 메시지: `refactor(law-viewer): extract [ComponentName]`
+- 각 Phase 완료 후 통합 테스트 커밋
+
+### 5. 롤백 계획
+
+**롤백 시나리오**:
+- 각 Phase 시작 전 브랜치 생성
+- 문제 발생 시 이전 Phase로 롤백 가능
+- 기능 플래그(Feature Flag) 고려 (점진적 배포)
+
+---
+
+## 📝 체크리스트
+
+### 리팩토링 전 확인
+- [ ] 현재 law-viewer 기능 전체 테스트 통과 확인
+- [ ] 기존 버그 리스트 작성 (리팩토링 후 재현 방지)
+- [ ] 성능 벤치마크 측정 (기준선 설정)
+- [ ] 팀원과 리팩토링 계획 공유 및 승인
+
+### Phase별 완료 체크
+- [ ] Phase 1: 뷰 모드 분리
+- [ ] Phase 2: 사이드바 및 헤더 분리
+- [ ] Phase 3: 공통 컴포넌트 추출
+- [ ] Phase 4: Custom Hooks 분리
+- [ ] Phase 5: Context API 도입
+- [ ] Phase 6: 통합 테스트 및 최적화
+
+### 리팩토링 후 확인
+- [ ] 모든 기능 테스트 통과
+- [ ] 성능 벤치마크 유지 또는 개선
+- [ ] TypeScript 타입 오류 0개
+- [ ] 코드 리뷰 완료
+- [ ] 문서 업데이트 (CLAUDE.md, README.md)
+
+---
+
+## 📚 참고 자료
+
+### React 패턴
+- [Compound Components Pattern](https://kentcdodds.com/blog/compound-components-with-react-hooks)
+- [Custom Hooks Best Practices](https://react.dev/learn/reusing-logic-with-custom-hooks)
+- [Context API Performance](https://react.dev/reference/react/useContext#optimizing-re-renders)
+
+### 코드 분할 가이드
+- [Component Composition](https://react.dev/learn/passing-props-to-a-component#forwarding-props-with-the-jsx-spread-syntax)
+- [Managing State](https://react.dev/learn/managing-state)
+- [Extracting State Logic](https://react.dev/learn/extracting-state-logic-into-a-reducer)
+
+---
+
+**문서 버전**: 1.2 (2025-11-18 업데이트)
+**Part 2 작성자**: Claude Code Analysis (law-viewer.tsx 리팩토링 계획)
+**예상 작업 기간**: 2-3주
+**예상 효과**: 가독성 10배 향상, 유지보수 비용 50% 감소
