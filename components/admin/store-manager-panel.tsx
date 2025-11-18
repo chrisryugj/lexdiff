@@ -50,6 +50,7 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
   const [switchingStore, setSwitchingStore] = useState(false)
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [showStoreList, setShowStoreList] = useState(true)
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('')
 
   useEffect(() => {
     loadStoreInfo()
@@ -78,6 +79,11 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
 
       if (data.success) {
         setAllStores(data.stores)
+        // Set initial selected store to current active store
+        const activeStore = data.stores.find((s: StoreInfo) => s.isActive)
+        if (activeStore) {
+          setSelectedStoreId(activeStore.id)
+        }
       } else {
         console.error('Failed to load stores:', data.error)
       }
@@ -204,8 +210,25 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
     }
   }
 
-  async function switchStore(storeId: string, storeName: string) {
-    if (!confirm(`"${storeName}" Store로 전환하시겠습니까?\n\n전환 후 서버를 재시작해야 합니다.`)) {
+  async function applyStoreSelection() {
+    if (!selectedStoreId) {
+      alert('Store를 선택해주세요')
+      return
+    }
+
+    const selectedStore = allStores.find((s) => s.id === selectedStoreId)
+    if (!selectedStore) {
+      alert('선택한 Store를 찾을 수 없습니다')
+      return
+    }
+
+    // If already active, no need to switch
+    if (selectedStore.isActive) {
+      alert('이미 활성화된 Store입니다')
+      return
+    }
+
+    if (!confirm(`"${selectedStore.displayName}" Store로 전환하시겠습니까?\n\n전환 후 서버를 재시작해야 합니다.`)) {
       return
     }
 
@@ -217,7 +240,7 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ storeId })
+        body: JSON.stringify({ storeId: selectedStoreId })
       })
 
       const data = await response.json()
@@ -361,22 +384,30 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
             )}
 
             {!loadingStores && allStores.length > 0 && (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {allStores.map((store) => (
-                  <div
-                    key={store.id}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      store.isActive
-                        ? 'bg-blue-900/30 border-blue-600'
-                        : 'bg-gray-900 border-gray-700 hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
+              <>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {allStores.map((store) => (
+                    <label
+                      key={store.id}
+                      className={`flex items-start p-3 rounded-lg border transition-colors cursor-pointer ${
+                        selectedStoreId === store.id
+                          ? 'bg-blue-900/30 border-blue-600'
+                          : 'bg-gray-900 border-gray-700 hover:border-gray-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="store-selection"
+                        value={store.id}
+                        checked={selectedStoreId === store.id}
+                        onChange={(e) => setSelectedStoreId(e.target.value)}
+                        className="mt-1 mr-3"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-white">{store.displayName}</span>
                           {store.isActive && (
-                            <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">활성</span>
+                            <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">현재 활성</span>
                           )}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
@@ -384,36 +415,36 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
                         </div>
                         <div className="text-xs text-gray-600 mt-1 font-mono break-all">{store.id}</div>
                       </div>
-                      <div className="flex flex-col gap-1 ml-3">
-                        {!store.isActive && (
-                          <>
-                            <Button
-                              onClick={() => switchStore(store.id, store.displayName)}
-                              disabled={switchingStore}
-                              size="sm"
-                              variant="outline"
-                              className="text-xs border-green-700 text-green-400 hover:bg-green-900/30"
-                            >
-                              ✓ 적용
-                            </Button>
-                            <Button
-                              onClick={() => deleteStore(store.id, store.displayName)}
-                              size="sm"
-                              variant="outline"
-                              className="text-xs border-red-700 text-red-400 hover:bg-red-900/30"
-                            >
-                              🗑️ 삭제
-                            </Button>
-                          </>
-                        )}
-                        {store.isActive && (
-                          <span className="px-2 py-1 text-xs text-gray-500 text-center">현재 사용 중</span>
-                        )}
+                      <div className="ml-3">
+                        <Button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            deleteStore(store.id, store.displayName)
+                          }}
+                          disabled={store.isActive}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-red-700 text-red-400 hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          🗑️
+                        </Button>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Apply Button */}
+                <div className="flex gap-3 pt-3 border-t border-gray-700">
+                  <Button
+                    onClick={applyStoreSelection}
+                    disabled={switchingStore || !selectedStoreId || allStores.find((s) => s.id === selectedStoreId)?.isActive}
+                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    size="lg"
+                  >
+                    {switchingStore ? '⏳ 전환 중...' : '✓ 선택한 Store 적용하기'}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )}
