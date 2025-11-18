@@ -658,7 +658,11 @@ export function LawViewer({
           await openExternalLawArticleModal(lawName, articleLabel)
           setLastExternalRef({ lawName, joLabel: articleLabel })
         } else {
-          window.open(`https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`, "_blank", "noopener")
+          // 자치법규 여부 감지
+          const isOrdinance = /조례|규칙/.test(lawName) ||
+                              /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+          const lawPath = isOrdinance ? '자치법규' : '법령'
+          window.open(`https://www.law.go.kr/${lawPath}/${encodeURIComponent(lawName)}`, "_blank", "noopener")
           setLastExternalRef({ lawName })
         }
       } else if (refType === "regulation") {
@@ -902,9 +906,10 @@ export function LawViewer({
     try {
       console.log('[Citation] Opening modal for:', { lawName, articleLabel })
 
-      // 자치법규 여부 감지 (조례, 규칙, 지방자치단체명 포함)
-      const isOrdinance = /조례|규칙|특별시|광역시|[가-힣]+도|[가-힣]+시|[가-힣]+군|[가-힣]+구/.test(lawName)
-      console.log('[Citation] Is ordinance:', isOrdinance)
+      // 자치법규 여부 감지 (조례, 규칙 키워드만으로도 판단)
+      const isOrdinance = /조례|규칙/.test(lawName) ||
+                          /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+      console.log('[Citation] Is ordinance:', isOrdinance, 'for law:', lawName)
 
       // 자치법규는 법제처 자치법규 페이지로 리다이렉트
       if (isOrdinance) {
@@ -1093,47 +1098,71 @@ export function LawViewer({
           호_length: Array.isArray(targetUnit.호) ? targetUnit.호.length : 0
         })
 
-        // 항 배열을 텍스트로 변환 (번호는 내용에 이미 포함되어 있음)
-        if (Array.isArray(targetUnit.항) && targetUnit.항.length > 0) {
-          const paragraphsText = targetUnit.항.map((hang: any) => {
-            const hangContent = hang?.항내용 || ""
-
-            // 호 배열 처리
-            if (Array.isArray(hang?.호) && hang.호.length > 0) {
-              const itemsText = hang.호.map((ho: any) => {
-                const hoContent = ho?.호내용 || ""
-                return hoContent
-              }).join('\n')
-              return hangContent ? `${hangContent}\n${itemsText}` : itemsText
-            }
-
-            return hangContent
-          }).join('\n\n')
-
-          console.log('[Citation] Converted from 항 array:', paragraphsText.length, 'chars')
-          rawContent = paragraphsText
+        // 먼저 조문내용에서 제목 부분 제거 (항/호 처리 전에)
+        if (rawContent && title) {
+          // 제1조(목적) 이 법은... → 이 법은...
+          const titlePattern = new RegExp(`^제${targetUnit.조문번호}조(?:의\\d+)?\\s*\\(${title}\\)\\s*`, 'i')
+          if (titlePattern.test(rawContent)) {
+            rawContent = rawContent.replace(titlePattern, '')
+            console.log('[Citation] After title pattern removal:', rawContent.length)
+          }
         }
-        // 항 없이 호만 있는 경우 처리 (예: 도로법 시행령 제55조)
+
+        // 항 처리: 배열 또는 단일 객체일 수 있음
+        const hangArray = Array.isArray(targetUnit.항)
+          ? targetUnit.항
+          : targetUnit.항
+          ? [targetUnit.항]
+          : []
+
+        if (hangArray.length > 0) {
+          // ✅ 먼저 항내용이 있는지 확인
+          const hasHangContent = hangArray.some((hang: any) => (hang?.항내용 || "").trim())
+
+          // 호 내용 추출
+          const allHo = hangArray.flatMap((hang: any) => {
+            const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
+            return hoInHang
+          })
+
+          if (hasHangContent) {
+            // 항내용이 있는 경우 → 기존 로직 (항내용 + 호)
+            const paragraphsText = hangArray.map((hang: any) => {
+              const hangContent = hang?.항내용 || ""
+              const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
+
+              if (hoInHang.length > 0) {
+                const itemsText = hoInHang.map((ho: any) => ho?.호내용 || "").join('\n')
+                return hangContent ? `${hangContent}\n${itemsText}` : itemsText
+              }
+
+              return hangContent
+            }).join('\n\n')
+
+            console.log('[Citation] Converted from 항 with 항내용:', paragraphsText.length, 'chars')
+            rawContent = paragraphsText
+          } else if (allHo.length > 0) {
+            // 항내용 없고 호만 있는 경우 → rawContent(본문) + 호 합치기
+            const itemsText = allHo.map((ho: any) => ho?.호내용 || "").join('\n')
+            rawContent = rawContent ? `${rawContent}\n${itemsText}` : itemsText
+            console.log('[Citation] Combined rawContent + 호 from 항 (no 항내용):', rawContent.length, 'chars')
+          } else {
+            // 항내용도 없고 호도 없음 → rawContent 그대로
+            console.log('[Citation] 항 exists but no 항내용 and no 호')
+          }
+        }
+        // 항 없이 최상위 호만 있는 경우 처리
         else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
           const itemsText = targetUnit.호.map((ho: any) => {
             const hoContent = ho?.호내용 || ""
             return hoContent
           }).join('\n')
 
-          console.log('[Citation] Converted from 호 array (no 항):', itemsText.length, 'chars')
+          console.log('[Citation] Converted from top-level 호 array (no 항):', itemsText.length, 'chars')
           // 조문내용(본문) + 호 내용 결합
           rawContent = rawContent ? `${rawContent}\n${itemsText}` : itemsText
         } else {
-          console.log('[Citation] Using 조문내용 directly, before title removal:', rawContent.length)
-          // 조문내용에서 제목 부분만 제거 (단, 한 줄에 모든 내용이 있는 경우 제목만 제거)
-          if (rawContent && title) {
-            // 제1조(목적) 이 법은... → 이 법은...
-            const titlePattern = new RegExp(`^제${targetUnit.조문번호}조(?:의\\d+)?\\s*\\(${title}\\)\\s*`, 'i')
-            if (titlePattern.test(rawContent)) {
-              rawContent = rawContent.replace(titlePattern, '')
-              console.log('[Citation] After title pattern removal:', rawContent.length)
-            }
-          }
+          console.log('[Citation] Using 조문내용 directly (no 항/호 arrays)')
         }
 
         const lawArticle: LawArticle = {
