@@ -688,9 +688,36 @@ export function LawViewer({
           setLastExternalRef({ lawName: lastExternalRef.lawName, joLabel: articleLabel })
         }
       } else if (refType === "related") {
-        if (!activeArticle) return
         const kind = target.getAttribute("data-kind") || "decree"
-        // Expand to 2-tier view to show delegations
+
+        // AI 답변 모드: 시행령/시행규칙 → 법령명 추론하여 모달 열기
+        if (aiAnswerMode) {
+          const { inferLawNameFromArticle } = await import('@/lib/ai-law-inference')
+
+          // 컨텍스트에서 법령명 추론
+          const inferred = inferLawNameFromArticle('', {
+            userQuery,
+            relatedLaws: relatedArticles,
+            aiAnswerContent,
+            citations: aiCitations,
+          })
+
+          if (inferred) {
+            const baseLawName = inferred.lawName.replace(/\s*(법|규칙|조례)$/, '$1')
+            const relatedLawName = kind === 'decree'
+              ? `${baseLawName} 시행령`
+              : kind === 'rule'
+              ? `${baseLawName} 시행규칙`
+              : baseLawName
+
+            console.log('[Related] Opening modal for:', { kind, baseLaw: baseLawName, relatedLaw: relatedLawName })
+            window.open(`https://www.law.go.kr/법령/${encodeURIComponent(relatedLawName)}`, "_blank", "noopener")
+            return
+          }
+        }
+
+        // 일반 모드: 3단 비교 뷰로 전환
+        if (!activeArticle) return
         console.log("[v0] [3단비교] 위임조문 클릭 - 2단뷰로 전환", { kind, activeJo: activeArticle.jo })
 
         // Close admin rules view and restore delegation view
@@ -875,6 +902,23 @@ export function LawViewer({
     try {
       console.log('[Citation] Opening modal for:', { lawName, articleLabel })
 
+      // 자치법규 여부 감지 (조례, 규칙, 지방자치단체명 포함)
+      const isOrdinance = /조례|규칙|특별시|광역시|[가-힣]+도|[가-힣]+시|[가-힣]+군|[가-힣]+구/.test(lawName)
+      console.log('[Citation] Is ordinance:', isOrdinance)
+
+      // 자치법규는 법제처 자치법규 페이지로 리다이렉트
+      if (isOrdinance) {
+        const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}`
+        setRefModal({
+          open: true,
+          title: `${lawName} ${articleLabel}`,
+          html: `<div class="space-y-3"><p>자치법규는 법제처 자치법규 페이지에서 확인하실 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
+          lawName: lawName,
+          articleNumber: articleLabel,
+        })
+        return
+      }
+
       const qs = new URLSearchParams({ query: lawName })
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
@@ -902,12 +946,13 @@ export function LawViewer({
       }
 
       // Extract just the article number (제X조 or 제X조의Y) from articleLabel
-      // articleLabel might be "제5조제2항" but buildJO only handles "제5조"
+      // articleLabel might be "제5조제2항" or "제55조제12호" but buildJO only handles "제5조"
+      // Remove 항(paragraph) and 호(item) parts: 제N항, 제N호
       let joCode = ""
       try {
         const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
         joCode = buildJO(articleOnly)
-        console.log('[Citation] JO code built:', { articleOnly, joCode })
+        console.log('[Citation] JO code built:', { original: articleLabel, articleOnly, joCode })
       } catch (err) {
         console.error("[Citation] Failed to build JO code:", err)
       }
@@ -1037,10 +1082,15 @@ export function LawViewer({
 
         console.log('[Citation] Raw unit data:', {
           조문내용_length: rawContent.length,
+          조문내용_preview: rawContent.substring(0, 200),
           조문제목: title,
           항_exists: !!targetUnit.항,
           항_isArray: Array.isArray(targetUnit.항),
-          항_length: Array.isArray(targetUnit.항) ? targetUnit.항.length : 0
+          항_length: Array.isArray(targetUnit.항) ? targetUnit.항.length : 0,
+          항_sample: Array.isArray(targetUnit.항) && targetUnit.항.length > 0 ? targetUnit.항[0] : null,
+          호_exists: !!targetUnit.호,
+          호_isArray: Array.isArray(targetUnit.호),
+          호_length: Array.isArray(targetUnit.호) ? targetUnit.호.length : 0
         })
 
         // 항 배열을 텍스트로 변환 (번호는 내용에 이미 포함되어 있음)
@@ -1062,6 +1112,17 @@ export function LawViewer({
 
           console.log('[Citation] Converted from 항 array:', paragraphsText.length, 'chars')
           rawContent = paragraphsText
+        }
+        // 항 없이 호만 있는 경우 처리 (예: 도로법 시행령 제55조)
+        else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
+          const itemsText = targetUnit.호.map((ho: any) => {
+            const hoContent = ho?.호내용 || ""
+            return hoContent
+          }).join('\n')
+
+          console.log('[Citation] Converted from 호 array (no 항):', itemsText.length, 'chars')
+          // 조문내용(본문) + 호 내용 결합
+          rawContent = rawContent ? `${rawContent}\n${itemsText}` : itemsText
         } else {
           console.log('[Citation] Using 조문내용 directly, before title removal:', rawContent.length)
           // 조문내용에서 제목 부분만 제거 (단, 한 줄에 모든 내용이 있는 경우 제목만 제거)
@@ -1808,7 +1869,7 @@ export function LawViewer({
 
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full" ref={contentRef}>
-            <div className="px-6 pt-0 pb-0">
+            <div className="px-5 pt-0 pb-0">
               {isOrdinance ? (
                 <div className="space-y-2">
                   {preambles.map((preamble, index) => (
@@ -2873,11 +2934,11 @@ export function LawViewer({
                         </div>
                       )}
 
-                      <div className="mb-6 pb-4 border-b border-border">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-2">
+                      <div className="mb-1 pb-10 border-b border-border">
+                        <div className="flex items-center justify-between gap-4 pt-2">
+                          <div className="flex items-center gap-2"   >
                             <Sparkles className="h-5 w-5 text-primary" />
-                            <h3 className="text-lg font-bold text-foreground mb-0">AI 답변</h3>
+                            <h3 className="text-xl font-bold text-foreground mb-0 ">AI 답변</h3>
                             <Badge variant="outline" className="text-xs">
                               File Search RAG
                             </Badge>
@@ -2894,8 +2955,7 @@ export function LawViewer({
                             <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
                               <ZoomIn className="h-4 w-4" />
                             </Button>
-                            <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                            <Separator orientation="vertical" className="h-5 mx-1" />
+                            <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -2908,13 +2968,10 @@ export function LawViewer({
                               <Copy className="h-4 w-4" />
                             </Button>
                             {aiCitations && aiCitations.length > 0 && (
-                              <>
-                                <Separator orientation="vertical" className="h-5 mx-1" />
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <ShieldCheck className="h-3.5 w-3.5" />
-                                  <span>검증된 출처</span>
-                                </div>
-                              </>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                                <span>검증된 출처</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2924,7 +2981,7 @@ export function LawViewer({
                       className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/50 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5

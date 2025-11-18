@@ -176,7 +176,7 @@ export async function* queryFileSearchStream(
   options?: {
     metadataFilter?: string
   }
-): AsyncGenerator<{ text: string; done: boolean; citations?: any[] }> {
+): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is required')
@@ -238,7 +238,7 @@ export async function* queryFileSearchStream(
       temperature: 0,  // 완전 결정적 출력
       topP: 0.8,  // 0.95 → 0.8 (토큰 효율성 개선)
       topK: 20,   // 40 → 20 (법령 검색에 최적화, 50% 감소)
-      maxOutputTokens: 2048  // 8192 → 2048 (75% 감소, 간결한 답변)
+      maxOutputTokens: 4096  // 2048 → 4096 (MAX_TOKENS 오류 방지, 한글 토큰 비효율 대응)
     }
   }
 
@@ -328,9 +328,15 @@ export async function* queryFileSearchStream(
 
             if (finishReason === 'MAX_TOKENS') {
               console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
-              console.error('[File Search] 현재 max_output_tokens:', 2048)
+              console.error('[File Search] 현재 max_output_tokens:', 4096)
               console.error('[File Search] 실제 사용된 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
               console.error('[File Search] 해결: 질문을 더 구체적으로 작성하거나 답변이 필요한 범위를 좁혀주세요.')
+
+              // 사용자에게 경고 메시지 전송
+              yield {
+                warning: '⚠️ 답변이 너무 길어 일부 내용이 생략되었습니다. 질문을 더 구체적으로 작성하거나 범위를 좁혀주세요.',
+                done: false
+              }
             } else if (finishReason === 'SAFETY') {
               console.error('[File Search] ❌ 안전 필터에 의해 차단되었습니다.')
             } else if (finishReason === 'RECITATION') {

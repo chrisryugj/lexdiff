@@ -65,14 +65,26 @@ export async function POST(request: NextRequest) {
                 })}\n\n`)
               )
             } else {
+              // 경고 메시지가 있으면 전송
+              if (chunk.warning) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: 'warning',
+                    message: chunk.warning
+                  })}\n\n`)
+                )
+              }
+
               // 텍스트 청크
-              fullResponse += chunk.text
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({
-                  type: 'text',
-                  text: chunk.text
-                })}\n\n`)
-              )
+              if (chunk.text) {
+                fullResponse += chunk.text
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: 'text',
+                    text: chunk.text
+                  })}\n\n`)
+                )
+              }
             }
           }
 
