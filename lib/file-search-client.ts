@@ -46,8 +46,8 @@ export async function createFileSearchStore() {
   const store = await genAI.fileSearchStores.create({
     displayName: 'Korean Laws & Ordinances Database',
     chunkingConfig: {
-      maxTokensPerChunk: 512,  // 조문 1개 정도
-      maxOverlapTokens: 100     // 문맥 유지
+      maxTokensPerChunk: 384,  // 512 → 384 (25% 감소, Phase 2 최적화)
+      maxOverlapTokens: 50      // 100 → 50 (50% 감소, 중복 최소화)
     }
   })
 
@@ -243,9 +243,9 @@ export async function* queryFileSearchStream(
     }],
     generationConfig: {
       temperature: 0,  // 완전 결정적 출력
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192  // 답변 잘림 방지
+      topP: 0.8,  // 0.95 → 0.8 (토큰 효율성 개선)
+      topK: 20,   // 40 → 20 (법령 검색에 최적화, 50% 감소)
+      maxOutputTokens: 2048  // 8192 → 2048 (75% 감소, 간결한 답변)
     }
   }
 
@@ -335,9 +335,9 @@ export async function* queryFileSearchStream(
 
             if (finishReason === 'MAX_TOKENS') {
               console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
-              console.error('[File Search] 현재 max_output_tokens:', 8192)
+              console.error('[File Search] 현재 max_output_tokens:', 2048)
               console.error('[File Search] 실제 사용된 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
-              console.error('[File Search] 해결: max_output_tokens 값을 증가시키거나 프롬프트를 간소화하세요.')
+              console.error('[File Search] 해결: 질문을 더 구체적으로 작성하거나 답변이 필요한 범위를 좁혀주세요.')
             } else if (finishReason === 'SAFETY') {
               console.error('[File Search] ❌ 안전 필터에 의해 차단되었습니다.')
             } else if (finishReason === 'RECITATION') {
