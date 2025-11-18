@@ -667,9 +667,11 @@ law-viewer.tsx (3060줄)
 
 **권장**: 컴포넌트는 하나의 책임만 가져야 함
 
-### 2. 코드 중복 패턴
+### 2. 코드 중복 패턴 ⚠️ **심각**
 
-#### 패턴 A: 2단/3단 레이아웃 (3회 반복)
+**실제 코드 분석 결과** (문서 작성 후 재검증):
+
+#### 패턴 A: 2단/3단 레이아웃 (**4회** 반복, ~30줄 × 4 = **120줄**)
 ```typescript
 <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
   <div className="overflow-y-auto pr-2">{/* Left */}</div>
@@ -678,24 +680,58 @@ law-viewer.tsx (3060줄)
 ```
 - 라인 2005 (행정규칙 상세)
 - 라인 2110 (행정규칙 목록)
+- 라인 2345 (2단 비교 - 추가 발견!)
 - 라인 2851 (AI 답변 비교)
 
-#### 패턴 B: 조문 헤더 (4회 반복)
+**중복 코드량**: ~120줄 (컴포넌트화 시 ~20줄로 축소 가능)
+
+#### 패턴 B: 조문 헤더 (**12회** 반복, ~10줄 × 12 = **120줄**)
 ```typescript
 <div className="mb-4 pb-3 border-b border-border">
   <h3>{formatSimpleJo(article.jo)}</h3>
   <Badge>{lawTitle}</Badge>
 </div>
 ```
+- 라인 2008, 2030, 2113, 2135, 2233, 2255, 2300, 2370, 2447, 2469, 2551, 2573
 
-#### 패턴 C: 조문 콘텐츠 렌더링 (5회 반복)
+**중복 코드량**: ~120줄 (컴포넌트화 시 ~15줄로 축소 가능)
+
+#### 패턴 C: 조문 콘텐츠 렌더링 (**11회** 반복, ~15줄 × 11 = **165줄**)
 ```typescript
 <div
-  style={{ fontSize: `${fontSize}px` }}
+  className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+  style={{
+    fontSize: `${fontSize}px`,
+    lineHeight: "1.8",
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
+  }}
   onClick={handleContentClick}
   dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
 />
 ```
+
+**중복 코드량**: ~165줄 (컴포넌트화 시 ~20줄로 축소 가능)
+
+#### 패턴 D: 스크롤 영역 (**17회** 반복)
+```typescript
+<div className="overflow-y-auto pr-2">
+  {/* 콘텐츠 */}
+</div>
+```
+
+#### 패턴 E: 로딩 스피너 (여러 곳에서 중복)
+```typescript
+<div className="flex items-center justify-center">
+  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  <p>로딩중...</p>
+</div>
+```
+
+#### 패턴 F: formatSimpleJo/formatJO 사용 (**25회**)
+- 조문 번호 포맷팅 로직 반복
+
+**총 중복 코드량 추정**: **~500줄 이상** (컴포넌트화 시 ~80줄로 축소 → **84% 감소**)
 
 ### 3. Props Drilling 문제
 
@@ -779,15 +815,19 @@ search-result-view.tsx
 | **TwoTierView** | 2342-2847 | 505줄 | 12개 | 0개 |
 | **AISummaryView** | 2847-3000+ | 150줄+ | 8개 | 0개 |
 
-#### Tier 3: 재사용 가능 UI 컴포넌트
+#### Tier 3: 재사용 가능 UI 컴포넌트 (**중복 제거 핵심**)
 
-| 컴포넌트 | 현재 | 설명 |
-|---------|------|------|
-| **TwoColumnLayout** | 중복 패턴 | 2단 레이아웃 래퍼 |
-| **ThreeColumnLayout** | 중복 패턴 | 3단 레이아웃 래퍼 |
-| **ArticleCard** | 중복 패턴 | 조문 헤더 + 콘텐츠 |
-| **ArticleContent** | 중복 패턴 | 조문 본문 렌더링 |
-| **DelegationCard** | 중복 패턴 | 위임조문 카드 |
+| 컴포넌트 | 현재 중복 | 제거 효과 | 설명 |
+|---------|----------|----------|------|
+| **TwoColumnLayout** | 4회 (120줄) | 100줄 감소 | 2단 레이아웃 래퍼 |
+| **ThreeColumnLayout** | 1회 | - | 3단 레이아웃 래퍼 |
+| **ArticleCard** | 12회 (120줄) | 105줄 감소 | 조문 헤더 + 콘텐츠 |
+| **ArticleContent** | 11회 (165줄) | 145줄 감소 | 조문 본문 렌더링 |
+| **DelegationCard** | 여러 곳 | 50줄 감소 | 위임조문 카드 |
+| **LoadingSpinner** | 3회 이상 | 30줄 감소 | 로딩 상태 표시 |
+| **EmptyState** | 여러 곳 | 40줄 감소 | 빈 상태 메시지 |
+
+**총 중복 제거 효과**: ~470줄 감소
 
 ### 2. 새로운 파일 구조
 
@@ -1066,9 +1106,11 @@ export function useThreeTierData(
 
 ---
 
-### Step 4: 중복 패턴 컴포넌트화
+### Step 4: 중복 패턴 컴포넌트화 ⭐ **핵심 최적화**
 
-#### 4.1 TwoColumnLayout
+**목표**: 500줄 이상의 중복 코드를 80줄의 재사용 컴포넌트로 축소 (84% 감소)
+
+#### 4.1 TwoColumnLayout (120줄 → 20줄)
 
 **파일**: `components/law-viewer/shared/TwoColumnLayout.tsx`
 
@@ -1111,9 +1153,10 @@ export function TwoColumnLayout({
 />
 ```
 
-**제거 가능한 중복 코드**: 3개 위치 (라인 2005, 2110, 2851)
+**제거 가능한 중복 코드**: 4개 위치 (라인 2005, 2110, 2345, 2851)
+**중복 감소**: 120줄 → 20줄 (100줄 감소, 83% ↓)
 
-#### 4.2 ArticleCard
+#### 4.2 ArticleCard (120줄 → 15줄)
 
 **파일**: `components/law-viewer/shared/ArticleCard.tsx`
 
@@ -1155,9 +1198,10 @@ export function ArticleCard({
 }
 ```
 
-**제거 가능한 중복 코드**: 4개 위치
+**제거 가능한 중복 코드**: 12개 위치
+**중복 감소**: 120줄 → 15줄 (105줄 감소, 88% ↓)
 
-#### 4.3 ArticleContent
+#### 4.3 ArticleContent (165줄 → 20줄)
 
 **파일**: `components/law-viewer/shared/ArticleContent.tsx`
 
@@ -1185,7 +1229,66 @@ export function ArticleContent({ article, fontSize, onClick }: ArticleContentPro
 }
 ```
 
-**제거 가능한 중복 코드**: 5개 위치
+**제거 가능한 중복 코드**: 11개 위치
+**중복 감소**: 165줄 → 20줄 (145줄 감소, 88% ↓)
+
+#### 4.4 LoadingSpinner (공통 컴포넌트)
+
+**파일**: `components/law-viewer/shared/LoadingSpinner.tsx`
+
+```typescript
+interface LoadingSpinnerProps {
+  message?: string
+  size?: 'sm' | 'md' | 'lg'
+}
+
+export function LoadingSpinner({ message = '로딩중...', size = 'md' }: LoadingSpinnerProps) {
+  const sizeClass = {
+    sm: 'h-4 w-4',
+    md: 'h-8 w-8',
+    lg: 'h-12 w-12'
+  }[size]
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-4">
+      <div className={`animate-spin rounded-full ${sizeClass} border-b-2 border-primary`}></div>
+      {message && <p className="text-muted-foreground">{message}</p>}
+    </div>
+  )
+}
+```
+
+**제거 가능한 중복 코드**: 3개 위치 (라인 1850, 1998, 2913)
+**중복 감소**: ~30줄 → 10줄 (20줄 감소)
+
+#### 4.5 EmptyState (공통 컴포넌트)
+
+**파일**: `components/law-viewer/shared/EmptyState.tsx`
+
+```typescript
+interface EmptyStateProps {
+  icon?: React.ReactNode
+  message: string
+  description?: string
+}
+
+export function EmptyState({ icon, message, description }: EmptyStateProps) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+      {icon}
+      <p className="font-medium">{message}</p>
+      {description && <p className="text-sm">{description}</p>}
+    </div>
+  )
+}
+```
+
+**제거 가능한 중복 코드**: 여러 위치 (빈 상태 메시지)
+**중복 감소**: ~40줄 감소
+
+---
+
+**Step 4 총 중복 제거 효과**: ~470줄 감소 (84% ↓)
 
 ---
 
@@ -1257,11 +1360,16 @@ function ArticleContent() {
 
 ### 파일 크기 감소
 
-| 컴포넌트 | Before | After | 감소율 |
-|---------|--------|-------|--------|
-| law-viewer/index.tsx | 3060줄 | ~250줄 | 92% ↓ |
-| 새로 생성된 컴포넌트 | - | ~3000줄 (20개 파일) | - |
-| **평균 파일 크기** | 3060줄 | **~150줄** | - |
+| 컴포넌트 | Before | After | 감소율 | 비고 |
+|---------|--------|-------|--------|------|
+| law-viewer/index.tsx | 3060줄 | ~250줄 | 92% ↓ | 분할 후 |
+| **중복 코드 제거** | **~500줄** | **~80줄** | **84% ↓** | **핵심 효과** |
+| 새로 생성된 컴포넌트 | - | ~2500줄 (20개 파일) | - | 순수 코드 |
+| **평균 파일 크기** | 3060줄 | **~125줄** | - | 유지보수 용이 |
+
+**순수 코드 감소**: 3060줄 - 500줄(중복) = 2560줄 실제 로직
+**리팩토링 후**: 250줄(index) + 2500줄(컴포넌트) - 420줄(중복 제거) = **2330줄**
+**실제 코드 감소량**: **230줄** (중복 제거 효과)
 
 ### 상태 복잡도 감소
 
@@ -1311,16 +1419,20 @@ function ArticleContent() {
 - [ ] `ActionButtonBar.tsx` 추출 (90줄)
 - [ ] 테스트: 사이드바, 헤더, 버튼 바 정상 작동
 
-### Phase 3: 공통 컴포넌트 추출 (1일)
+### Phase 3: 공통 컴포넌트 추출 ⭐ **중복 제거** (1일)
 
 **Week 2, Day 3:**
-- [ ] `TwoColumnLayout.tsx` 생성
+- [ ] `TwoColumnLayout.tsx` 생성 (4개 위치 중복 제거)
 - [ ] `ThreeColumnLayout.tsx` 생성
-- [ ] `ArticleCard.tsx` 생성
-- [ ] `ArticleContent.tsx` 생성
+- [ ] `ArticleCard.tsx` 생성 (12개 위치 중복 제거)
+- [ ] `ArticleContent.tsx` 생성 (11개 위치 중복 제거)
 - [ ] `DelegationCard.tsx` 생성
-- [ ] 기존 중복 코드 제거 (3개 위치)
+- [ ] `LoadingSpinner.tsx` 생성 (3개 위치 중복 제거)
+- [ ] `EmptyState.tsx` 생성 (여러 위치 중복 제거)
+- [ ] 기존 중복 코드 제거 (30개 이상 위치)
 - [ ] 테스트: 레이아웃, 카드 정상 렌더링
+
+**예상 효과**: ~470줄 중복 코드 제거
 
 ### Phase 4: Custom Hooks 분리 (1일)
 
