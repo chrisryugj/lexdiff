@@ -780,12 +780,16 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   }
 
   const handleSearchInternal = async (query: { lawName: string; article?: string; jo?: string }) => {
+    // 🔥 CRITICAL: 검색 쿼리 즉시 업데이트 (프로그레스바 표시용)
+    const fullQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
+    setSearchQuery(fullQuery)
+    debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery })
+
     // 검색 모드 초기화 (기본 검색으로 시작)
     setSearchMode('basic')
     onModeChange?.('basic')
 
     // 🤖 자동 자연어 검색 감지
-    const fullQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
     const queryDetection = detectQueryType(fullQuery)
 
     debugLogger.info('🔍 검색 타입 감지', {
