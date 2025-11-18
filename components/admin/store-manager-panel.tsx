@@ -23,6 +23,7 @@ interface StoreInfo {
   displayName: string
   createTime: string
   updateTime: string
+  isActive?: boolean
 }
 
 interface CostEstimate {
@@ -39,15 +40,20 @@ interface StoreManagerPanelProps {
 export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
   const [documents, setDocuments] = useState<StoreDocument[]>([])
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null)
+  const [allStores, setAllStores] = useState<StoreInfo[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingStores, setLoadingStores] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showStoreId, setShowStoreId] = useState(false)
   const [newStoreName, setNewStoreName] = useState('')
   const [creatingStore, setCreatingStore] = useState(false)
+  const [switchingStore, setSwitchingStore] = useState(false)
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [showStoreList, setShowStoreList] = useState(true)
 
   useEffect(() => {
     loadStoreInfo()
+    loadAllStores()
     loadDocuments()
   }, [])
 
@@ -61,6 +67,24 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
       }
     } catch (err: any) {
       console.error('Failed to load store info:', err)
+    }
+  }
+
+  async function loadAllStores() {
+    setLoadingStores(true)
+    try {
+      const response = await fetch('/api/admin/list-stores')
+      const data = await response.json()
+
+      if (data.success) {
+        setAllStores(data.stores)
+      } else {
+        console.error('Failed to load stores:', data.error)
+      }
+    } catch (err: any) {
+      console.error('Failed to load stores:', err)
+    } finally {
+      setLoadingStores(false)
     }
   }
 
@@ -165,8 +189,11 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
       if (data.success) {
         alert(data.message || '✅ Store 생성 완료!\n.env.local이 자동으로 업데이트되었습니다.\n\n⚠️ 서버 재시작이 필요합니다.')
         setNewStoreName('')
-        // Store info will be updated after server restart
-        setTimeout(() => loadStoreInfo(), 1000)
+        // Reload stores and store info
+        setTimeout(() => {
+          loadStoreInfo()
+          loadAllStores()
+        }, 1000)
       } else {
         alert('생성 실패: ' + data.error)
       }
@@ -174,6 +201,83 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
       alert('생성 중 오류: ' + error.message)
     } finally {
       setCreatingStore(false)
+    }
+  }
+
+  async function switchStore(storeId: string, storeName: string) {
+    if (!confirm(`"${storeName}" Store로 전환하시겠습니까?\n\n전환 후 서버를 재시작해야 합니다.`)) {
+      return
+    }
+
+    setSwitchingStore(true)
+
+    try {
+      const response = await fetch('/api/admin/switch-store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ storeId })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(data.message || '✅ Store 전환 완료!\n\n⚠️ 서버 재시작이 필요합니다.')
+        // Reload stores and store info
+        setTimeout(() => {
+          loadStoreInfo()
+          loadAllStores()
+          loadDocuments()
+        }, 1000)
+      } else {
+        alert('전환 실패: ' + data.error)
+      }
+    } catch (error: any) {
+      alert('전환 중 오류: ' + error.message)
+    } finally {
+      setSwitchingStore(false)
+    }
+  }
+
+  async function deleteStore(storeId: string, storeName: string) {
+    // First confirmation
+    if (
+      !confirm(
+        `"${storeName}" Store를 삭제하시겠습니까?\n\n⚠️ 경고: 이 작업은 되돌릴 수 없습니다!\n\n삭제되는 내용:\n• Store 내 모든 문서 (법령, 조례 등)\n• 문서와 연결된 모든 메타데이터\n• 업로드 이력 정보`
+      )
+    ) {
+      return
+    }
+
+    // Second confirmation (stronger warning)
+    if (
+      !confirm(
+        `⚠️ 최종 확인\n\n정말로 "${storeName}" Store를 삭제하시겠습니까?\n\n이 작업은 복구할 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.`
+      )
+    ) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/delete-store', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ storeId })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert('✅ Store가 삭제되었습니다')
+        loadAllStores()
+      } else {
+        alert('❌ 삭제 실패: ' + data.error)
+      }
+    } catch (error: any) {
+      alert('❌ 삭제 중 오류: ' + error.message)
     }
   }
 
@@ -226,6 +330,94 @@ export function StoreManagerPanel({ onRefresh }: StoreManagerPanelProps) {
           </div>
         </div>
       )}
+
+      {/* All Stores List */}
+      <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium text-white">🗂️ 모든 Stores</h3>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowStoreList(!showStoreList)}
+              size="sm"
+              variant="outline"
+              className="text-xs"
+            >
+              {showStoreList ? '숨기기' : '보기'}
+            </Button>
+            <Button onClick={loadAllStores} disabled={loadingStores} size="sm" variant="outline" className="text-xs">
+              {loadingStores ? '새로고침 중...' : '🔄'}
+            </Button>
+          </div>
+        </div>
+
+        {showStoreList && (
+          <div className="space-y-2">
+            {loadingStores && (
+              <div className="p-4 text-center text-gray-400">로딩 중...</div>
+            )}
+
+            {!loadingStores && allStores.length === 0 && (
+              <div className="p-4 text-center text-gray-500">Store가 없습니다</div>
+            )}
+
+            {!loadingStores && allStores.length > 0 && (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {allStores.map((store) => (
+                  <div
+                    key={store.id}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      store.isActive
+                        ? 'bg-blue-900/30 border-blue-600'
+                        : 'bg-gray-900 border-gray-700 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white">{store.displayName}</span>
+                          {store.isActive && (
+                            <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">활성</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          생성: {new Date(store.createTime).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1 font-mono break-all">{store.id}</div>
+                      </div>
+                      <div className="flex flex-col gap-1 ml-3">
+                        {!store.isActive && (
+                          <>
+                            <Button
+                              onClick={() => switchStore(store.id, store.displayName)}
+                              disabled={switchingStore}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-green-700 text-green-400 hover:bg-green-900/30"
+                            >
+                              ✓ 적용
+                            </Button>
+                            <Button
+                              onClick={() => deleteStore(store.id, store.displayName)}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-red-700 text-red-400 hover:bg-red-900/30"
+                            >
+                              🗑️ 삭제
+                            </Button>
+                          </>
+                        )}
+                        {store.isActive && (
+                          <span className="px-2 py-1 text-xs text-gray-500 text-center">현재 사용 중</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Cost Estimate */}
       {costEstimate && (

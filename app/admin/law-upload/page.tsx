@@ -13,8 +13,9 @@ import { UploadProgressPanel } from '@/components/admin/upload-progress-panel'
 import { StoreManagerPanel } from '@/components/admin/store-manager-panel'
 import { EnforcementDownloadPanel } from '@/components/admin/enforcement-download-panel'
 import { OrdinanceUploadPanel } from '@/components/admin/ordinance-upload-panel'
+import { DocumentUploadPanel } from '@/components/admin/document-upload-panel'
 
-type Tab = 'parse' | 'enforcement' | 'upload' | 'ordinance' | 'manage'
+type Tab = 'parse' | 'enforcement' | 'upload' | 'ordinance' | 'documents' | 'manage'
 
 interface ParsedLaw {
   lawId: string
@@ -190,6 +191,16 @@ export default function AdminLawUploadPage() {
               4️⃣ 조례 업로드
             </button>
             <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-4 py-3 font-medium transition-colors ${
+                activeTab === 'documents'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              5️⃣ 일반 문서
+            </button>
+            <button
               onClick={() => setActiveTab('manage')}
               className={`px-4 py-3 font-medium transition-colors ${
                 activeTab === 'manage'
@@ -197,7 +208,7 @@ export default function AdminLawUploadPage() {
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
-              5️⃣ 관리
+              6️⃣ 관리
             </button>
           </div>
         </div>
@@ -228,6 +239,8 @@ export default function AdminLawUploadPage() {
         )}
 
         {activeTab === 'ordinance' && <OrdinanceUploadPanel refreshTrigger={Date.now()} />}
+
+        {activeTab === 'documents' && <DocumentUploadPanel onUploadComplete={loadSavedLaws} />}
 
         {activeTab === 'manage' && <StoreManagerPanel onRefresh={loadSavedLaws} />}
       </div>
