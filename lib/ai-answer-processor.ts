@@ -408,9 +408,11 @@ function linkifyRefsB(text: string): string {
   let t = text
 
   // 1. 「법령명」 제X조 패턴 (항, 호 포함) - 임시 마커로 변환
+  // 링크는 조문까지만, 표시는 항·호 포함
   t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
-    return '<<<LAWLINK_WITH_ARTICLE:' + lawName + '|||' + joLabel + '>>>'
+    const displayLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
+    const linkLabel = '제' + art + '조' + (branch ? '의' + branch : '')  // 항·호 제외
+    return '<<<LAWLINK_WITH_ARTICLE:' + lawName + '|||' + linkLabel + '|||' + displayLabel + '>>>'
   })
 
   // 2. 「법령명」 단독 - 임시 마커로 변환
@@ -419,8 +421,9 @@ function linkifyRefsB(text: string): string {
   })
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 임시 마커로 변환
+  // "법률 시행령"같이 법률 뒤에 다른 단어가 오는 경우 제외
   t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
+    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·]+(?:법률|법|령|규칙|조례))(?!\s+[가-힣]+령)\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
     (_match, lawName, art, _p2, branch, title) => {
       const cleanLawName = lawName.trim()
       const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
@@ -435,13 +438,15 @@ function linkifyRefsB(text: string): string {
     return '<<<ARTICLE:' + data + '>>>'
   })
 
-  // 5. 대통령령, 시행령 - 임시 마커로 변환
-  t = t.replace(/(?<!<<<[^>]*)(대통령령|시행령)(?![으로로이가>])/g, (m) => {
+  // 5. 대통령령, 시행령 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
+  // 법률 시행령, 법령 시행령 등 복합어 제외
+  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가>])/g, (m) => {
     return '<<<DECREE:' + m + '>>>'
   })
 
-  // 6. 부령, 시행규칙 - 임시 마커로 변환
-  t = t.replace(/(?<!<<<[^>]*)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가>])/g, (m) => {
+  // 6. 부령, 시행규칙 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
+  // 법률 시행규칙 등 복합어 제외
+  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가>])/g, (m) => {
     return '<<<RULE:' + m + '>>>'
   })
 
@@ -454,10 +459,10 @@ function linkifyRefsB(text: string): string {
 function restoreLinkMarkers(text: string): string {
   let t = text
 
-  // 1. 「법령명」 제X조 링크 복원
-  t = t.replace(/&lt;&lt;&lt;LAWLINK_WITH_ARTICLE:([^|]+)\|\|\|([^&]+)&gt;&gt;&gt;/g, (_, lawName, joLabel) => {
-    const label = '「' + lawName + '」 ' + joLabel
-    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + label + '</a>'
+  // 1. 「법령명」 제X조 링크 복원 (linkLabel만 data-article에, displayLabel은 텍스트에)
+  t = t.replace(/&lt;&lt;&lt;LAWLINK_WITH_ARTICLE:([^|]+)\|\|\|([^|&]+)(?:\|\|\|([^&]+))?&gt;&gt;&gt;/g, (_, lawName, linkLabel, displayLabel) => {
+    const label = '「' + lawName + '」 ' + (displayLabel || linkLabel)
+    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + linkLabel + '">' + label + '</a>'
   })
 
   // 2. 「법령명」 단독 링크 복원

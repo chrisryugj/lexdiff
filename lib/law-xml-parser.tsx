@@ -478,9 +478,9 @@ function linkifyRefsB(text: string): string {
     return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
   })
 
-  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 항/호까지 포함, 이미 링크되지 않은 경우만
-  // Lookahead to avoid breaking mid-attribute
-  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
+  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 항/호까지 포함
+  // "법률 시행령"같이 법률 뒤에 다른 단어가 오는 경우 제외
+  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+(?:법률|법|령|규칙|조례))(?!\s+[가-힣]+령)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
     const joLabel = "제" + art + "조" +
       (branch ? "의" + branch : "") +
       (para ? "제" + para + "항" : "") +
@@ -514,15 +514,15 @@ function linkifyRefsB(text: string): string {
     (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
   )
 
-  // 7. 대통령령, 시행령 단독
+  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외)
   t = t.replace(
-    /(대통령령|시행령)(?![으로로이가])/g,
+    /(?<!">)(대통령령|시행령)(?![으로로이가<])/g,
     (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
   )
 
-  // 8. 부령, 시행규칙 단독
+  // 8. 부령, 시행규칙 단독 (이미 링크된 텍스트 제외)
   t = t.replace(
-    /((?:[가-힣]+)?부령|시행규칙)(?![으로로이가])/g,
+    /(?<!">)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가<])/g,
     (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
   )
 
