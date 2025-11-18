@@ -191,7 +191,7 @@ export async function* queryFileSearchStream(
     throw new Error(`Invalid STORE_ID format: ${STORE_ID}. Must start with 'fileSearchStores/'`)
   }
 
-  // 법령 전문 AI 시스템 프롬프트 (토큰 최적화: 450 → 270 토큰, 40% 감소)
+  // 법령 전문 AI 시스템 프롬프트 (토큰 최적화: 450 → 280 토큰, 38% 감소)
   const systemInstruction = `법령 RAG AI. File Search Store 결과만 사용. 조문 없으면: "File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다"
 
 출력 형식 (각 항목 1줄, 간결):
@@ -202,13 +202,13 @@ export async function* queryFileSearchStream(
 - 🔔 실무 행동
 
 ## 📄 상세
-📜 법령명 제N조 ([제목]): 핵심 1줄 (항,호 번호 포함)
-📖 해석: 1줄
-📝 실무: 1줄
-🔴 주의: 1줄
+- 📜 법령명 제N조 ([제목]): 핵심 1줄 (항,호 번호 포함)
+- 📖 해석: 1줄
+- 📝 실무: 1줄
+- 🔴 주의: 1줄
 
-## 💡 추가 참고
-서류·절차·주의사항 (간결)
+## 💡 추가 참고 (최대 2줄)
+- 서류·절차·주의사항
 
 ## 📖 관련 법령
 - 📜 법령명 제N조 ([제목]) 목록만
