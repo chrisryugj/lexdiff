@@ -39,8 +39,9 @@ export function SearchProgressModern({
         <DialogPrimitive.Content
           className="fixed top-[50%] left-[50%] z-50 translate-x-[-50%] translate-y-[-50%] sm:max-w-lg max-w-[90vw] [&>button]:hidden border-2 shadow-2xl rounded-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200"
           style={{
-            borderColor: mode === 'ai' ? 'rgb(147, 51, 234)' : 'rgb(217, 119, 6)',
-            background: 'linear-gradient(135deg, rgba(0,0,0,0.97) 0%, rgba(15,15,25,0.97) 100%)'
+            borderColor: mode === 'ai' ? 'rgb(147, 51, 234)' : 'rgb(59, 130, 246)',
+            background: 'linear-gradient(135deg, rgba(0,0,0,0.97) 0%, rgba(15,15,25,0.97) 100%)',
+            fontFamily: 'Pretendard, sans-serif'
           }}
           aria-describedby={undefined}
         >
@@ -50,7 +51,7 @@ export function SearchProgressModern({
 
           <div className="relative">
             {/* 장식적 헤더 라인 */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
             {/* 메인 컨텐츠 */}
             <div className="pt-8 pb-6 px-6 space-y-6">
@@ -78,7 +79,7 @@ export function SearchProgressModern({
               {/* 장식적 푸터 */}
               <div className="pt-4 border-t border-white/10 flex items-center justify-center gap-2 text-xs text-white/40">
                 <Scale className="h-3 w-3" />
-                <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+                <span className="font-medium tracking-wide">
                   LexDiff Legal Search System
                 </span>
               </div>
@@ -106,7 +107,6 @@ function AISearchHeader({ lawName, isCacheHit }: { lawName?: string; isCacheHit:
           <h3
             className="text-2xl font-bold tracking-tight"
             style={{
-              fontFamily: 'Georgia, serif',
               background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
@@ -121,7 +121,7 @@ function AISearchHeader({ lawName, isCacheHit }: { lawName?: string; isCacheHit:
       </div>
       {lawName && (
         <div className="mt-3 px-4 py-2 bg-purple-950/40 border border-purple-500/30 rounded">
-          <p className="text-sm text-purple-200 font-medium" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+          <p className="text-sm text-purple-200 font-medium">
             질의: <span className="text-purple-100">{lawName}</span>
           </p>
         </div>
@@ -142,32 +142,31 @@ function LawSearchHeader({ lawName, isCacheHit }: { lawName?: string; isCacheHit
     <>
       <div className="flex items-center justify-center gap-3">
         <div className="relative">
-          <div className="absolute inset-0 rounded bg-amber-500/20 blur animate-pulse" />
-          <div className="relative bg-gradient-to-br from-amber-600 to-amber-800 rounded p-3 shadow-lg shadow-amber-500/30">
-            <Gavel className="h-7 w-7 text-white" />
+          <div className="absolute inset-0 rounded bg-blue-500/20 blur animate-pulse" />
+          <div className="relative bg-gradient-to-br from-blue-600 to-blue-800 rounded p-3 shadow-lg shadow-blue-500/30">
+            <Scale className="h-7 w-7 text-white" />
           </div>
         </div>
         <div className="text-left">
           <h3
             className="text-2xl font-bold tracking-tight"
             style={{
-              fontFamily: 'Georgia, serif',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}
           >
             법령 데이터 조회
           </h3>
-          <p className="text-xs text-amber-300/70 font-medium tracking-wide">
+          <p className="text-xs text-blue-300/70 font-medium tracking-wide">
             LEGAL STATUTE DATABASE QUERY
           </p>
         </div>
       </div>
       {lawName && (
-        <div className="mt-3 px-4 py-2 bg-amber-950/40 border border-amber-500/30 rounded">
-          <p className="text-sm text-amber-200 font-medium" style={{ fontFamily: 'Pretendard, sans-serif' }}>
-            검색: <span className="text-amber-100">{lawName}</span>
+        <div className="mt-3 px-4 py-2 bg-blue-950/40 border border-blue-500/30 rounded">
+          <p className="text-sm text-blue-200 font-medium">
+            검색: <span className="text-blue-100">{lawName}</span>
           </p>
         </div>
       )}
@@ -194,7 +193,7 @@ function ProgressTrack({ progress, mode }: { progress: number; mode: 'law' | 'ai
             width: `${progress}%`,
             background: mode === 'ai'
               ? 'linear-gradient(90deg, #a855f7 0%, #ec4899 100%)'
-              : 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
+              : 'linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%)',
             opacity: 0.6
           }}
         />
@@ -205,7 +204,7 @@ function ProgressTrack({ progress, mode }: { progress: number; mode: 'law' | 'ai
             width: `${progress}%`,
             background: mode === 'ai'
               ? 'linear-gradient(90deg, #a855f7 0%, #ec4899 100%)'
-              : 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)'
+              : 'linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%)'
           }}
         />
         {/* 반짝이는 엣지 */}
@@ -213,7 +212,7 @@ function ProgressTrack({ progress, mode }: { progress: number; mode: 'law' | 'ai
           className="absolute top-0 h-full w-20 transition-all duration-700 ease-out"
           style={{
             left: `${Math.max(0, progress - 20)}%`,
-            background: `linear-gradient(90deg, transparent, ${mode === 'ai' ? '#ec4899' : '#ef4444'}80, transparent)`,
+            background: `linear-gradient(90deg, transparent, ${mode === 'ai' ? '#ec4899' : '#06b6d4'}80, transparent)`,
             animation: 'shimmer 2s infinite'
           }}
         />
@@ -223,7 +222,7 @@ function ProgressTrack({ progress, mode }: { progress: number; mode: 'law' | 'ai
       <div className="flex justify-between items-center">
         <span
           className="text-xs font-mono font-bold tracking-wider"
-          style={{ color: mode === 'ai' ? '#c084fc' : '#fbbf24' }}
+          style={{ color: mode === 'ai' ? '#c084fc' : '#60a5fa' }}
         >
           {progress.toFixed(0)}%
         </span>
@@ -377,7 +376,7 @@ function AIStageItem({
           status === 'complete' && 'text-green-300',
           status === 'active' && 'text-purple-200',
           status === 'pending' && 'text-white/40'
-        )} style={{ fontFamily: 'Pretendard, sans-serif' }}>
+        )}>
           {label}
         </p>
         <p className={cn(
@@ -424,31 +423,31 @@ function LawStageItem({
     <div className={cn(
       "relative flex items-start gap-4 p-4 rounded-lg transition-all duration-500 border-l-4",
       status === 'complete' && "bg-gradient-to-r from-green-950/40 to-green-900/20 border-green-500",
-      status === 'active' && "bg-gradient-to-r from-amber-950/50 to-amber-900/30 border-amber-500 shadow-lg shadow-amber-500/20",
+      status === 'active' && "bg-gradient-to-r from-blue-950/50 to-blue-900/30 border-blue-500 shadow-lg shadow-blue-500/20",
       status === 'pending' && "bg-white/5 border-white/10"
     )}>
       {/* 체크박스 스타일 인디케이터 */}
       <div className={cn(
         "flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all",
         status === 'complete' && "bg-green-600 border-green-400",
-        status === 'active' && "border-amber-500 animate-pulse",
+        status === 'active' && "border-blue-500 animate-pulse",
         status === 'pending' && "border-white/20"
       )}>
         {status === 'complete' && <CheckCircle className="h-4 w-4 text-white" />}
-        {status === 'active' && <div className="w-3 h-3 bg-amber-500 rounded-sm animate-pulse" />}
+        {status === 'active' && <div className="w-3 h-3 bg-blue-500 rounded-sm animate-pulse" />}
       </div>
 
       {/* 아이콘 */}
       <div className={cn(
         "flex-shrink-0 p-2 rounded transition-all",
         status === 'complete' && "bg-green-600/20",
-        status === 'active' && "bg-amber-600/30",
+        status === 'active' && "bg-blue-600/30",
         status === 'pending' && "bg-white/5"
       )}>
         <Icon className={cn(
           "h-5 w-5 transition-all",
           status === 'complete' && "text-green-400",
-          status === 'active' && "text-amber-400 animate-spin",
+          status === 'active' && "text-blue-400 animate-spin",
           status === 'pending' && "text-white/30"
         )} />
       </div>
@@ -458,15 +457,15 @@ function LawStageItem({
         <p className={cn(
           "text-sm font-bold mb-0.5 transition-colors",
           status === 'complete' && 'text-green-300',
-          status === 'active' && 'text-amber-200',
+          status === 'active' && 'text-blue-200',
           status === 'pending' && 'text-white/40'
-        )} style={{ fontFamily: 'Pretendard, sans-serif' }}>
+        )}>
           {label}
         </p>
         <p className={cn(
           "text-xs transition-colors font-mono",
           status === 'complete' && 'text-green-400/60',
-          status === 'active' && 'text-amber-300/70',
+          status === 'active' && 'text-blue-300/70',
           status === 'pending' && 'text-white/20'
         )}>
           {description}
@@ -477,7 +476,7 @@ function LawStageItem({
       <div className={cn(
         "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all",
         status === 'complete' && "bg-green-600/30 text-green-300",
-        status === 'active' && "bg-amber-600/30 text-amber-300",
+        status === 'active' && "bg-blue-600/30 text-blue-300",
         status === 'pending' && "bg-white/5 text-white/30"
       )}>
         {number}
