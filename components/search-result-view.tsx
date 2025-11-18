@@ -22,7 +22,7 @@ import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { RagSearchPanel, type SearchOptions } from "@/components/rag-search-panel"
 import { RagResultCard } from "@/components/rag-result-card"
 import { RagAnswerCard } from "@/components/rag-answer-card"
-import { SearchProgressModern as SearchProgressDialog } from "@/components/search-progress-modern"
+import { ModernProgressBar } from "@/components/ui/modern-progress-bar"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -2010,15 +2010,36 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* 프로그레스 Dialog (SearchResultView 내부) */}
-      <SearchProgressDialog
-        isOpen={isSearching}
-        mode={searchMode === 'rag' ? 'ai' : 'law'}
-        stage={searchStage}
-        progress={searchProgress}
-        lawName={searchQuery}
-        isCacheHit={isCacheHit}
-      />
+      {/* 프로그레스 오버레이 - ModernProgressBar 사용 */}
+      {isSearching && (
+        <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <div className="w-full max-w-md px-6">
+            <ModernProgressBar
+              progress={searchProgress}
+              label={searchMode === 'rag' ? 'AI 검색' : '법령 검색'}
+              statusMessage={
+                searchStage === 'searching' ? 'Gemini 2.5 Flash로 검색 중...' :
+                searchStage === 'parsing' ? '법령 데이터 파싱 중...' :
+                searchStage === 'streaming' ? 'AI 답변 생성 중...' :
+                '검색 완료!'
+              }
+              variant={searchMode === 'rag' ? 'lavender' : 'ocean'}
+              size="lg"
+              animationDuration={800}
+            />
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {searchQuery && `"${searchQuery}" 검색 중...`}
+              </p>
+              {isCacheHit && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  캐시에서 불러오는 중...
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
       <main className="flex-1">
@@ -2219,7 +2240,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               </div>
             </div>
           ) : !lawData ? (
-            // 로딩 화면 제거 - SearchProgressDialog만 사용
+            // 로딩 화면 제거 - ModernProgressBar만 사용
             null
           ) : (
             <div className="space-y-4">

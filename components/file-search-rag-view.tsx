@@ -27,7 +27,6 @@ export function FileSearchRAGView({
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
-  const [progressStage, setProgressStage] = useState(0)
   const [confidenceLevel, setConfidenceLevel] = useState<'high' | 'medium' | 'low'>('high')
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
@@ -36,21 +35,6 @@ export function FileSearchRAGView({
 
   // 프로그레스에 표시할 질의 (ref로 즉시 업데이트)
   const searchingQueryRef = useRef(initialQuery)
-
-  // 선택된 관련 법령 데이터 (Phase 4)
-  const [selectedLawMeta, setSelectedLawMeta] = useState<LawMeta | null>(null)
-  const [selectedLawArticles, setSelectedLawArticles] = useState<LawArticle[]>([])
-  const [selectedJo, setSelectedJo] = useState<string | undefined>(undefined)
-  const [isLoadingLaw, setIsLoadingLaw] = useState(false)
-
-  // 더미 meta/articles (AI 모드에서는 사용 안 함)
-  const dummyMeta: LawMeta = {
-    lawId: '',
-    lawTitle: 'AI 답변',
-    promulgationDate: '',
-    lawType: ''
-  }
-  const dummyArticles: LawArticle[] = []
 
   /**
    * AI 답변 완료 후 관련 법령 추출
@@ -62,19 +46,6 @@ export function FileSearchRAGView({
       debugLogger.success('관련 법령 추출 완료', { count: laws.length })
     }
   }, [analysis, isAnalyzing])
-
-  /**
-   * 프로그레스 단계 자동 전환 (로딩 중일 때만)
-   */
-  useEffect(() => {
-    if (!isAnalyzing) return
-
-    const timer = setInterval(() => {
-      setProgressStage((prev) => (prev + 1) % 4)
-    }, 1500)
-
-    return () => clearInterval(timer)
-  }, [isAnalyzing])
 
   /**
    * File Search RAG 쿼리 실행
@@ -91,7 +62,6 @@ export function FileSearchRAGView({
       setIsAnalyzing(true)
       setAnalysis('')
       setRelatedLaws([])
-      setProgressStage(0)
       setConfidenceLevel('high') // 초기값은 높음으로 가정
 
       // 프로그레스 초기화
