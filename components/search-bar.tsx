@@ -39,26 +39,30 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
-    // 자연어 감지
+    // 우선순위 1: 법령/조례 키워드가 있으면 무조건 법령 검색으로 처리
+    const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query)
+    const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
+    const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
+
+    if (hasLawKeyword || hasOrdinanceKeyword) {
+      setSearchType(isOrdinanceQuery ? "ordinance" : "law")
+      setIsNaturalQuery(false)
+      console.log("[v0] 법령 검색 모드:", { query, hasLawKeyword, hasOrdinanceKeyword, type: isOrdinanceQuery ? "조례" : "법령" })
+      return
+    }
+
+    // 우선순위 2: 법령 키워드가 없을 때만 자연어 감지
     const queryDetection = detectQueryType(query)
     if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
       setSearchType("ai")
       setIsNaturalQuery(true)
       console.log("[v0] AI 검색 모드 감지:", { query, confidence: queryDetection.confidence })
       return
-    } else {
-      setIsNaturalQuery(false)
     }
 
-    // 법령 키워드가 있으면 무조건 법령으로 처리
-    const hasLawKeyword = /법$|령$|법률|시행령|시행규칙/.test(query)
-    // 조례/규칙 키워드가 명시적으로 있는지 확인 (시행령/시행규칙은 제외)
-    const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
-    // 조례 키워드가 있고 법령 키워드가 없으면 조례로 판단
-    const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
-
-    setSearchType(isOrdinanceQuery ? "ordinance" : "law")
-    console.log("[v0] 검색어 타입 감지:", { query, hasLawKeyword, hasOrdinanceKeyword, type: isOrdinanceQuery ? "조례" : "법령" })
+    // 기본값: 법령 검색
+    setSearchType("law")
+    setIsNaturalQuery(false)
   }, [query])
 
   useEffect(() => {

@@ -1,0 +1,34 @@
+{
+  "defaultLanguage": "ko",
+  "codeStyle": {
+    "preferEdit": true,
+    "noEmojis": true,
+    "alwaysValidate": true
+  },
+  "responseGuidelines": {
+    "alwaysKorean": true,
+    "concise": true,
+    "showFileReferences": true
+  },
+  "workflowRules": [
+    "파일 수정 시 항상 Read 먼저 수행",
+    "새 파일 생성보다 기존 파일 수정 우선",
+    "API 응답 파싱 시 형식 확인 (XML vs JSON)",
+    "async 함수를 onClick에 직접 사용 금지",
+    "SSE 스트림 종료 후 남은 buffer 반드시 처리",
+    "조문 설정 전 실제 존재 여부 검증",
+    "상태 업데이트 시 관련된 모든 상태 함께 초기화"
+  ],
+  "commonPatterns": {
+    "xmlParsing": "DOMParser + querySelector",
+    "jsonParsing": "직접 스키마 접근 (no wrapper)",
+    "sseParsing": "buffer 처리 + 루프 종료 후 잔여 처리",
+    "asyncHandlers": ".then()/.catch() 패턴 사용"
+  },
+  "debuggingRules": {
+    "useDebugLogger": true,
+    "logApiCalls": true,
+    "logParsingSteps": true,
+    "verifyBeforeSet": true
+  }
+}

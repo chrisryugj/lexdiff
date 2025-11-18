@@ -970,7 +970,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
-    const isOrdinanceQuery = /조례|규칙|특별시|광역시|도|시|군|구/.test(query.lawName)
+    // 조례 검색 조건: "조례" 키워드가 있거나, "규칙"이 있되 "시행규칙"이 아닌 경우
+    // "시행령", "시행규칙"은 법령이므로 제외
+    const hasOrdinanceKeyword = /조례/.test(query.lawName) || (/규칙/.test(query.lawName) && !/시행규칙/.test(query.lawName))
+    const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query.lawName)
+    const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
     const lawName = query.lawName
     const articleNumber = query.article
     const jo = query.jo
@@ -2157,29 +2161,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               </div>
             </div>
           ) : !lawData ? (
-            // 로딩 화면 - 프로그레스 다이얼로그가 있을 때는 숨김
-            !isSearching ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-6">
-                {/* 로딩 애니메이션 */}
-                <div className="relative">
-                  <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                  <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-r-accent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-                </div>
-
-                {/* 로딩 텍스트 */}
-                <div className="text-center space-y-2" style={{ fontFamily: "Pretendard, sans-serif" }}>
-                  <p className="text-lg font-semibold text-foreground">검색 데이터를 불러오는 중</p>
-                  <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
-                </div>
-
-                {/* 애니메이션 도트 */}
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            ) : null
+            // 로딩 화면 제거 - SearchProgressDialog만 사용
+            null
           ) : (
             <div className="space-y-4">
               <div className="md:hidden">
