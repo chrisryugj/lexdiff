@@ -378,12 +378,15 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     const joSet = new Set(initialFavs.map((f) => f.jo))
     setFavorites(joSet)
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   // searchId로부터 데이터 복원 (History 이동 시 캐시 활용)
   useEffect(() => {
     let isSubscribed = true
+    let abortController: AbortController | null = null
 
     const loadSearchResult = async () => {
       try {
@@ -451,11 +454,14 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           // lawData가 없으면 검색 실행
           debugLogger.info('📡 lawData 없음 - 검색 시작', cached.query)
 
+          // AbortController 생성
+          abortController = new AbortController()
+
           // 검색 실행 (비동기)
           setIsSearching(true)
           updateProgress('searching', 20)
           // ✅ await 추가 - 검색이 완료될 때까지 대기
-          await handleSearchInternal(cached.query)
+          await handleSearchInternal(cached.query, abortController.signal)
         }
       } catch (error) {
         if (!isSubscribed) return
@@ -469,6 +475,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     return () => {
       isSubscribed = false
+      // 컴포넌트 언마운트 또는 searchId 변경 시 진행 중인 요청 취소
+      if (abortController) {
+        debugLogger.info('🚫 검색 취소 (페이지 이동)', { searchId })
+        abortController.abort()
+      }
     }
   }, [searchId])
 
@@ -779,7 +790,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
   }
 
-  const handleSearchInternal = async (query: { lawName: string; article?: string; jo?: string }) => {
+  const handleSearchInternal = async (query: { lawName: string; article?: string; jo?: string }, signal?: AbortSignal) => {
     // 🔥 CRITICAL: 검색 쿼리 즉시 업데이트 (프로그레스바 표시용)
     const fullQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
     setSearchQuery(fullQuery)
@@ -790,7 +801,19 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     onModeChange?.('basic')
 
     // 🤖 자동 자연어 검색 감지
-    const queryDetection = detectQueryType(fullQuery)
+    // 우선순위 1: 법령/조례 키워드가 있으면 무조건 법령 검색으로 처리 (SearchBar와 동일 로직)
+    const hasLawKeyword = /법|법률|시행령|시행규칙/.test(fullQuery)
+    const hasOrdinanceKeyword = /조례|자치법규/.test(fullQuery) || (/규칙/.test(fullQuery) && !/시행규칙/.test(fullQuery))
+
+    let queryDetection = detectQueryType(fullQuery)
+
+    if (hasLawKeyword || hasOrdinanceKeyword) {
+      queryDetection = {
+        type: 'structured',
+        confidence: 1.0,
+        reason: '법령/조례 키워드 포함 (강제 구조화)'
+      }
+    }
 
     debugLogger.info('🔍 검색 타입 감지', {
       query: fullQuery,
@@ -819,11 +842,24 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       try {
         updateProgress('parsing', 40)
 
+        // 🚫 AbortSignal 체크
+        if (signal?.aborted) {
+          debugLogger.info('🚫 AI 검색 취소됨 (fetch 전)')
+          return
+        }
+
         const response = await fetch('/api/file-search-rag', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: fullQuery })
+          body: JSON.stringify({ query: fullQuery }),
+          signal // AbortSignal 전달
         })
+
+        // 🚫 AbortSignal 체크
+        if (signal?.aborted) {
+          debugLogger.info('🚫 AI 검색 취소됨 (fetch 후)')
+          return
+        }
 
         if (!response.ok) {
           throw new Error('File Search API 호출 실패')
@@ -846,6 +882,13 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
         // ✅ 스트리밍 중에는 UI 업데이트 하지 않음 - 모두 수집만 함
         while (true) {
+          // 🚫 AbortSignal 체크
+          if (signal?.aborted) {
+            debugLogger.info('🚫 AI 검색 취소됨 (스트리밍 중)')
+            reader.cancel()
+            return
+          }
+
           const { done, value } = await reader.read()
           if (done) break
 
@@ -883,12 +926,18 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           }
         }
 
+        // 🚫 최종 AbortSignal 체크
+        if (signal?.aborted) {
+          debugLogger.info('🚫 AI 검색 취소됨 (완료 직전)')
+          return
+        }
+
         // ✅ 스트리밍 완료 후 한번에 처리
         const processedContent = fullContent.replace(/\^/g, ' ')
 
         // 검색 실패 감지 (프롬프트에서 정의한 실패 메시지 패턴)
         const searchFailed = processedContent.includes('File Search Store에서') &&
-                            processedContent.includes('찾을 수 없습니다')
+          processedContent.includes('찾을 수 없습니다')
         setFileSearchFailed(searchFailed)
 
         if (searchFailed) {
@@ -924,7 +973,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             lawTitle: 'AI 답변',
             promulgationDate: new Date().toISOString().split('T')[0],
             lawType: 'AI',
-            isOrdinance: false
+            isOrdinance: false,
+            fetchedAt: new Date().toISOString()
           },
           articles: [], // AI 모드에서는 조문 목록 대신 관련 법령 표시
           selectedJo: undefined,
@@ -939,6 +989,15 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         setIsSearching(false)
 
       } catch (error) {
+        // AbortError는 정상적인 취소이므로 에러 메시지 표시 안 함
+        if (error instanceof Error && error.name === 'AbortError') {
+          debugLogger.info('🚫 AI 검색이 사용자에 의해 취소되었습니다')
+          setIsSearching(false)
+          updateProgress('complete', 0)
+          setIsAiMode(false)
+          return
+        }
+
         debugLogger.error('❌ File Search API 오류', error)
         setIsSearching(false)
         updateProgress('complete', 0)
@@ -972,8 +1031,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     // 조례 검색 조건: "조례" 키워드가 있거나, "규칙"이 있되 "시행규칙"이 아닌 경우
     // "시행령", "시행규칙"은 법령이므로 제외
-    const hasOrdinanceKeyword = /조례/.test(query.lawName) || (/규칙/.test(query.lawName) && !/시행규칙/.test(query.lawName))
-    const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query.lawName)
+    // (위에서 이미 선언됨)
     const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
     const lawName = query.lawName
     const articleNumber = query.article
@@ -1222,7 +1280,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
     ===== Phase 5 비활성화 끝 ===== */
 
-    // Phase 5 건너뛰고 바로 기본 검색으로 진행
+      // Phase 5 건너뛰고 바로 기본 검색으로 진행
     } // Phase 7 종료
 
     // === 기본 검색 시작 ===

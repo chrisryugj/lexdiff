@@ -43,25 +43,25 @@ export function detectQueryType(query: string): QueryDetectionResult {
 
   // 1-1: "법령명 + 조번호"만 있는 경우 → 구조화 검색 (예: "관세법 38조")
   if (hasArticleNumber) {
-    const lengthAfterArticle = trimmedQuery.replace(articlePattern, '').trim().length
+    // 조문 번호 제외한 나머지 텍스트 길이 체크
+    // 법령명이 길 수 있으므로, 단순히 길이만으로 판단하면 안됨 ("도로법 시행령 55조" 등)
 
-    // 조문 번호 뒤에 추가 텍스트가 거의 없으면 구조화 검색
-    if (lengthAfterArticle <= 5) {
+    // 질문형 종결어미나 의문사가 없으면 구조화 검색으로 간주
+    const isQuestion = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘$/.test(trimmedQuery) || /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느)/.test(trimmedQuery) || /에\s*대해/.test(trimmedQuery)
+
+    if (!isQuestion) {
       return {
         type: 'structured',
         confidence: 0.98,
-        reason: '조문 번호만 포함 (추가 질문 없음)'
+        reason: '조문 번호 포함 (질문 패턴 없음)'
       }
     }
 
-    // 조문 번호 + 긴 질문이 있으면 자연어로 간주
-    // 예: "관세법 38조에 대해 알려줘" (뒤에 10글자 추가)
-    if (lengthAfterArticle > 5) {
-      return {
-        type: 'natural',
-        confidence: 0.9,
-        reason: '조문 번호 + 자연어 질문 혼합'
-      }
+    // 질문 패턴이 있으면 자연어로
+    return {
+      type: 'natural',
+      confidence: 0.9,
+      reason: '조문 번호 + 자연어 질문 혼합'
     }
   }
 

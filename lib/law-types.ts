@@ -153,3 +153,10 @@ export interface ThreeTierData {
   articles: ThreeTierArticle[]
   kndType: "인용조문" | "위임조문"
 }
+
+// Law Data (Full content)
+export interface LawData {
+  meta: LawMeta
+  articles: LawArticle[]
+  articleCount?: number
+}
