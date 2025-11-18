@@ -12,7 +12,7 @@ import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
-import { SearchProgressModern as SearchProgressDialog } from './search-progress-modern'
+import { ModernProgressBar } from '@/components/ui/modern-progress-bar'
 
 
 export function FileSearchRAGView({
@@ -32,6 +32,7 @@ export function FileSearchRAGView({
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
   const [currentQuery, setCurrentQuery] = useState(initialQuery) // 현재 검색 중인 질의
+  const [progressMessage, setProgressMessage] = useState('') // 프로그래스바 메시지
 
   // 프로그레스에 표시할 질의 (ref로 즉시 업데이트)
   const searchingQueryRef = useRef(initialQuery)
@@ -96,6 +97,7 @@ export function FileSearchRAGView({
       // 프로그레스 초기화
       setSearchStage('searching')
       setSearchProgress(10)
+      setProgressMessage('Gemini 2.5 Flash로 검색 중...')
 
       const response = await fetch('/api/file-search-rag', {
         method: 'POST',
@@ -110,6 +112,7 @@ export function FileSearchRAGView({
       // 검색 완료 → 파싱 단계
       setSearchStage('parsing')
       setSearchProgress(30)
+      setProgressMessage('법령 데이터 파싱 중...')
 
       // SSE 스트리밍 읽기
       const reader = response.body?.getReader()
@@ -122,6 +125,7 @@ export function FileSearchRAGView({
       // 스트리밍 시작
       setSearchStage('streaming')
       setSearchProgress(50)
+      setProgressMessage('AI 답변 생성 중...')
 
       let buffer = ''
       let streamChunkCount = 0
@@ -215,6 +219,7 @@ export function FileSearchRAGView({
       // 완료 - 프로그레스 완료 표시 후 딜레이
       setSearchStage('complete')
       setSearchProgress(100)
+      setProgressMessage('검색 완료!')
 
       // 완료 상태 표시 후 프로그레스 닫기
       setTimeout(() => {
@@ -358,14 +363,26 @@ export function FileSearchRAGView({
 
   return (
     <div className="flex flex-col h-full relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
-      {/* 프로그레스 Dialog */}
-      <SearchProgressDialog
-        isOpen={isAnalyzing}
-        mode="ai"
-        stage={searchStage}
-        progress={searchProgress}
-        lawName={currentQuery}
-      />
+      {/* 프로그레스 오버레이 - ModernProgressBar 사용 */}
+      {isAnalyzing && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="w-full max-w-md px-6">
+            <ModernProgressBar
+              progress={searchProgress}
+              label="AI 검색"
+              statusMessage={progressMessage}
+              variant="lavender"
+              size="lg"
+              animationDuration={800}
+            />
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {currentQuery && `"${currentQuery}" 검색 중...`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* Error State */}
