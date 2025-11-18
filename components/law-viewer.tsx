@@ -1394,17 +1394,17 @@ export function LawViewer({
                     </Badge>
                     {excerptOnlyCount > 0 && (
                       <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
-                        📜 발췌 {excerptOnlyCount}
+                        ⚖️ 발췌 {excerptOnlyCount}
                       </Badge>
                     )}
                     {relatedOnlyCount > 0 && (
                       <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
-                        📖 관련 {relatedOnlyCount}
+                        🔗 관련 {relatedOnlyCount}
                       </Badge>
                     )}
                     {bothCount > 0 && (
                       <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
-                        📜📖 둘 다 {bothCount}
+                        ⚖️🔗 둘 다 {bothCount}
                       </Badge>
                     )}
                   </div>
@@ -1469,10 +1469,10 @@ export function LawViewer({
                             {/* 출처 아이콘 (중복 시 여러 개 표시) */}
                             <div className="flex items-center gap-1 shrink-0">
                               {sources.has('excerpt') && (
-                                <span className="text-xs" title="발췌조문">📜</span>
+                                <span className="text-xs" title="발췌조문">⚖️</span>
                               )}
                               {sources.has('related') && (
-                                <span className="text-xs" title="관련법령">📖</span>
+                                <span className="text-xs" title="관련법령">🔗</span>
                               )}
                             </div>
                           </div>
