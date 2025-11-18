@@ -346,6 +346,7 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
 
   // 패턴 1: 조문 발췌 헤더 (볼드 + 이모지)
   // 예: **📜 관세법 제38조 (신고납부)**
+  // 주의: "⚖️ 조문 발췌"는 섹션 제목이고, 실제 법령은 📜로 시작
   const headerPattern = /\*\*📜\s*([^*]+?)\*\*/g
   let match
 
@@ -367,8 +368,8 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
   if (sectionMatch) {
     const section = sectionMatch[1]
 
-    // 리스트 아이템 파싱: - 법령명 제N조 (제목)
-    const listPattern = /-\s*([^\n]+)/g
+    // 리스트 아이템 파싱: - 📜 법령명 제N조 (제목)
+    const listPattern = /-\s*📜?\s*([^\n]+)/g
     let listMatch
 
     while ((listMatch = listPattern.exec(section)) !== null) {
