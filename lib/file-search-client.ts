@@ -46,8 +46,8 @@ export async function createFileSearchStore() {
   const store = await genAI.fileSearchStores.create({
     displayName: 'Korean Laws & Ordinances Database',
     chunkingConfig: {
-      maxTokensPerChunk: 512,  // 조문 1개 정도
-      maxOverlapTokens: 100     // 문맥 유지
+      maxTokensPerChunk: 384,  // 512 → 384 (25% 감소, Phase 2 최적화)
+      maxOverlapTokens: 50      // 100 → 50 (50% 감소, 중복 최소화)
     }
   })
 
@@ -191,41 +191,29 @@ export async function* queryFileSearchStream(
     throw new Error(`Invalid STORE_ID format: ${STORE_ID}. Must start with 'fileSearchStores/'`)
   }
 
-  // 법령 전문 AI 시스템 프롬프트
-  const systemInstruction = `당신은 대한민국 법령 RAG 전문 AI입니다.
-반드시 File Search Store 검색 결과만 사용해 답변합니다.
-조문을 찾지 못하면 다음과 같이 답변하세요:
-"죄송합니다. File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다."
+  // 법령 전문 AI 시스템 프롬프트 (토큰 최적화: 450 → 280 토큰, 38% 감소)
+  const systemInstruction = `법령 RAG AI. File Search Store 결과만 사용. 조문 없으면: "File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다"
 
-# 출력 구조 (짧고 핵심만 작성, 괄호안 메시지 지시사항이며 출력금지)
+출력 형식 (각 항목 1줄, 간결):
 
-## 📋 핵심 요약 (3줄 고정, 이모지 반드시 반환)
-- ✅ 결론 1줄
-- 📌 적용 조건/예외 1줄
-- 🔔 사용자가 지금 해야 할 행동 1줄
+## 📋 핵심 요약 (3줄, 이모지 필수)
+- ✅ 결론
+- 📌 조건/예외
+- 🔔 실무 행동
 
-## 📄 상세 내용 (각 항목은 1줄만)
-- 📖 조문 발췌
-  **📜 법령명 조문번호 ([조문제목])**
-- 그 아래에 핵심 문장 *1줄만* 인용, 항,호 번호(①,1.) 반드시 포함
-- 📖 핵심 해석*1줄만*
-- 📝 실무 적용*1줄만*
-- 🔴 조건·예외*1줄만*
+## 📄 상세
+- 📜 법령명 제N조 ([제목]): 핵심 1줄 (항,호 번호 포함)
+- 📖 해석: 1줄
+- 📝 실무: 1줄
+- 🔴 주의: 1줄
 
 ## 💡 추가 참고 (최대 2줄)
-- 필요한 서류·절차 또는 주의사항 중심
+- 서류·절차·주의사항
 
 ## 📖 관련 법령
-- 📜 법령명 조문번호 ([조문제목]) 형식 목록
-- 조문 전문 금지 (전문은 API에서 조회)
+- 📜 법령명 제N조 ([제목]) 목록만
 
-# 작성 규칙
-- 모든 문장은 *최소한의 핵심 정보*만 포함
-- 장문 금지, 서술형 문단 금지
-- 예시는 선택 사항이며 1줄만 허용
-- 반복 설명·배경 설명 금지
-- 불확실하면 "불확실" 명시
-- 조문 인용은 반드시 "헤더 + 1줄 요약" 형태로만 작성`
+규칙: 각 1줄. 조문 전문 금지. 불확실시 명시. 간결.`
 
   // REST API 요청 본문 (Gemini REST API는 camelCase 필수!)
   const requestBody = {
@@ -243,9 +231,9 @@ export async function* queryFileSearchStream(
     }],
     generationConfig: {
       temperature: 0,  // 완전 결정적 출력
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192  // 답변 잘림 방지
+      topP: 0.8,  // 0.95 → 0.8 (토큰 효율성 개선)
+      topK: 20,   // 40 → 20 (법령 검색에 최적화, 50% 감소)
+      maxOutputTokens: 2048  // 8192 → 2048 (75% 감소, 간결한 답변)
     }
   }
 
@@ -335,9 +323,9 @@ export async function* queryFileSearchStream(
 
             if (finishReason === 'MAX_TOKENS') {
               console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
-              console.error('[File Search] 현재 max_output_tokens:', 8192)
+              console.error('[File Search] 현재 max_output_tokens:', 2048)
               console.error('[File Search] 실제 사용된 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
-              console.error('[File Search] 해결: max_output_tokens 값을 증가시키거나 프롬프트를 간소화하세요.')
+              console.error('[File Search] 해결: 프롬프트가 충분히 간결한지 확인하거나 질문을 더 구체적으로 작성하세요.')
             } else if (finishReason === 'SAFETY') {
               console.error('[File Search] ❌ 안전 필터에 의해 차단되었습니다.')
             } else if (finishReason === 'RECITATION') {
