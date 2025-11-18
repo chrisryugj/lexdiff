@@ -72,6 +72,8 @@ export default function Home() {
         debugLogger.info('⬅️ History 이동 (초기 상태 → 홈)', { state })
         setViewMode('home')
         setSearchId(null)
+        setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
+        setIsSearching(false) // 검색 중 상태 초기화
         return
       }
 
@@ -83,6 +85,8 @@ export default function Home() {
       if (state.viewMode === 'home') {
         setViewMode('home')
         setSearchId(null)
+        setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
+        setIsSearching(false) // 검색 중 상태 초기화
       } else if (state.viewMode === 'search-result' && state.searchId) {
         setViewMode('search-result')
         setSearchId(state.searchId)
