@@ -223,7 +223,7 @@ function styleMainSectionHeadings(text: string): string {
     const regex = new RegExp(`^(${escaped})$`, 'gm')
     result = result.replace(
       regex,
-      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border)); font-size: inherit;">$1</div>`
+      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border)); font-size: 1.05rem;">$1</div>`
     )
   })
 

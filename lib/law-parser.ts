@@ -360,8 +360,8 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
   debugLogger.info('발췌조문 헤더 추출', { count: laws.length })
 
   // 패턴 2: 관련 법령 섹션의 리스트
-  // "## 📖 관련 법령" 섹션 찾기
-  const relatedSectionPattern = /## 📖 관련\s*법령([\s\S]*?)(?=##|$)/
+  // "## 🔗 관련 법령" 섹션 찾기 (📖 → 🔗 변경됨)
+  const relatedSectionPattern = /## 🔗 관련\s*법령([\s\S]*?)(?=##|$)/
   const sectionMatch = markdown.match(relatedSectionPattern)
 
   if (sectionMatch) {
