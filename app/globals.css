@@ -223,10 +223,11 @@
   }
 
   a.law-ref:hover {
-    color: oklch(0.75 0.22 250);
-    background-size: 100% 1.5px;
-    background-color: oklch(0.65 0.2 250 / 0.08);
-    box-shadow: 0 1px 4px oklch(0.65 0.2 250 / 0.3);
+    color: oklch(0.8 0.25 250);
+    background-size: 100% 2px;
+    background-color: oklch(0.65 0.2 250 / 0.15);
+    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
+    transform: translateY(-1px);
   }
 
   .prose a.law-ref {
@@ -244,10 +245,11 @@
   }
 
   .prose a.law-ref:hover {
-    color: oklch(0.75 0.22 250);
-    background-size: 100% 1.5px;
-    background-color: oklch(0.65 0.2 250 / 0.08);
-    box-shadow: 0 1px 4px oklch(0.65 0.2 250 / 0.3);
+    color: oklch(0.8 0.25 250);
+    background-size: 100% 2px;
+    background-color: oklch(0.65 0.2 250 / 0.15);
+    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
+    transform: translateY(-1px);
   }
 
   a.law-html-link,
