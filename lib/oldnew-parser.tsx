@@ -2,12 +2,10 @@ import type { OldNewComparison } from "./law-types"
 import { debugLogger } from "./debug-logger"
 
 export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewComparison {
-  debugLogger.info("신·구법 XML 파싱 시작", { xmlLength: xmlText.length, targetJo })
 
   const parser = new DOMParser()
   const xmlDoc = parser.parseFromString(xmlText, "text/xml")
 
-  console.log("[v0] [DEBUG] XML 샘플 (첫 1000자):", xmlText.substring(0, 1000))
 
   let targetMain: number | null = null
   let targetSub: number | null = null
@@ -20,16 +18,16 @@ export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewCompar
 
   // Extract old version metadata
   const oldInfo = xmlDoc.querySelector("구조문_기본정보")
-  console.log("[v0] [DEBUG] 구조문_기본정보 존재:", !!oldInfo)
+  console.log("[DEBUG] 구조문_기본정보 존재:", !!oldInfo)
   if (oldInfo) {
-    console.log("[v0] [DEBUG] 구조문_기본정보 내용:", oldInfo.outerHTML?.substring(0, 500))
+    console.log("[DEBUG] 구조문_기본정보 내용:", oldInfo.outerHTML?.substring(0, 500))
   }
 
   const oldEffectiveDate = oldInfo?.querySelector("시행일자")?.textContent || undefined
   const oldPromulgationDate = oldInfo?.querySelector("공포일자")?.textContent || undefined
   const oldPromulgationNumber = oldInfo?.querySelector("공포번호")?.textContent || undefined
 
-  console.log("[v0] [DEBUG] 구법 메타데이터:", {
+  console.log("[DEBUG] 구법 메타데이터:", {
     effectiveDate: oldEffectiveDate,
     promulgationDate: oldPromulgationDate,
     promulgationNumber: oldPromulgationNumber,
@@ -37,7 +35,7 @@ export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewCompar
 
   // Extract new version metadata
   const newInfo = xmlDoc.querySelector("신조문_기본정보")
-  console.log("[v0] [DEBUG] 신조문_기본정보 존재:", !!newInfo)
+  console.log("[DEBUG] 신조문_기본정보 존재:", !!newInfo)
 
   const newEffectiveDate = newInfo?.querySelector("시행일자")?.textContent || undefined
   const newPromulgationDate = newInfo?.querySelector("공포일자")?.textContent || undefined
@@ -49,7 +47,7 @@ export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewCompar
     newInfo?.querySelector("법령명")?.textContent || oldInfo?.querySelector("법령명")?.textContent || "알 수 없는 법령"
   const mst = lawTitle
 
-  console.log("[v0] [DEBUG] 신법 메타데이터:", {
+  console.log("[DEBUG] 신법 메타데이터:", {
     effectiveDate: newEffectiveDate,
     promulgationDate: newPromulgationDate,
     promulgationNumber: newPromulgationNumber,
@@ -131,7 +129,6 @@ export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewCompar
   const newPTags = (newContent.match(/<P>/g) || []).length
   const changeCount = Math.max(oldPTags, newPTags)
 
-  debugLogger.success("신·구법 XML 파싱 완료", { changeCount })
 
   return {
     oldVersion: {
@@ -166,7 +163,7 @@ export function highlightDifferences(
   oldContent: string,
   newContent: string,
 ): { oldHighlighted: string; newHighlighted: string } {
-  console.log("[v0] Highlighting differences...")
+  console.log("Highlighting differences...")
 
   let oldHighlighted = oldContent
     .replace(
@@ -198,7 +195,7 @@ export function highlightDifferences(
   oldHighlighted = oldHighlighted.replace(/\n/g, "<br>")
   newHighlighted = newHighlighted.replace(/\n/g, "<br>")
 
-  console.log("[v0] Highlighting complete")
+  console.log("Highlighting complete")
 
   return { oldHighlighted, newHighlighted }
 }

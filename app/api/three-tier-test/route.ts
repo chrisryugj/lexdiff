@@ -46,7 +46,6 @@ export async function GET(request: Request) {
 
     console.log("[3단비교 테스트] 응답 상태:", response.status)
     console.log("[3단비교 테스트] 응답 길이:", text.length, "바이트")
-    console.log("[3단비교 테스트] 응답 샘플 (처음 500자):")
     console.log(text.substring(0, 500))
 
     if (!response.ok) {
@@ -65,25 +64,20 @@ export async function GET(request: Request) {
         console.log("[3단비교 테스트] 인용조문 파서 실행 중...")
         parsedData = parseThreeTierCitation(jsonData)
       } else {
-        console.log("[3단비교 테스트] 위임조문 파서 실행 중...")
         parsedData = parseThreeTierDelegation(jsonData)
       }
 
-      console.log("[3단비교 테스트] 파싱 완료:")
       console.log("  - 법령명:", parsedData.meta.lawName)
       console.log("  - 전체 조문 수:", parsedData.articles.length)
-      console.log("  - 위임조문이 있는 조문 수:", parsedData.articles.filter((a) => a.delegations.length > 0).length)
 
       // 샘플 조문 출력
       if (parsedData.articles.length > 0) {
         const sampleArticle = parsedData.articles.find((a) => a.delegations.length > 0)
         if (sampleArticle) {
-          console.log("[3단비교 테스트] 샘플 조문 (위임조문 보유):")
           console.log("  - JO:", sampleArticle.jo)
           console.log("  - 조문:", sampleArticle.joNum)
           console.log("  - 제목:", sampleArticle.title)
           console.log("  - 내용:", sampleArticle.content.substring(0, 100) + "...")
-          console.log("  - 위임조문 개수:", sampleArticle.delegations.length)
           sampleArticle.delegations.forEach((del, idx) => {
             console.log(`    [${idx + 1}] ${del.type}: ${del.joNum || "조번호없음"} - ${del.title || "제목없음"}`)
           })

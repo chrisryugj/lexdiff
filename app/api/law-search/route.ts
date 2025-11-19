@@ -38,15 +38,14 @@ export async function GET(request: Request) {
       aliasMatched: aliasResolution.matchedAlias,
       url,
     })
-    console.log("[v0] Law search URL:", url)
+    console.log("Law search URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[v0] Law search response status:", response.status)
-    console.log("[v0] Law search response (first 500 chars):", text.substring(0, 500))
+    console.log("Law search response status:", response.status)
 
     if (!response.ok) {
       debugLogger.error("법령 검색 API 오류", { status: response.status, body: text.substring(0, 200) })
@@ -62,7 +61,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] Law search error:", error)
+    console.log("Law search error:", error)
     debugLogger.error("법령 검색 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

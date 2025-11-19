@@ -47,7 +47,6 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
   }
 
   const formatDateTime = (isoString: string) => {
-    console.log("[v0] [즐겨찾기] 날짜 포맷팅:", isoString)
     const date = new Date(isoString)
     const formatted = date.toLocaleString("ko-KR", {
       year: "numeric",
@@ -57,7 +56,6 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
       minute: "2-digit",
       hour12: false,
     })
-    console.log("[v0] [즐겨찾기] 포맷팅 결과:", formatted)
     return formatted
   }
 

@@ -10,8 +10,7 @@ export interface RevisionInfo {
 }
 
 export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
-  debugLogger.info("조문 개정이력 XML 파싱 시작", { xmlLength: xmlText.length })
-  console.log("[v0] Received revision history XML, length:", xmlText.length)
+  console.log("Received revision history XML, length:", xmlText.length)
 
   try {
     const parser = new DOMParser()
@@ -19,27 +18,25 @@ export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
 
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("[v0] XML parsing error:", parserError.textContent)
+      console.log("XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
-    console.log("[v0] XML root element:", xmlDoc.documentElement.tagName)
-    console.log("[v0] XML sample (first 1000 chars):", xmlText.substring(0, 1000))
+    console.log("XML root element:", xmlDoc.documentElement.tagName)
 
     const history: RevisionHistoryItem[] = []
 
     const lawElements = xmlDoc.querySelectorAll("law")
-    console.log("[v0] Found law elements:", lawElements.length)
 
     if (lawElements.length === 0) {
-      console.log("[v0] No <law> elements found, trying alternative selectors")
+      console.log("No <law> elements found, trying alternative selectors")
       return []
     }
 
     lawElements.forEach((law, index) => {
       const lawInfo = law.querySelector("법령정보")
       if (!lawInfo) {
-        console.log(`[v0] No 법령정보 found in law element ${index}`)
+        console.log(`No 법령정보 found in law element ${index}`)
         return
       }
 
@@ -54,7 +51,7 @@ export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
       const articleLink = articleLinkRaw ? `https://www.law.go.kr${articleLinkRaw}` : ""
 
       if (index < 3) {
-        console.log(`[v0] Parsed revision ${index + 1}:`, {
+        console.log(`Parsed revision ${index + 1}:`, {
           promulgationDate,
           promulgationNumber,
           revisionType,
@@ -81,22 +78,19 @@ export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
       }
     })
 
-    console.log("[v0] Parsed revision history:", history.length, "items")
     if (history.length > 0) {
-      console.log("[v0] First 3 revisions:", history.slice(0, 3))
+      console.log("First 3 revisions:", history.slice(0, 3))
     }
 
-    debugLogger.success("조문 개정이력 파싱 완료", { count: history.length })
     return history
   } catch (error) {
-    console.log("[v0] Revision parsing error:", error)
+    console.log("Revision parsing error:", error)
     debugLogger.error("조문 개정이력 파싱 실패", error)
     return []
   }
 }
 
 export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
-  debugLogger.info("개정이력 XML 파싱 시작", { xmlLength: xmlText.length })
 
   try {
     const parser = new DOMParser()
@@ -107,15 +101,13 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
       throw new Error("XML 파싱 오류")
     }
 
-    console.log("[v0] [개정이력] XML root element:", xmlDoc.documentElement.tagName)
-    console.log("[v0] [개정이력] XML sample (first 2000 chars):", xmlText.substring(0, 2000))
+    console.log("[개정이력] XML root element:", xmlDoc.documentElement.tagName)
 
     const allElements = xmlDoc.getElementsByTagName("*")
     const elementNames = new Set<string>()
     for (let i = 0; i < Math.min(allElements.length, 100); i++) {
       elementNames.add(allElements[i].tagName)
     }
-    console.log("[v0] [개정이력] Available XML elements:", Array.from(elementNames).join(", "))
 
     const revisions: RevisionInfo[] = []
 
@@ -140,7 +132,7 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
     for (const selector of selectors) {
       const elements = xmlDoc.querySelectorAll(selector)
       if (elements.length > 0) {
-        console.log(`[v0] [개정이력] Found ${elements.length} entries using selector: "${selector}"`)
+        console.log(`[개정이력] Found ${elements.length} entries using selector: "${selector}"`)
         lawElements = elements
         usedSelector = selector
         break
@@ -148,11 +140,11 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
     }
 
     if (!lawElements || lawElements.length === 0) {
-      console.log("[v0] [개정이력] No revision entries found with any selector")
+      console.log("[개정이력] No revision entries found with any selector")
       return []
     }
 
-    console.log(`[v0] [개정이력] Using selector "${usedSelector}" - found ${lawElements.length} entries`)
+    console.log(`[개정이력] Using selector "${usedSelector}" - found ${lawElements.length} entries`)
 
     lawElements.forEach((law, index) => {
       if (index < 3) {
@@ -206,7 +198,7 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
         ""
 
       if (index < 3) {
-        console.log(`[v0] [개정이력] Parsed revision ${index + 1}:`, {
+        console.log(`[개정이력] Parsed revision ${index + 1}:`, {
           promulgationDate,
           promulgationNumber,
           revisionType,
@@ -226,7 +218,7 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
       }
     })
 
-    console.log("[v0] [개정이력] Total revisions parsed:", revisions.length)
+    console.log("[개정이력] Total revisions parsed:", revisions.length)
     if (revisions.length > 0) {
       console.log(
         "[v0] [개정이력] First 5 revisions:",
@@ -237,10 +229,9 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
       )
     }
 
-    debugLogger.success("개정이력 파싱 완료", { count: revisions.length })
     return revisions
   } catch (error) {
-    console.log("[v0] [개정이력] Revision parsing error:", error)
+    console.log("[개정이력] Revision parsing error:", error)
     debugLogger.error("개정이력 파싱 실패", error)
     return []
   }

@@ -15,7 +15,6 @@ export interface OrdinanceSearchResult {
 
 export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[] {
   try {
-    console.log("[v0] Parsing ordinance search XML, length:", xmlText.length)
 
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(xmlText, "text/xml")
@@ -23,12 +22,12 @@ export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[
     // Check for parsing errors
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("[v0] XML parsing error:", parserError.textContent)
+      console.log("XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
     const ordinances = xmlDoc.querySelectorAll("law")
-    console.log("[v0] Found ordinances:", ordinances.length)
+    console.log("Found ordinances:", ordinances.length)
 
     const results: OrdinanceSearchResult[] = []
 
@@ -57,14 +56,12 @@ export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[
           effectiveDate,
           ordinField,
         })
-        console.log("[v0] Parsed ordinance:", { ordinSeq, ordinName, ordinKind, orgName })
       }
     })
 
-    debugLogger.info("자치법규 검색 결과 파싱 완료", { count: results.length })
     return results
   } catch (error) {
-    console.log("[v0] Ordinance search parsing error:", error)
+    console.log("Ordinance search parsing error:", error)
     debugLogger.error("자치법규 검색 결과 파싱 실패", error)
     return []
   }

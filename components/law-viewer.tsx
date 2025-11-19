@@ -97,7 +97,7 @@ export function LawViewer({
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
 
-  console.log("[v0] LawViewer 렌더링:", {
+  console.log("LawViewer 렌더링:", {
     lawTitle: meta.lawTitle,
     articleCount: articles.length,
     selectedJo,
@@ -165,14 +165,11 @@ export function LawViewer({
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
-    console.log("[v0] Updating loadedArticles from props.articles:", actualArticles.length)
     setLoadedArticles(actualArticles)
   }, [articles])
 
   // Log when loadedArticles changes
   useEffect(() => {
-    console.log("[v0] loadedArticles updated:", loadedArticles.length, "articles")
-    console.log("[v0] Current activeJo:", activeJo)
   }, [loadedArticles, activeJo])
 
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
@@ -222,11 +219,10 @@ export function LawViewer({
   const tierItems = threeTierDataType === "delegation" ? validDelegations : validCitations
 
   useEffect(() => {
-    console.log("[v0] activeArticle changed:", activeArticle?.jo, activeArticle?.title)
   }, [activeArticle])
 
   useEffect(() => {
-    console.log("[v0] [개정이력] Active article revision history:", {
+    console.log("[개정이력] Active article revision history:", {
       jo: activeArticle?.jo,
       title: activeArticle?.title,
       hasRevisionHistory: !!activeArticle?.revisionHistory,
@@ -236,12 +232,11 @@ export function LawViewer({
   }, [activeArticle])
 
   useEffect(() => {
-    console.log("[v0] LawViewer useEffect 실행:", { selectedJo, activeJo, isOrdinance, viewMode, isFullView })
 
     // Only update activeJo if selectedJo is different from current activeJo
     // This prevents overriding user clicks from the sidebar
     if (selectedJo && selectedJo !== activeJo) {
-      console.log("[v0] selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
+      console.log("selectedJo 변경 감지 - activeJo 업데이트:", selectedJo)
       setActiveJo(selectedJo)
 
       // Reset admin rules when changing articles to prevent unnecessary searches
@@ -253,7 +248,6 @@ export function LawViewer({
       setTierViewMode("1-tier")
 
       if (!isFullView && contentRef.current) {
-        console.log("[v0] 단일 조문 모드 - 스크롤 최상단 이동")
         setTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
@@ -275,7 +269,7 @@ export function LawViewer({
         jo: jo,
       })
 
-      console.log("[v0] Fetching revision history for article:", { lawId: meta.lawId, jo })
+      console.log("Fetching revision history for article:", { lawId: meta.lawId, jo })
       const response = await fetch(`/api/article-history?${params.toString()}`)
 
       if (!response.ok) {
@@ -292,10 +286,9 @@ export function LawViewer({
       }
 
       const xmlText = await response.text()
-      console.log("[v0] Received revision history XML, length:", xmlText.length)
+      console.log("Received revision history XML, length:", xmlText.length)
 
       const history = parseArticleHistoryXML(xmlText)
-      console.log("[v0] Parsed revision history:", history.length, "items")
 
       setRevisionHistory(history)
     } catch (error) {
@@ -307,7 +300,7 @@ export function LawViewer({
   }
 
   useEffect(() => {
-    console.log("[v0] [개정이력 useEffect] 실행", {
+    console.log("[개정이력 useEffect] 실행", {
       hasLawId: !!meta.lawId,
       lawId: meta.lawId,
       isOrdinance,
@@ -316,19 +309,19 @@ export function LawViewer({
     })
 
     if (!meta.lawId) {
-      console.log("[v0] [개정이력 useEffect] lawId 없음 - 종료")
+      console.log("[개정이력 useEffect] lawId 없음 - 종료")
       return
     }
     if (isOrdinance) {
-      console.log("[v0] [개정이력 useEffect] 조례 - 종료")
+      console.log("[개정이력 useEffect] 조례 - 종료")
       return
     }
     if (!activeJo) {
-      console.log("[v0] [개정이력 useEffect] activeJo 없음 - 종료")
+      console.log("[개정이력 useEffect] activeJo 없음 - 종료")
       return
     }
 
-    console.log("[v0] [개정이력 useEffect] 개정이력 조회 시작:", activeJo)
+    console.log("[개정이력 useEffect] 개정이력 조회 시작:", activeJo)
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance])
 
@@ -336,21 +329,17 @@ export function LawViewer({
   useEffect(() => {
     const fetchThreeTierData = async () => {
       if (aiAnswerMode) {
-        console.log("[v0] [3단비교] AI 답변 모드 - 3단비교 비활성화")
         return
       }
 
       if (isOrdinance) {
-        console.log("[v0] [3단비교] 조례는 3단비교 미지원 - 종료")
         return
       }
 
       if (!meta.lawId && !meta.mst) {
-        console.log("[v0] [3단비교] lawId/mst 없음 - 종료")
         return
       }
 
-      console.log("[v0] [3단비교] 3단비교 데이터 로딩 시작", { lawId: meta.lawId, mst: meta.mst })
       setIsLoadingThreeTier(true)
 
       try {
@@ -369,7 +358,7 @@ export function LawViewer({
 
         const data = await response.json()
         if (data.success) {
-          console.log("[v0] [3단비교] 데이터 로딩 완료", {
+          console.log("[3단비교] 데이터 로딩 완료", {
             citationArticles: data.citation?.articles?.length || 0,
             delegationArticles: data.delegation?.articles?.length || 0,
           })
@@ -389,16 +378,13 @@ export function LawViewer({
   // Auto-reset tier view mode if the current article doesn't support it
   useEffect(() => {
     if (tierViewMode === "3-tier" && !hasValidSihyungkyuchik) {
-      console.log("[v0] [3단비교] 시행규칙 없음 - 2단 또는 1단으로 전환")
       setTierViewMode(hasValidThreeTierData ? "2-tier" : "1-tier")
     } else if (tierViewMode === "2-tier" && !hasValidThreeTierData) {
-      console.log("[v0] [3단비교] 위임조문 없음 - 1단으로 전환")
       setTierViewMode("1-tier")
     }
   }, [tierViewMode, hasValidSihyungkyuchik, hasValidThreeTierData, activeJo])
 
   const handleArticleClick = async (jo: string) => {
-    console.log("[v0] 조문 클릭:", { jo, isOrdinance, viewMode, isFullView })
 
     // Close article list on mobile after selection
     setIsArticleListExpanded(false)
@@ -426,7 +412,7 @@ export function LawViewer({
 
     if (!existingArticle && !isOrdinance && (meta.lawId || meta.mst)) {
       // Article not loaded - fetch it dynamically
-      console.log("[v0] 조문이 로드되지 않음 - 동적으로 로드:", jo)
+      console.log("조문이 로드되지 않음 - 동적으로 로드:", jo)
       setLoadingJo(jo)
 
       try {
@@ -454,10 +440,8 @@ export function LawViewer({
             // Avoid duplicates
             const existing = prev.find((a) => a.jo === newArticle.jo)
             if (existing) {
-              console.log("[v0] Article already exists, skipping")
               return prev
             }
-            console.log("[v0] Adding article to loadedArticles:", newArticle.jo)
             return [...prev, newArticle]
           })
         }
@@ -472,13 +456,12 @@ export function LawViewer({
     setActiveJo(jo)
 
     if (isFullView) {
-      console.log("[v0] 전체 조문 뷰 - 스크롤 이동")
       const element = articleRefs.current[jo]
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" })
       }
     } else {
-      console.log("[v0] 단일 조문 뷰 - activeJo 설정 완료")
+      console.log("단일 조문 뷰 - activeJo 설정 완료")
     }
   }
 
@@ -689,7 +672,6 @@ export function LawViewer({
         }
       } else if (refType === "regulation") {
         const clickedText = target.textContent || ""
-        console.log("[v0] [행정규칙] 링크 클릭 - 행정규칙 버튼 활성화 및 2단 뷰 전환", { clickedText })
 
         // Enable admin rules, set list view mode, and switch to 2-tier view
         if (!showAdminRules) {
@@ -744,7 +726,6 @@ export function LawViewer({
 
         // 일반 모드: 3단 비교 뷰로 전환
         if (!activeArticle) return
-        console.log("[v0] [3단비교] 위임조문 클릭 - 2단뷰로 전환", { kind, activeJo: activeArticle.jo })
 
         // Close admin rules view and restore delegation view
         setShowAdminRules(false)
@@ -1467,7 +1448,7 @@ export function LawViewer({
     }
   }
 
-  console.log("[v0] LawViewer 렌더링 완료:", {
+  console.log("LawViewer 렌더링 완료:", {
     activeJo,
     activeArticle: activeArticle ? { jo: activeArticle.jo, title: activeArticle.title } : null,
     viewMode,

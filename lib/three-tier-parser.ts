@@ -37,7 +37,6 @@ function formatJoNum(jo: string): string {
  * 위임조문 3단비교 JSON 파싱 (knd=2)
  */
 export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
-  debugLogger.info("위임조문 3단비교 파싱 시작")
 
   try {
     const service = jsonData.LspttnThdCmpLawXService
@@ -76,7 +75,6 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
 
     const articleArray = Array.isArray(rawArticles) ? rawArticles : [rawArticles]
 
-    debugLogger.info(`법률조문 ${articleArray.length}개 파싱 시작`)
 
     for (const rawArticle of articleArray) {
       const articleNum = rawArticle.조번호 || "0000"
@@ -184,7 +182,6 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
       }
     }
 
-    debugLogger.success(`위임조문 파싱 완료: ${articles.length}개 조문 (위임조문 보유)`)
 
     return {
       meta,
@@ -201,7 +198,6 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
  * 인용조문 3단비교 JSON 파싱 (knd=1)
  */
 export function parseThreeTierCitation(jsonData: any): ThreeTierData {
-  debugLogger.info("인용조문 3단비교 파싱 시작")
 
   try {
     const service = jsonData.ThdCmpLawXService
@@ -240,7 +236,6 @@ export function parseThreeTierCitation(jsonData: any): ThreeTierData {
 
     const articleArray = Array.isArray(rawArticles) ? rawArticles : [rawArticles]
 
-    debugLogger.info(`법률조문 ${articleArray.length}개 파싱 시작`)
 
     for (const rawArticle of articleArray) {
       const articleNum = rawArticle.조번호 || "0000"
@@ -266,7 +261,6 @@ export function parseThreeTierCitation(jsonData: any): ThreeTierData {
       })
     }
 
-    debugLogger.success(`인용조문 파싱 완료: ${articles.length}개 조문`)
 
     return {
       meta,

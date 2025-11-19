@@ -7,8 +7,6 @@ export function parseOrdinanceXML(xmlText: string): {
   articles: LawArticle[]
 } {
   debugLogger.debug("자치법규 XML 파싱 시작", { length: xmlText.length })
-  console.log("[v0] Parsing ordinance XML, length:", xmlText.length)
-  console.log("[v0] Ordinance XML sample (first 2000 chars):", xmlText.substring(0, 2000))
 
   try {
     const parser = new DOMParser()
@@ -16,13 +14,11 @@ export function parseOrdinanceXML(xmlText: string): {
 
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("[v0] XML parser error:", parserError.textContent)
+      console.log("XML parser error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
     const rootElement = xmlDoc.documentElement
-    console.log("[v0] Root element name:", rootElement.tagName)
-    console.log("[v0] Root element children count:", rootElement.children.length)
     console.log(
       "[v0] Root element child names:",
       Array.from(rootElement.children)
@@ -33,13 +29,11 @@ export function parseOrdinanceXML(xmlText: string): {
     const meta = extractOrdinanceMetadata(xmlDoc)
     const articles = extractOrdinanceArticles(xmlDoc)
 
-    debugLogger.success("자치법규 XML 파싱 완료", { articleCount: articles.length })
-    console.log("[v0] Parsed ordinance data:", { meta, articleCount: articles.length })
 
     return { meta, articles }
   } catch (error) {
     debugLogger.error("자치법규 XML 파싱 실패", error)
-    console.log("[v0] Ordinance parsing error:", error)
+    console.log("Ordinance parsing error:", error)
     throw error
   }
 }
@@ -54,7 +48,7 @@ function extractOrdinanceMetadata(xmlDoc: Document): LawMeta {
   const ordinKind = xmlDoc.querySelector("자치법규종류명")?.textContent || undefined
   const orgName = xmlDoc.querySelector("지자체기관명")?.textContent || undefined
 
-  console.log("[v0] Extracted ordinance metadata:", {
+  console.log("Extracted ordinance metadata:", {
     ordinId,
     ordinSeq,
     ordinName,
@@ -83,7 +77,7 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
   for (const containerName of contentContainers) {
     const element = xmlDoc.querySelector(containerName)
     if (element) {
-      console.log(`[v0] Found content container: ${containerName}`)
+      console.log(`Found content container: ${containerName}`)
       containerElement = element
       break
     }
@@ -98,25 +92,25 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
   for (const selector of possibleSelectors) {
     const elements = searchRoot.querySelectorAll(selector)
     if (elements.length > 0) {
-      console.log(`[v0] Found ${elements.length} articles using selector: ${selector}`)
+      console.log(`Found ${elements.length} articles using selector: ${selector}`)
       joElements = elements
       break
     }
   }
 
   if (!joElements || joElements.length === 0) {
-    console.log("[v0] No articles found with any selector")
+    console.log("No articles found with any selector")
     const allElements = xmlDoc.getElementsByTagName("*")
     const elementNames = new Set<string>()
     for (let i = 0; i < Math.min(allElements.length, 50); i++) {
       elementNames.add(allElements[i].tagName)
     }
-    console.log("[v0] Available element names in XML:", Array.from(elementNames).join(", "))
+    console.log("Available element names in XML:", Array.from(elementNames).join(", "))
     return articles
   }
 
   joElements.forEach((joElement, index) => {
-    console.log(`[v0] Processing article ${index + 1}, element name: ${joElement.tagName}`)
+    console.log(`Processing article ${index + 1}, element name: ${joElement.tagName}`)
     console.log(
       `[v0] Article ${index + 1} children:`,
       Array.from(joElement.children)
@@ -134,13 +128,13 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
     const joContent =
       joElement.querySelector("조내용, 조문내용, 내용, 본문")?.textContent || joElement.textContent || ""
 
-    console.log("[v0] Processing article:", {
+    console.log("Processing article:", {
       rawJoNum,
       joTitle,
       hasContent: !!joContent.trim(),
       contentLength: joContent.length,
     })
-    console.log(`[v0] rawJoNum="${rawJoNum}" joTitle="${joTitle}"`)
+    console.log(`rawJoNum="${rawJoNum}" joTitle="${joTitle}"`)
 
     let normalizedJo = rawJoNum
     let displayJoNum = rawJoNum
@@ -161,7 +155,7 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
         displayJoNum = `제${lawArticleNum}조`
         if (lawBranchNum > 0) displayJoNum += `의${lawBranchNum}`
 
-        console.log(`[v0] Converted law format to ordinance: "${rawJoNum}" → jo="${normalizedJo}" display="${displayJoNum}"`)
+        console.log(`Converted law format to ordinance: "${rawJoNum}" → jo="${normalizedJo}" display="${displayJoNum}"`)
       } else {
         // 이미 조례 형식(AABBCC)인 경우
         const articleNum = Number.parseInt(rawJoNum.substring(0, 2), 10)
@@ -174,7 +168,7 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
 
         normalizedJo = rawJoNum
 
-        console.log(`[v0] Already ordinance format: "${rawJoNum}" → "${displayJoNum}"`)
+        console.log(`Already ordinance format: "${rawJoNum}" → "${displayJoNum}"`)
       }
     } else if (rawJoNum.startsWith("제") && rawJoNum.includes("조")) {
       // 이미 "제1조" 형식이면 조례용 6자리 코드로 직접 변환
@@ -189,15 +183,15 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
                        "00"
         displayJoNum = rawJoNum
 
-        console.log(`[v0] Converted ordinance text to code: "${rawJoNum}" → "${normalizedJo}"`)
+        console.log(`Converted ordinance text to code: "${rawJoNum}" → "${normalizedJo}"`)
       } else {
         normalizedJo = rawJoNum
         displayJoNum = rawJoNum
-        console.log(`[v0] Could not parse "${rawJoNum}", using as-is`)
+        console.log(`Could not parse "${rawJoNum}", using as-is`)
       }
     } else {
       // 기타 형식: 숫자만 추출하여 정규화
-      console.log(`[v0] Unknown format for "${rawJoNum}", extracting number`)
+      console.log(`Unknown format for "${rawJoNum}", extracting number`)
       const articleMatch = rawJoNum.match(/(\d+)/)
       if (articleMatch) {
         const articleNum = Number.parseInt(articleMatch[1], 10)
@@ -218,10 +212,10 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
         if (branchNum > 0) finalDisplayJoNum += `의${branchNum}`
         if (subNum > 0) finalDisplayJoNum += `-${subNum}`
 
-        console.log(`[v0] Final conversion for display: "${displayJoNum}" → "${finalDisplayJoNum}"`)
+        console.log(`Final conversion for display: "${displayJoNum}" → "${finalDisplayJoNum}"`)
       }
 
-      console.log(`[v0] FINAL PUSH: jo="${normalizedJo}" joNum="${finalDisplayJoNum}" title="${joTitle}"`)
+      console.log(`FINAL PUSH: jo="${normalizedJo}" joNum="${finalDisplayJoNum}" title="${joTitle}"`)
 
       articles.push({
         jo: normalizedJo,
@@ -234,7 +228,7 @@ function extractOrdinanceArticles(xmlDoc: Document): LawArticle[] {
     }
   })
 
-  console.log("[v0] Extracted articles:", articles.length)
+  console.log("Extracted articles:", articles.length)
 
   return articles
 }

@@ -109,7 +109,6 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
       const xmlText = await response.text()
       const history = parseArticleHistoryXML(xmlText)
 
-      console.log('[ComparisonModal] 조문별 개정이력 파싱 결과:', history)
       setArticleHistory(history)
       debugLogger.success("조문별 개정이력 조회 완료", { count: history.length, history })
     } catch (err) {

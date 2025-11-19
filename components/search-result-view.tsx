@@ -138,7 +138,6 @@ function extractContentFromHangArray(hangArray: any[]): string {
 }
 
 function parseLawJSON(jsonData: any): LawData {
-  debugLogger.info("JSON 파싱 시작")
 
   try {
     const lawData = jsonData.법령
@@ -160,7 +159,6 @@ function parseLawJSON(jsonData: any): LawData {
       fetchedAt: new Date().toISOString(),
     }
 
-    console.log("[v0] [JSON 파싱] 법령 제목:", meta.lawTitle)
 
     const articles: LawArticle[] = []
     const articleUnits = lawData.조문?.조문단위 || []
@@ -184,7 +182,6 @@ function parseLawJSON(jsonData: any): LawData {
 
       // Debug: Log article parsing for "조의" articles
       if (branchNum && Number.parseInt(branchNum) > 0) {
-        console.log(`📄 [파싱] 조의 조문: ${display} (JO: ${code}, articleNum: ${articleNum}, branchNum: ${branchNum})`)
       }
 
       // CRITICAL: 본문 (조문내용) + 항/호 결합 로직 (law-parser-server.ts와 동일)
@@ -255,11 +252,9 @@ function parseLawJSON(jsonData: any): LawData {
       })
     }
 
-    debugLogger.success("JSON 파싱 완료: " + articles.length + "개 조문")
 
     // Debug: Show JO code range
     if (articles.length > 0) {
-      console.log(`📄 [파싱 완료] ${meta.lawTitle}: ${articles.length}개 조문`)
       console.log(`   JO 코드 범위: ${articles[0]?.jo} (${articles[0]?.joNum}) ~ ${articles[articles.length - 1]?.jo} (${articles[articles.length - 1]?.joNum})`)
 
       // Show all "조의" articles
@@ -525,7 +520,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     selectedLaw: LawSearchResult,
     query: { lawName: string; article?: string; jo?: string },
   ) => {
-    console.log("[v0] ========== FETCHING LAW CONTENT ==========")
+    console.log("========== FETCHING LAW CONTENT ==========")
     debugLogger.info("법령 ID 확인", { lawId: selectedLaw.lawId, lawName: selectedLaw.lawName })
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
@@ -613,7 +608,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
         // Debug: Show sample JO codes
         const sampleJos = articles.slice(0, 10).map(a => a.jo).join(', ')
-        console.log(`   샘플 JO 코드 (처음 10개): ${sampleJos}`)
 
         // Check if any "조의" articles exist
         const branchArticles = articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
@@ -1332,7 +1326,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
                   // Debug: Show sample JO codes
                   const sampleJos = parsedData.articles.slice(0, 10).map(a => a.jo).join(', ')
-                  console.log(`   샘플 JO 코드 (처음 10개): ${sampleJos}`)
 
                   // Check if any "조의" articles exist
                   const branchArticles = parsedData.articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
@@ -2067,7 +2060,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       const article = lawData.articles.find((a) => a.jo === jo)
       const joNum = article ? article.joNum : jo
 
-      debugLogger.success("✅ 신·구법 데이터 파싱 완료 (전체)", {
         joNum,
         oldContentLength: comparison.oldVersion.content.length,
         newContentLength: comparison.newVersion.content.length,

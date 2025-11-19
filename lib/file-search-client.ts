@@ -396,7 +396,6 @@ export async function* queryFileSearchStream(
 
     // DEBUG: 첫 청크 상세 로깅
     if (idx === 0) {
-      console.log('[File Search] Sample chunk text (first 300 chars):', chunkText.substring(0, 300))
       console.log('[File Search] Chunk URI:', uri)
       console.log('[File Search] Full chunk keys:', Object.keys(chunk))
       if (chunk.retrievedContext) {

@@ -17,17 +17,15 @@ function normalizeDateFormat(dateStr: string | undefined): string | undefined {
 
   // Validate it's 8 digits (YYYYMMDD)
   if (cleaned.length === 8 && /^\d{8}$/.test(cleaned)) {
-    console.log(`[v0] Normalized date: "${dateStr}" → "${cleaned}"`)
     return cleaned
   }
 
-  console.log(`[v0] Invalid date format, skipping: "${dateStr}"`)
+  console.log(`Invalid date format, skipping: "${dateStr}"`)
   return undefined
 }
 
 export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
   try {
-    console.log("[v0] Parsing law search XML, length:", xmlText.length)
 
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(xmlText, "text/xml")
@@ -35,12 +33,12 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
     // Check for parsing errors
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("[v0] XML parsing error:", parserError.textContent)
+      console.log("XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
     const laws = xmlDoc.querySelectorAll("law")
-    console.log("[v0] Found laws:", laws.length)
+    console.log("Found laws:", laws.length)
 
     const results: LawSearchResult[] = []
 
@@ -65,7 +63,7 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
           promulgationDate,
           effectiveDate,
         })
-        console.log("[v0] Parsed law:", {
+        console.log("Parsed law:", {
           lawId: normalizedLawId,
           mst,
           lawName,
@@ -76,10 +74,9 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
       }
     })
 
-    debugLogger.info("법령 검색 결과 파싱 완료", { count: results.length })
     return results
   } catch (error) {
-    console.log("[v0] Law search parsing error:", error)
+    console.log("Law search parsing error:", error)
     debugLogger.error("법령 검색 결과 파싱 실패", error)
     return []
   }

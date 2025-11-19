@@ -13,11 +13,11 @@ function normalizeDateFormat(dateStr: string | null): string {
   const cleaned = dateStr.replace(/[^\d]/g, "")
 
   if (cleaned.length === 8 && /^\d{8}$/.test(cleaned)) {
-    console.log(`[v0] Normalized efYd parameter: "${dateStr}" → "${cleaned}"`)
+    console.log(`Normalized efYd parameter: "${dateStr}" → "${cleaned}"`)
     return cleaned
   }
 
-  console.log(`[v0] Invalid efYd format "${dateStr}", using today's date`)
+  console.log(`Invalid efYd format "${dateStr}", using today's date`)
   const today = new Date()
   return today.toISOString().slice(0, 10).replace(/-/g, "")
 }
@@ -45,52 +45,51 @@ export async function GET(request: Request) {
       type: "JSON",
     })
 
-    console.log("[v0] ========== EFLAW API REQUEST ==========")
-    console.log("[v0] Raw efYd parameter:", efYd)
-    console.log("[v0] Law ID:", lawId)
-    console.log("[v0] MST:", mst)
-    console.log("[v0] JO parameter:", jo)
+    console.log("========== EFLAW API REQUEST ==========")
+    console.log("Raw efYd parameter:", efYd)
+    console.log("Law ID:", lawId)
+    console.log("MST:", mst)
+    console.log("JO parameter:", jo)
 
     if (lawId) {
       params.append("ID", lawId)
       if (efYd) {
         const effectiveDate = normalizeDateFormat(efYd)
-        console.log("[v0] Using provided effective date:", effectiveDate)
+        console.log("Using provided effective date:", effectiveDate)
         params.append("efYd", effectiveDate)
       } else {
-        console.log("[v0] No efYd provided - API will return the most current version")
+        console.log("No efYd provided - API will return the most current version")
       }
     } else if (mst) {
       params.append("MST", mst)
       if (efYd) {
         const effectiveDate = normalizeDateFormat(efYd)
-        console.log("[v0] Using provided effective date:", effectiveDate)
+        console.log("Using provided effective date:", effectiveDate)
         params.append("efYd", effectiveDate)
       } else {
-        console.log("[v0] No efYd provided - API will return the most current version")
+        console.log("No efYd provided - API will return the most current version")
       }
     }
 
     if (jo) {
       params.append("JO", jo)
-      console.log("[v0] ✓ Adding JO parameter to API call:", jo)
+      console.log("✓ Adding JO parameter to API call:", jo)
       debugLogger.info("특정 조문 요청", { jo })
     } else {
-      console.log("[v0] ✓ No JO parameter - fetching all articles")
+      console.log("✓ No JO parameter - fetching all articles")
       debugLogger.info("전체 조문 요청")
     }
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("현행법령 API 호출", { lawId, mst, efYd: efYd || "최신버전", jo: jo || "전체조문", url })
-    console.log("[v0] Full API URL:", url)
+    console.log("Full API URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[v0] Eflaw response status:", response.status)
-    console.log("[v0] Eflaw response (first 500 chars):", text.substring(0, 500))
+    console.log("Eflaw response status:", response.status)
 
     if (!response.ok) {
       debugLogger.error("현행법령 API 오류", { status: response.status, body: text.substring(0, 500) })
@@ -98,13 +97,13 @@ export async function GET(request: Request) {
     }
 
     if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
-      console.log("[v0] Received HTML error page instead of JSON")
+      console.log("Received HTML error page instead of JSON")
       debugLogger.error("현행법령 API가 HTML 오류 페이지를 반환했습니다", { url })
       throw new Error("API가 오류 페이지를 반환했습니다. 법령명이나 조문 번호를 확인해주세요.")
     }
 
     debugLogger.success("현행법령 조회 완료", { length: text.length })
-    console.log("[v0] ========== EFLAW API SUCCESS ==========")
+    console.log("========== EFLAW API SUCCESS ==========")
 
     return new NextResponse(text, {
       headers: {
@@ -113,7 +112,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] Eflaw API error:", error)
+    console.log("Eflaw API error:", error)
     debugLogger.error("현행법령 조회 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

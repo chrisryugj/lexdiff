@@ -55,7 +55,6 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
       setSearchType("ai")
       setIsNaturalQuery(true)
-      console.log("[v0] AI 검색 모드 감지:", { query, confidence: queryDetection.confidence, reason: queryDetection.reason })
       return
     }
 
@@ -67,7 +66,6 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     if (hasLawKeyword || hasOrdinanceKeyword) {
       setSearchType(isOrdinanceQuery ? "ordinance" : "law")
       setIsNaturalQuery(false)
-      console.log("[v0] 법령 검색 모드:", { query, hasLawKeyword, hasOrdinanceKeyword, type: isOrdinanceQuery ? "조례" : "법령" })
       return
     }
 
