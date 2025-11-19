@@ -1515,8 +1515,16 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         console.log(`   결과 목록:`, results.slice(0, 5).map(r => r.lawName).join(', '))
 
         // 1. 정확히 일치하는 법령 찾기
-        let exactMatch = results.find((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
-        console.log(`   정확 매칭: ${exactMatch ? exactMatch.lawName : '없음'}`)
+        const exactMatches = results.filter((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
+
+        // 정확 매칭이 여러 개일 경우 가장 짧은 이름 우선 선택
+        let exactMatch = exactMatches.length > 0
+          ? exactMatches.reduce((shortest, current) =>
+              current.lawName.length < shortest.lawName.length ? current : shortest
+            )
+          : undefined
+
+        console.log(`   정확 매칭: ${exactMatch ? exactMatch.lawName : '없음'}${exactMatches.length > 1 ? ` (${exactMatches.length}개 중 선택)` : ''}`)
 
         // 2. 유사도 기반 매칭 (정확한 매칭이 없을 때만)
         if (!exactMatch) {
