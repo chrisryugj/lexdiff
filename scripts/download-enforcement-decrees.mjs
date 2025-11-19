@@ -172,33 +172,50 @@ function parseLawJSON(jsonData) {
       displayNumber = `제${articleNum}조의${branchNum}`
     }
 
-    // Extract content
-    let content = ''
+    // STEP 1: 본문 추출 (조문내용)
+    let mainContent = ''
+    if (unit.조문내용 && typeof unit.조문내용 === 'string') {
+      mainContent = unit.조문내용.trim()
+    }
+
+    // STEP 2: 항/호/목 추출
+    let paraContent = ''
     if (unit.항 && Array.isArray(unit.항)) {
       for (const hang of unit.항) {
         if (hang.항내용) {
           let hangContent = Array.isArray(hang.항내용) ? hang.항내용.join('\n') : hang.항내용
-          content += '\n' + hangContent
+          paraContent += '\n' + hangContent
         }
 
         if (hang.호 && Array.isArray(hang.호)) {
           for (const ho of hang.호) {
             if (ho.호내용) {
               let hoContent = Array.isArray(ho.호내용) ? ho.호내용.join('\n') : ho.호내용
-              content += '\n' + hoContent
+              paraContent += '\n' + hoContent
             }
 
             if (ho.목 && Array.isArray(ho.목)) {
               for (const mok of ho.목) {
                 if (mok.목내용) {
                   let mokContent = Array.isArray(mok.목내용) ? mok.목내용.join('\n') : mok.목내용
-                  content += '\n  ' + mokContent
+                  paraContent += '\n  ' + mokContent
                 }
               }
             }
           }
         }
       }
+    }
+
+    // STEP 3: 본문 + 항/호 결합
+    let content = ''
+    if (mainContent) {
+      content = mainContent
+      if (paraContent) {
+        content += '\n' + paraContent.trim()
+      }
+    } else {
+      content = paraContent.trim()
     }
 
     articles.push({

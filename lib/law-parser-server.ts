@@ -208,9 +208,26 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
     let mainContent = "" // 본문 (조문내용에서 추출)
 
     // STEP 1: 본문 추출 (조문내용에서)
-    // CRITICAL: 제목 제거 없이 원본 유지 (마크다운 생성 시 자동 처리)
+    // CRITICAL: 제목 부분 제거 (마크다운 헤더에 이미 포함됨)
     if (unit.조문내용 && typeof unit.조문내용 === "string") {
-      mainContent = unit.조문내용.trim()
+      let rawContent = unit.조문내용.trim()
+
+      // 제목 패턴: 제X조(제목) 또는 제X조의Y(제목)
+      const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)[\s\S]*/)
+
+      if (headerMatch) {
+        const headerPart = headerMatch[1]
+        const bodyPart = rawContent.substring(headerPart.length).trim()
+
+        // 제목 제거하고 본문만 저장
+        if (bodyPart) {
+          mainContent = bodyPart
+        }
+        // else: 본문 없음 (호만 있는 경우이므로 mainContent는 빈 문자열)
+      } else {
+        // 제목 형식이 아니면 전체를 본문으로
+        mainContent = rawContent
+      }
     }
 
     // STEP 2: 항/호 내용 추출

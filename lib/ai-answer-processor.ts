@@ -3,6 +3,7 @@
  */
 
 import { debugLogger } from './debug-logger'
+import { linkifyRefsAI } from './unified-link-generator'
 
 /**
  * AI 답변을 HTML로 변환 (extractArticleText와 동일한 파이프라인)
@@ -20,8 +21,9 @@ export function convertAIAnswerToHTML(markdown: string): string {
   debugLogger.info('마커 추가 후', { hasMarker: text.includes('<<<QUOTE_START>>>') })
 
   // 3단계: 법령 링크를 임시 마커로 변환 (이스케이프 전에)
-  text = linkifyRefsB(text)
-  debugLogger.info('링크 마커 변환 후', { hasLawLink: text.includes('<<<LAWLINK') })
+  // 통합 시스템 사용 - aggressive 모드로 모든 패턴 매칭
+  text = linkifyRefsAI(text)
+  debugLogger.info('링크 마커 변환 후', { hasLawLink: text.includes('law-ref') })
 
   // 4단계: HTML 이스케이프
   text = escapeHtml(text)
@@ -31,9 +33,8 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = styleStructuredSections(text)
   debugLogger.info('스타일링 후', { hasBlockquote: text.includes('<blockquote') })
 
-  // 6단계: 법령 링크 마커 복원 (이스케이프된 마커를 실제 링크로 변환)
-  text = restoreLinkMarkers(text)
-  debugLogger.info('링크 복원 후', { hasLawLink: text.includes('law-ref') })
+  // 6단계: 링크는 이미 생성됨 (통합 시스템에서 처리 완료)
+  debugLogger.info('링크 생성 완료', { hasLawLink: text.includes('law-ref') })
 
   // 7단계: 줄바꿈 처리
   // 연속된 빈 줄 제거
@@ -492,117 +493,5 @@ function styleDetailSection(text: string, sectionTitle: string): string {
   })
 }
 
-/**
- * 법령 링크 생성 (law-xml-parser.tsx의 linkifyRefsB와 동일)
- *
- * 중요: 이미 생성된 HTML 속성 안의 텍스트는 다시 링크하지 않도록 lookbehind 사용
- */
-function linkifyRefsB(text: string): string {
-  let t = text
-
-  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
-  t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const linkLabel = '제' + art + '조' + (branch ? '의' + branch : '')  // 조문까지만
-    const displayLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')  // 전체 표시
-    return '<<<LAWLINK_WITH_ARTICLE:' + lawName + '|||' + linkLabel + '|||' + displayLabel + '>>>'
-  })
-
-  // 2. 「법령명」 단독 - 임시 마커로 변환
-  t = t.replace(/「([^」]+)」/g, (_match, lawName) => {
-    return '<<<LAWLINK:' + lawName + '>>>'
-  })
-
-  // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 임시 마커로 변환
-  // 복합 법령명 처리를 위해 개선된 패턴 (법률 시행령, 법 시행령 등)
-  // CRITICAL: 이미 「」로 처리된 것과 마커 안의 텍스트 제외
-  t = t.replace(
-    /(?<!<<<[^>]*|「)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+?(?:법률\s+시행령|법률\s+시행규칙|법\s+시행령|법\s+시행규칙|법률|법|령|규칙|조례))(?!」)\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
-    (_match, lawName, art, _p2, branch, title) => {
-      const cleanLawName = lawName.trim()
-      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-      const titlePart = title ? '|||' + title.replace(/\[([^\]]+)\]/g, '$1') : ''
-      return '<<<LAWLINK_ARTICLE:' + cleanLawName + '|||' + joLabel + titlePart + '>>>'
-    }
-  )
-
-  // 4. 제X조 패턴 (현재 법령) - 임시 마커로 변환
-  t = t.replace(/(?<!<<<[^>]*|[가-힣A-Za-z\d·\s]+(?:법|령|규칙|조례)\s+)제(\d{1,4})조(의(\d{1,2}))?/g, (m) => {
-    const data = m.replace(/\s+/g, '')
-    return '<<<ARTICLE:' + data + '>>>'
-  })
-
-  // 5.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
-  // "도로법 시행규칙" -> LAWLINK (국가법령)
-  // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요하거나 현재 지원 미비)
-  t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?!\s*제)(?![으로로이가>])/g,
-    (match, lawName, type) => {
-      const trimmedName = lawName.trim()
-
-      // 조례 시행규칙은 국가법령 검색에서 찾을 수 없으므로 링크하지 않음
-      if (trimmedName.endsWith('조례')) {
-        return match
-      }
-
-      const fullLawName = trimmedName + ' ' + type
-      return '<<<LAWLINK:' + fullLawName + '>>>'
-    }
-  )
-
-  // 5. 대통령령, 시행령 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
-  // "법률 시행령" 처럼 앞에 한글과 공백이 있으면 제외
-  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가>])/g, (m) => {
-    return '<<<DECREE:' + m + '>>>'
-  })
-
-  // 6. 부령, 시행규칙 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
-  // "법률 시행규칙" 처럼 앞에 한글과 공백이 있으면 제외
-  // 부령의 경우 전체 단어만 매칭
-  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(?<![가-힣])([가-힣]+부령|시행규칙)(?![으로로이가>])/g, (m) => {
-    return '<<<RULE:' + m + '>>>'
-  })
-
-  return t
-}
-
-/**
- * 마커를 실제 HTML 링크로 복원 (이스케이프 후 실행)
- */
-function restoreLinkMarkers(text: string): string {
-  let t = text
-
-  // 1. 「법령명」 제X조 링크 복원 (linkLabel만 data-article에, displayLabel은 텍스트에)
-  t = t.replace(/&lt;&lt;&lt;LAWLINK_WITH_ARTICLE:([^|]+)\|\|\|([^|&]+)(?:\|\|\|([^&]+))?&gt;&gt;&gt;/g, (_, lawName, linkLabel, displayLabel) => {
-    const label = '「' + lawName + '」 ' + (displayLabel || linkLabel)
-    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + linkLabel + '">' + label + '</a>'
-  })
-
-  // 2. 「법령명」 단독 링크 복원
-  t = t.replace(/&lt;&lt;&lt;LAWLINK:([^&]+)&gt;&gt;&gt;/g, (_, lawName) => {
-    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">「' + lawName + '」</a>'
-  })
-
-  // 3. 법령명 제X조 (꺽쇄 없음) 링크 복원
-  t = t.replace(/&lt;&lt;&lt;LAWLINK_ARTICLE:([^|]+)\|\|\|([^|&]+)(?:\|\|\|([^&]+))?&gt;&gt;&gt;/g, (_, lawName, joLabel, title) => {
-    const linkPart = lawName + ' ' + joLabel
-    const titlePart = title ? ' ' + title : ''
-    return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + linkPart + '</a>' + titlePart
-  })
-
-  // 4. 제X조 링크 복원
-  t = t.replace(/&lt;&lt;&lt;ARTICLE:([^&]+)&gt;&gt;&gt;/g, (_, article) => {
-    return '<a href="#" class="law-ref" data-ref="article" data-article="' + article + '">' + article + '</a>'
-  })
-
-  // 5. 대통령령, 시행령 링크 복원
-  t = t.replace(/&lt;&lt;&lt;DECREE:([^&]+)&gt;&gt;&gt;/g, (_, decree) => {
-    return '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + decree + '</a>'
-  })
-
-  // 6. 부령, 시행규칙 링크 복원
-  t = t.replace(/&lt;&lt;&lt;RULE:([^&]+)&gt;&gt;&gt;/g, (_, rule) => {
-    return '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + rule + '</a>'
-  })
-
-  return t
-}
+// 기존 linkifyRefsB와 restoreLinkMarkers 함수는 통합 시스템(unified-link-generator)으로 대체됨
+// linkifyRefsAI 사용으로 마커 시스템 불필요
