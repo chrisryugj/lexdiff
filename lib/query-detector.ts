@@ -47,7 +47,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
     // 법령명이 길 수 있으므로, 단순히 길이만으로 판단하면 안됨 ("도로법 시행령 55조" 등)
 
     // 질문형 종결어미나 의문사가 없으면 구조화 검색으로 간주
-    const isQuestion = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘$/.test(trimmedQuery) || /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느)/.test(trimmedQuery) || /에\s*대해/.test(trimmedQuery)
+    const isQuestion = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘|궁금/.test(trimmedQuery) || /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느)/.test(trimmedQuery) || /에\s*대해/.test(trimmedQuery)
 
     if (!isQuestion) {
       return {
@@ -66,7 +66,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
   }
 
   // 패턴 2: 질문 종결어미 → 자연어 검색
-  const questionEndings = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘$/
+  const questionEndings = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘|궁금$/
   if (questionEndings.test(trimmedQuery)) {
     return {
       type: 'natural',
