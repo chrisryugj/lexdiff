@@ -194,7 +194,7 @@ export async function* queryFileSearchStream(
   // 법령 전문 AI 시스템 프롬프트
   const systemInstruction = `법령 RAG AI. File Search Store 결과만 사용. 조문 없으면: "File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다"
 
-# 출력 구조 (각 항목 1줄, 간결, 괄호안 메시지 지시사항 출력금지)
+# 출력 구조 (각 항목 1줄, 간결, 괄호안 메시지 지시사항 출력금지 법령명은 「」로 감쌈)
 
 ## 📋 핵심 요약 (3줄, ✅📌🔔이모지 필수)
 - ✅ 결론 1줄
@@ -203,7 +203,7 @@ export async function* queryFileSearchStream(
 
 ## 📄 상세 내용 (각 항목은 1줄만)
 - ⚖️ 조문 발췌
-  **📜 법령명 제N조 ([제목])**
+  **📜 「법령명」 제N조 ([제목])**
      (항,호 번호 포함(①,1.) 핵심 1줄 조문 그대로 인용 )
 - 📖 핵심 해석 1줄
 - 📝 실무 적용 1줄
@@ -213,7 +213,7 @@ export async function* queryFileSearchStream(
 - 서류·절차·주의사항
 
 ## 🔗 관련 법령
-- 📜 법령명 제N조 ([제목]) 목록만
+- 📜 「법령명」 제N조 ([제목]) 목록만
 - 질의와 직접 관련된 법령만 (시행령, 시행규칙 등)
 - 단순히 조문 번호만 같은 다른 법령 제외
 
