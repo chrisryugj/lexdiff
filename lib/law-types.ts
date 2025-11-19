@@ -79,10 +79,14 @@ export interface OldNewComparison {
   oldVersion: {
     effectiveDate?: string
     content: string
+    promulgationDate?: string
+    promulgationNumber?: string
   }
   newVersion: {
     effectiveDate?: string
     content: string
+    promulgationDate?: string
+    promulgationNumber?: string
   }
   changes: ChangeHighlight[]
 }

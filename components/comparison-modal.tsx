@@ -8,7 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2, ArrowLeftRight, Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, History, X, GitCompare } from "lucide-react"
 import type { OldNewComparison } from "@/lib/law-types"
 import { parseOldNewXML, highlightDifferences } from "@/lib/oldnew-parser"
-import { parseRevisionHistoryXML, formatDate, type RevisionInfo } from "@/lib/revision-parser"
+import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
+import type { RevisionHistoryItem } from "@/lib/law-types"
 import { debugLogger } from "@/lib/debug-logger"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -27,7 +28,7 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
   const [error, setError] = useState<string | null>(null)
   const [syncScroll, setSyncScroll] = useState(true)
   const [fontSize, setFontSize] = useState(15)
-  const [revisionHistory, setRevisionHistory] = useState<RevisionInfo[]>([])
+  const [articleHistory, setArticleHistory] = useState<RevisionHistoryItem[]>([])
   const [revisionStack, setRevisionStack] = useState<Array<{ date?: string; number?: string }>>([])
   const [currentRevisionIndex, setCurrentRevisionIndex] = useState(0)
   const [showRevisionHistory, setShowRevisionHistory] = useState(true)
@@ -46,11 +47,11 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
   }, [isOpen, lawId, mst])
 
   useEffect(() => {
-    console.log('[ComparisonModal] revisionHistory 상태 변경:', {
-      count: revisionHistory.length,
-      revisions: revisionHistory
+    console.log('[ComparisonModal] articleHistory 상태 변경:', {
+      count: articleHistory.length,
+      revisions: articleHistory
     })
-  }, [revisionHistory])
+  }, [articleHistory])
 
   useEffect(() => {
     if (comparison && targetJo && oldScrollRef.current && newScrollRef.current) {
@@ -79,6 +80,13 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
   }, [comparison, targetJo])
 
   const loadRevisionHistory = async () => {
+    // targetJo가 없으면 조문별 개정이력을 불러올 수 없음
+    if (!targetJo) {
+      console.log('[ComparisonModal] targetJo가 없어 개정이력을 불러올 수 없습니다')
+      setArticleHistory([])
+      return
+    }
+
     try {
       const params = new URLSearchParams()
       if (lawId) {
@@ -86,23 +94,28 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
       } else if (mst) {
         params.append("mst", mst)
       }
+      params.append("jo", targetJo)
 
-      debugLogger.info("개정이력 조회 시작", { lawTitle, lawId, mst })
+      debugLogger.info("조문별 개정이력 조회 시작", { lawTitle, lawId, mst, targetJo })
 
-      const response = await fetch(`/api/revision-history?${params.toString()}`)
+      const response = await fetch(`/api/article-history?${params.toString()}`)
 
       if (!response.ok) {
-        throw new Error("개정이력 조회 실패")
+        console.warn('[ComparisonModal] 조문별 개정이력 조회 실패:', response.status)
+        setArticleHistory([])
+        return
       }
 
       const xmlText = await response.text()
-      const revisions = parseRevisionHistoryXML(xmlText)
+      const history = parseArticleHistoryXML(xmlText)
 
-      console.log('[ComparisonModal] 개정이력 파싱 결과:', revisions)
-      setRevisionHistory(revisions)
-      debugLogger.success("개정이력 조회 완료", { count: revisions.length, revisions })
+      console.log('[ComparisonModal] 조문별 개정이력 파싱 결과:', history)
+      setArticleHistory(history)
+      debugLogger.success("조문별 개정이력 조회 완료", { count: history.length, history })
     } catch (err) {
-      debugLogger.error("개정이력 조회 실패", err)
+      console.warn('[ComparisonModal] 조문별 개정이력 조회 오류:', err)
+      debugLogger.error("조문별 개정이력 조회 실패", err)
+      setArticleHistory([])
     }
   }
 
@@ -220,9 +233,12 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     loadComparison(revision.date, revision.number)
   }
 
-  const handleRevisionSelect = (revision: RevisionInfo) => {
-    loadComparison(revision.promulgationDate, revision.promulgationNumber)
-    setShowRevisionHistory(false)
+  const handleRevisionSelect = (revision: RevisionHistoryItem) => {
+    // 조문별 개정이력은 날짜 정보만 있으므로 해당 날짜의 버전을 로드
+    // date는 "YYYY-MM-DD" 형식이므로 "YYYYMMDD"로 변환
+    const revisionDate = revision.date.replace(/-/g, '')
+    loadComparison(revisionDate, undefined)
+    // 사이드바 열린 상태 유지 (닫지 않음)
   }
 
   const canGoToPrevious =
@@ -301,9 +317,10 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                 size="sm"
                 onClick={() => setShowRevisionHistory(!showRevisionHistory)}
                 className="text-xs h-8"
+                disabled={articleHistory.length === 0}
               >
                 <History className="h-3 w-3 mr-1" />
-                개정이력 ({revisionHistory.length})
+                개정이력 ({articleHistory.length})
               </Button>
             </div>
 
@@ -311,24 +328,25 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
               <Select
                 value=""
                 onValueChange={(value) => {
-                  const revision = revisionHistory[Number.parseInt(value)]
+                  const revision = articleHistory[Number.parseInt(value)]
                   if (revision) handleRevisionSelect(revision)
                 }}
+                disabled={articleHistory.length === 0}
               >
                 <SelectTrigger className="h-7 text-[10px] w-full">
-                  <SelectValue placeholder={`개정이력 (${revisionHistory.length})`} />
+                  <SelectValue placeholder={`개정이력 (${articleHistory.length})`} />
                 </SelectTrigger>
                 <SelectContent>
-                  {revisionHistory.map((revision, index) => (
+                  {articleHistory.map((revision, index) => (
                     <SelectItem
-                      key={`${revision.promulgationDate}-${revision.promulgationNumber}`}
+                      key={`${revision.date}-${index}`}
                       value={String(index)}
                       className="text-xs"
                     >
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{formatDate(revision.promulgationDate)}</span>
-                          <span className="text-[10px] text-muted-foreground">{revision.revisionType}</span>
+                          <span className="font-medium">{revision.date}</span>
+                          <span className="text-[10px] text-muted-foreground">{revision.type}</span>
                         </div>
                       </div>
                     </SelectItem>
@@ -373,8 +391,8 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
 
         <div className="flex-1 min-h-0 overflow-hidden flex">
           {showRevisionHistory && (
-            <div className="hidden sm:flex w-80 border-r border-border flex-col">
-              <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="hidden sm:flex w-80 border-r border-border flex-col overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between flex-shrink-0">
                 <div>
                   <h3 className="font-semibold text-sm text-foreground mb-1">개정 이력</h3>
                   <p className="text-xs text-muted-foreground">개정 버전을 선택하여 비교하세요</p>
@@ -383,54 +401,63 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <ScrollArea className="flex-1">
+              <div className="flex-1 overflow-y-auto">
                 <div className="p-2 space-y-1">
-                  {revisionHistory.map((revision, index) => {
-                    const isCurrentNew = comparison?.newVersion.promulgationDate === revision.promulgationDate
-                    const isCurrentOld = comparison?.oldVersion.promulgationDate === revision.promulgationDate
-                    const isCurrent = isCurrentNew || isCurrentOld
+                  {articleHistory.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      <p>개정 이력이 없습니다</p>
+                      <p className="text-xs mt-2">이 조문은 제정 이후 개정되지 않았습니다</p>
+                    </div>
+                  ) : (
+                    // 최근 목록이 위로 오도록 reverse
+                    [...articleHistory].reverse().map((revision, index) => {
+                      // 현재 비교 중인 버전과 일치하는지 확인
+                      const revisionDateFormatted = revision.date.replace(/-/g, '')
+                      const isCurrentNew = comparison?.newVersion.promulgationDate === revisionDateFormatted
+                      const isCurrentOld = comparison?.oldVersion.promulgationDate === revisionDateFormatted
+                      const isCurrent = isCurrentNew || isCurrentOld
 
-                    return (
-                      <button
-                        key={`${revision.promulgationDate}-${revision.promulgationNumber}`}
-                        onClick={() => handleRevisionSelect(revision)}
-                        className={`w-full text-left p-3 rounded-md border transition-all ${
-                          isCurrent
-                            ? 'bg-primary/10 border-primary/40 shadow-md'
-                            : 'bg-card hover:bg-secondary border-border hover:border-primary/20'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={isCurrent ? "default" : "outline"}
-                              className="text-xs"
-                            >
-                              {revision.revisionType}
-                            </Badge>
-                            {isCurrentNew && (
-                              <span className="text-[10px] font-semibold text-success">신법</span>
-                            )}
-                            {isCurrentOld && (
-                              <span className="text-[10px] font-semibold text-destructive">구법</span>
+                      return (
+                        <button
+                          key={`${revision.date}-${index}`}
+                          onClick={() => handleRevisionSelect(revision)}
+                          className={`w-full text-left p-3 rounded-md border transition-all ${
+                            isCurrent
+                              ? 'bg-primary/10 border-primary/40 shadow-md'
+                              : 'bg-card hover:bg-secondary border-border hover:border-primary/20'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={isCurrent ? "default" : "outline"}
+                                className="text-xs"
+                              >
+                                {revision.type}
+                              </Badge>
+                              {isCurrentNew && (
+                                <span className="text-[10px] font-semibold text-success">신법</span>
+                              )}
+                              {isCurrentOld && (
+                                <span className="text-[10px] font-semibold text-destructive">구법</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div className={`font-medium ${isCurrent ? 'text-foreground' : ''}`}>
+                              {revision.date}
+                            </div>
+                            {revision.description && (
+                              <div className="text-muted-foreground text-[11px]">{revision.description}</div>
                             )}
                           </div>
-                          <span className="text-xs text-muted-foreground">#{revisionHistory.length - index}</span>
-                        </div>
-                        <div className="text-xs space-y-1">
-                          <div className={`font-medium ${isCurrent ? 'text-foreground' : ''}`}>
-                            공포: {formatDate(revision.promulgationDate)}
-                          </div>
-                          <div className="text-muted-foreground text-[11px]">{revision.promulgationNumber}</div>
-                          {revision.effectiveDate && (
-                            <div className="text-muted-foreground text-[11px]">시행: {formatDate(revision.effectiveDate)}</div>
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           )}
 
