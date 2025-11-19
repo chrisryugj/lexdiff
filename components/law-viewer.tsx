@@ -569,6 +569,14 @@ export function LawViewer({
     const target = e.target as HTMLElement
     if (target && target.tagName === "A") {
       e.preventDefault()
+      e.stopPropagation() // 이벤트 버블링 차단
+
+      console.log('[handleContentClick] Link clicked:', {
+        tagName: target.tagName,
+        refType: target.getAttribute("data-ref"),
+        article: target.getAttribute("data-article"),
+        law: target.getAttribute("data-law")
+      })
 
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
