@@ -121,6 +121,7 @@ export function LawViewer({
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
   const [refModal, setRefModal] = useState<{ open: boolean; title?: string; html?: string; forceWhiteTheme?: boolean; lawName?: string; articleNumber?: string }>({ open: false })
+  const [refModalHistory, setRefModalHistory] = useState<Array<{ title: string; html?: string; forceWhiteTheme?: boolean; lawName?: string; articleNumber?: string }>>([])
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -633,6 +634,17 @@ export function LawViewer({
           const joCode = buildJO(articleLabel)
           const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
           if (found) {
+            // 현재 모달이 열려있으면 히스토리에 저장
+            if (refModal.open && refModal.title) {
+              setRefModalHistory(prev => [...prev, {
+                title: refModal.title!,
+                html: refModal.html,
+                forceWhiteTheme: refModal.forceWhiteTheme,
+                lawName: refModal.lawName,
+                articleNumber: refModal.articleNumber,
+              }])
+            }
+
             setRefModal({
               open: true,
               title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
@@ -833,25 +845,7 @@ export function LawViewer({
           '<span class="rev-mark">＜$1 $2＞</span>'
         )
 
-        // Linkify law references - IMPORTANT: Order matters! Longer patterns first.
-
-        // 1. 「법령명」 제X조 pattern (긴 패턴 먼저)
-        content = content.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-          const joLabel = "제" + art + "조" + (branch ? "의" + branch : "") + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
-          const label = "「" + lawName + "」 " + joLabel
-          return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + label + '</a>'
-        })
-
-        // 2. 법 제X조 pattern (without 「」)
-        content = content.replace(/([가-힣]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-          const joLabel = "제" + art + "조" + (branch ? "의" + branch : "") + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
-          return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + lawName + '" data-article="' + joLabel + '">' + lawName + ' ' + joLabel + '</a>'
-        })
-
-        // 3. 「법령명」 pattern only (짧은 패턴 마지막)
-        content = content.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
-          return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + '</a>'
-        })
+        // NOTE: 법령 링크는 law-xml-parser.tsx의 linkifyRefsB()에서 처리됨
 
         // Check if content has paragraph markers (①②③) or numbered items (1. 2. 3.)
         const hasParagraphMarkers = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(content)
@@ -936,7 +930,30 @@ export function LawViewer({
 
       const parser = new DOMParser()
       const searchDoc = parser.parseFromString(searchXml, "text/xml")
-      const lawNode = searchDoc.querySelector("law")
+
+      // ✅ 모든 법령 검색하고 가장 짧은 이름 선택 (정확 매칭 우선)
+      const allLaws = Array.from(searchDoc.querySelectorAll("law"))
+      const normalizedSearchName = lawName.replace(/\s+/g, "")
+
+      const exactMatches = allLaws.filter(lawNode => {
+        const nodeLawName = lawNode.querySelector("법령명한글")?.textContent || ""
+        return nodeLawName.replace(/\s+/g, "") === normalizedSearchName
+      })
+
+      const lawNode = exactMatches.length > 0
+        ? exactMatches.reduce((shortest, current) => {
+            const shortestName = shortest.querySelector("법령명한글")?.textContent || ""
+            const currentName = current.querySelector("법령명한글")?.textContent || ""
+            return currentName.length < shortestName.length ? current : shortest
+          })
+        : allLaws[0]
+
+      console.log('[Citation] Law matching:', {
+        searched: lawName,
+        found: lawNode?.querySelector("법령명한글")?.textContent,
+        exactMatches: exactMatches.length,
+        totalResults: allLaws.length
+      })
 
       const lawId = lawNode?.querySelector("법령ID")?.textContent || undefined
       const mst = lawNode?.querySelector("법령일련번호")?.textContent || undefined
@@ -1200,6 +1217,17 @@ export function LawViewer({
             html: `<div class="space-y-3"><p>⚠️ 조문 내용을 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground">이 조문은 최근 개정으로 인해 내용이 변경되었거나 삭제되었을 수 있습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기</a></div></div>`,
           })
           return
+        }
+
+        // 현재 모달이 열려있으면 히스토리에 저장
+        if (refModal.open && refModal.title) {
+          setRefModalHistory(prev => [...prev, {
+            title: refModal.title!,
+            html: refModal.html,
+            forceWhiteTheme: refModal.forceWhiteTheme,
+            lawName: refModal.lawName,
+            articleNumber: refModal.articleNumber,
+          }])
         }
 
         setRefModal({
@@ -3074,13 +3102,29 @@ export function LawViewer({
         </Card >
         <ReferenceModal
           isOpen={refModal.open}
-          onClose={() => setRefModal({ open: false })}
+          onClose={() => {
+            setRefModal({ open: false })
+            setRefModalHistory([]) // 히스토리 초기화
+          }}
           title={refModal.title || "연결된 본문"}
           html={refModal.html}
           onContentClick={handleContentClick}
           forceWhiteTheme={refModal.forceWhiteTheme}
           lawName={refModal.lawName}
           articleNumber={refModal.articleNumber}
+          hasHistory={refModalHistory.length > 0}
+          onBack={() => {
+            // 히스토리에서 마지막 항목 가져오기
+            const lastItem = refModalHistory[refModalHistory.length - 1]
+            if (lastItem) {
+              setRefModal({
+                open: true,
+                ...lastItem
+              })
+              // 히스토리에서 제거
+              setRefModalHistory(prev => prev.slice(0, -1))
+            }
+          }}
         />
       </div >
     </>

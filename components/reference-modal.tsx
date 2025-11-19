@@ -5,7 +5,7 @@ import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, Copy, Check, ExternalLink } from "lucide-react"
+import { ZoomIn, ZoomOut, Copy, Check, ExternalLink, ArrowLeft } from "lucide-react"
 
 interface ReferenceModalProps {
   isOpen: boolean
@@ -17,9 +17,11 @@ interface ReferenceModalProps {
   forceWhiteTheme?: boolean
   lawName?: string
   articleNumber?: string
+  hasHistory?: boolean
+  onBack?: () => void
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const [copied, setCopied] = useState(false)
@@ -80,7 +82,21 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
       <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]" style={{ fontFamily: 'Pretendard, sans-serif' }}>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle className="text-base font-semibold truncate flex-1 pr-2">{title}</DialogTitle>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {/* 뒤로가기 버튼 (히스토리가 있을 때만 표시) */}
+              {hasHistory && onBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onBack}
+                  className="p-1 h-7 w-7 flex-shrink-0"
+                  title="이전 법령으로"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <DialogTitle className="text-base font-semibold truncate">{title}</DialogTitle>
+            </div>
             <div className="flex items-center gap-2 flex-wrap" style={{ marginRight: '16px' }}>
               {/* 폰트 크기 조절 */}
               <div className="flex items-center gap-1">
