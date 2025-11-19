@@ -1,6 +1,7 @@
 ﻿import type { LawArticle, LawParagraph, LawItem, LawMeta } from "./law-types"
 import { debugLogger } from "./debug-logger"
 import { buildJO } from "./law-parser"
+import { linkifyRefsB } from "./unified-link-generator"
 
 export function parseLawXML(xmlText: string): {
   meta: LawMeta
@@ -73,7 +74,7 @@ function extractTitleFromContent(content: string): string | undefined {
     return match[1].trim()
   }
 
-  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?[^(（]*[（(]\s*([^)）]+?)\s*[）)]/s)
+  match = normalized.match(/제\s*\d+\s*조(?:의\d+)?[^(（]*[（(]\s*([^)）]+?)\s*[）)]/)
   if (match) {
     return match[1].trim()
   }
@@ -302,7 +303,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
       content = applyRevisionStyling(content)
 
       // 조문 제목 패턴 매치 - 제X조(제목) 형식
-      const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*(.*)$/s)
+      const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*([\s\S]*)$/)
 
       if (titleMatch) {
         const titlePart = titleMatch[1]  // 제X조(제목)
@@ -515,152 +516,8 @@ function applyRevisionStyling(text: string): string {
   return styled
 }
 
-function linkifyRefsB(text: string): string {
-  let t = text
-
-  // First, handle "같은 법" pattern - 조문까지만 링크
-  t = t.replace(/같은\s*법\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, art, _p1, branch, _p2, para, _p3, item, offset) => {
-    // Find last 「법령명」 before this position
-    const textBefore = t.substring(0, offset)
-    const allLawMatches = textBefore.matchAll(/「\s*([^」]+)\s*」/g)
-    const lawMatchesArray = Array.from(allLawMatches)
-
-    if (lawMatchesArray.length > 0) {
-      const lastLawMatch = lawMatchesArray[lawMatchesArray.length - 1]
-      const lawName = lastLawMatch[1].trim()
-      const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
-      const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
-
-      return (
-        '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-        lawName +
-        '" data-article="' +
-        joLabel +  // 조문까지만
-        '">같은 법 ' +
-        fullLabel +  // 전체 텍스트 표시
-        "</a>"
-      )
-    }
-
-    return match  // If no law found, keep original text
-  })
-
-  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
-  t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
-    const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
-
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +  // 조문까지만 data-article에 저장
-      '">「' +
-      lawName +
-      '」 ' +
-      fullLabel +  // 전체 텍스트는 표시
-      "</a>"
-    )
-  })
-
-  // 2. 「법령명」 단독 패턴 (조문 번호 없음)
-  t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
-    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
-  })
-
-  // 3. 패턴 제거 - 「」없는 법령명은 링크하지 않음
-  // 이유: HTML 속성 내부 텍스트를 잘못 매칭하는 문제를 피하기 위함
-  // 대부분의 법령 참조는 「」를 사용하므로 패턴 1,2로 충분
-
-  // 4. XXX부령으로/로 정하는 패턴
-  t = t.replace(
-    /([가-힣]+부령)(?:으로|로)\s*정하는/g,
-    (m, term) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
-  )
-
-  // 5. 대통령령으로 정하는 패턴
-  t = t.replace(
-    /(대통령령)(?:으로|로)\s*정하는/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
-  )
-
-  // 6. XXX이/가 정하는 패턴 (관세청장이 정하는 등)
-  t = t.replace(
-    /([가-힣]+(?:청장|장관|부장관|차관|위원장|원장|이사장))(?:이|가)\s*정하는/g,
-    (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
-  )
-
-  // 6.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
-  // "도로법 시행규칙" -> 법령 링크 (국가법령)
-  // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요)
-  t = t.replace(
-    /(?<!")([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?!\s*제)(?![으로로이가<])/g,
-    (match, lawName, type) => {
-      const trimmedName = lawName.trim()
-
-      // 조례 시행규칙은 국가법령 검색에서 찾을 수 없으므로 링크하지 않음
-      if (trimmedName.endsWith('조례')) {
-        return match
-      }
-
-      const fullLawName = trimmedName + ' ' + type
-      return '<a href="#" class="law-ref" data-ref="law" data-law="' + fullLawName + '">' + fullLawName + '</a>'
-    }
-  )
-
-  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
-  // "법률 시행규칙" 처럼 앞에 한글과 공백이 있으면 제외
-  // 부령의 경우 전체 단어만 매칭 (국토교통부령 전체, 토교통부령 X)
-  t = t.replace(
-    /(?<!">)(?<![가-힣]\s)(?<![가-힣])([가-힣]+부령|시행규칙)(?![으로로이가<])/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
-  )
-
-  // 9. 제X조 패턴 (현재 법령의 조문) - 「법령명」 뒤에 오는 경우 제외
-  //     data-article 속성값 내부 중복 매칭 방지
-  t = t.replace(/(?<!data-article=")(?<!data-article=')(?<!」\s)제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?(?![제\d])/g, (m) => {
-    const label = m
-    const data = m.replace(/\s+/g, "")
-    return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + "</a>"
-  })
-
-  return t
-}
-
-// Ordinance-specific linkify function (removes internal article links)
-function linkifyOrdinanceRefs(text: string): string {
-  let t = text
-
-  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
-  t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
-    const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
-
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +  // 조문까지만
-      '">「' +
-      lawName +
-      '」 ' +
-      fullLabel +  // 전체 텍스트 표시
-      "</a>"
-    )
-  })
-
-  // 2. 「법령명」 단독 패턴
-  t = t.replace(/「\s*([^」]+)\s*」/g, (match, lawName) => {
-    return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
-  })
-
-  // 3. 패턴 제거 - 「」없는 법령명은 링크하지 않음
-  // 이유: HTML 속성 내부 텍스트를 잘못 매칭하는 문제를 피하기 위함
-
-  // NOTE: 조례 자체 조문 (제X조)은 링크하지 않음
-
-  return t
-}
+// 기존 linkifyRefsB 및 linkifyOrdinanceRefs 함수는 통합 시스템(unified-link-generator)으로 대체됨
+// import { linkifyRefsB } from "./unified-link-generator"를 사용
 
 
 
