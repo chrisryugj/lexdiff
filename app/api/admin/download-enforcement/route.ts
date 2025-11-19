@@ -79,6 +79,126 @@ async function fetchLawContent(lawId: string) {
 }
 
 /**
+ * Extract content from 항 array (paragraph array)
+ * CRITICAL: 항내용 없고 호만 있는 경우 처리
+ */
+function extractContentFromHangArray(hangArray: any[], articleNum?: string): string {
+  let content = ''
+
+  if (!Array.isArray(hangArray)) {
+    if (articleNum === '55') {
+      console.log('[DEBUG-EXTRACT] Article 55: hangArray is not an array!', typeof hangArray)
+    }
+    return content
+  }
+
+  // DEBUG: 제55조 항 구조 상세 로그
+  if (articleNum === '55') {
+    console.log('[DEBUG-EXTRACT] Article 55 hangArray structure:', {
+      length: hangArray.length,
+      firstHang_keys: hangArray[0] ? Object.keys(hangArray[0]) : null,
+      firstHang_항내용: hangArray[0]?.항내용,
+      firstHang_has호: !!hangArray[0]?.호,
+      firstHang_호_type: typeof hangArray[0]?.호,
+      firstHang_호_isArray: Array.isArray(hangArray[0]?.호),
+      firstHang_호_length: hangArray[0]?.호?.length,
+      firstHang_호_first: hangArray[0]?.호?.[0]
+    })
+  }
+
+  // 먼저 항내용이 있는지 확인
+  const hasHangContent = hangArray.some(hang => {
+    const hangContent = hang.항내용
+    if (!hangContent) return false
+
+    // 배열인 경우
+    if (Array.isArray(hangContent)) {
+      return hangContent.some(c => c && c.trim())
+    }
+    // 문자열인 경우
+    return hangContent.trim().length > 0
+  })
+
+  // 모든 호 수집
+  const allItems = hangArray.flatMap(hang => {
+    if (hang.호 && Array.isArray(hang.호)) {
+      return hang.호
+    }
+    return []
+  })
+
+  if (articleNum === '55') {
+    console.log('[DEBUG-EXTRACT] Article 55 parsing decision:', {
+      hasHangContent,
+      allItems_length: allItems.length,
+      willUse: hasHangContent ? 'hang+ho logic' : (allItems.length > 0 ? 'ho only logic' : 'nothing')
+    })
+  }
+
+  if (hasHangContent) {
+    // 항내용이 있는 경우: 기존 로직
+    for (const hang of hangArray) {
+      if (hang.항내용) {
+        let hangContent = hang.항내용
+        if (Array.isArray(hangContent)) {
+          hangContent = hangContent.join('\n')
+        }
+        content += '\n' + hangContent
+      }
+
+      if (hang.호 && Array.isArray(hang.호)) {
+        for (const ho of hang.호) {
+          if (ho.호내용) {
+            let hoContent = ho.호내용
+            if (Array.isArray(hoContent)) {
+              hoContent = hoContent.join('\n')
+            }
+            content += '\n' + hoContent
+          }
+
+          if (ho.목 && Array.isArray(ho.목)) {
+            for (const mok of ho.목) {
+              if (mok.목내용) {
+                let mokContent = mok.목내용
+                if (Array.isArray(mokContent)) {
+                  mokContent = mokContent.join('\n')
+                }
+                content += '\n  ' + mokContent
+              }
+            }
+          }
+        }
+      }
+    }
+  } else if (allItems.length > 0) {
+    // 항내용 없고 호만 있는 경우: 호만 추가
+    for (const ho of allItems) {
+      if (ho.호내용) {
+        let hoContent = ho.호내용
+        if (Array.isArray(hoContent)) {
+          hoContent = hoContent.join('\n')
+        }
+        content += '\n' + hoContent
+      }
+
+      if (ho.목 && Array.isArray(ho.목)) {
+        for (const mok of ho.목) {
+          if (mok.목내용) {
+            let mokContent = mok.목내용
+            if (Array.isArray(mokContent)) {
+              mokContent = mokContent.join('\n')
+            }
+            content += '\n  ' + mokContent
+          }
+        }
+      }
+    }
+  }
+
+  return content.trim()
+}
+
+/**
  * Parse law JSON
  */
 function parseLawJSON(jsonData: any) {
@@ -137,69 +257,32 @@ function parseLawJSON(jsonData: any) {
       }
     }
 
+    // DEBUG: 제55조 구조 확인
+    if (articleNum === '55' || displayNumber.includes('55')) {
+      console.log('[DEBUG-ADMIN] Article 55 structure:', {
+        조문번호: articleNum,
+        조문내용_length: unit.조문내용?.length,
+        조문내용_sample: unit.조문내용?.substring(0, 100),
+        mainContent_length: mainContent.length,
+        mainContent_sample: mainContent.substring(0, 100),
+        has항: !!unit.항,
+        항_isArray: Array.isArray(unit.항),
+        항_length: unit.항?.length,
+        항_structure: JSON.stringify(unit.항, null, 2)?.substring(0, 1000)
+      })
+    }
+
     // STEP 2: 항/호/목 추출
     let paraContent = ''
+    if (unit.항 && Array.isArray(unit.항)) {
+      paraContent = extractContentFromHangArray(unit.항, articleNum)
 
-    // 먼저 항내용이 있는지 확인
-    const hasHangContent = unit.항 && Array.isArray(unit.항) && unit.항.some(hang => {
-      const hangContent = hang.항내용
-      if (!hangContent) return false
-      if (Array.isArray(hangContent)) {
-        return hangContent.some(c => c && c.trim())
-      }
-      return hangContent.trim().length > 0
-    })
-
-    // 모든 호 수집
-    const allItems = unit.항 && Array.isArray(unit.항) ? unit.항.flatMap(hang => {
-      if (hang.호 && Array.isArray(hang.호)) {
-        return hang.호
-      }
-      return []
-    }) : []
-
-    if (hasHangContent) {
-      // 항내용이 있는 경우: 기존 로직
-      for (const hang of unit.항) {
-        if (hang.항내용) {
-          let hangContent = Array.isArray(hang.항내용) ? hang.항내용.join('\n') : hang.항내용
-          paraContent += '\n' + hangContent
-        }
-
-        if (hang.호 && Array.isArray(hang.호)) {
-          for (const ho of hang.호) {
-            if (ho.호내용) {
-              let hoContent = Array.isArray(ho.호내용) ? ho.호내용.join('\n') : ho.호내용
-              paraContent += '\n' + hoContent
-            }
-
-            if (ho.목 && Array.isArray(ho.목)) {
-              for (const mok of ho.목) {
-                if (mok.목내용) {
-                  let mokContent = Array.isArray(mok.목내용) ? mok.목내용.join('\n') : mok.목내용
-                  paraContent += '\n  ' + mokContent
-                }
-              }
-            }
-          }
-        }
-      }
-    } else if (allItems.length > 0) {
-      // 항내용 없고 호만 있는 경우: 호만 추가
-      for (const ho of allItems) {
-        if (ho.호내용) {
-          let hoContent = Array.isArray(ho.호내용) ? ho.호내용.join('\n') : ho.호내용
-          paraContent += '\n' + hoContent
-        }
-
-        if (ho.목 && Array.isArray(ho.목)) {
-          for (const mok of ho.목) {
-            if (mok.목내용) {
-              let mokContent = Array.isArray(mok.목내용) ? mok.목내용.join('\n') : mok.목내용
-              paraContent += '\n  ' + mokContent
-            }
-          }
-        }
+      // DEBUG: 제55조 paraContent 확인
+      if (articleNum === '55' || displayNumber.includes('55')) {
+        console.log('[DEBUG-ADMIN] Article 55 paraContent:', {
+          paraContent_length: paraContent.length,
+          paraContent_sample: paraContent.substring(0, 200)
+        })
       }
     }
 
@@ -208,10 +291,10 @@ function parseLawJSON(jsonData: any) {
     if (mainContent) {
       content = mainContent
       if (paraContent) {
-        content += paraContent  // trim 제거 - 줄바꿈 유지
+        content += '\n' + paraContent
       }
     } else {
-      content = paraContent.trimStart()  // 앞쪽 공백만 제거
+      content = paraContent
     }
 
     articles.push({

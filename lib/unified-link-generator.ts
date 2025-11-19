@@ -138,13 +138,15 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
 
 /**
  * 「」 없는 법령명 패턴 수집 (aggressive 모드)
+ * 단순 법령명만 처리 (복합 법령명은 「」 사용 권장)
  */
 function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
-  // 복합 법령명 + 제X조 패턴
-  const complexRegex = /(?<!「)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+  // 단순 법령명 패턴: 2-10 단어 + (법/령/규칙) + 조문
+  // "관세법 제38조", "도로법 시행령 제55조" 등
+  const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례))\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
   let match: RegExpExecArray | null
 
-  while ((match = complexRegex.exec(text)) !== null) {
+  while ((match = simpleRegex.exec(text)) !== null) {
     // 이미 「」로 처리된 영역 제외
     const isInQuoted = matches.some(m =>
       m.type === 'law-quoted' &&
@@ -306,11 +308,35 @@ export function linkifyRefsB(text: string): string {
 
 /**
  * AI 답변용 (aggressive 모드)
+ * 이스케이프된 HTML 텍스트를 처리
  */
-export function linkifyRefsAI(text: string): string {
-  return generateLinks(text, {
+export function linkifyRefsAI(escapedText: string): string {
+  // 1. HTML 디코드
+  const text = escapedText
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+
+  // 2. 링크 생성
+  const linked = generateLinks(text, {
     mode: 'aggressive',
     enableSameRef: false,
     enableAdminRules: false
+  })
+
+  // 3. 링크 태그 외의 부분만 재이스케이프
+  return linked.replace(/(<a[^>]*>.*?<\/a>)|([^<]+|<(?!a\s|\/a>))/g, (match, link, text) => {
+    if (link) return link // 링크는 그대로
+    if (text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
+    return match
   })
 }

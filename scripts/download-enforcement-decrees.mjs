@@ -133,6 +133,101 @@ async function fetchLawContent(lawId) {
 }
 
 /**
+ * Extract content from 항 array (paragraph array)
+ * CRITICAL: 항내용 없고 호만 있는 경우 처리
+ */
+function extractContentFromHangArray(hangArray) {
+  let content = ''
+
+  if (!Array.isArray(hangArray)) {
+    return content
+  }
+
+  // 먼저 항내용이 있는지 확인
+  const hasHangContent = hangArray.some(hang => {
+    const hangContent = hang.항내용
+    if (!hangContent) return false
+
+    // 배열인 경우
+    if (Array.isArray(hangContent)) {
+      return hangContent.some(c => c && c.trim())
+    }
+    // 문자열인 경우
+    return hangContent.trim().length > 0
+  })
+
+  // 모든 호 수집
+  const allItems = hangArray.flatMap(hang => {
+    if (hang.호 && Array.isArray(hang.호)) {
+      return hang.호
+    }
+    return []
+  })
+
+  if (hasHangContent) {
+    // 항내용이 있는 경우: 기존 로직
+    for (const hang of hangArray) {
+      if (hang.항내용) {
+        let hangContent = hang.항내용
+        if (Array.isArray(hangContent)) {
+          hangContent = hangContent.join('\n')
+        }
+        content += '\n' + hangContent
+      }
+
+      if (hang.호 && Array.isArray(hang.호)) {
+        for (const ho of hang.호) {
+          if (ho.호내용) {
+            let hoContent = ho.호내용
+            if (Array.isArray(hoContent)) {
+              hoContent = hoContent.join('\n')
+            }
+            content += '\n' + hoContent
+          }
+
+          if (ho.목 && Array.isArray(ho.목)) {
+            for (const mok of ho.목) {
+              if (mok.목내용) {
+                let mokContent = mok.목내용
+                if (Array.isArray(mokContent)) {
+                  mokContent = mokContent.join('\n')
+                }
+                content += '\n  ' + mokContent
+              }
+            }
+          }
+        }
+      }
+    }
+  } else if (allItems.length > 0) {
+    // 항내용 없고 호만 있는 경우: 호만 추가
+    for (const ho of allItems) {
+      if (ho.호내용) {
+        let hoContent = ho.호내용
+        if (Array.isArray(hoContent)) {
+          hoContent = hoContent.join('\n')
+        }
+        content += '\n' + hoContent
+      }
+
+      if (ho.목 && Array.isArray(ho.목)) {
+        for (const mok of ho.목) {
+          if (mok.목내용) {
+            let mokContent = mok.목내용
+            if (Array.isArray(mokContent)) {
+              mokContent = mokContent.join('\n')
+            }
+            content += '\n  ' + mokContent
+          }
+        }
+      }
+    }
+  }
+
+  return content.trim()
+}
+
+/**
  * Parse law JSON (simplified from law-parser-server.ts)
  */
 function parseLawJSON(jsonData) {
@@ -173,38 +268,33 @@ function parseLawJSON(jsonData) {
     }
 
     // STEP 1: 본문 추출 (조문내용)
+    // CRITICAL: 제목 부분 제거 (마크다운 헤더에 이미 포함됨)
     let mainContent = ''
     if (unit.조문내용 && typeof unit.조문내용 === 'string') {
-      mainContent = unit.조문내용.trim()
+      let rawContent = unit.조문내용.trim()
+
+      // 제목 패턴: 제X조(제목) 또는 제X조의Y(제목)
+      const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)[\s\S]*/)
+
+      if (headerMatch) {
+        const headerPart = headerMatch[1]
+        const bodyPart = rawContent.substring(headerPart.length).trim()
+
+        // 제목 제거하고 본문만 저장
+        if (bodyPart) {
+          mainContent = bodyPart
+        }
+        // else: 본문 없음 (호만 있는 경우이므로 mainContent는 빈 문자열)
+      } else {
+        // 제목 형식이 아니면 전체를 본문으로
+        mainContent = rawContent
+      }
     }
 
     // STEP 2: 항/호/목 추출
     let paraContent = ''
     if (unit.항 && Array.isArray(unit.항)) {
-      for (const hang of unit.항) {
-        if (hang.항내용) {
-          let hangContent = Array.isArray(hang.항내용) ? hang.항내용.join('\n') : hang.항내용
-          paraContent += '\n' + hangContent
-        }
-
-        if (hang.호 && Array.isArray(hang.호)) {
-          for (const ho of hang.호) {
-            if (ho.호내용) {
-              let hoContent = Array.isArray(ho.호내용) ? ho.호내용.join('\n') : ho.호내용
-              paraContent += '\n' + hoContent
-            }
-
-            if (ho.목 && Array.isArray(ho.목)) {
-              for (const mok of ho.목) {
-                if (mok.목내용) {
-                  let mokContent = Array.isArray(mok.목내용) ? mok.목내용.join('\n') : mok.목내용
-                  paraContent += '\n  ' + mokContent
-                }
-              }
-            }
-          }
-        }
-      }
+      paraContent = extractContentFromHangArray(unit.항)
     }
 
     // STEP 3: 본문 + 항/호 결합
@@ -212,10 +302,10 @@ function parseLawJSON(jsonData) {
     if (mainContent) {
       content = mainContent
       if (paraContent) {
-        content += '\n' + paraContent.trim()
+        content += '\n' + paraContent
       }
     } else {
-      content = paraContent.trim()
+      content = paraContent
     }
 
     articles.push({

@@ -20,23 +20,20 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = markLawQuotes(text)
   debugLogger.info('마커 추가 후', { hasMarker: text.includes('<<<QUOTE_START>>>') })
 
-  // 3단계: 법령 링크를 임시 마커로 변환 (이스케이프 전에)
-  // 통합 시스템 사용 - aggressive 모드로 모든 패턴 매칭
-  text = linkifyRefsAI(text)
-  debugLogger.info('링크 마커 변환 후', { hasLawLink: text.includes('law-ref') })
-
-  // 4단계: HTML 이스케이프
+  // 3단계: HTML 이스케이프 (링크 생성 전에)
   text = escapeHtml(text)
   debugLogger.info('이스케이프 후', { hasEscapedMarker: text.includes('&lt;&lt;&lt;QUOTE_START&gt;&gt;&gt;') })
 
-  // 5단계: 구조화 항목 스타일링 추가
+  // 4단계: 구조화 항목 스타일링 추가
   text = styleStructuredSections(text)
   debugLogger.info('스타일링 후', { hasBlockquote: text.includes('<blockquote') })
 
-  // 6단계: 링크는 이미 생성됨 (통합 시스템에서 처리 완료)
+  // 5단계: 법령 링크 생성 (이스케이프된 텍스트 처리)
+  // linkifyRefsAI가 디코드 → 링크 생성 → 재이스케이프 처리
+  text = linkifyRefsAI(text)
   debugLogger.info('링크 생성 완료', { hasLawLink: text.includes('law-ref') })
 
-  // 7단계: 줄바꿈 처리
+  // 6단계: 줄바꿈 처리
   // 연속된 빈 줄 제거
   text = text.replace(/\n\n+/g, '\n')
 
