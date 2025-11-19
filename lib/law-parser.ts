@@ -136,6 +136,7 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
   const trimmedLawName = normalizedQuery.trim()
   const lawNameResolution = resolveLawAlias(trimmedLawName)
 
+  debugLogger.info("법령명 정규화 결과", {
     lawName: lawNameResolution.canonical,
     matchedAlias: lawNameResolution.matchedAlias,
   })
