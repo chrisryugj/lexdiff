@@ -1935,7 +1935,7 @@ export function LawViewer({
                   ))}
                 </div>
               ) : viewMode === "full" ? (
-                <div className="space-y-10">
+                <div className="space-y-4">
                   {preambles.map((preamble, index) => (
                     <div
                       key={`preamble-${index}`}
@@ -1953,8 +1953,8 @@ export function LawViewer({
                       }}
                       className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
                     >
-                      <div className="mb-6 pb-4 border-b border-border">
-                        <h3 className="text-lg font-bold text-foreground mb-2 flex items-center gap-2">
+                      <div className="mb-2 pb-1 border-b border-border">
+                        <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
                           {formatSimpleJo(article.jo)}
                           {article.title && <span className="text-muted-foreground">({article.title})</span>}
                           {activeJo === article.jo && (
@@ -1989,7 +1989,7 @@ export function LawViewer({
                         </div>
                       )}
 
-                      {index < actualArticles.length - 1 && <Separator className="my-8" />}
+                      {index < actualArticles.length - 1 && <Separator className="my-3" />}
                     </div>
                   ))}
                 </div>

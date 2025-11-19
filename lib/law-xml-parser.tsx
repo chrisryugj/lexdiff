@@ -268,14 +268,31 @@ function extractRevisionMarks(
 
 export function extractArticleText(article: LawArticle, isOrdinance = false): string {
   let text = ""
+  let hasMainContent = false
 
   if (article.content) {
     let content = escapeHtml(article.content)
     content = applyRevisionStyling(content)
 
-    // Make article number and title bold BEFORE linkifying (for both laws and ordinances)
-    // This catches patterns like "제1조(목적)" or "제1조" at the start
-    content = content.replace(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)/, '<strong>$1</strong>')
+    // 조문 제목 패턴 매치 - 제X조(제목) 형식
+    const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*(.*)$/s)
+
+    if (titleMatch) {
+      const titlePart = titleMatch[1]  // 제X조(제목)
+      const bodyPart = titleMatch[2]   // 나머지 본문
+
+      // 제목 부분을 bold로
+      content = '<strong>' + titlePart + '</strong>'
+
+      // 본문이 있으면 추가
+      if (bodyPart && bodyPart.trim()) {
+        content += ' ' + bodyPart
+        hasMainContent = true
+      }
+    } else {
+      // 제목 형식이 아니면 전체를 본문으로 처리
+      hasMainContent = true
+    }
 
     content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content)
 
@@ -426,7 +443,7 @@ function applyRevisionStyling(text: string): string {
 function linkifyRefsB(text: string): string {
   let t = text
 
-  // First, handle "같은 법" pattern by finding the last law name before each occurrence
+  // First, handle "같은 법" pattern - 조문까지만 링크
   t = t.replace(/같은\s*법\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, art, _p1, branch, _p2, para, _p3, item, offset) => {
     // Find last 「법령명」 before this position
     const textBefore = t.substring(0, offset)
@@ -436,17 +453,16 @@ function linkifyRefsB(text: string): string {
     if (lawMatchesArray.length > 0) {
       const lastLawMatch = lawMatchesArray[lawMatchesArray.length - 1]
       const lawName = lastLawMatch[1].trim()
-      const joLabel = "제" + art + "조" +
-        (branch ? "의" + branch : "") +
-        (para ? "제" + para + "항" : "") +
-        (item ? "제" + item + "호" : "")
+      const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
+      const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
+
       return (
         '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
         lawName +
         '" data-article="' +
-        joLabel +
+        joLabel +  // 조문까지만
         '">같은 법 ' +
-        joLabel +
+        fullLabel +  // 전체 텍스트 표시
         "</a>"
       )
     }
@@ -454,21 +470,20 @@ function linkifyRefsB(text: string): string {
     return match  // If no law found, keep original text
   })
 
-  // 1. 「법령명」 제X조 패턴 (조문 번호 포함) - 항/호까지 포함
+  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
   t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" +
-      (branch ? "의" + branch : "") +
-      (para ? "제" + para + "항" : "") +
-      (item ? "제" + item + "호" : "")
+    const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
+    const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
+
     return (
       '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
       lawName +
       '" data-article="' +
-      joLabel +
+      joLabel +  // 조문까지만 data-article에 저장
       '">「' +
       lawName +
       '」 ' +
-      joLabel +
+      fullLabel +  // 전체 텍스트는 표시
       "</a>"
     )
   })
@@ -478,23 +493,9 @@ function linkifyRefsB(text: string): string {
     return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
   })
 
-  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 항/호까지 포함
-  // "법률 시행령"같이 법률 뒤에 다른 단어가 오는 경우 제외
-  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+(?:법률|법|령|규칙|조례))(?!\s+[가-힣]+령)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" +
-      (branch ? "의" + branch : "") +
-      (para ? "제" + para + "항" : "") +
-      (item ? "제" + item + "호" : "")
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +
-      '">' +
-      match +
-      "</a>"
-    )
-  })
+  // 3. 패턴 제거 - 「」없는 법령명은 링크하지 않음
+  // 이유: HTML 속성 내부 텍스트를 잘못 매칭하는 문제를 피하기 위함
+  // 대부분의 법령 참조는 「」를 사용하므로 패턴 1,2로 충분
 
   // 4. XXX부령으로/로 정하는 패턴
   t = t.replace(
@@ -514,15 +515,18 @@ function linkifyRefsB(text: string): string {
     (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
   )
 
-  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외)
+  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
+  // "법률 시행령" 처럼 앞에 한글과 공백이 있으면 제외
   t = t.replace(
-    /(?<!">)(대통령령|시행령)(?![으로로이가<])/g,
+    /(?<!">)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가<])/g,
     (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
   )
 
-  // 8. 부령, 시행규칙 단독 (이미 링크된 텍스트 제외)
+  // 8. 부령, 시행규칙 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
+  // "법률 시행규칙" 처럼 앞에 한글과 공백이 있으면 제외
+  // 부령의 경우 전체 단어만 매칭 (국토교통부령 전체, 토교통부령 X)
   t = t.replace(
-    /(?<!">)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가<])/g,
+    /(?<!">)(?<![가-힣]\s)(?<![가-힣])([가-힣]+부령|시행규칙)(?![으로로이가<])/g,
     (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="rule">' + m + "</a>",
   )
 
@@ -540,21 +544,20 @@ function linkifyRefsB(text: string): string {
 function linkifyOrdinanceRefs(text: string): string {
   let t = text
 
-  // 1. 「법령명」 제X조 패턴 - 외부 법령 참조만 링크
+  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
   t = t.replace(/「\s*([^」]+)\s*」\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" +
-      (branch ? "의" + branch : "") +
-      (para ? "제" + para + "항" : "") +
-      (item ? "제" + item + "호" : "")
+    const joLabel = "제" + art + "조" + (branch ? "의" + branch : "")
+    const fullLabel = joLabel + (para ? "제" + para + "항" : "") + (item ? "제" + item + "호" : "")
+
     return (
       '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
       lawName +
       '" data-article="' +
-      joLabel +
+      joLabel +  // 조문까지만
       '">「' +
       lawName +
       '」 ' +
-      joLabel +
+      fullLabel +  // 전체 텍스트 표시
       "</a>"
     )
   })
@@ -564,23 +567,8 @@ function linkifyOrdinanceRefs(text: string): string {
     return '<a href="#" class="law-ref" data-ref="law" data-law="' + lawName + '">' + match + "</a>"
   })
 
-  // 3. 법령명 제X조 패턴 (꺽쇄 없는 버전) - 이미 링크되지 않은 경우만
-  // Lookahead to avoid breaking mid-attribute
-  t = t.replace(/(?<!">)(?<!"data-article=")([가-힣A-Za-z\d·]+법)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!<\/a>)(?!["\)])/g, (match, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const joLabel = "제" + art + "조" +
-      (branch ? "의" + branch : "") +
-      (para ? "제" + para + "항" : "") +
-      (item ? "제" + item + "호" : "")
-    return (
-      '<a href="#" class="law-ref" data-ref="law-article" data-law="' +
-      lawName +
-      '" data-article="' +
-      joLabel +
-      '">' +
-      match +
-      "</a>"
-    )
-  })
+  // 3. 패턴 제거 - 「」없는 법령명은 링크하지 않음
+  // 이유: HTML 속성 내부 텍스트를 잘못 매칭하는 문제를 피하기 위함
 
   // NOTE: 조례 자체 조문 (제X조)은 링크하지 않음
 
