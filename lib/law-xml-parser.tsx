@@ -590,26 +590,6 @@ function linkifyRefsB(text: string): string {
     (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
   )
 
-  // 6.5a. "법령명 + 시행규칙/시행령 + 제X조" 패턴 (조문 번호 있는 경우)
-  // "도로법 시행규칙 제29조" -> 법령 조문 링크 (모달로 표시)
-  t = t.replace(
-    /(?<!")([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙))\s+(시행령|시행규칙)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?![<])/g,
-    (match, lawName, type, art, _p1, branch, _p2, para, _p3, item) => {
-      const trimmedName = lawName.trim()
-
-      // 조례는 제외
-      if (trimmedName.endsWith('조례')) {
-        return match
-      }
-
-      const fullLawName = trimmedName + ' ' + type
-      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-      const fullLabel = joLabel + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
-
-      return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + fullLawName + '" data-article="' + joLabel + '">' + fullLawName + ' ' + fullLabel + '</a>'
-    }
-  )
-
   // 6.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
   // "도로법 시행규칙" -> 법령 링크 (국가법령)
   // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요)

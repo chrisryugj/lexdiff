@@ -514,8 +514,9 @@ function linkifyRefsB(text: string): string {
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 임시 마커로 변환
   // 복합 법령명 처리를 위해 개선된 패턴 (법률 시행령, 법 시행령 등)
+  // CRITICAL: 이미 「」로 처리된 것과 마커 안의 텍스트 제외
   t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+?(?:법률\s+시행령|법률\s+시행규칙|법\s+시행령|법\s+시행규칙|법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
+    /(?<!<<<[^>]*|「)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+?(?:법률\s+시행령|법률\s+시행규칙|법\s+시행령|법\s+시행규칙|법률|법|령|규칙|조례))(?!」)\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
     (_match, lawName, art, _p2, branch, title) => {
       const cleanLawName = lawName.trim()
       const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
@@ -529,26 +530,6 @@ function linkifyRefsB(text: string): string {
     const data = m.replace(/\s+/g, '')
     return '<<<ARTICLE:' + data + '>>>'
   })
-
-  // 5.5a. "법령명 + 시행규칙/시행령 + 제X조" 패턴 (조문 번호 있는 경우)
-  // "도로법 시행규칙 제29조" -> LAWLINK_ARTICLE (국가법령 조문 링크)
-  t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙))\s+(시행령|시행규칙)\s+제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?(?![>])/g,
-    (match, lawName, type, art, _p1, branch, _p2, para, _p3, item) => {
-      const trimmedName = lawName.trim()
-
-      // 조례는 제외
-      if (trimmedName.endsWith('조례')) {
-        return match
-      }
-
-      const fullLawName = trimmedName + ' ' + type
-      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
-      const displayLabel = joLabel + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
-
-      return '<<<LAWLINK_WITH_ARTICLE:' + fullLawName + '|||' + joLabel + '|||' + displayLabel + '>>>'
-    }
-  )
 
   // 5.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
   // "도로법 시행규칙" -> LAWLINK (국가법령)

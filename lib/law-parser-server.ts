@@ -208,28 +208,9 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
     let mainContent = "" // 본문 (조문내용에서 추출)
 
     // STEP 1: 본문 추출 (조문내용에서)
+    // CRITICAL: 제목 제거 없이 원본 유지 (마크다운 생성 시 자동 처리)
     if (unit.조문내용 && typeof unit.조문내용 === "string") {
-      let rawContent = unit.조문내용.trim()
-
-      // Try to extract header for comparison
-      const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)(.*)$/s)
-
-      if (headerMatch) {
-        const headerPart = headerMatch[1]  // 제X조(제목)
-        const bodyPart = headerMatch[2].trim()  // 나머지 본문
-
-        if (bodyPart) {
-          // 본문이 있으면 본문만 저장
-          mainContent = bodyPart
-        } else {
-          // 본문 없이 제목만 있는 경우 (도로법 시행령 55조)
-          // 제목을 그대로 유지 (호가 있을 수 있음)
-          mainContent = headerPart
-        }
-      } else {
-        // 제목 형식이 아니면 전체를 본문으로
-        mainContent = rawContent
-      }
+      mainContent = unit.조문내용.trim()
     }
 
     // STEP 2: 항/호 내용 추출
