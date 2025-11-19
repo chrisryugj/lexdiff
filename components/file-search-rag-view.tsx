@@ -294,16 +294,13 @@ export function FileSearchRAGView({
           )}
 
           <LawViewer
-            meta={{ lawId: '', lawTitle: 'AI 답변', promulgationDate: '', lawType: '' }}
-            articles={[]}
-            selectedJo={undefined}
-            favorites={new Set()}
-            isOrdinance={false}
-            viewMode="single"
             aiAnswerMode={true}
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
             aiConfidenceLevel={confidenceLevel}
+            favorites={new Set()}
+            isOrdinance={false}
+            viewMode="single"
           />
         </>
       )}

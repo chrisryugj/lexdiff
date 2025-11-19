@@ -44,8 +44,8 @@ import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
 
 interface LawViewerProps {
-  meta: LawMeta
-  articles: LawArticle[]
+  meta?: LawMeta
+  articles?: LawArticle[]
   selectedJo?: string
   onCompare?: (jo: string) => void
   onSummarize?: (jo: string) => void
@@ -72,8 +72,8 @@ interface LawViewerProps {
 }
 
 export function LawViewer({
-  meta,
-  articles,
+  meta = { lawTitle: '', fetchedAt: new Date().toISOString() },
+  articles = [],
   selectedJo,
   onCompare,
   onSummarize,
