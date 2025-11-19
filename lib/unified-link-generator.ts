@@ -11,6 +11,7 @@ export interface LinkConfig {
   mode: 'safe' | 'aggressive'  // safe: 「」 있는 것만, aggressive: 모든 패턴
   enableSameRef?: boolean       // "같은 법" 패턴 활성화
   enableAdminRules?: boolean    // 행정규칙 링크 활성화
+  currentLawName?: string       // 현재 보고 있는 법령명 (시행령에서 상위법 추론용)
 }
 
 interface LinkMatch {
@@ -31,7 +32,7 @@ export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' 
 
   // 1단계: 모든 매칭 수집
   if (config.enableSameRef) {
-    collectSameLawMatches(text, matches)
+    collectSameLawMatches(text, matches, config.currentLawName)
   }
 
   collectQuotedLawMatches(text, matches)
@@ -57,11 +58,12 @@ export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' 
 /**
  * "같은 법" 패턴 수집
  */
-function collectSameLawMatches(text: string, matches: LinkMatch[]): void {
-  const regex = /같은\s*법\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawName?: string): void {
+  // 패턴 1: "같은 법 제X조"
+  const sameLawRegex = /같은\s*법\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
   let match: RegExpExecArray | null
 
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = sameLawRegex.exec(text)) !== null) {
     const offset = match.index
     const fullText = match[0]
 
@@ -83,6 +85,60 @@ function collectSameLawMatches(text: string, matches: LinkMatch[]): void {
         article: joLabel,
         displayText: fullText,
         html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">같은 법 ${fullLabel}</a>`
+      })
+    }
+  }
+
+  // 패턴 2: "법 제X조", "시행령 제X조", "규칙 제X조" (상위법 참조)
+  const shortRefRegex = /(법|시행령|규칙)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+
+  while ((match = shortRefRegex.exec(text)) !== null) {
+    const offset = match.index
+    const fullText = match[0]
+    const refType = match[1] // "법", "시행령", "규칙"
+
+    // Find the last 「법령명」 before this position
+    const textBefore = text.substring(0, offset)
+    const lawMatches = Array.from(textBefore.matchAll(/「\s*([^」]+)\s*」/g))
+
+    let targetLawName: string | undefined
+
+    if (lawMatches.length > 0) {
+      // 「법령명」이 있는 경우
+      const lastLaw = lawMatches[lawMatches.length - 1]
+      let baseLawName = lastLaw[1].trim()
+
+      // 법령명 변환: "법" → 기본, "시행령" → "법 시행령", "규칙" → "법 시행규칙"
+      targetLawName = baseLawName
+      if (refType === '시행령') {
+        targetLawName = baseLawName.replace(/\s*(시행령|시행규칙)$/, '') + ' 시행령'
+      } else if (refType === '규칙') {
+        targetLawName = baseLawName.replace(/\s*(시행령|시행규칙)$/, '') + ' 시행규칙'
+      }
+    } else if (currentLawName) {
+      // 「법령명」이 없지만 현재 법령명이 있는 경우 (시행령 → 상위법 추론)
+      if (refType === '법') {
+        // 현재 법령이 시행령/시행규칙이면 상위법으로 변환
+        targetLawName = currentLawName.replace(/\s*(시행령|시행규칙)$/, '')
+      } else if (refType === '시행령') {
+        targetLawName = currentLawName.includes('시행령') ? currentLawName : currentLawName + ' 시행령'
+      } else if (refType === '규칙') {
+        targetLawName = currentLawName.replace(/\s*(시행령|시행규칙)$/, '') + ' 시행규칙'
+      }
+    }
+
+    if (targetLawName) {
+      const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
+      const fullLabel = joLabel + (match[6] ? `제${match[6]}항` : '') + (match[8] ? `제${match[8]}호` : '')
+
+      matches.push({
+        start: offset,
+        end: offset + fullText.length,
+        type: 'same-law',
+        lawName: targetLawName,
+        article: joLabel,
+        displayText: fullText,
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${targetLawName}" data-article="${joLabel}">${refType} ${fullLabel}</a>`
       })
     }
   }
@@ -298,11 +354,12 @@ function buildHtml(text: string, matches: LinkMatch[]): string {
 /**
  * 호환성을 위한 기존 함수명 제공
  */
-export function linkifyRefsB(text: string): string {
+export function linkifyRefsB(text: string, currentLawName?: string): string {
   return generateLinks(text, {
     mode: 'safe',
     enableSameRef: true,
-    enableAdminRules: true
+    enableAdminRules: true,
+    currentLawName
   })
 }
 

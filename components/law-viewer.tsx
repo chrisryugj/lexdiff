@@ -62,6 +62,7 @@ interface LawViewerProps {
   fileSearchFailed?: boolean  // 검색 실패 여부
   aiCitations?: any[]  // File Search Citations
   userQuery?: string   // 사용자 질의
+  aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
 
   // AI 모드 - 관련 법령 2단 비교
   comparisonLawMeta?: LawMeta | null
@@ -91,6 +92,7 @@ export function LawViewer({
   isLoadingComparison = false,
   aiCitations = [],
   userQuery = '',
+  aiConfidenceLevel = 'high',
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -1723,6 +1725,56 @@ export function LawViewer({
             </Button>
           </div>
 
+          {/* Header - Hidden in AI Answer Mode */}
+          {!aiAnswerMode && (
+            <div className="border-b border-border px-4 pt-2 pb-5">
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
+                {!isOrdinance && viewMode === "full" && (
+                  <Badge variant="outline" className="text-xs">
+                    전체 조문
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {meta.latestEffectiveDate && (
+                  <Badge variant="outline" className="text-xs">
+                    📅 시행: {meta.latestEffectiveDate}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="text-xs">
+                  📋 {articles.length}개 조문
+                </Badge>
+
+                {isOrdinance && (
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                    🏛️ 자치법규
+                  </Badge>
+                )}
+                {meta.revisionType && (
+                  <Badge variant="secondary" className="text-xs">
+                    {meta.revisionType}
+                  </Badge>
+                )}
+                {!isOrdinance && viewMode === "full" && activeArticle && (
+                  <Badge variant="outline" className="text-xs">
+                    현재: {formatSimpleJo(activeArticle.jo)}
+                    {activeArticle.title && ` (${activeArticle.title})`}
+                  </Badge>
+                )}
+                {(() => {
+                  const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
+                  return currentLawFavorites > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      ⭐ {currentLawFavorites}개
+                    </Badge>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           {
             !aiAnswerMode && !isOrdinance && activeArticle && (
@@ -2849,7 +2901,7 @@ export function LawViewer({
                             className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
@@ -2946,7 +2998,7 @@ export function LawViewer({
                             <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                               <ZoomOut className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setFontSize(14)} title="기본 크기">
+                            <Button variant="ghost" size="sm" onClick={() => setFontSize(15)} title="기본 크기">
                               <RotateCcw className="h-3 w-3" />
                             </Button>
                             <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
@@ -2965,9 +3017,17 @@ export function LawViewer({
                               <Copy className="h-4 w-4" />
                             </Button>
                             {aiCitations && aiCitations.length > 0 && (
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
+                              <div className={`flex items-center gap-1.5 text-xs ml-2 ${
+                                aiConfidenceLevel === 'high'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : aiConfidenceLevel === 'medium'
+                                  ? 'text-yellow-600 dark:text-yellow-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
                                 <ShieldCheck className="h-3.5 w-3.5" />
-                                <span>검증된 출처</span>
+                                <span>
+                                  {aiConfidenceLevel === 'high' ? '신뢰도 높음' : '신뢰도 보통'}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -2978,7 +3038,7 @@ export function LawViewer({
                         className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/50 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5

@@ -220,7 +220,7 @@ export function FileSearchRAGView({
   }, [initialQuery])
 
   return (
-    <div className="flex flex-col h-full relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
+    <div className="flex flex-col h-full relative">
       {/* 프로그레스 오버레이 - ModernProgressBar 사용 */}
       {isAnalyzing && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -303,6 +303,7 @@ export function FileSearchRAGView({
             aiAnswerMode={true}
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
+            aiConfidenceLevel={confidenceLevel}
           />
         </>
       )}
