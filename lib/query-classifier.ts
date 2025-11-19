@@ -31,6 +31,10 @@ export function classifyQuery(query: string): QueryClassification {
     /^[\w가-힣\s]+법$/,
     /^[\w가-힣\s]+령$/,
     /^[\w가-힣\s]+규칙$/,
+    // 법령명 + 키워드 (예: "도로법 점용허가", "건축법 용도변경")
+    /^[\w가-힣\s]+법\s+[\w가-힣]+$/,
+    /^[\w가-힣\s]+령\s+[\w가-힣]+$/,
+    /^[\w가-힣\s]+규칙\s+[\w가-힣]+$/,
   ]
 
   for (const pattern of simpleSearchPatterns) {

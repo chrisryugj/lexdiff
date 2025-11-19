@@ -38,8 +38,16 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, Sparkles, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import { buildJO } from "@/lib/law-parser"
+import { HelpCircle, Scale, Brain } from "lucide-react"
 
 // 법령 타입별 Badge 색상 클래스 반환
 function getLawTypeBadgeClass(lawType: string): string {
@@ -349,6 +357,10 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     selectedJo?: string
   } | null>(null)
   const [isLoadingComparison, setIsLoadingComparison] = useState(false)
+
+  // 검색 모드 선택 다이얼로그 상태
+  const [showChoiceDialog, setShowChoiceDialog] = useState(false)
+  const [pendingQuery, setPendingQuery] = useState<{ lawName: string; article?: string; jo?: string } | null>(null)
 
   // Progress 상태 (SearchResultView 내부 관리)
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
@@ -790,11 +802,25 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
   }
 
-  const handleSearchInternal = async (query: { lawName: string; article?: string; jo?: string }, signal?: AbortSignal) => {
+  const handleSearchChoice = (mode: 'law' | 'ai') => {
+    setShowChoiceDialog(false)
+    if (pendingQuery) {
+      // 선택된 모드로 강제 실행
+      handleSearchInternal(pendingQuery, undefined, mode)
+      setPendingQuery(null)
+    }
+  }
+
+  const handleSearchInternal = async (
+    query: { lawName: string; article?: string; jo?: string },
+    signal?: AbortSignal,
+    forcedMode?: 'law' | 'ai' // 강제 모드 파라미터 추가
+  ) => {
     // 🔥 CRITICAL: 검색 쿼리 즉시 업데이트 (프로그레스바 표시용)
     const fullQuery = query.article ? `${query.lawName} ${query.article}` : query.lawName
     setSearchQuery(fullQuery)
-    debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery })
+    setUserQuery(fullQuery)
+    debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode })
 
     // 검색 모드 초기화 (기본 검색으로 시작)
     setSearchMode('basic')
@@ -805,15 +831,56 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     const hasLawKeyword = /법|법률|시행령|시행규칙/.test(fullQuery)
     const hasOrdinanceKeyword = /조례|자치법규/.test(fullQuery) || (/규칙/.test(fullQuery) && !/시행규칙/.test(fullQuery))
 
-    // 자연어 감지를 먼저 수행
     let queryDetection = detectQueryType(fullQuery)
 
-    // 자연어 패턴이 없고, 법령 키워드가 있을 때만 강제 구조화
-    if (queryDetection.type !== 'natural' && (hasLawKeyword || hasOrdinanceKeyword)) {
+    // 강제 모드가 설정된 경우 감지 결과 덮어쓰기
+    if (forcedMode === 'ai') {
+      queryDetection = {
+        type: 'natural',
+        confidence: 1.0,
+        reason: '사용자 강제 선택 (AI)'
+      }
+    } else if (forcedMode === 'law') {
       queryDetection = {
         type: 'structured',
         confidence: 1.0,
-        reason: '법령/조례 키워드 포함 (강제 구조화)'
+        reason: '사용자 강제 선택 (법령)'
+      }
+    } else {
+      // 키워드가 있지만 자연어로 감지되지 않은 경우 -> 애매함 (다이얼로그 유도)
+      if (queryDetection.type !== 'natural' && (hasLawKeyword || hasOrdinanceKeyword)) {
+        // 조문 번호가 명확한 경우 ("5조", "제5조" 등)는 바로 검색
+        const isClearArticle = query.article && /^(제)?\d/.test(query.article.trim())
+
+        if (isClearArticle) {
+          queryDetection = {
+            type: 'structured',
+            confidence: 1.0,
+            reason: '명확한 조문 번호 포함 (강제 구조화)'
+          }
+        } else {
+          // "도로법 시행령 점용허가" (article="점용허가") 또는 "도로법" (article=undefined)
+
+          // 순수 법령명인지 확인 ("도로법", "관세법 시행령" 등)
+          const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+          const isPureLawName = pureLawNamePattern.test(fullQuery.trim())
+
+          if (isPureLawName) {
+            // 순수 법령명이면 명확한 구조화 검색으로 처리
+            queryDetection = {
+              type: 'structured',
+              confidence: 1.0,
+              reason: '순수 법령명 (강제 구조화)'
+            }
+          } else {
+            // "도로법 시행령 점용허가" 처럼 뒤에 뭔가 더 붙은 경우 -> AI 검색일 수도 있음
+            queryDetection = {
+              type: 'structured',
+              confidence: 0.6,
+              reason: '법령 키워드 포함되나 조문 불분명 (다이얼로그 유도)'
+            }
+          }
+        }
       }
     }
 
@@ -824,11 +891,28 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       reason: queryDetection.reason
     })
 
+    // 🚦 모드 선택 다이얼로그 로직
+    // 1. 강제 모드가 없고 (forcedMode === undefined)
+    // 2. 자연어인지 구조화인지 애매한 경우 (confidence < 0.7)
+    // 3. 단, 명확한 법령 키워드가 있으면 다이얼로그 스킵 (위에서 이미 confidence 1.0으로 처리됨)
+    if (!forcedMode && queryDetection.confidence < 0.7) {
+      debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', { confidence: queryDetection.confidence })
+      setPendingQuery(query)
+      setIsSearching(false) // 강제 리셋
+      updateProgress('complete', 0) // 강제 리셋
+      setShowChoiceDialog(true)
+      return
+    }
+
+    // 결정된 모드 또는 강제 모드에 따라 실행
+    const isAiSearch = forcedMode === 'ai' || (!forcedMode && queryDetection.type === 'natural')
+
     // 자연어로 판단되면 File Search API를 호출하여 AI 답변을 받고 법령뷰로 표시
-    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+    if (isAiSearch) {
       debugLogger.success('✨ 자연어 검색 감지 → AI 답변 모드', {
         query: fullQuery,
-        confidence: queryDetection.confidence
+        confidence: queryDetection.confidence,
+        forced: !!forcedMode
       })
 
       // 사용자 질의 저장 (법령명 추론에 사용)
@@ -986,7 +1070,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         setLawData(aiLawData)
         setMobileView("content")
 
-        // ✅ 프로그레스 완료
+        // ✅ 검색 완료 상태 업데이트 (프로그레스바 종료)
         updateProgress('complete', 100)
         setIsSearching(false)
 
@@ -1287,6 +1371,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     // === 기본 검색 시작 ===
     try {
+      setIsSearching(true)
       updateProgress('searching', 40)
       if (isOrdinanceQuery) {
         const apiUrl = "/api/ordin-search?query=" + encodeURIComponent(lawName)
@@ -1336,7 +1421,22 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         setIsSearching(false)
       } else {
         const apiUrl = "/api/law-search?query=" + encodeURIComponent(lawName)
-        const response = await fetch(apiUrl)
+
+        // 타임아웃 설정 (10초)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+        let response
+        try {
+          response = await fetch(apiUrl, { signal: controller.signal })
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+            throw new Error("검색 시간이 초과되었습니다. 다시 시도해주세요.")
+          }
+          throw err
+        } finally {
+          clearTimeout(timeoutId)
+        }
 
         apiLogs.push({
           url: apiUrl,
@@ -1359,18 +1459,20 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         if (results.length === 0) {
           // 벡터 검색은 search-strategy.ts에서 처리됨 (Phase 5/6)
 
-          reportError(
-            "법령 검색",
-            new Error("검색 결과를 찾을 수 없습니다"),
-            {
-              query: query.lawName,
-              searchType: "법령",
-              resultCount: 0,
-            },
-            apiLogs,
-          )
-          updateProgress('complete', 0)
+          // ⚠️ 검색 결과가 없는 경우 -> AI 검색 제안
+          debugLogger.warning(`⚠️ [법령 검색] "${lawName}" 검색 결과 없음 -> AI 검색 제안`)
+
+          // 에러 리포트 대신 다이얼로그 표시
+          setPendingQuery(query)
           setIsSearching(false)
+          updateProgress('complete', 0)
+          setShowChoiceDialog(true)
+
+          toast({
+            title: "검색 결과 없음",
+            description: "정확한 법령을 찾을 수 없어 AI 검색을 제안합니다.",
+          })
+
           return
         }
 
@@ -2020,10 +2122,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               progress={searchProgress}
               label={searchMode === 'rag' ? 'AI 검색' : '법령 검색'}
               statusMessage={
-                searchStage === 'searching' ? 'Gemini 2.5 Flash로 검색 중...' :
-                searchStage === 'parsing' ? '법령 데이터 파싱 중...' :
-                searchStage === 'streaming' ? 'AI 답변 생성 중...' :
-                '검색 완료!'
+                searchStage === 'searching'
+                  ? (searchMode === 'rag' ? 'Gemini 2.5 Flash로 검색 중...' : '국가법령정보 API 검색중...')
+                  : searchStage === 'parsing' ? '법령 데이터 파싱 중...' :
+                    searchStage === 'streaming' ? 'AI 답변 생성 중...' :
+                      '검색 완료!'
               }
               variant={searchMode === 'rag' ? 'lavender' : 'ocean'}
               size="lg"
@@ -2379,7 +2482,56 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         onClose={() => setFavoritesDialogOpen(false)}
         onSelect={handleFavoriteSelect}
       />
-      <ErrorReportDialog />
+      <ErrorReportDialog onDismiss={onBack} />
+
+      {/* 검색 모드 선택 다이얼로그 */}
+      <Dialog open={showChoiceDialog} onOpenChange={setShowChoiceDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-blue-500" />
+              검색 방법을 선택하세요
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              <span className="block text-sm text-muted-foreground mb-3">
+                입력하신 "<span className="font-medium text-foreground">{pendingQuery?.lawName} {pendingQuery?.article}</span>"를 어떻게 검색할까요?
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <Button
+              onClick={() => handleSearchChoice('law')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all"
+            >
+              <Scale className="h-8 w-8 text-amber-500" />
+              <div className="text-center">
+                <div className="font-semibold text-foreground">법령 검색</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  조문 직접 확인
+                </div>
+              </div>
+            </Button>
+            <Button
+              onClick={() => handleSearchChoice('ai')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
+            >
+              <Brain className="h-8 w-8 text-purple-500" />
+              <div className="text-center">
+                <div className="font-semibold text-foreground">AI 검색</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  자연어로 설명
+                </div>
+              </div>
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground text-center mt-3">
+            💡 Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {!lawData && !lawSelectionState && !ordinanceSelectionState && (
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-6">

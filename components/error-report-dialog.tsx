@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useErrorReportStore } from "@/lib/error-report-store"
 
-export function ErrorReportDialog() {
+export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
   const { currentError, showErrorDialog, clearCurrentError, getErrorReportText } = useErrorReportStore()
   const [copied, setCopied] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -32,10 +32,15 @@ export function ErrorReportDialog() {
     console.log("[v0] 에러 리포트 복사 완료")
   }
 
+  const handleClose = () => {
+    clearCurrentError()
+    onDismiss?.()
+  }
+
   console.log("[v0] [에러 다이얼로그] 렌더링 중:", { showErrorDialog, errorMessage: currentError.errorMessage })
 
   return (
-    <Dialog open={showErrorDialog} onOpenChange={(open) => !open && clearCurrentError()}>
+    <Dialog open={showErrorDialog} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-lg bg-white text-black">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{currentError.operation} 실패</DialogTitle>
@@ -69,7 +74,7 @@ export function ErrorReportDialog() {
                 </>
               )}
             </Button>
-            <Button onClick={clearCurrentError} className="flex-1" size="sm">
+            <Button onClick={handleClose} className="flex-1" size="sm">
               확인
             </Button>
           </div>

@@ -85,14 +85,15 @@ function escapeHtml(text: string): string {
 
 /**
  * ⚖️ 조문 발췌 마커 추가 (HTML 이스케이프 전에 실행)
- * "⚖️ 조문 발췌"와 "📖 핵심 해석" 사이의 모든 내용을 
- * 로 감싸기
+ * "⚖️ 조문 발췌"와 "📖 핵심 해석" 사이의 조문 내용만 블록으로 처리
+ * "(조문 내용 없음)" 이후의 항목은 블록에 포함시키지 않음
  */
 function markLawQuotes(text: string): string {
   const lines = text.split('\n')
   const result: string[] = []
   let i = 0
   let inQuoteSection = false
+  let currentQuoteLines: string[] = []
 
   while (i < lines.length) {
     const line = lines[i]
@@ -101,24 +102,90 @@ function markLawQuotes(text: string): string {
     // "⚖️ 조문 발췌" 시작
     if (trimmed === '⚖️ 조문 발췌') {
       result.push(line)
-      result.push('<<<QUOTE_START>>>')
       inQuoteSection = true
+      currentQuoteLines = []
       i++
       continue
     }
 
-    // "📖 핵심 해석" 종료
+    // "📖 핵심 해석" 종료 - 블록 종료
     if (inQuoteSection && trimmed === '📖 핵심 해석') {
-      result.push('<<<QUOTE_END>>>')
+      // 수집된 조문 내용을 블록으로 감싸기
+      if (currentQuoteLines.length > 0) {
+        result.push('<<<QUOTE_START>>>')
+        result.push(...currentQuoteLines)
+        result.push('<<<QUOTE_END>>>')
+      }
       result.push(line)
       inQuoteSection = false
+      currentQuoteLines = []
       i++
       continue
     }
 
-    // 조문 발췌 섹션 내부 - 모든 내용 수집
+    // 조문 발췌 섹션 내부에서 처리
     if (inQuoteSection) {
-      result.push(line)
+      // "(조문 내용 없음)" 발견 시 그것까지만 블록에 포함
+      if (trimmed === '(조문 내용 없음)') {
+        currentQuoteLines.push(line)
+        // 블록 종료하고 나머지는 일반 텍스트로 처리
+        if (currentQuoteLines.length > 0) {
+          result.push('<<<QUOTE_START>>>')
+          result.push(...currentQuoteLines)
+          result.push('<<<QUOTE_END>>>')
+        }
+        currentQuoteLines = []
+        // 다음 줄부터는 블록 바깥으로 처리 (📖 핵심 해석이 나올 때까지)
+        i++
+
+        // "(조문 내용 없음)" 이후 "📖 핵심 해석" 전까지의 내용은 블록 밖에 표시
+        while (i < lines.length) {
+          const nextLine = lines[i]
+          const nextTrimmed = nextLine.trim()
+
+          if (nextTrimmed === '📖 핵심 해석') {
+            result.push(nextLine)
+            inQuoteSection = false
+            i++
+            break
+          }
+
+          result.push(nextLine)
+          i++
+        }
+        continue
+      }
+
+      // 빈 줄이 2개 이상 연속으로 나오면 블록 종료 (조문 끝으로 간주)
+      if (!trimmed && i + 1 < lines.length && !lines[i + 1].trim()) {
+        if (currentQuoteLines.length > 0) {
+          result.push('<<<QUOTE_START>>>')
+          result.push(...currentQuoteLines)
+          result.push('<<<QUOTE_END>>>')
+          currentQuoteLines = []
+        }
+        result.push(line)
+        i++
+        continue
+      }
+
+      // 조문 제목 패턴 (📜로 시작하는 경우)
+      if (trimmed.startsWith('📜')) {
+        // 이전 블록이 있으면 종료
+        if (currentQuoteLines.length > 0) {
+          result.push('<<<QUOTE_START>>>')
+          result.push(...currentQuoteLines)
+          result.push('<<<QUOTE_END>>>')
+          currentQuoteLines = []
+        }
+        // 새로운 블록 시작
+        currentQuoteLines.push(line)
+        i++
+        continue
+      }
+
+      // 일반 조문 내용 수집
+      currentQuoteLines.push(line)
       i++
       continue
     }
@@ -129,7 +196,9 @@ function markLawQuotes(text: string): string {
   }
 
   // 섹션이 끝까지 열려있으면 닫기
-  if (inQuoteSection) {
+  if (inQuoteSection && currentQuoteLines.length > 0) {
+    result.push('<<<QUOTE_START>>>')
+    result.push(...currentQuoteLines)
     result.push('<<<QUOTE_END>>>')
   }
 

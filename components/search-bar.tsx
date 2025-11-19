@@ -3,9 +3,16 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot, Brain } from "lucide-react"
+import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot, Brain, HelpCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { cn } from "@/lib/utils"
@@ -26,6 +33,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   const [searchType, setSearchType] = useState<"law" | "ordinance" | "ai" | null>(null)
   const [isNaturalQuery, setIsNaturalQuery] = useState(false)
   const [forceAiMode, setForceAiMode] = useState(false)  // NEW: 수동 AI 모드 전환
+  const [showChoiceDialog, setShowChoiceDialog] = useState(false)  // 선택 다이얼로그
+  const [pendingQuery, setPendingQuery] = useState("")  // 대기중인 쿼리
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -124,16 +133,36 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     }
 
     try {
-      // AI 모드일 때는 전체 쿼리를 그대로 전달
-      if (isAiMode) {
-        debugLogger.info("AI 검색 실행", { query })
+      // 수동으로 AI 모드를 선택한 경우
+      if (forceAiMode) {
+        debugLogger.info("AI 검색 실행 (수동 선택)", { query })
         saveRecentSearch(query.trim())
         onSearch({ lawName: query.trim(), article: undefined, jo: undefined })
         setShowRecent(false)
         return
       }
 
-      // 일반 법령 검색
+      // 자동 감지로 AI 모드가 확실한 경우
+      if (searchType === 'ai' && isNaturalQuery) {
+        debugLogger.info("AI 검색 실행 (자동 감지)", { query })
+        saveRecentSearch(query.trim())
+        onSearch({ lawName: query.trim(), article: undefined, jo: undefined })
+        setShowRecent(false)
+        return
+      }
+
+      // 애매한 경우 판별
+      const queryDetection = detectQueryType(query)
+      const hasArticleNumber = /제?\s*\d+\s*조(?:의\s*\d+)?/.test(query)
+
+      // 조문번호가 있고 confidence가 애매한 경우 (0.6 ~ 0.9)
+      if (hasArticleNumber && queryDetection.confidence >= 0.6 && queryDetection.confidence < 0.95) {
+        setPendingQuery(query.trim())
+        setShowChoiceDialog(true)
+        return
+      }
+
+      // 명확한 법령 검색
       const parsed = parseSearchQuery(query)
       debugLogger.info("통합 검색 실행", parsed)
 
@@ -143,6 +172,27 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     } catch (error) {
       debugLogger.error("검색어 파싱 실패", error)
     }
+  }
+
+  // 선택 다이얼로그에서 선택 처리
+  const handleSearchChoice = (choice: 'law' | 'ai') => {
+    setShowChoiceDialog(false)
+    saveRecentSearch(pendingQuery)
+
+    if (choice === 'ai') {
+      debugLogger.info("AI 검색 실행 (사용자 선택)", { query: pendingQuery })
+      onSearch({ lawName: pendingQuery, article: undefined, jo: undefined })
+    } else {
+      try {
+        const parsed = parseSearchQuery(pendingQuery)
+        debugLogger.info("법령 검색 실행 (사용자 선택)", parsed)
+        onSearch(parsed)
+      } catch (error) {
+        debugLogger.error("법령 검색 파싱 실패", error)
+      }
+    }
+
+    setPendingQuery("")
   }
 
   const handleRecentClick = (search: string) => {
@@ -164,8 +214,9 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-3xl relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
-      <div className="flex gap-2">
+    <>
+      <form onSubmit={handleSubmit} className="w-full max-w-3xl relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div className="flex gap-2">
         {/* AI 모드 전환 버튼 (NEW) */}
         <Button
           type="button"
@@ -264,5 +315,54 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         </Button>
       </div>
     </form>
+
+    {/* 검색 모드 선택 다이얼로그 */}
+    <Dialog open={showChoiceDialog} onOpenChange={setShowChoiceDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-blue-500" />
+            검색 방법을 선택하세요
+          </DialogTitle>
+          <DialogDescription className="pt-2">
+            <div className="text-sm text-muted-foreground mb-3">
+              입력하신 "<span className="font-medium text-foreground">{pendingQuery}</span>"를 어떻게 검색할까요?
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <Button
+            onClick={() => handleSearchChoice('law')}
+            variant="outline"
+            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+          >
+            <Scale className="h-8 w-8 text-amber-500" />
+            <div className="text-center">
+              <div className="font-semibold">법령 검색</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                조문 직접 확인
+              </div>
+            </div>
+          </Button>
+          <Button
+            onClick={() => handleSearchChoice('ai')}
+            variant="outline"
+            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+          >
+            <Brain className="h-8 w-8 text-purple-500" />
+            <div className="text-center">
+              <div className="font-semibold">AI 검색</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                자연어로 설명
+              </div>
+            </div>
+          </Button>
+        </div>
+        <div className="text-xs text-muted-foreground text-center mt-3">
+          💡 Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

@@ -43,30 +43,34 @@ export function detectQueryType(query: string): QueryDetectionResult {
 
   // 1-1: "법령명 + 조번호"만 있는 경우 → 구조화 검색 (예: "관세법 38조")
   if (hasArticleNumber) {
-    // 조문 번호 제외한 나머지 텍스트 길이 체크
-    // 법령명이 길 수 있으므로, 단순히 길이만으로 판단하면 안됨 ("도로법 시행령 55조" 등)
+    // 순수한 법령 검색 패턴인지 확인 (네거티브 방식)
+    // 법령명 + 조문번호만 있고 다른 텍스트가 없는 경우만 구조화 검색으로 처리
 
-    // 질문형 종결어미나 의문사가 없으면 구조화 검색으로 간주
-    const isQuestion = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘|궁금/.test(trimmedQuery) || /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느)/.test(trimmedQuery) || /에\s*대해/.test(trimmedQuery)
+    // 조문 번호를 제거한 후 남은 텍스트 확인
+    const textWithoutArticle = trimmedQuery.replace(articlePattern, '').trim()
 
-    if (!isQuestion) {
+    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+
+    // 법령명만 있고 추가 텍스트가 없는 경우 → 구조화 검색
+    if (pureLawNamePattern.test(textWithoutArticle)) {
       return {
         type: 'structured',
         confidence: 0.98,
-        reason: '조문 번호 포함 (질문 패턴 없음)'
+        reason: '순수 법령명 + 조문 번호'
       }
     }
 
-    // 질문 패턴이 있으면 자연어로
+    // 그 외 모든 경우 → 자연어 검색 (뭔가 추가 단어가 있음)
     return {
       type: 'natural',
       confidence: 0.9,
-      reason: '조문 번호 + 자연어 질문 혼합'
+      reason: '조문 번호 + 추가 텍스트 (자연어)'
     }
   }
 
   // 패턴 2: 질문 종결어미 → 자연어 검색
-  const questionEndings = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘|궁금$/
+  const questionEndings = /[?？]$|인가요?$|인지요?$|될까요?$|되나요?$|습니까?$|니까?$|알려줘|설명해줘|가르쳐줘|말해줘|찾아줘|보여줘|궁금|뭐야|뭐지|뭔지|뭘까$/
   if (questionEndings.test(trimmedQuery)) {
     return {
       type: 'natural',
@@ -86,12 +90,22 @@ export function detectQueryType(query: string): QueryDetectionResult {
   }
 
   // 패턴 3: 질문 의문사 포함
-  const questionWords = /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느)/
+  const questionWords = /(무엇|어떻게|어떤|왜|언제|어디서|누가|어느|뭐|뭘)/
   if (questionWords.test(trimmedQuery)) {
     return {
       type: 'natural',
       confidence: 0.9,
       reason: '질문 의문사 포함'
+    }
+  }
+
+  // 패턴 3-1: 자연어 키워드 포함 (내용, 설명, 의미 등)
+  const naturalKeywords = /내용|설명|의미|뜻|정의|요약|핵심|중요|차이|비교/
+  if (naturalKeywords.test(trimmedQuery)) {
+    return {
+      type: 'natural',
+      confidence: 0.85,
+      reason: '자연어 키워드 포함'
     }
   }
 
@@ -131,10 +145,22 @@ export function detectQueryType(query: string): QueryDetectionResult {
   // 패턴 6: 짧은 단어 나열 (법령명 검색으로 추정)
   // 예: "관세법", "지방세법", "FTA특례법"
   if (trimmedQuery.length < 15) {
+    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+
+    if (pureLawNamePattern.test(trimmedQuery)) {
+      return {
+        type: 'structured',
+        confidence: 0.95,
+        reason: '순수 법령명 (짧은 쿼리)'
+      }
+    }
+
+    // 법령명 + 키워드 형태 ("도로법 점용허가") -> 애매함
     return {
       type: 'structured',
-      confidence: 0.8,
-      reason: '짧은 법령명 쿼리'
+      confidence: 0.6,
+      reason: '법령명 + 키워드 추정 (다이얼로그 유도)'
     }
   }
 

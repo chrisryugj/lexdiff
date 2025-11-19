@@ -640,7 +640,7 @@ export function LawViewer({
             })
             return
           }
-        } catch {}
+        } catch { }
       } else if (refType === "law") {
         const lawName = target.getAttribute("data-law") || ""
         // Try to pair with next article anchor on the same line
@@ -660,7 +660,7 @@ export function LawViewer({
         } else {
           // 자치법규 여부 감지
           const isOrdinance = /조례|규칙/.test(lawName) ||
-                              /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+            /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
           const lawPath = isOrdinance ? '자치법규' : '법령'
           window.open(`https://www.law.go.kr/${lawPath}/${encodeURIComponent(lawName)}`, "_blank", "noopener")
           setLastExternalRef({ lawName })
@@ -711,8 +711,8 @@ export function LawViewer({
             const relatedLawName = kind === 'decree'
               ? `${baseLawName} 시행령`
               : kind === 'rule'
-              ? `${baseLawName} 시행규칙`
-              : baseLawName
+                ? `${baseLawName} 시행규칙`
+                : baseLawName
 
             console.log('[Related] Opening modal for:', { kind, baseLaw: baseLawName, relatedLaw: relatedLawName })
             window.open(`https://www.law.go.kr/법령/${encodeURIComponent(relatedLawName)}`, "_blank", "noopener")
@@ -908,7 +908,7 @@ export function LawViewer({
 
       // 자치법규 여부 감지 (조례, 규칙 키워드만으로도 판단)
       const isOrdinance = /조례|규칙/.test(lawName) ||
-                          /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+        /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
       console.log('[Citation] Is ordinance:', isOrdinance, 'for law:', lawName)
 
       // 자치법규는 법제처 자치법규 페이지로 리다이렉트
@@ -995,8 +995,8 @@ export function LawViewer({
         const articleUnits = Array.isArray(rawArticleUnits)
           ? rawArticleUnits
           : rawArticleUnits
-          ? [rawArticleUnits]
-          : []
+            ? [rawArticleUnits]
+            : []
 
         console.log('[Citation] Article units count:', articleUnits.length)
 
@@ -1112,8 +1112,8 @@ export function LawViewer({
         const hangArray = Array.isArray(targetUnit.항)
           ? targetUnit.항
           : targetUnit.항
-          ? [targetUnit.항]
-          : []
+            ? [targetUnit.항]
+            : []
 
         if (hangArray.length > 0) {
           // ✅ 먼저 항내용이 있는지 확인
@@ -1420,547 +1420,1353 @@ export function LawViewer({
           />
         )}
 
-      {/* Left sidebar - AI 답변 모드 or 조문 목록 */}
-      <Card className={`p-4 flex-col overflow-hidden ${
-        isArticleListExpanded
+        {/* Left sidebar - AI 답변 모드 or 조문 목록 */}
+        <Card className={`p-4 flex-col overflow-hidden ${isArticleListExpanded
           ? 'flex fixed lg:relative top-4 left-4 right-4 bottom-4 z-50 lg:z-auto'
           : 'hidden lg:flex'
-      }`}>
-        {aiAnswerMode ? (
-          // ========== AI 모드: 왼쪽은 관련 법령 목록 ==========
-          <>
-            {/* Mobile close button */}
-            {isArticleListExpanded && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsArticleListExpanded(false)}
-                className="lg:hidden mb-2 w-full"
-              >
-                닫기
-              </Button>
-            )}
+          }`}>
+          {aiAnswerMode ? (
+            // ========== AI 모드: 왼쪽은 관련 법령 목록 ==========
+            <>
+              {/* Mobile close button */}
+              {isArticleListExpanded && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsArticleListExpanded(false)}
+                  className="lg:hidden mb-2 w-full"
+                >
+                  닫기
+                </Button>
+              )}
 
-            <div className="border-b border-border p-4 flex-shrink-0">
-              <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="text-xl font-bold text-foreground">관련 법령 목록</h3>
+              <div className="border-b border-border p-4 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h3 className="text-xl font-bold text-foreground">관련 법령 목록</h3>
+                </div>
+                {(() => {
+                  // 중복 제거를 위한 그룹화 (카운트 계산용)
+                  const grouped = new Map<string, { source: Set<string> }>()
+                  relatedArticles.forEach(law => {
+                    const key = `${law.lawName}|${law.jo}`
+                    const existing = grouped.get(key)
+                    if (existing) {
+                      existing.source.add(law.source)
+                    } else {
+                      grouped.set(key, { source: new Set([law.source]) })
+                    }
+                  })
+
+                  // 중복 제거된 고유 조문 수
+                  const uniqueCount = grouped.size
+
+                  // 발췌만 있는 조문 수 (관련법령에도 있으면 제외)
+                  const excerptOnlyCount = Array.from(grouped.values()).filter(
+                    g => g.source.has('excerpt') && g.source.size === 1
+                  ).length
+
+                  // 관련법령만 있는 조문 수 (발췌에도 있으면 제외)
+                  const relatedOnlyCount = Array.from(grouped.values()).filter(
+                    g => g.source.has('related') && g.source.size === 1
+                  ).length
+
+                  // 둘 다 있는 조문 수
+                  const bothCount = Array.from(grouped.values()).filter(
+                    g => g.source.size === 2
+                  ).length
+
+                  return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs">
+                        전체 {uniqueCount}개
+                      </Badge>
+                      {excerptOnlyCount > 0 && (
+                        <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
+                          ⚖️ 발췌 {excerptOnlyCount}
+                        </Badge>
+                      )}
+                      {relatedOnlyCount > 0 && (
+                        <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
+                          🔗 관련 {relatedOnlyCount}
+                        </Badge>
+                      )}
+                      {bothCount > 0 && (
+                        <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
+                          ⚖️🔗 둘 다 {bothCount}
+                        </Badge>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
-              {(() => {
-                // 중복 제거를 위한 그룹화 (카운트 계산용)
-                const grouped = new Map<string, { source: Set<string> }>()
-                relatedArticles.forEach(law => {
-                  const key = `${law.lawName}|${law.jo}`
-                  const existing = grouped.get(key)
-                  if (existing) {
-                    existing.source.add(law.source)
-                  } else {
-                    grouped.set(key, { source: new Set([law.source]) })
-                  }
-                })
 
-                // 중복 제거된 고유 조문 수
-                const uniqueCount = grouped.size
+              <div className="flex-1 min-h-0">
+                <ScrollArea className="h-full">
+                  <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
+                    {relatedArticles.length > 0 ? (
+                      (() => {
+                        // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
+                        const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
 
-                // 발췌만 있는 조문 수 (관련법령에도 있으면 제외)
-                const excerptOnlyCount = Array.from(grouped.values()).filter(
-                  g => g.source.has('excerpt') && g.source.size === 1
-                ).length
+                        relatedArticles.forEach(law => {
+                          const key = `${law.lawName}|${law.jo}`
+                          const existing = grouped.get(key)
+                          if (existing) {
+                            existing.sources.add(law.source)
+                          } else {
+                            grouped.set(key, { law, sources: new Set([law.source]) })
+                          }
+                        })
 
-                // 관련법령만 있는 조문 수 (발췌에도 있으면 제외)
-                const relatedOnlyCount = Array.from(grouped.values()).filter(
-                  g => g.source.has('related') && g.source.size === 1
-                ).length
+                        return Array.from(grouped.values()).map(({ law, sources }, idx) => {
+                          const handleClick = () => {
+                            debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
+                              lawName: law.lawName,
+                              jo: law.jo,
+                              article: law.article,
+                              sources: Array.from(sources)
+                            })
 
-                // 둘 다 있는 조문 수
-                const bothCount = Array.from(grouped.values()).filter(
-                  g => g.source.size === 2
-                ).length
+                            // 사이드바 닫기 (모바일)
+                            setIsArticleListExpanded(false)
 
-                return (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">
-                      전체 {uniqueCount}개
-                    </Badge>
-                    {excerptOnlyCount > 0 && (
-                      <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
-                        ⚖️ 발췌 {excerptOnlyCount}
-                      </Badge>
-                    )}
-                    {relatedOnlyCount > 0 && (
-                      <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
-                        🔗 관련 {relatedOnlyCount}
-                      </Badge>
-                    )}
-                    {bothCount > 0 && (
-                      <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
-                        ⚖️🔗 둘 다 {bothCount}
-                      </Badge>
+                            // ✅ 모달로 법령 조문 열기
+                            openExternalLawArticleModal(law.lawName, law.article)
+                              .then(() => {
+                                setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
+                                debugLogger.success('모달 열기 성공', { lawName: law.lawName, article: law.article })
+                              })
+                              .catch((err) => {
+                                debugLogger.error('모달 열기 실패', err)
+                              })
+                          }
+
+                          return (
+                            <button
+                              key={`${law.lawName}-${law.jo}-${idx}`}
+                              onClick={handleClick}
+                              className="w-full text-left pl-4 pr-5 py-3 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 flex-1">
+                                  <ExternalLink className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
+                                  <span className="font-medium text-blue-300 group-hover:text-blue-200 text-base">
+                                    {law.lawName}
+                                  </span>
+                                </div>
+                                {/* 출처 아이콘 (중복 시 여러 개 표시) */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {sources.has('excerpt') && (
+                                    <span className="text-xs" title="발췌조문">⚖️</span>
+                                  )}
+                                  {sources.has('related') && (
+                                    <span className="text-xs" title="관련법령">🔗</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-sm text-muted-foreground pl-5">
+                                {law.article}
+                                {law.title && (
+                                  <span className="text-blue-400/70 ml-1">{law.title}</span>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })
+                      })()
+                    ) : (
+                      <div className="text-sm text-muted-foreground text-center py-8">
+                        관련 법령이 없습니다
+                      </div>
                     )}
                   </div>
-                )
-              })()}
-            </div>
+                </ScrollArea>
+              </div>
+            </>
+          ) : (
+            // ========== 기존 조문 목록 ==========
+            <>
+              {/* Mobile close button - top */}
+              {isArticleListExpanded && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsArticleListExpanded(false)}
+                  className="lg:hidden mb-2 w-full"
+                >
+                  닫기
+                </Button>
+              )}
 
-            <div className="flex-1 min-h-0">
-              <ScrollArea className="h-full">
-                <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
-                  {relatedArticles.length > 0 ? (
-                    (() => {
-                      // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
-                      const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
+              {/* 헤더 - 본문 헤더와 동일한 디자인 */}
+              <div className="border-b border-border p-4 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  📋 {actualArticles.length}개 조문
+                </Badge>
+              </div>
 
-                      relatedArticles.forEach(law => {
-                        const key = `${law.lawName}|${law.jo}`
-                        const existing = grouped.get(key)
-                        if (existing) {
-                          existing.sources.add(law.source)
-                        } else {
-                          grouped.set(key, { law, sources: new Set([law.source]) })
-                        }
-                      })
+              <div className="flex-1 min-h-0">
+                <ScrollArea className="h-full">
+                  <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
+                    {actualArticles.map((article, index) => {
+                      const isLoading = loadingJo === article.jo
+                      const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
 
-                      return Array.from(grouped.values()).map(({ law, sources }, idx) => {
-                        const handleClick = () => {
-                          debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
-                            lawName: law.lawName,
-                            jo: law.jo,
-                            article: law.article,
-                            sources: Array.from(sources)
-                          })
-
-                          // 사이드바 닫기 (모바일)
-                          setIsArticleListExpanded(false)
-
-                          // ✅ 모달로 법령 조문 열기
-                          openExternalLawArticleModal(law.lawName, law.article)
-                            .then(() => {
-                              setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
-                              debugLogger.success('모달 열기 성공', { lawName: law.lawName, article: law.article })
-                            })
-                            .catch((err) => {
-                              debugLogger.error('모달 열기 실패', err)
-                            })
-                        }
-
-                        return (
+                      return (
                         <button
-                          key={`${law.lawName}-${law.jo}-${idx}`}
-                          onClick={handleClick}
-                          className="w-full text-left pl-4 pr-5 py-3 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                          key={`${article.jo}-${index}`}
+                          onClick={() => handleArticleClick(article.jo)}
+                          disabled={isLoading}
+                          className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${activeJo === article.jo
+                            ? "bg-primary text-primary-foreground font-bold"
+                            : "hover:bg-secondary text-foreground font-medium"
+                            } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
                         >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-1.5 flex-1">
-                              <ExternalLink className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
-                              <span className="font-medium text-blue-300 group-hover:text-blue-200 text-base">
-                                {law.lawName}
-                              </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="text-base font-bold">
+                                {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
+                              </div>
+                              {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
+                              {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
                             </div>
-                            {/* 출처 아이콘 (중복 시 여러 개 표시) */}
+
+                            {/* 아이콘 영역 */}
                             <div className="flex items-center gap-1 shrink-0">
-                              {sources.has('excerpt') && (
-                                <span className="text-xs" title="발췌조문">⚖️</span>
+                              {activeJo === article.jo ? (
+                                <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                              ) : (
+                                <Bookmark className="h-3.5 w-3.5 opacity-40" />
                               )}
-                              {sources.has('related') && (
-                                <span className="text-xs" title="관련법령">🔗</span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onToggleFavorite?.(article.jo)
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    onToggleFavorite?.(article.jo)
+                                  }
+                                }}
+                                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${favorites.has(article.jo)
+                                  ? "text-[var(--color-warning)]"
+                                  : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                                  }`}
+                                aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                                aria-pressed={favorites.has(article.jo)}
+                                title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                              >
+                                <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
+                              </span>
+                              {article.hasChanges && (
+                                <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
                               )}
                             </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground pl-5">
-                            {law.article}
-                            {law.title && (
-                              <span className="text-blue-400/70 ml-1">{law.title}</span>
-                            )}
                           </div>
                         </button>
-                        )
-                      })
-                    })()
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-8">
-                      관련 법령이 없습니다
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          </>
-        ) : (
-          // ========== 기존 조문 목록 ==========
-          <>
-        {/* Mobile close button - top */}
-        {isArticleListExpanded && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsArticleListExpanded(false)}
-            className="lg:hidden mb-2 w-full"
-          >
-            닫기
-          </Button>
-        )}
-
-        {/* 헤더 - 본문 헤더와 동일한 디자인 */}
-        <div className="border-b border-border p-4 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            📋 {actualArticles.length}개 조문
-          </Badge>
-        </div>
-
-        <div className="flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
-            {actualArticles.map((article, index) => {
-              const isLoading = loadingJo === article.jo
-              const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
-
-              return (
-                <button
-                  key={`${article.jo}-${index}`}
-                  onClick={() => handleArticleClick(article.jo)}
-                  disabled={isLoading}
-                  className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
-                    activeJo === article.jo
-                      ? "bg-primary text-primary-foreground font-bold"
-                      : "hover:bg-secondary text-foreground font-medium"
-                  } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="text-base font-bold">
-                        {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
-                      </div>
-                      {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
-                      {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
-                    </div>
-
-                    {/* 아이콘 영역 */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {activeJo === article.jo ? (
-                        <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-                      ) : (
-                        <Bookmark className="h-3.5 w-3.5 opacity-40" />
-                      )}
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onToggleFavorite?.(article.jo)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            onToggleFavorite?.(article.jo)
-                          }
-                        }}
-                        className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-                          favorites.has(article.jo)
-                            ? "text-[var(--color-warning)]"
-                            : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-                        }`}
-                        aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                        aria-pressed={favorites.has(article.jo)}
-                        title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                      >
-                        <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
-                      </span>
-                      {article.hasChanges && (
-                        <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
-                      )}
-                    </div>
+                      )
+                    })}
                   </div>
-                </button>
-              )
-            })}
-            </div>
-          </ScrollArea>
-        </div>
+                </ScrollArea>
+              </div>
 
-        {/* Mobile close button - bottom */}
-        {isArticleListExpanded && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsArticleListExpanded(false)}
-            className="lg:hidden mt-2 w-full"
-          >
-            닫기
-          </Button>
-        )}
-          </>
-        )}
-      </Card>
+              {/* Mobile close button - bottom */}
+              {isArticleListExpanded && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsArticleListExpanded(false)}
+                  className="lg:hidden mt-2 w-full"
+                >
+                  닫기
+                </Button>
+              )}
+            </>
+          )
+          }
+        </Card >
 
-      {/* Right panel - Article content */}
-      <Card className="flex flex-col">
-        {/* Mobile article list toggle */}
-        <div className="lg:hidden p-3 border-b border-border bg-muted/30">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsArticleListExpanded(!isArticleListExpanded)}
-            className="w-full"
-          >
-            {isArticleListExpanded ? (
-              <>
-                <ChevronUp className="h-4 w-4 mr-2" />
-                조문 목록 닫기
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4 mr-2" />
-                {aiAnswerMode
-                  ? `답변 속 법령 보기 (${relatedArticles.length}개)`
-                  : `조문 목록 보기 (${actualArticles.length}개)`}
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Header - Hidden in AI Answer Mode */}
-        {!aiAnswerMode && (
-          <div className="border-b border-border px-4 pt-2 pb-5">
-            <div className="flex items-center gap-2 mb-1">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
-              {!isOrdinance && viewMode === "full" && (
-                <Badge variant="outline" className="text-xs">
-                  전체 조문
-                </Badge>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {meta.latestEffectiveDate && (
-                <Badge variant="outline" className="text-xs">
-                  📅 시행: {meta.latestEffectiveDate}
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-xs">
-                📋 {articles.length}개 조문
-              </Badge>
-           
-              {isOrdinance && (
-                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
-                  🏛️ 자치법규
-                </Badge>
-              )}
-              {meta.revisionType && (
-                <Badge variant="secondary" className="text-xs">
-                  {meta.revisionType}
-                </Badge>
-              )}
-              {!isOrdinance && viewMode === "full" && activeArticle && (
-                <Badge variant="outline" className="text-xs">
-                  현재: {formatSimpleJo(activeArticle.jo)}
-                  {activeArticle.title && ` (${activeArticle.title})`}
-                </Badge>
-              )}
-              {(() => {
-                const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
-                return currentLawFavorites > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    ⭐ {currentLawFavorites}개
-                  </Badge>
-                )
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        {!aiAnswerMode && !isOrdinance && activeArticle && (
-          <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
-            <div className="flex flex-wrap gap-1.5">
-              <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
-                <GitCompare className="h-3.5 w-3.5 mr-1" />
-                신·구법 비교
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
-                <Sparkles className="h-3.5 w-3.5 mr-1" />
-                AI 요약
-              </Button>
-              <Button
-                variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
-                size="sm"
-                onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                className="h-7 px-2"
-              >
-                <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
-                즐겨찾기
-              </Button>
-              <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                원문 보기
-              </Button>
-              {/* Show 2-tier and 3-tier view buttons if valid 3-tier data exists */}
-              {hasValidThreeTierData && (
+        {/* Right panel - Article content */}
+        < Card className="flex flex-col" >
+          {/* Mobile article list toggle */}
+          < div className="lg:hidden p-3 border-b border-border bg-muted/30" >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsArticleListExpanded(!isArticleListExpanded)}
+              className="w-full"
+            >
+              {isArticleListExpanded ? (
                 <>
-                  <Button
-                    variant={tierViewMode === "2-tier" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
-                    title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
-                    className="h-7 px-2"
-                  >
-                    {threeTierDataType === "delegation" ? (
-                      <FileText className="h-3.5 w-3.5 mr-1" />
-                    ) : (
-                      <Link2 className="h-3.5 w-3.5 mr-1" />
-                    )}
-                    시행령
-                  </Button>
-                  {threeTierDataType === "delegation" && hasValidSihyungkyuchik && (
-                    <Button
-                      variant={tierViewMode === "3-tier" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
-                      title="시행규칙 보기"
-                      className="h-7 px-2"
-                    >
-                      <FileText className="h-3.5 w-3.5 mr-1" />
-                      시행규칙
-                    </Button>
-                  )}
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  조문 목록 닫기
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  {aiAnswerMode
+                    ? `답변 속 법령 보기 (${relatedArticles.length}개)`
+                    : `조문 목록 보기 (${actualArticles.length}개)`}
                 </>
               )}
-              {/* Admin rules button */}
-              <Button
-                variant={showAdminRules ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  const newValue = !showAdminRules
-                  setShowAdminRules(newValue)
-                  if (newValue) {
-                    // 행정규칙 활성화 시 목록 뷰로 설정
-                    setAdminRuleViewMode("list")
-                  }
-                }}
-                disabled={loadingAdminRules}
-                title="행정규칙 보기"
-                className="h-7 px-2"
-              >
-                {loadingAdminRules ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
-                    {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total}` : "로딩 중"}
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-3.5 w-3.5 mr-1" />
-                    행정규칙 {adminRules.length > 0 && `(${adminRules.length})`}
-                  </>
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
-        )}
 
-        {isOrdinance && (
-          <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                원문 보기
-              </Button>
-              
-              <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                <ZoomOut className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                <ZoomIn className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
-                  navigator.clipboard.writeText(content)
-                  toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
-                }}
-                title="전체 복사"
-                className="h-7 px-2"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full" ref={contentRef}>
-            <div className="px-5 pt-0 pb-0">
-              {isOrdinance ? (
-                <div className="space-y-2">
-                  {preambles.map((preamble, index) => (
-                    <div
-                      key={`preamble-${index}`}
-                      className="mb-2"
-                      dangerouslySetInnerHTML={{ __html: preamble.content }}
-                    />
-                  ))}
-
-                  {actualArticles.map((article, index) => (
-                    <div
-                      key={`${article.jo}-${index}`}
-                      id={`article-${article.jo}`}
-                      ref={(el) => {
-                        articleRefs.current[article.jo] = el
-                      }}
-                      className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
-                    >
-                      {/* Header removed for ordinances - article number already in content */}
-                      <div
-                        className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance) }}
-                      />
-                      <Separator className="my-1" />
-                    </div>
-                  ))}
+          {/* Action Buttons */}
+          {
+            !aiAnswerMode && !isOrdinance && activeArticle && (
+              <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                <div className="flex flex-wrap gap-1.5">
+                  <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
+                    <GitCompare className="h-3.5 w-3.5 mr-1" />
+                    신·구법 비교
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
+                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    AI 요약
+                  </Button>
+                  <Button
+                    variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                    className="h-7 px-2"
+                  >
+                    <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
+                    즐겨찾기
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    원문 보기
+                  </Button>
+                  {/* Show 2-tier and 3-tier view buttons if valid 3-tier data exists */}
+                  {hasValidThreeTierData && (
+                    <>
+                      <Button
+                        variant={tierViewMode === "2-tier" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
+                        title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
+                        className="h-7 px-2"
+                      >
+                        {threeTierDataType === "delegation" ? (
+                          <FileText className="h-3.5 w-3.5 mr-1" />
+                        ) : (
+                          <Link2 className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        시행령
+                      </Button>
+                      {threeTierDataType === "delegation" && hasValidSihyungkyuchik && (
+                        <Button
+                          variant={tierViewMode === "3-tier" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
+                          title="시행규칙 보기"
+                          className="h-7 px-2"
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1" />
+                          시행규칙
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {/* Admin rules button */}
+                  <Button
+                    variant={showAdminRules ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newValue = !showAdminRules
+                      setShowAdminRules(newValue)
+                      if (newValue) {
+                        // 행정규칙 활성화 시 목록 뷰로 설정
+                        setAdminRuleViewMode("list")
+                      }
+                    }}
+                    disabled={loadingAdminRules}
+                    title="행정규칙 보기"
+                    className="h-7 px-2"
+                  >
+                    {loadingAdminRules ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
+                        {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total}` : "로딩 중"}
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3.5 w-3.5 mr-1" />
+                        행정규칙 {adminRules.length > 0 && `(${adminRules.length})`}
+                      </>
+                    )}
+                  </Button>
                 </div>
-              ) : viewMode === "full" ? (
-                <div className="space-y-4">
-                  {preambles.map((preamble, index) => (
-                    <div
-                      key={`preamble-${index}`}
-                      className="mb-8 text-xl font-bold text-center"
-                      dangerouslySetInnerHTML={{ __html: preamble.content }}
-                    />
-                  ))}
+              </div>
+            )
+          }
 
-                  {actualArticles.map((article, index) => (
-                    <div
-                      key={`${article.jo}-${index}`}
-                      id={`article-${article.jo}`}
-                      ref={(el) => {
-                        articleRefs.current[article.jo] = el
-                      }}
-                      className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
-                    >
-                      <div className="mb-2 pb-1 border-b border-border">
-                        <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-                          {formatSimpleJo(article.jo)}
-                          {article.title && <span className="text-muted-foreground">({article.title})</span>}
-                          {activeJo === article.jo && (
-                            <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
+          {
+            isOrdinance && (
+              <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    원문 보기
+                  </Button>
+
+                  <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                    <ZoomOut className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                    <RotateCcw className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                    <ZoomIn className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
+                      navigator.clipboard.writeText(content)
+                      toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
+                    }}
+                    title="전체 복사"
+                    className="h-7 px-2"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )
+          }
+
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full" ref={contentRef}>
+              <div className="px-5 pt-0 pb-0">
+                {isOrdinance ? (
+                  <div className="space-y-2">
+                    {preambles.map((preamble, index) => (
+                      <div
+                        key={`preamble-${index}`}
+                        className="mb-2"
+                        dangerouslySetInnerHTML={{ __html: preamble.content }}
+                      />
+                    ))}
+
+                    {actualArticles.map((article, index) => (
+                      <div
+                        key={`${article.jo}-${index}`}
+                        id={`article-${article.jo}`}
+                        ref={(el) => {
+                          articleRefs.current[article.jo] = el
+                        }}
+                        className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
+                      >
+                        {/* Header removed for ordinances - article number already in content */}
+                        <div
+                          className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance) }}
+                        />
+                        <Separator className="my-1" />
+                      </div>
+                    ))}
+                  </div>
+                ) : viewMode === "full" ? (
+                  <div className="space-y-4">
+                    {preambles.map((preamble, index) => (
+                      <div
+                        key={`preamble-${index}`}
+                        className="mb-8 text-xl font-bold text-center"
+                        dangerouslySetInnerHTML={{ __html: preamble.content }}
+                      />
+                    ))}
+
+                    {actualArticles.map((article, index) => (
+                      <div
+                        key={`${article.jo}-${index}`}
+                        id={`article-${article.jo}`}
+                        ref={(el) => {
+                          articleRefs.current[article.jo] = el
+                        }}
+                        className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
+                      >
+                        <div className="mb-2 pb-1 border-b border-border">
+                          <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
+                            {formatSimpleJo(article.jo)}
+                            {article.title && <span className="text-muted-foreground">({article.title})</span>}
+                            {activeJo === article.jo && (
+                              <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
+                            )}
+                          </h3>
+                        </div>
+
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                        />
+
+                        {article.hasChanges && (
+                          <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-semibold text-foreground">변경된 조문</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  이 조문은 최근 개정되었습니다. 신·구법 비교를 통해 변경 내용을 확인하세요.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {index < actualArticles.length - 1 && <Separator className="my-3" />}
+                      </div>
+                    ))}
+                  </div>
+                ) : loadingJo ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p>조문을 불러오는 중...</p>
+                  </div>
+                ) : activeArticle ? (
+                  // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
+                  showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
+                    // Admin rules detail view: 2-tier (law | admin rule content)
+                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Left: Main article */}
+                      <div className="overflow-y-auto pr-2">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Admin rule full content */}
+                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-foreground" />
+                              <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  // Go back to list view
+                                  setAdminRuleViewMode("list")
+                                }}
+                              >
+                                ← 목록
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  // Force refresh admin rule content
+                                  const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                  if (currentRule) {
+                                    const idParam = currentRule.serialNumber || currentRule.id
+                                    if (idParam) {
+                                      // Clear cache
+                                      await clearAdminRuleContentCache(idParam)
+                                      console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+
+                                      // Reset state
+                                      setAdminRuleHtml(null)
+
+                                      // Reload
+                                      await handleViewAdminRuleFullContent(currentRule)
+                                    }
+                                  }
+                                }}
+                                title="캐시 삭제 후 다시 로드"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                              {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                >
+                                  <a
+                                    href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    법령 사이트
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          <div
+                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: "1.8",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    // Priority 2: Admin rules list view (행정규칙 목록 뷰)
+                  ) : showAdminRules && adminRuleViewMode === "list" && (loadingAdminRules || adminRules.length > 0) ? (
+                    // Admin rules list view: 2-tier (law | admin rules list)
+                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Left: Main article */}
+                      <div className="overflow-y-auto pr-2 flex flex-col">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Admin rules list */}
+                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-foreground" />
+                            <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                          </div>
+                          {loadingAdminRules ? (
+                            <Badge variant="secondary" className="text-xs">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              {adminRules.length}개 매칭
+                            </Badge>
                           )}
-                        </h3>
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          {loadingAdminRules ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                              <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                              <p className="text-sm">행정규칙 검색 중...</p>
+                              {adminRulesProgress && (
+                                <p className="text-xs mt-2">
+                                  {adminRulesProgress.current} / {adminRulesProgress.total}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3 pr-2">
+                              {adminRules.map((rule, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-lg border border-border bg-card"
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
+                                    <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
+                                      {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
+                                    </Badge>
+                                  </div>
+                                  {rule.purpose.title && (
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      {rule.purpose.number} ({rule.purpose.title})
+                                    </p>
+                                  )}
+                                  <div
+                                    className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
+                                    style={{
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 3,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    {rule.purpose.content}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleViewAdminRuleFullContent(rule)}
+                                      className="flex-1 text-xs h-7"
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      본문 조회
+                                    </Button>
+                                    {getLawGoKrLink(rule.serialNumber) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild
+                                        className="flex-1 text-xs h-7"
+                                      >
+                                        <a
+                                          href={getLawGoKrLink(rule.serialNumber)!}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <ExternalLink className="h-3 w-3 mr-1" />
+                                          법령 사이트
+                                        </a>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    // Priority 3: 3-tier delegation view (위임조문 3단 뷰)
+                  ) : tierViewMode === "3-tier" && threeTierDataType === "delegation" && validDelegations.length > 0 ? (
+                    // 3-tier view: Split into three columns - law | decree (시행령) | rule (시행규칙) - only for delegations
+                    <div className="grid grid-cols-3 gap-3 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Left: Main article (law) */}
+                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Middle: Decrees (시행령) */}
+                      <div className="border-l border-r border-border px-3 overflow-y-auto">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-foreground" />
+                            <h3 className="text-base font-bold text-foreground">시행령</h3>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {validDelegations.filter((d) => d.type === "시행령").length}개
+                          </Badge>
+                        </div>
+                        <div className="space-y-0">
+                          {validDelegations
+                            .filter((d) => d.type === "시행령")
+                            .map((delegation, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-lg border border-border"
+                              >
+                                {delegation.title && (
+                                  <p className="font-semibold text-sm text-foreground mb-2">
+                                    {delegation.title}
+                                  </p>
+                                )}
+                                {delegation.content && (
+                                  <div
+                                    className="text-xs text-foreground leading-relaxed break-words"
+                                    style={{
+                                      fontSize: `${fontSize}px`,
+                                      lineHeight: "1.8",
+                                      overflowWrap: "break-word",
+                                      wordBreak: "break-word",
+                                    }}
+                                    onClick={handleContentClick}
+                                    dangerouslySetInnerHTML={{ __html: formatDelegationContent(delegation.content) }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Rules (시행규칙, 행정규칙) */}
+                      <div className="border-l border-border pl-3 overflow-y-auto">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-base font-bold text-foreground">시행규칙</h3>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
+                          </Badge>
+                        </div>
+                        <div className="space-y-0">
+                          {validDelegations
+                            .filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
+                            .map((delegation, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-lg border border-border"
+                              >
+                                {delegation.title && (
+                                  <p className="font-semibold text-sm text-foreground mb-2">
+                                    {delegation.title}
+                                  </p>
+                                )}
+                                {delegation.content && (
+                                  <div
+                                    className="text-xs text-foreground leading-relaxed break-words"
+                                    style={{
+                                      fontSize: `${fontSize}px`,
+                                      lineHeight: "1.8",
+                                      overflowWrap: "break-word",
+                                      wordBreak: "break-word",
+                                    }}
+                                    onClick={handleContentClick}
+                                    dangerouslySetInnerHTML={{ __html: formatDelegationContent(delegation.content) }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    // Priority 4: 2-tier delegation view (위임조문 2단 뷰)
+                  ) : tierViewMode === "2-tier" && tierItems.length > 0 ? (
+                    // 2-tier view: Split horizontally - left: main article, right: delegations
+                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Left: Main article */}
+                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                        <div className="mb-6 pb-4 border-b border-border">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Delegations/Citations */}
+                      <div className="border-l border-border pl-4 overflow-y-auto">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <div className="flex items-center gap-2 mb-2">
+                            {threeTierDataType === "delegation" ? (
+                              <FileText className="h-5 w-5 text-foreground" />
+                            ) : (
+                              <Link2 className="h-5 w-5 text-foreground" />
+                            )}
+                            <h3 className="text-base font-bold text-foreground">
+                              {threeTierDataType === "delegation" ? "위임 조문" : "인용 조문"}
+                            </h3>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {tierItems.length}개 {threeTierDataType === "delegation" ? "위임" : "인용"}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-0">
+                          {tierItems.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="py-3 border-b border-border last:border-0"
+                            >
+                              {threeTierDataType === "delegation" ? (
+                                <>
+                                  <div className="flex items-start gap-2 mb-2">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {item.type}
+                                    </Badge>
+                                    {item.joNum && (
+                                      <span className="font-semibold text-sm text-foreground">{item.joNum}</span>
+                                    )}
+                                  </div>
+                                  {item.lawName && (
+                                    <p className="text-xs text-muted-foreground mb-2 font-medium">{item.lawName}</p>
+                                  )}
+                                  {item.title && (
+                                    <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {item.joNum && (
+                                    <p className="font-semibold text-sm text-foreground mb-2">{item.joNum}</p>
+                                  )}
+                                  {item.title && (
+                                    <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                  )}
+                                </>
+                              )}
+                              {item.content && (
+                                <div
+                                  className="text-foreground leading-relaxed break-words text-sm"
+                                  style={{
+                                    fontSize: `${fontSize}px`,
+                                    lineHeight: "1.8",
+                                    overflowWrap: "break-word",
+                                    wordBreak: "break-word",
+                                  }}
+                                  onClick={handleContentClick}
+                                  dangerouslySetInnerHTML={{ __html: formatDelegationContent(item.content) }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    // 중복 블록 제거됨 - Admin rules 뷰는 최상위로 이동됨
+                  ) : false ? (
+                    // Admin rules detail view: 2-tier (law | admin rule content)
+                    <div className="grid grid-cols-2 gap-4" style={{ height: "100%" }}>
+                      {/* Left: Main article */}
+                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                        <div className="mb-4 pb-3 border-b border-border">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Admin rule full content */}
+                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-foreground" />
+                              <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  // Go back to list view
+                                  setAdminRuleViewMode("list")
+                                }}
+                              >
+                                ← 목록
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  // Force refresh admin rule content
+                                  const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                  if (currentRule) {
+                                    const idParam = currentRule.serialNumber || currentRule.id
+                                    if (idParam) {
+                                      // Clear cache
+                                      await clearAdminRuleContentCache(idParam)
+                                      console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+
+                                      // Reset state
+                                      setAdminRuleHtml(null)
+
+                                      // Reload
+                                      await handleViewAdminRuleFullContent(currentRule)
+                                    }
+                                  }
+                                }}
+                                title="캐시 삭제 후 다시 로드"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                              {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                >
+                                  <a
+                                    href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    법령 사이트
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          <div
+                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: "1.8",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    // 중복 블록 제거됨 - Admin rules list 뷰는 최상위로 이동됨
+                  ) : false ? (
+                    // Admin rules list view: 2-tier (law | admin rules list)
+                    <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
+                      {/* Left: Main article */}
+                      <div className="overflow-y-auto pr-2 flex flex-col">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <h3 className="text-base font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Admin rules list */}
+                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-foreground" />
+                            <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                          </div>
+                          {loadingAdminRules ? (
+                            <Badge variant="secondary" className="text-xs">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              {adminRules.length}개 매칭
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          {loadingAdminRules ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                              <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                              <p className="text-sm">행정규칙 검색 중...</p>
+                              {adminRulesProgress && (
+                                <p className="text-xs mt-2">
+                                  {adminRulesProgress.current} / {adminRulesProgress.total}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3 pr-2">
+                              {adminRules.map((rule, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-lg border border-border bg-card"
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
+                                    <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
+                                      {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
+                                    </Badge>
+                                  </div>
+                                  {rule.purpose.title && (
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      {rule.purpose.number} ({rule.purpose.title})
+                                    </p>
+                                  )}
+                                  <div
+                                    className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
+                                    style={{
+                                      fontSize: `${Math.max(fontSize - 2, 11)}px`,
+                                      lineHeight: "1.6",
+                                      overflowWrap: "break-word",
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {rule.purpose.content}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleViewAdminRuleFullContent(rule)}
+                                      className="flex-1 text-xs h-7"
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      전체 보기
+                                    </Button>
+                                    {getLawGoKrLink(rule.serialNumber) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild
+                                        className="flex-1 text-xs h-7"
+                                      >
+                                        <a
+                                          href={getLawGoKrLink(rule.serialNumber)!}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <ExternalLink className="h-3 w-3 mr-1" />
+                                          법령 사이트
+                                        </a>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    // 중복 블록 제거됨 - 위임조문 2단 뷰는 위로 이동됨
+                  ) : false ? (
+                    // 2-tier view: Split horizontally - left: main article, right: delegations/citations/admin rules
+                    <div className="grid grid-cols-2 gap-4 h-full">
+                      {/* Left: Main article */}
+                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                        <div className="mb-6 pb-4 border-b border-border">
+                          <h3 className="text-lg font-bold text-foreground mb-2">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                        </div>
+
+                        <div
+                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                          style={{
+                            fontSize: `${fontSize}px`,
+                            lineHeight: "1.8",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}
+                          onClick={handleContentClick}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        />
+                      </div>
+
+                      {/* Right: Delegations, Citations, or Admin Rules */}
+                      <div className="border-l border-border pl-4 overflow-y-auto">
+                        {adminRuleViewMode === "detail" && adminRuleHtml ? (
+                          <>
+                            <div className="mb-6 pb-4 border-b border-border">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-5 w-5 text-foreground" />
+                                  <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Go back to list view
+                                    setAdminRuleViewMode("list")
+                                  }}
+                                >
+                                  ← 목록
+                                </Button>
+                              </div>
+                            </div>
+                            <div
+                              className="text-foreground"
+                              dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div className="mb-6 pb-4 border-b border-border">
+                              <div className="flex items-center gap-2 mb-2">
+                                {threeTierDataType === "delegation" ? (
+                                  <FileText className="h-5 w-5 text-foreground" />
+                                ) : (
+                                  <Link2 className="h-5 w-5 text-foreground" />
+                                )}
+                                <h3 className="text-lg font-bold text-foreground">
+                                  {threeTierDataType === "delegation" ? "위임 조문" : "인용 조문"}
+                                </h3>
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {tierItems.length}개 {threeTierDataType === "delegation" ? "위임" : "인용"}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-0">
+                              {tierItems.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-4 rounded-lg border border-border"
+                                >
+                                  {threeTierDataType === "delegation" ? (
+                                    <>
+                                      <div className="flex items-start gap-2 mb-2">
+                                        <Badge
+                                          variant="secondary"
+                                          className="text-xs"
+                                        >
+                                          {item.type}
+                                        </Badge>
+                                        {item.joNum && (
+                                          <span className="font-semibold text-sm text-foreground">{item.joNum}</span>
+                                        )}
+                                      </div>
+                                      {item.lawName && (
+                                        <p className="text-xs text-muted-foreground mb-2 font-medium">{item.lawName}</p>
+                                      )}
+                                      {item.title && (
+                                        <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {item.joNum && (
+                                        <p className="font-semibold text-sm text-foreground mb-2">{item.joNum}</p>
+                                      )}
+                                      {item.title && (
+                                        <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
+                                      )}
+                                    </>
+                                  )}
+                                  {item.content && (
+                                    <div
+                                      className="text-sm text-foreground leading-relaxed break-words"
+                                      style={{
+                                        fontSize: `${fontSize}px`,
+                                        lineHeight: "1.8",
+                                        overflowWrap: "break-word",
+                                        wordBreak: "break-word",
+                                      }}
+                                      onClick={handleContentClick}
+                                      dangerouslySetInnerHTML={{ __html: formatDelegationContent(item.content) }}
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    // 1-tier view: Normal single article view
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <div className="mb-6 pb-4 border-b border-border">
+                        <div className="flex items-center justify-between gap-4">
+                          <h3 className="text-lg font-bold text-foreground mb-0">
+                            {formatSimpleJo(activeArticle.jo)}
+                            {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                          </h3>
+                          {/* 글자 크기 조절 및 복사 */}
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
+                              <ZoomOut className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
+                              <ZoomIn className="h-4 w-4" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
+                            <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
+                              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
 
                       <div
@@ -1972,10 +2778,10 @@ export function LawViewer({
                           wordBreak: "break-word",
                         }}
                         onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
                       />
 
-                      {article.hasChanges && (
+                      {activeArticle.hasChanges && (
                         <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
                           <div className="flex items-start gap-2">
                             <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
@@ -1988,904 +2794,50 @@ export function LawViewer({
                           </div>
                         </div>
                       )}
-
-                      {index < actualArticles.length - 1 && <Separator className="my-3" />}
                     </div>
-                  ))}
-                </div>
-              ) : loadingJo ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  <p>조문을 불러오는 중...</p>
-                </div>
-              ) : activeArticle ? (
-                // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
-                showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
-                  // Admin rules detail view: 2-tier (law | admin rule content)
-                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: Main article */}
-                    <div className="overflow-y-auto pr-2">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
+                  )
+                ) : aiAnswerMode && aiAnswerContent ? (
+                  // AI 모드: AI 답변 표시 (비교 법령이 있으면 2단 뷰)
+                  comparisonLawMeta && comparisonLawArticles.length > 0 ? (
+                    // 2단 비교 뷰: AI 답변 (좌) + 관련 법령 (우)
+                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Left: AI Answer with Glassmorphism */}
+                      <div className="overflow-y-auto pr-2 relative">
+                        {/* 🎨 배경 그라데이션 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none rounded-lg" />
 
-                    {/* Right: Admin rule full content */}
-                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-foreground" />
-                            <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                // Go back to list view
-                                setAdminRuleViewMode("list")
-                              }}
-                            >
-                              ← 목록
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                // Force refresh admin rule content
-                                const currentRule = adminRules.find(r => r.name === adminRuleTitle)
-                                if (currentRule) {
-                                  const idParam = currentRule.serialNumber || currentRule.id
-                                  if (idParam) {
-                                    // Clear cache
-                                    await clearAdminRuleContentCache(idParam)
-                                    console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
-
-                                    // Reset state
-                                    setAdminRuleHtml(null)
-
-                                    // Reload
-                                    await handleViewAdminRuleFullContent(currentRule)
-                                  }
-                                }
-                              }}
-                              title="캐시 삭제 후 다시 로드"
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                            {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                asChild
-                              >
-                                <a
-                                  href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  법령 사이트
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="overflow-y-auto flex-1">
-                        <div
-                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                // Priority 2: Admin rules list view (행정규칙 목록 뷰)
-                ) : showAdminRules && adminRuleViewMode === "list" && (loadingAdminRules || adminRules.length > 0) ? (
-                  // Admin rules list view: 2-tier (law | admin rules list)
-                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: Main article */}
-                    <div className="overflow-y-auto pr-2 flex flex-col">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Right: Admin rules list */}
-                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-foreground" />
-                          <h3 className="text-base font-bold text-foreground">행정규칙</h3>
-                        </div>
-                        {loadingAdminRules ? (
-                          <Badge variant="secondary" className="text-xs">
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            {adminRules.length}개 매칭
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="overflow-y-auto flex-1">
-                        {loadingAdminRules ? (
-                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                            <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                            <p className="text-sm">행정규칙 검색 중...</p>
-                            {adminRulesProgress && (
-                              <p className="text-xs mt-2">
-                                {adminRulesProgress.current} / {adminRulesProgress.total}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-3 pr-2">
-                          {adminRules.map((rule, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-lg border border-border bg-card"
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
-                              <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
-                                {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
-                              </Badge>
-                            </div>
-                            {rule.purpose.title && (
-                              <p className="text-xs text-muted-foreground mb-2">
-                                {rule.purpose.number} ({rule.purpose.title})
-                              </p>
-                            )}
-                            <div
-                              className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
-                              style={{
-                                display: "-webkit-box",
-                                WebkitLineClamp: 3,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {rule.purpose.content}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleViewAdminRuleFullContent(rule)}
-                                className="flex-1 text-xs h-7"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                본문 조회
-                              </Button>
-                              {getLawGoKrLink(rule.serialNumber) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  asChild
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  <a
-                                    href={getLawGoKrLink(rule.serialNumber)!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                    법령 사이트
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                          ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                // Priority 3: 3-tier delegation view (위임조문 3단 뷰)
-                ) : tierViewMode === "3-tier" && threeTierDataType === "delegation" && validDelegations.length > 0 ? (
-                  // 3-tier view: Split into three columns - law | decree (시행령) | rule (시행규칙) - only for delegations
-                  <div className="grid grid-cols-3 gap-3 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: Main article (law) */}
-                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Middle: Decrees (시행령) */}
-                    <div className="border-l border-r border-border px-3 overflow-y-auto">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-foreground" />
-                          <h3 className="text-base font-bold text-foreground">시행령</h3>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {validDelegations.filter((d) => d.type === "시행령").length}개
-                        </Badge>
-                      </div>
-                      <div className="space-y-0">
-                        {validDelegations
-                          .filter((d) => d.type === "시행령")
-                          .map((delegation, idx) => (
-                            <div
-                              key={idx}
-                              className="p-3 rounded-lg border border-border"
-                            >
-                              {delegation.title && (
-                                <p className="font-semibold text-sm text-foreground mb-2">
-                                  {delegation.title}
-                                </p>
-                              )}
-                              {delegation.content && (
-                                <div
-                                  className="text-xs text-foreground leading-relaxed break-words"
-                                  style={{
-                                    fontSize: `${fontSize}px`,
-                                    lineHeight: "1.8",
-                                    overflowWrap: "break-word",
-                                    wordBreak: "break-word",
-                                  }}
-                                  onClick={handleContentClick}
-                                  dangerouslySetInnerHTML={{ __html: formatDelegationContent(delegation.content) }}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
-                          <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right: Rules (시행규칙, 행정규칙) */}
-                    <div className="border-l border-border pl-3 overflow-y-auto">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-base font-bold text-foreground">시행규칙</h3>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
-                        </Badge>
-                      </div>
-                      <div className="space-y-0">
-                        {validDelegations
-                          .filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
-                          .map((delegation, idx) => (
-                            <div
-                              key={idx}
-                              className="p-3 rounded-lg border border-border"
-                            >
-                              {delegation.title && (
-                                <p className="font-semibold text-sm text-foreground mb-2">
-                                  {delegation.title}
-                                </p>
-                              )}
-                              {delegation.content && (
-                                <div
-                                  className="text-xs text-foreground leading-relaxed break-words"
-                                  style={{
-                                    fontSize: `${fontSize}px`,
-                                    lineHeight: "1.8",
-                                    overflowWrap: "break-word",
-                                    wordBreak: "break-word",
-                                  }}
-                                  onClick={handleContentClick}
-                                  dangerouslySetInnerHTML={{ __html: formatDelegationContent(delegation.content) }}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length === 0 && (
-                          <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                // Priority 4: 2-tier delegation view (위임조문 2단 뷰)
-                ) : tierViewMode === "2-tier" && tierItems.length > 0 ? (
-                  // 2-tier view: Split horizontally - left: main article, right: delegations
-                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: Main article */}
-                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
-                      <div className="mb-6 pb-4 border-b border-border">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Right: Delegations/Citations */}
-                    <div className="border-l border-border pl-4 overflow-y-auto">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <div className="flex items-center gap-2 mb-2">
-                          {threeTierDataType === "delegation" ? (
-                            <FileText className="h-5 w-5 text-foreground" />
-                          ) : (
-                            <Link2 className="h-5 w-5 text-foreground" />
-                          )}
-                          <h3 className="text-base font-bold text-foreground">
-                            {threeTierDataType === "delegation" ? "위임 조문" : "인용 조문"}
-                          </h3>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {tierItems.length}개 {threeTierDataType === "delegation" ? "위임" : "인용"}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-0">
-                        {tierItems.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="py-3 border-b border-border last:border-0"
-                          >
-                            {threeTierDataType === "delegation" ? (
-                              <>
-                                <div className="flex items-start gap-2 mb-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {item.type}
-                                  </Badge>
-                                  {item.joNum && (
-                                    <span className="font-semibold text-sm text-foreground">{item.joNum}</span>
-                                  )}
-                                </div>
-                                {item.lawName && (
-                                  <p className="text-xs text-muted-foreground mb-2 font-medium">{item.lawName}</p>
-                                )}
-                                {item.title && (
-                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                {item.joNum && (
-                                  <p className="font-semibold text-sm text-foreground mb-2">{item.joNum}</p>
-                                )}
-                                {item.title && (
-                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
-                                )}
-                              </>
-                            )}
-                            {item.content && (
-                              <div
-                                className="text-foreground leading-relaxed break-words text-sm"
-                                style={{
-                                  fontSize: `${fontSize}px`,
-                                  lineHeight: "1.8",
-                                  overflowWrap: "break-word",
-                                  wordBreak: "break-word",
-                                }}
-                                onClick={handleContentClick}
-                                dangerouslySetInnerHTML={{ __html: formatDelegationContent(item.content) }}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                // 중복 블록 제거됨 - Admin rules 뷰는 최상위로 이동됨
-                ) : false ? (
-                  // Admin rules detail view: 2-tier (law | admin rule content)
-                  <div className="grid grid-cols-2 gap-4" style={{ height: "100%" }}>
-                    {/* Left: Main article */}
-                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
-                      <div className="mb-4 pb-3 border-b border-border">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Right: Admin rule full content */}
-                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-foreground" />
-                            <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                // Go back to list view
-                                setAdminRuleViewMode("list")
-                              }}
-                            >
-                              ← 목록
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                // Force refresh admin rule content
-                                const currentRule = adminRules.find(r => r.name === adminRuleTitle)
-                                if (currentRule) {
-                                  const idParam = currentRule.serialNumber || currentRule.id
-                                  if (idParam) {
-                                    // Clear cache
-                                    await clearAdminRuleContentCache(idParam)
-                                    console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
-
-                                    // Reset state
-                                    setAdminRuleHtml(null)
-
-                                    // Reload
-                                    await handleViewAdminRuleFullContent(currentRule)
-                                  }
-                                }
-                              }}
-                              title="캐시 삭제 후 다시 로드"
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                            {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                asChild
-                              >
-                                <a
-                                  href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  법령 사이트
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="overflow-y-auto flex-1">
-                        <div
-                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                // 중복 블록 제거됨 - Admin rules list 뷰는 최상위로 이동됨
-                ) : false ? (
-                  // Admin rules list view: 2-tier (law | admin rules list)
-                  <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
-                    {/* Left: Main article */}
-                    <div className="overflow-y-auto pr-2 flex flex-col">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <h3 className="text-base font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Right: Admin rules list */}
-                    <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                      <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-foreground" />
-                          <h3 className="text-base font-bold text-foreground">행정규칙</h3>
-                        </div>
-                        {loadingAdminRules ? (
-                          <Badge variant="secondary" className="text-xs">
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            {adminRules.length}개 매칭
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="overflow-y-auto flex-1">
-                        {loadingAdminRules ? (
-                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                            <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                            <p className="text-sm">행정규칙 검색 중...</p>
-                            {adminRulesProgress && (
-                              <p className="text-xs mt-2">
-                                {adminRulesProgress.current} / {adminRulesProgress.total}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-3 pr-2">
-                          {adminRules.map((rule, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-lg border border-border bg-card"
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
-                              <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
-                                {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
-                              </Badge>
-                            </div>
-                            {rule.purpose.title && (
-                              <p className="text-xs text-muted-foreground mb-2">
-                                {rule.purpose.number} ({rule.purpose.title})
-                              </p>
-                            )}
-                            <div
-                              className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
-                              style={{
-                                fontSize: `${Math.max(fontSize - 2, 11)}px`,
-                                lineHeight: "1.6",
-                                overflowWrap: "break-word",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {rule.purpose.content}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewAdminRuleFullContent(rule)}
-                                className="flex-1 text-xs h-7"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                전체 보기
-                              </Button>
-                              {getLawGoKrLink(rule.serialNumber) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  asChild
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  <a
-                                    href={getLawGoKrLink(rule.serialNumber)!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                    법령 사이트
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                          ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                // 중복 블록 제거됨 - 위임조문 2단 뷰는 위로 이동됨
-                ) : false ? (
-                  // 2-tier view: Split horizontally - left: main article, right: delegations/citations/admin rules
-                  <div className="grid grid-cols-2 gap-4 h-full">
-                    {/* Left: Main article */}
-                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
-                      <div className="mb-6 pb-4 border-b border-border">
-                        <h3 className="text-lg font-bold text-foreground mb-2">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                      </div>
-
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                      />
-                    </div>
-
-                    {/* Right: Delegations, Citations, or Admin Rules */}
-                    <div className="border-l border-border pl-4 overflow-y-auto">
-                      {adminRuleViewMode === "detail" && adminRuleHtml ? (
-                        <>
-                          <div className="mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-foreground" />
-                                <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                        <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-4">
+                          <div className="mb-3 pb-2 border-b border-purple-500/20 flex items-center gap-2">
+                            {/* Glowing AI Icon */}
+                            <div className="relative">
+                              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                              <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
+                                <Sparkles className="h-4 w-4 text-white" />
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  // Go back to list view
-                                  setAdminRuleViewMode("list")
-                                }}
-                              >
-                                ← 목록
-                              </Button>
                             </div>
-                          </div>
-                          <div
-                            className="text-foreground"
-                            dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <div className="mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center gap-2 mb-2">
-                              {threeTierDataType === "delegation" ? (
-                                <FileText className="h-5 w-5 text-foreground" />
-                              ) : (
-                                <Link2 className="h-5 w-5 text-foreground" />
-                              )}
-                              <h3 className="text-lg font-bold text-foreground">
-                                {threeTierDataType === "delegation" ? "위임 조문" : "인용 조문"}
-                              </h3>
-                            </div>
+                            <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
                             <Badge variant="secondary" className="text-xs">
-                              {tierItems.length}개 {threeTierDataType === "delegation" ? "위임" : "인용"}
+                              File Search RAG
                             </Badge>
                           </div>
 
-                      <div className="space-y-0">
-                        {tierItems.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="p-4 rounded-lg border border-border"
-                          >
-                            {threeTierDataType === "delegation" ? (
-                              <>
-                                <div className="flex items-start gap-2 mb-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {item.type}
-                                  </Badge>
-                                  {item.joNum && (
-                                    <span className="font-semibold text-sm text-foreground">{item.joNum}</span>
-                                  )}
+                          {/* 검색 실패 경고 메시지 */}
+                          {fileSearchFailed && (
+                            <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
+                                  <p className="text-xs text-red-200/80">
+                                    File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
+                                  </p>
                                 </div>
-                                {item.lawName && (
-                                  <p className="text-xs text-muted-foreground mb-2 font-medium">{item.lawName}</p>
-                                )}
-                                {item.title && (
-                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                {item.joNum && (
-                                  <p className="font-semibold text-sm text-foreground mb-2">{item.joNum}</p>
-                                )}
-                                {item.title && (
-                                  <p className="text-sm font-semibold text-foreground mb-2">{item.title}</p>
-                                )}
-                              </>
-                            )}
-                            {item.content && (
-                              <div
-                                className="text-sm text-foreground leading-relaxed break-words"
-                                style={{
-                                  fontSize: `${fontSize}px`,
-                                  lineHeight: "1.8",
-                                  overflowWrap: "break-word",
-                                  wordBreak: "break-word",
-                                }}
-                                onClick={handleContentClick}
-                                dangerouslySetInnerHTML={{ __html: formatDelegationContent(item.content) }}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  // 1-tier view: Normal single article view
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <div className="mb-6 pb-4 border-b border-border">
-                      <div className="flex items-center justify-between gap-4">
-                        <h3 className="text-lg font-bold text-foreground mb-0">
-                          {formatSimpleJo(activeArticle.jo)}
-                          {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
-                        </h3>
-                        {/* 글자 크기 조절 및 복사 */}
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
-                            <ZoomOut className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                          <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
-                          <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
-                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                      style={{
-                        fontSize: `${fontSize}px`,
-                        lineHeight: "1.8",
-                        overflowWrap: "break-word",
-                        wordBreak: "break-word",
-                      }}
-                      onClick={handleContentClick}
-                      dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
-                    />
-
-                    {activeArticle.hasChanges && (
-                      <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-semibold text-foreground">변경된 조문</p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              이 조문은 최근 개정되었습니다. 신·구법 비교를 통해 변경 내용을 확인하세요.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              ) : aiAnswerMode && aiAnswerContent ? (
-                // AI 모드: AI 답변 표시 (비교 법령이 있으면 2단 뷰)
-                comparisonLawMeta && comparisonLawArticles.length > 0 ? (
-                  // 2단 비교 뷰: AI 답변 (좌) + 관련 법령 (우)
-                  <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                    {/* Left: AI Answer with Glassmorphism */}
-                    <div className="overflow-y-auto pr-2 relative">
-                      {/* 🎨 배경 그라데이션 */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none rounded-lg" />
-
-                      <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-4">
-                        <div className="mb-3 pb-2 border-b border-purple-500/20 flex items-center gap-2">
-                          {/* Glowing AI Icon */}
-                          <div className="relative">
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                            <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
-                              <Sparkles className="h-4 w-4 text-white" />
+                              </div>
                             </div>
-                          </div>
-                          <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
-                          <Badge variant="secondary" className="text-xs">
-                            File Search RAG
-                          </Badge>
-                        </div>
+                          )}
 
-                      {/* 검색 실패 경고 메시지 */}
-                      {fileSearchFailed && (
-                        <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
-                          <div className="flex items-start gap-2">
-                            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
-                              <p className="text-xs text-red-200/80">
-                                File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div
-                        className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
+                          <div
+                            className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
                         [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/20 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
@@ -2893,61 +2845,61 @@ export function LawViewer({
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
-                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-                      />
+                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
+                          />
 
-                        {/* AI 답변 주의사항 */}
-                        <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                          <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                          <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                          {/* AI 답변 주의사항 */}
+                          <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                            <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Right: Comparison Law Article */}
-                    <div className="overflow-y-auto pr-2">
-                      {isLoadingComparison ? (
-                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                          <p>관련 법령을 불러오는 중...</p>
-                        </div>
-                      ) : (() => {
-                        const comparisonArticle = comparisonLawArticles.find(a => a.jo === comparisonLawSelectedJo) || comparisonLawArticles[0]
-                        if (!comparisonArticle) {
+                      {/* Right: Comparison Law Article */}
+                      <div className="overflow-y-auto pr-2">
+                        {isLoadingComparison ? (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            <p>관련 법령을 불러오는 중...</p>
+                          </div>
+                        ) : (() => {
+                          const comparisonArticle = comparisonLawArticles.find(a => a.jo === comparisonLawSelectedJo) || comparisonLawArticles[0]
+                          if (!comparisonArticle) {
+                            return (
+                              <div className="flex items-center justify-center h-full text-muted-foreground">
+                                <p>관련 법령 조문을 찾을 수 없습니다</p>
+                              </div>
+                            )
+                          }
+
                           return (
-                            <div className="flex items-center justify-center h-full text-muted-foreground">
-                              <p>관련 법령 조문을 찾을 수 없습니다</p>
+                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                              <div className="mb-6 pb-4 border-b border-border">
+                                <h3 className="text-base font-bold text-foreground mb-2">
+                                  {formatSimpleJo(comparisonArticle.jo)}
+                                  {comparisonArticle.title && <span className="text-muted-foreground text-sm"> ({comparisonArticle.title})</span>}
+                                </h3>
+                                <Badge variant="outline" className="text-xs">
+                                  {comparisonLawMeta.lawTitle}
+                                </Badge>
+                              </div>
+
+                              <div
+                                className="law-content text-sm text-foreground leading-relaxed"
+                                style={{ fontSize: `${fontSize}px` }}
+                                dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle) }}
+                              />
                             </div>
                           )
-                        }
-
-                        return (
-                          <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <div className="mb-6 pb-4 border-b border-border">
-                              <h3 className="text-base font-bold text-foreground mb-2">
-                                {formatSimpleJo(comparisonArticle.jo)}
-                                {comparisonArticle.title && <span className="text-muted-foreground text-sm"> ({comparisonArticle.title})</span>}
-                              </h3>
-                              <Badge variant="outline" className="text-xs">
-                                {comparisonLawMeta.lawTitle}
-                              </Badge>
-                            </div>
-
-                            <div
-                              className="law-content text-sm text-foreground leading-relaxed"
-                              style={{ fontSize: `${fontSize}px` }}
-                              dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle) }}
-                            />
-                          </div>
-                        )
-                      })()}
+                        })()}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  // 기본 AI 답변 (비교 법령 없음) - Editorial Clean Design
-                  <div className="animate-fade-in-up">
+                  ) : (
+                    // 기본 AI 답변 (비교 법령 없음) - Editorial Clean Design
+                    <div className="animate-fade-in-up">
                       {/* 검색 실패 경고 메시지 - 간소화 */}
                       {fileSearchFailed && (
                         <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
@@ -3006,8 +2958,8 @@ export function LawViewer({
                         </div>
                       </div>
 
-                    <div
-                      className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
+                      <div
+                        className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
                         [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:bg-muted/50 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:italic
@@ -3015,46 +2967,46 @@ export function LawViewer({
                         [&_ul]:my-3 [&_li]:my-1.5
                         [&_ol]:my-3 [&_ol_li]:my-1.5
                         [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
-                      style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                      onClick={handleContentClick}
-                      dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-                    />
+                        style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
+                      />
 
                       {/* AI 답변 주의사항 */}
                       <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
                         <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                         <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                       </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>조문을 선택하세요</p>
                   </div>
-                )
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>조문을 선택하세요</p>
-                </div>
-              )}
-              {!isOrdinance && revisionHistory.length > 0 && activeArticle && (
-                <div className="mt-12">
-                  <RevisionHistory
-                    history={revisionHistory}
-                    articleTitle={`${formatSimpleJo(activeArticle.jo)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
-                  />
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-      </Card>
-      <ReferenceModal
-        isOpen={refModal.open}
-        onClose={() => setRefModal({ open: false })}
-        title={refModal.title || "연결된 본문"}
-        html={refModal.html}
-        onContentClick={handleContentClick}
-        forceWhiteTheme={refModal.forceWhiteTheme}
-        lawName={refModal.lawName}
-        articleNumber={refModal.articleNumber}
-      />
-      </div>
+                )}
+                {!isOrdinance && revisionHistory.length > 0 && activeArticle && (
+                  <div className="mt-12">
+                    <RevisionHistory
+                      history={revisionHistory}
+                      articleTitle={`${formatSimpleJo(activeArticle.jo)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
+                    />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </Card >
+        <ReferenceModal
+          isOpen={refModal.open}
+          onClose={() => setRefModal({ open: false })}
+          title={refModal.title || "연결된 본문"}
+          html={refModal.html}
+          onContentClick={handleContentClick}
+          forceWhiteTheme={refModal.forceWhiteTheme}
+          lawName={refModal.lawName}
+          articleNumber={refModal.articleNumber}
+        />
+      </div >
     </>
   )
 }
