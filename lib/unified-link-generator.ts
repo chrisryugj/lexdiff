@@ -30,7 +30,14 @@ interface LinkMatch {
 export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' }): string {
   const matches: LinkMatch[] = []
 
+  console.log('[generateLinks] Called with config:', config, 'text length:', text.length)
+
   // 1단계: 모든 매칭 수집
+  // CRITICAL: 내부 조문 참조를 가장 먼저 수집 (우선권)
+  console.log('[generateLinks] About to call collectInternalArticleMatches')
+  collectInternalArticleMatches(text, matches)
+  console.log('[generateLinks] After collectInternalArticleMatches, total matches:', matches.length)
+
   if (config.enableSameRef) {
     collectSameLawMatches(text, matches, config.currentLawName)
   }
@@ -46,6 +53,18 @@ export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' 
 
   if (config.enableAdminRules) {
     collectAdminRuleMatches(text, matches)
+  }
+
+  // DEBUG: 매칭 결과 로깅
+  if (matches.length > 0) {
+    console.log('[linkify] 수집된 매칭:', {
+      total: matches.length,
+      types: matches.reduce((acc, m) => {
+        acc[m.type] = (acc[m.type] || 0) + 1
+        return acc
+      }, {} as Record<string, number>),
+      samples: matches.slice(0, 3).map(m => ({ type: m.type, text: m.displayText }))
+    })
   }
 
   // 2단계: 충돌 해결 (위치 기반 중복 제거)
@@ -226,6 +245,50 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       })
     }
   }
+}
+
+/**
+ * 내부 조문 참조 패턴 수집
+ * 예: "제5조", "제10조의2", "제5조제2항", "(제39조에"
+ */
+function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void {
+  // 패턴: 제X조 (독립적으로 나타나는 경우)
+  // 부정 후방탐색: 「법령명」 패턴 제외
+  // 전방 허용: 괄호(, 공백, 문장 시작
+  // 후방 허용: 한글 조사 "에", "의", "을", "를", 괄호) 등
+  const articleRegex = /(?<!「[^」]*)(제\s*(\d+)\s*조(?:의\s*(\d+))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?![」])/g
+  let match: RegExpExecArray | null
+  let foundCount = 0
+
+  while ((match = articleRegex.exec(text)) !== null) {
+    foundCount++
+
+    // 이미 처리된 영역인지 확인
+    const isOverlap = matches.some(m =>
+      match!.index >= m.start && match!.index < m.end
+    )
+
+    if (isOverlap) {
+      console.log('[collectInternalArticleMatches] Skipped overlap:', match[0])
+      continue
+    }
+
+    const joLabel = `제${match[2]}조${match[3] ? '의' + match[3] : ''}`
+    const fullLabel = match[1] + (match[4] ? `제${match[4]}항` : '') + (match[5] ? `제${match[5]}호` : '')
+
+    matches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      type: 'article',
+      article: joLabel,
+      displayText: match[0],
+      html: `<a href="#" class="law-ref" data-ref="article" data-article="${joLabel}">${fullLabel}</a>`
+    })
+
+    console.log('[collectInternalArticleMatches] Added:', { joLabel, fullLabel, index: match.index })
+  }
+
+  console.log('[collectInternalArticleMatches] Total found:', foundCount, 'Added:', matches.filter(m => m.type === 'article').length)
 }
 
 /**
