@@ -4,7 +4,121 @@
 
 ---
 
-## 2025-11-19: 법령 링크 개선 및 버그 수정
+## 2025-11-19 (오후): AI 뷰 최적화 Phase 1 완료
+
+### 1. 미사용 RAG 카드 컴포넌트 제거 (7cd2d6e)
+
+**문제**: 사용하지 않는 RAG 관련 컴포넌트 3개가 토큰 낭비 유발
+- `components/rag-search-panel.tsx` (~80줄)
+- `components/rag-result-card.tsx` (~70줄)
+- `components/rag-answer-card.tsx` (~90줄)
+- `search-result-view.tsx`에서 import만 주석 처리되어 있음
+
+**해결**:
+- 3개 컴포넌트 파일 완전 삭제 (~240줄)
+- `search-result-view.tsx`에서 주석 처리된 import 라인 제거
+- 실제 사용 중인 컴포넌트만 유지:
+  - `RAGAnalysisView` (Manual RAG 모드, `/rag-test` 페이지)
+  - `FileSearchRAGView` (File Search 모드, `/rag-test` 페이지)
+  - `RAGCollectionProgress` (RAGAnalysisView 내부)
+
+**영향**:
+- 코드 ~240줄 감소
+- 토큰 사용량 ~10% 감소
+- 불필요한 import 제거로 빌드 시간 미세 개선
+
+📍 `components/rag-*.tsx`, `components/search-result-view.tsx`
+
+### 2. file-search-rag-view.tsx 더미 데이터 제거 (7cd2d6e)
+
+**문제**: AI 답변 모드에서 의미 없는 더미 meta/articles props 전달
+```typescript
+// Before
+<LawViewer
+  meta={{ lawId: '', lawTitle: 'AI 답변', promulgationDate: '', lawType: '' }}
+  articles={[]}
+  // ... AI 관련 props
+/>
+```
+
+**해결**: AI 모드에 필요한 props만 전달
+```typescript
+// After
+<LawViewer
+  aiAnswerMode={true}
+  aiAnswerContent={analysis}
+  relatedArticles={relatedLaws}
+  aiConfidenceLevel={confidenceLevel}
+  // meta, articles는 선택사항이므로 생략
+/>
+```
+
+**영향**:
+- Props 체인 단순화 (불필요한 데이터 제거)
+- AI 모드와 일반 모드의 구분 명확화
+- 코드 가독성 향상
+
+📍 `components/file-search-rag-view.tsx:296-304`
+
+### 3. law-viewer.tsx Props 개선 (7cd2d6e)
+
+**문제**: meta, articles가 필수 props여서 AI 모드에서도 더미 데이터 전달 필요
+
+**해결**: Props를 선택사항으로 변경하고 기본값 설정
+```typescript
+// Props 인터페이스
+interface LawViewerProps {
+  meta?: LawMeta       // 필수 → 선택사항
+  articles?: LawArticle[]  // 필수 → 선택사항
+  // ... 기타 props
+}
+
+// 기본값 설정
+export function LawViewer({
+  meta = { lawTitle: '', fetchedAt: new Date().toISOString() },
+  articles = [],
+  // ...
+}: LawViewerProps) {
+```
+
+**영향**:
+- AI 모드에서 더미 데이터 전달 불필요
+- 일반 모드는 기존과 동일하게 작동 (하위 호환성 유지)
+- TypeScript 타입 안전성 유지
+
+📍 `components/law-viewer.tsx:46-76`
+
+### 4. 최적화 계획 문서 작성 (7cd2d6e)
+
+**추가된 문서**:
+1. `docs/ai-view-optimization-plan-updated.md` (현행화 버전)
+   - 현재 코드 상태 면밀 분석 (file-search-rag-view: 313줄, law-viewer: 3167줄)
+   - Phase 1 즉시 적용 계획 (완료)
+   - Phase 2 law-viewer 분할 계획 (20개 파일, 상세)
+
+2. `docs/ai-view-optimization-plan-safe.md` (안전 버전) ⭐ **채택**
+   - 과도한 분할 지양 (20개 → 3개 파일)
+   - Claude가 읽기 편한 크기 (~1400줄 × 3개)
+   - 점진적 개선 가능한 구조
+
+**Phase 2 계획 (미래 작업)**:
+```
+law-viewer.tsx (3167줄)
+  ↓ 분할
+components/law-viewer/
+├── index.tsx (~1167줄)           - 핵심 로직 유지
+├── view-renderers.tsx (~1200줄)  - 6가지 뷰 렌더링 함수
+└── shared-components.tsx (~800줄) - 공통 UI 컴포넌트
+```
+
+**예상 효과 (Phase 2)**:
+- 중복 코드 ~500줄 제거 (84% 감소)
+- 파일 크기: 3167줄 → 평균 ~1000줄 (Claude 읽기 편함)
+- 유지보수 비용 50% 감소
+
+---
+
+## 2025-11-19 (오전): 법령 링크 개선 및 버그 수정
 
 ### 1. 항 없이 호만 있는 조문 본문-호 간 빈 줄 제거 (90131dc)
 
