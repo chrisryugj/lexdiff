@@ -281,6 +281,19 @@ function extractRevisionMarks(
 }
 
 export function extractArticleText(article: LawArticle, isOrdinance = false, currentLawName?: string): string {
+  // DEBUG: 관세법 2조 전체 article 구조 확인
+  if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+    console.log('[DEBUG 관세법 2조 FULL ARTICLE]', {
+      jo: article.jo,
+      title: article.title,
+      contentLength: article.content?.length || 0,
+      contentPreview: article.content?.substring(0, 200),
+      hasParagraphs: !!article.paragraphs,
+      paragraphsCount: article.paragraphs?.length || 0,
+      paragraphsSample: article.paragraphs?.[0]
+    })
+  }
+
   let text = ""
 
   // CRITICAL FIX: article.content가 없어도 title이 있으면 표시
@@ -302,6 +315,18 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         } else {
           rawContent = ''  // 본문 없음 (호만 있는 경우)
         }
+      }
+
+      // DEBUG: 관세법 2조 원본 데이터 확인
+      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+        console.log('[DEBUG 관세법 2조 rawContent]', {
+          length: rawContent.length,
+          last100: rawContent.substring(rawContent.length - 100),
+          hasTrailingNewline: rawContent.endsWith('\n'),
+          hasTrailingSpace: /\s$/.test(rawContent),
+          charCodes: rawContent.substring(rawContent.length - 10).split('').map(c => c.charCodeAt(0)),
+          lastChars: rawContent.substring(rawContent.length - 10).split('').map(c => `'${c}'`).join(', ')
+        })
       }
 
       // 1. 링크 생성 (escape 전에)
@@ -333,8 +358,11 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       content += '</strong>'
     }
 
-    // Replace 2+ newlines before paragraph markers with single newline
+    // Replace 2+ newlines before paragraph markers (원형번호) with single newline
     content = content.replace(/\n{2,}\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
+
+    // Replace 2+ newlines before numbered items (호 번호: "1. ", "2. ") with single newline
+    content = content.replace(/\n{2,}\s*(\d+\.)/g, '\n$1')
 
     // Convert all newlines to <br>
     content = content.replace(/\n/g, '<br>')
@@ -348,7 +376,31 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       }
       return '<span class="para-marker">' + match + '</span>'
     })
-    text += content + "\n"
+
+    // DEBUG: 관세법 2조 본문 <br> 확인
+    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+      console.log('[DEBUG 관세법 2조 content BEFORE removing trailing <br>]', {
+        contentLength: content.length,
+        contentEnd: content.substring(content.length - 100),
+        endsWithBr: content.endsWith('<br>'),
+        endsWithBrRegex: /<br>\s*$/.test(content),
+        match: content.match(/<br>\s*$/)?.[0]
+      })
+    }
+
+    // CRITICAL: 본문 끝 <br> 제거 (호가 있을 경우 이중 줄바꿈 방지)
+    content = content.replace(/<br>\s*$/, '')
+
+    // DEBUG: 관세법 2조 본문 <br> 확인
+    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+      console.log('[DEBUG 관세법 2조 content AFTER removing trailing <br>]', {
+        contentLength: content.length,
+        contentEnd: content.substring(content.length - 100),
+        endsWithBr: content.endsWith('<br>')
+      })
+    }
+
+    text += content
   }
 
   if (article.paragraphs && article.paragraphs.length > 0) {
@@ -358,8 +410,22 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
     // 모든 호 수집
     const allItems = article.paragraphs.flatMap(para => para.items || [])
 
+    // DEBUG: 관세법 2조 확인
+    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+      console.log('[DEBUG 관세법 2조 extractArticleText]', {
+        hasParaContent,
+        paragraphsCount: article.paragraphs.length,
+        allItemsCount: allItems.length,
+        textLength: text.length,
+        textEnd: text.substring(text.length - 150),
+        textEndCharCodes: text.substring(text.length - 10).split('').map(c => `${c}(${c.charCodeAt(0)})`).join(' ')
+      })
+    }
+
     if (hasParaContent) {
-      // 항내용이 있는 경우: 기존 로직
+      // 항내용이 있는 경우: 본문과 항 사이 줄바꿈 추가
+      if (text) text += "\n"
+
       article.paragraphs.forEach((para) => {
         const paraContent = para.content || ""
         const paraNum = para.num || ""
@@ -411,8 +477,8 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       })
     } else if (allItems.length > 0) {
       // 항내용 없고 호만 있는 경우: 본문은 이미 위에서 처리했고, 호만 추가
-      // (도로법 시행령 제55조 같은 경우)
-      allItems.forEach((item) => {
+      // (관세법 제2조 같은 경우 - 호내용에 이미 번호 포함)
+      allItems.forEach((item, index) => {
         const itemContent = item.content || ""
         const itemNum = item.num || ""
 
@@ -427,12 +493,11 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         })
         styledItemContent = applyRevisionStyling(styledItemContent)
 
-        if (startsWithNumber) {
-          text += styledItemContent + "\n"
-        } else if (itemNum) {
-          text += itemNum + ". " + styledItemContent + "\n"
+        // 첫 번째 호만 <br> 하나로 연결, 나머지는 <br> 추가
+        if (index === 0) {
+          text += "<br>" + styledItemContent
         } else {
-          text += styledItemContent + "\n"
+          text += "<br>" + styledItemContent
         }
       })
     }

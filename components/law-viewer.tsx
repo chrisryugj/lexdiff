@@ -1171,10 +1171,10 @@ export function LawViewer({
             console.log('[Citation] Converted from 항 with 항내용:', paragraphsText.length, 'chars')
             rawContent = paragraphsText
           } else if (allHo.length > 0) {
-            // 항내용 없고 호만 있는 경우 → rawContent(본문) + 호 합치기
-            const itemsText = allHo.map((ho: any) => ho?.호내용 || "").join('\n')
-            rawContent = rawContent ? `${rawContent}\n${itemsText}` : itemsText
-            console.log('[Citation] Combined rawContent + 호 from 항 (no 항내용):', rawContent.length, 'chars')
+            // 항내용 없고 호만 있는 경우 → paragraphs 구조로 전달 (extractArticleText가 처리)
+            // rawContent는 본문만 유지, 호는 별도로 처리
+            console.log('[Citation] Will pass 호 as paragraphs (no 항내용):', allHo.length, 'items')
+            // rawContent는 본문만 유지 (호 합치지 않음)
           } else {
             // 항내용도 없고 호도 없음 → rawContent 그대로
             console.log('[Citation] 항 exists but no 항내용 and no 호')
@@ -1182,16 +1182,42 @@ export function LawViewer({
         }
         // 항 없이 최상위 호만 있는 경우 처리
         else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
-          const itemsText = targetUnit.호.map((ho: any) => {
-            const hoContent = ho?.호내용 || ""
-            return hoContent
-          }).join('\n')
-
-          console.log('[Citation] Converted from top-level 호 array (no 항):', itemsText.length, 'chars')
-          // 조문내용(본문) + 호 내용 결합
-          rawContent = rawContent ? `${rawContent}\n${itemsText}` : itemsText
+          console.log('[Citation] Will pass top-level 호 as paragraphs (no 항):', targetUnit.호.length, 'items')
+          // rawContent는 본문만 유지 (호 합치지 않음)
         } else {
           console.log('[Citation] Using 조문내용 directly (no 항/호 arrays)')
+        }
+
+        // paragraphs 구조 생성 (항내용 없고 호만 있는 경우)
+        let paragraphs: any[] | undefined
+        if (hangArray.length > 0) {
+          const hasHangContent = hangArray.some((hang: any) => (hang?.항내용 || "").trim())
+          const allHo = hangArray.flatMap((hang: any) => {
+            const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
+            return hoInHang
+          })
+
+          if (!hasHangContent && allHo.length > 0) {
+            // 항내용 없고 호만 있는 경우 → paragraphs 구조로 전달
+            paragraphs = [{
+              num: "",
+              content: "",
+              items: allHo.map((ho: any, idx: number) => ({
+                num: `${idx + 1}`,
+                content: ho?.호내용 || ""
+              }))
+            }]
+          }
+        } else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
+          // 최상위 호만 있는 경우
+          paragraphs = [{
+            num: "",
+            content: "",
+            items: targetUnit.호.map((ho: any, idx: number) => ({
+              num: `${idx + 1}`,
+              content: ho?.호내용 || ""
+            }))
+          }]
         }
 
         const lawArticle: LawArticle = {
@@ -1199,7 +1225,8 @@ export function LawViewer({
           joNum: articleLabel,
           title,
           content: rawContent,
-          isPreamble: false
+          isPreamble: false,
+          paragraphs
         }
 
         const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
