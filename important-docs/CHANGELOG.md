@@ -116,6 +116,68 @@ components/law-viewer/
 - 파일 크기: 3167줄 → 평균 ~1000줄 (Claude 읽기 편함)
 - 유지보수 비용 50% 감소
 
+### 5. 디버그 콘솔 및 불필요한 로그 제거 (06a71c0, cd78c44)
+
+**문제**: 개발 중 사용한 디버그 콘솔과 과도한 로그가 프로덕션에 남아있음
+- 메인 레이아웃에 DebugConsole 컴포넌트 렌더링 (화면 하단)
+- 브라우저 콘솔에 `[v0]` 프리픽스가 붙은 로그 181개
+- 불필요한 디버그 로그 88개 (XML 샘플, 상태 변경, 파싱 성공 등)
+- 총 269개의 불필요한 console.log
+
+**해결**:
+```typescript
+// app/layout.tsx
+// Before
+<body>
+  {children}
+  <DebugConsole />  // ❌ 제거
+  <Analytics />
+</body>
+
+// After
+<body>
+  {children}
+  <Analytics />  // ✅ DebugConsole 제거
+</body>
+```
+
+**스크립트 작성**:
+1. `scripts/cleanup-v0-logs.mjs`
+   - 모든 `console.log("[v0] ...")` → `console.log("...")`로 변경
+   - 181개 로그 프리픽스 제거
+
+2. `scripts/remove-debug-logs.mjs`
+   - 불필요한 디버그 로그 88개 제거
+   - 에러 로그는 유지 (debugging에 필수)
+
+**제거된 로그 유형**:
+- XML/JSON 파싱 성공 로그
+- XML 샘플 출력 로그 (first 500/1000/2000 chars)
+- 상태 변경 상세 로그
+- 개정이력/조문이력 디버그 로그
+- LawViewer 렌더링 로그
+- 검색 모드 전환 로그
+- 즐겨찾기 추가/삭제 로그
+
+**유지된 로그**:
+- `console.error()` - 에러 로그
+- `console.warn()` - 경고 로그
+- `debugLogger.error()` - 에러 로거
+- `debugLogger.warning()` - 경고 로거
+- `debugLogger.success()` - 주요 성공 로그 (신·구법 비교 등)
+
+**영향**:
+- 브라우저 콘솔 출력 대폭 감소 (269개 로그 제거)
+- 디버그 콘솔 UI 제거로 화면 깔끔해짐
+- 실제 에러 발생 시 파악 용이 (노이즈 제거)
+- 프로덕션 성능 미세 개선 (console.log 오버헤드 감소)
+
+**버그 수정** (cd78c44):
+- 로그 제거 스크립트가 `debugLogger.success()` 호출 시작 부분을 잘못 제거한 문제 수정
+- search-result-view.tsx의 신·구법 비교 데이터 로드 성공 로그 복구
+
+📍 `app/layout.tsx`, `components/error-report-dialog.tsx`, 전체 로그 시스템
+
 ---
 
 ## 2025-11-19 (오전): 법령 링크 개선 및 버그 수정
