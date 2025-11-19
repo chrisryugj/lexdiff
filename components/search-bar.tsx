@@ -39,7 +39,18 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
-    // 우선순위 1: 법령/조례 키워드가 있으면 무조건 법령 검색으로 처리
+    // 우선순위 1: 자연어 감지를 먼저 수행
+    const queryDetection = detectQueryType(query)
+
+    // 우선순위 2: 자연어 패턴이 감지되면 AI 검색 우선
+    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+      setSearchType("ai")
+      setIsNaturalQuery(true)
+      console.log("[v0] AI 검색 모드 감지:", { query, confidence: queryDetection.confidence, reason: queryDetection.reason })
+      return
+    }
+
+    // 우선순위 3: 자연어가 아닌 경우 법령/조례 키워드 확인
     const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query)
     const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
     const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
@@ -48,15 +59,6 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       setSearchType(isOrdinanceQuery ? "ordinance" : "law")
       setIsNaturalQuery(false)
       console.log("[v0] 법령 검색 모드:", { query, hasLawKeyword, hasOrdinanceKeyword, type: isOrdinanceQuery ? "조례" : "법령" })
-      return
-    }
-
-    // 우선순위 2: 법령 키워드가 없을 때만 자연어 감지
-    const queryDetection = detectQueryType(query)
-    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
-      setSearchType("ai")
-      setIsNaturalQuery(true)
-      console.log("[v0] AI 검색 모드 감지:", { query, confidence: queryDetection.confidence })
       return
     }
 
