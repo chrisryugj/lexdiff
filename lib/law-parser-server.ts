@@ -36,12 +36,17 @@ export interface ParsedLaw {
 
 /**
  * Extract content from 항 array (paragraph array)
- * This is the CORRECT parsing logic copied from app/page.tsx
+ * This is the CORRECT parsing logic copied from law-xml-parser.tsx
  *
  * CRITICAL: This function handles the law.go.kr API's hierarchical structure:
  * - 항 (paragraphs)
  * - 호 (items within paragraphs)
  * - 목 (sub-items within items)
+ *
+ * EDGE CASES HANDLED:
+ * - 항내용 없고 호만 있는 경우 (도로법 시행령 제55조)
+ * - 항만 있고 항내용/호가 없는 경우
+ * - 호만 있는 경우
  */
 function extractContentFromHangArray(hangArray: any[]): string {
   let content = ""
@@ -50,46 +55,101 @@ function extractContentFromHangArray(hangArray: any[]): string {
     return content
   }
 
-  for (const hang of hangArray) {
-    // Extract 항내용 (paragraph content)
-    if (hang.항내용) {
-      let hangContent = hang.항내용
+  // 먼저 항내용이 있는지 확인
+  const hasHangContent = hangArray.some(hang => {
+    const hangContent = hang.항내용
+    if (!hangContent) return false
 
-      // Handle array format (some 항내용 are arrays of strings)
-      if (Array.isArray(hangContent)) {
-        hangContent = hangContent.join("\n")
-      }
-
-      content += "\n" + hangContent
+    // 배열인 경우
+    if (Array.isArray(hangContent)) {
+      return hangContent.some(c => c && c.trim())
     }
+    // 문자열인 경우
+    return hangContent.trim().length > 0
+  })
 
-    // Extract 호 (items) if present
+  // 모든 호 수집
+  const allItems = hangArray.flatMap(hang => {
     if (hang.호 && Array.isArray(hang.호)) {
-      for (const ho of hang.호) {
-        if (ho.호내용) {
-          let hoContent = ho.호내용
+      return hang.호
+    }
+    return []
+  })
 
-          // Handle array format
-          if (Array.isArray(hoContent)) {
-            hoContent = hoContent.join("\n")
-          }
+  if (hasHangContent) {
+    // 항내용이 있는 경우: 기존 로직
+    for (const hang of hangArray) {
+      // Extract 항내용 (paragraph content)
+      if (hang.항내용) {
+        let hangContent = hang.항내용
 
-          content += "\n" + hoContent
+        // Handle array format (some 항내용 are arrays of strings)
+        if (Array.isArray(hangContent)) {
+          hangContent = hangContent.join("\n")
         }
 
-        // Extract 목 (sub-items) if present
-        if (ho.목 && Array.isArray(ho.목)) {
-          for (const mok of ho.목) {
-            if (mok.목내용) {
-              let mokContent = mok.목내용
+        content += "\n" + hangContent
+      }
 
-              // Handle array format
-              if (Array.isArray(mokContent)) {
-                mokContent = mokContent.join("\n")
-              }
+      // Extract 호 (items) if present
+      if (hang.호 && Array.isArray(hang.호)) {
+        for (const ho of hang.호) {
+          if (ho.호내용) {
+            let hoContent = ho.호내용
 
-              content += "\n  " + mokContent
+            // Handle array format
+            if (Array.isArray(hoContent)) {
+              hoContent = hoContent.join("\n")
             }
+
+            content += "\n" + hoContent
+          }
+
+          // Extract 목 (sub-items) if present
+          if (ho.목 && Array.isArray(ho.목)) {
+            for (const mok of ho.목) {
+              if (mok.목내용) {
+                let mokContent = mok.목내용
+
+                // Handle array format
+                if (Array.isArray(mokContent)) {
+                  mokContent = mokContent.join("\n")
+                }
+
+                content += "\n  " + mokContent
+              }
+            }
+          }
+        }
+      }
+    }
+  } else if (allItems.length > 0) {
+    // 항내용 없고 호만 있는 경우: 호만 추가
+    // (본문은 조문내용에서 처리됨)
+    for (const ho of allItems) {
+      if (ho.호내용) {
+        let hoContent = ho.호내용
+
+        // Handle array format
+        if (Array.isArray(hoContent)) {
+          hoContent = hoContent.join("\n")
+        }
+
+        content += "\n" + hoContent
+      }
+
+      // Extract 목 (sub-items) if present
+      if (ho.목 && Array.isArray(ho.목)) {
+        for (const mok of ho.목) {
+          if (mok.목내용) {
+            let mokContent = mok.목내용
+
+            // Handle array format
+            if (Array.isArray(mokContent)) {
+              mokContent = mokContent.join("\n")
+            }
+
+            content += "\n  " + mokContent
           }
         }
       }
@@ -145,9 +205,38 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
 
     // Extract content using CORRECT parsing logic
     let content = ""
+    let mainContent = "" // 본문 (조문내용에서 추출)
+
+    // STEP 1: 본문 추출 (조문내용에서)
+    if (unit.조문내용 && typeof unit.조문내용 === "string") {
+      let rawContent = unit.조문내용.trim()
+
+      // Try to extract header for comparison
+      const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)(.*)$/s)
+
+      if (headerMatch) {
+        const headerPart = headerMatch[1]  // 제X조(제목)
+        const bodyPart = headerMatch[2].trim()  // 나머지 본문
+
+        if (bodyPart) {
+          // 본문이 있으면 본문만 저장
+          mainContent = bodyPart
+        } else {
+          // 본문 없이 제목만 있는 경우 (도로법 시행령 55조)
+          // 제목을 그대로 유지 (호가 있을 수 있음)
+          mainContent = headerPart
+        }
+      } else {
+        // 제목 형식이 아니면 전체를 본문으로
+        mainContent = rawContent
+      }
+    }
+
+    // STEP 2: 항/호 내용 추출
+    let paraContent = ""
 
     if (unit.항 && Array.isArray(unit.항)) {
-      content = extractContentFromHangArray(unit.항)
+      paraContent = extractContentFromHangArray(unit.항)
     }
     // Fallback: if 항 is an object with 호 array (old structure)
     else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
@@ -158,20 +247,20 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
             if (Array.isArray(hoContent)) {
               hoContent = hoContent.join("\n")
             }
-            content += "\n" + hoContent
+            paraContent += "\n" + hoContent
           }
         }
       }
     }
-    // Last resort: use 조문내용 (usually only contains title)
-    else if (unit.조문내용 && typeof unit.조문내용 === "string") {
-      let rawContent = unit.조문내용.trim()
 
-      // Remove the article header (e.g., "제28조(개별소비세의 사무 관할)")
-      const headerPattern = /^제\d+조(?:의\d+)?\([^)]+\)\s*/
-      rawContent = rawContent.replace(headerPattern, "")
-
-      content = rawContent
+    // STEP 3: 본문 + 항/호 결합
+    if (mainContent) {
+      content = mainContent
+      if (paraContent) {
+        content += "\n" + paraContent
+      }
+    } else {
+      content = paraContent
     }
 
     articles.push({

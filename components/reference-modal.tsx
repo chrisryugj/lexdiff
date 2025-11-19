@@ -27,18 +27,19 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   const canShowOriginal = !!originalUrl
 
-  // 법령 이름으로 조례 여부 판단 (조례, 규칙 키워드만으로도 판단)
+  // 법령 이름으로 조례 여부 판단
+  // "시행규칙", "시행령"은 국가법령이므로 제외
   const isOrdinanceLaw = lawName && (
-    /조례|규칙/.test(lawName) ||
-    /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+    /조례/.test(lawName) ||
+    (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName) && !/시행규칙|시행령/.test(lawName))
   )
 
   // 법제처 링크 생성 (조례와 법령 자동 구분)
   const molegUrl = lawName && articleNumber
     ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}/${articleNumber}`
     : lawName
-    ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}`
-    : null
+      ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}`
+      : null
 
   // 폰트 크기 조절
   const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 18))
@@ -173,11 +174,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             `}</style>
             <div
               ref={contentRef}
-              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere ${
-                forceWhiteTheme
+              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere ${forceWhiteTheme
                   ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
                   : "dark:prose-invert"
-              }`}
+                }`}
               style={
                 forceWhiteTheme
                   ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }

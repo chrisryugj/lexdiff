@@ -906,9 +906,11 @@ export function LawViewer({
     try {
       console.log('[Citation] Opening modal for:', { lawName, articleLabel })
 
-      // 자치법규 여부 감지 (조례, 규칙 키워드만으로도 판단)
-      const isOrdinance = /조례|규칙/.test(lawName) ||
-        /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
+      // 자치법규 여부 감지
+      // "시행규칙", "시행령"은 국가법령이므로 제외
+      const isOrdinance = (/조례/.test(lawName) ||
+        (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName) && !/시행규칙|시행령/.test(lawName))) &&
+        !/시행규칙|시행령/.test(lawName)
       console.log('[Citation] Is ordinance:', isOrdinance, 'for law:', lawName)
 
       // 자치법규는 법제처 자치법규 페이지로 리다이렉트
@@ -2922,7 +2924,7 @@ export function LawViewer({
                         </div>
                       )}
 
-                      <div className="mb-1 pb-10 border-b border-border">
+                      <div className="mb-1 pb-5 border-b border-border">
                         <div className="flex items-center justify-between gap-4 pt-2">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
@@ -2933,7 +2935,7 @@ export function LawViewer({
                               </Badge>
                             </div>
                             {userQuery && (
-                              <div className="text-sm text-muted-foreground font-medium pl-1">
+                              <div className="text-md text-muted-foreground font-medium pl-1">
                                 Q. {userQuery}
                               </div>
                             )}
