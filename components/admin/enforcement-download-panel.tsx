@@ -1,14 +1,13 @@
 /**
- * Enforcement Download Panel
- * Download 시행령/시행규칙 for saved laws
+ * Enforcement Download Panel - LexDiff Professional Edition
+ * Refined interface for downloading enforcement decrees and rules
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Loader2, Download, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
 
 interface SavedLaw {
   lawId: string
@@ -28,7 +27,7 @@ interface DownloadStatus {
 }
 
 interface EnforcementDownloadPanelProps {
-  refreshTrigger?: number // Optional prop to trigger refresh
+  refreshTrigger?: number
 }
 
 export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownloadPanelProps = {}) {
@@ -42,7 +41,6 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
     loadLaws()
   }, [])
 
-  // Reload when refreshTrigger changes
   useEffect(() => {
     if (refreshTrigger !== undefined) {
       loadLaws()
@@ -56,56 +54,35 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
 
       if (data.success) {
         const allLaws = data.laws || []
-
-        // Separate base laws and enforcement files
         const baseLaws = allLaws.filter(
           (law: SavedLaw) => !law.lawName.includes('시행령') && !law.lawName.includes('시행규칙')
         )
 
-        // Track which enforcement files are already downloaded
         const downloaded = new Set<string>()
-        const enforcementFiles: string[] = []
-
         allLaws.forEach((law: SavedLaw) => {
           if (law.lawName.includes('시행령') || law.lawName.includes('시행규칙')) {
             downloaded.add(law.lawName)
-            enforcementFiles.push(law.lawName)
           }
         })
 
         setLaws(baseLaws)
         setDownloadedFiles(downloaded)
 
-        console.log('📋 All enforcement files found:')
-        enforcementFiles.forEach(name => console.log(`   - ${name}`))
-
-        // Initialize download status based on local files
         const initialProgress = new Map<string, DownloadStatus[]>()
         baseLaws.forEach((law: SavedLaw) => {
-          // Try multiple matching patterns
           const patterns = [
-            `${law.lawName} 시행령`,           // "관세법 시행령"
-            `${law.lawName}시행령`,             // "관세법시행령" (공백 없음)
-            `${law.lawName.trim()} 시행령`,    // 앞뒤 공백 제거
+            `${law.lawName} 시행령`,
+            `${law.lawName}시행령`,
+            `${law.lawName.trim()} 시행령`
           ]
-
           const rulePatterns = [
             `${law.lawName} 시행규칙`,
             `${law.lawName}시행규칙`,
-            `${law.lawName.trim()} 시행규칙`,
+            `${law.lawName.trim()} 시행규칙`
           ]
 
-          // Check if any pattern matches
-          const hasDecree = patterns.some(pattern => downloaded.has(pattern))
-          const hasRule = rulePatterns.some(pattern => downloaded.has(pattern))
-
-          // Find exact match for logging
-          const matchedDecree = patterns.find(p => downloaded.has(p))
-          const matchedRule = rulePatterns.find(p => downloaded.has(p))
-
-          console.log(`\n🔍 Checking ${law.lawName}:`)
-          console.log(`   시행령: ${hasDecree ? `✅ 있음 (${matchedDecree})` : '❌ 없음'}`)
-          console.log(`   시행규칙: ${hasRule ? `✅ 있음 (${matchedRule})` : '❌ 없음'}`)
+          const hasDecree = patterns.some((pattern) => downloaded.has(pattern))
+          const hasRule = rulePatterns.some((pattern) => downloaded.has(pattern))
 
           initialProgress.set(law.lawName, [
             {
@@ -122,8 +99,6 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         })
 
         setDownloadProgress(initialProgress)
-
-        console.log(`\n✅ Summary: ${baseLaws.length} base laws, ${downloaded.size} enforcement files already downloaded`)
       }
     } catch (error) {
       console.error('Failed to load laws:', error)
@@ -136,7 +111,6 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
     const key = lawName
     const currentProgress = downloadProgress.get(key) || []
 
-    // Update status to downloading
     const updatedProgress = currentProgress.map((p) => (p.type === type ? { ...p, status: 'downloading' as const } : p))
     setDownloadProgress(new Map(downloadProgress.set(key, updatedProgress)))
 
@@ -149,14 +123,12 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
 
       const result = await response.json()
 
-      // Update status based on result
       const finalProgress = currentProgress.map((p) => {
         if (p.type !== type) return p
 
         if (result.success) {
-          // Add to downloaded files set
           const enforcementName = `${lawName} ${type}`
-          setDownloadedFiles(prev => new Set([...prev, enforcementName]))
+          setDownloadedFiles((prev) => new Set([...prev, enforcementName]))
 
           if (result.skipped) {
             return { ...p, status: 'success' as const }
@@ -192,13 +164,17 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
     setIsDownloading(true)
 
     await downloadEnforcement(lawName, '시행령')
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // 1초 delay
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     await downloadEnforcement(lawName, '시행규칙')
 
     setIsDownloading(false)
   }
 
   async function downloadAllLaws() {
+    if (!confirm(`전체 ${laws.length}개 법령의 시행령/시행규칙을 다운로드하시겠습니까?`)) {
+      return
+    }
+
     setIsDownloading(true)
 
     for (const law of laws) {
@@ -213,24 +189,24 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   function getStatusIcon(status: DownloadStatus['status']) {
     switch (status) {
       case 'pending':
-        return <AlertCircle className="w-4 h-4 text-gray-400" />
+        return <AlertCircle className="w-4 h-4 text-muted-foreground" />
       case 'downloading':
-        return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+        return <Loader2 className="w-4 h-4 text-primary animate-spin" />
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-400" />
+        return <CheckCircle2 className="w-4 h-4 text-accent" />
       case 'not_found':
-        return <XCircle className="w-4 h-4 text-yellow-400" />
+        return <XCircle className="w-4 h-4 text-warning" />
       case 'error':
-        return <XCircle className="w-4 h-4 text-red-400" />
+        return <XCircle className="w-4 h-4 text-destructive" />
     }
   }
 
   function getStatusText(status: DownloadStatus['status']) {
     switch (status) {
       case 'pending':
-        return '대기 중'
+        return '대기'
       case 'downloading':
-        return '다운로드 중...'
+        return '다운로드 중'
       case 'success':
         return '완료'
       case 'not_found':
@@ -243,45 +219,62 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     )
   }
 
+  const completedCount = Array.from(downloadProgress.values())
+    .flat()
+    .filter((s) => s.status === 'success').length
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-white">시행령/시행규칙 다운로드</h2>
-          <p className="text-sm text-gray-400 mt-1">저장된 법령의 시행령과 시행규칙을 다운로드합니다</p>
-        </div>
-        <Button onClick={downloadAllLaws} disabled={isDownloading || laws.length === 0} className="gap-2">
-          {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          전체 다운로드
-        </Button>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="p-4 bg-gray-800 border-gray-700">
-          <p className="text-sm text-gray-400">총 법령</p>
-          <p className="text-2xl font-bold text-white">{laws.length}</p>
-        </Card>
-        <Card className="p-4 bg-gray-800 border-gray-700">
-          <p className="text-sm text-gray-400">다운로드 가능</p>
-          <p className="text-2xl font-bold text-blue-400">{laws.length * 2}</p>
-          <p className="text-xs text-gray-500">시행령 + 시행규칙</p>
-        </Card>
-        <Card className="p-4 bg-gray-800 border-gray-700">
-          <p className="text-sm text-gray-400">로컬 MD 파일</p>
-          <p className="text-2xl font-bold text-green-400">{downloadedFiles.size}</p>
-          <p className="text-xs text-gray-500">이미 다운로드됨</p>
-        </Card>
-        <Card className="p-4 bg-gray-800 border-gray-700">
-          <p className="text-sm text-gray-400">남은 파일</p>
-          <p className="text-2xl font-bold text-yellow-400">{laws.length * 2 - downloadedFiles.size}</p>
-        </Card>
+        <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-sm text-muted-foreground mb-1">총 법령</div>
+          <div className="text-3xl font-bold text-foreground">{laws.length}</div>
+        </div>
+        <div className="p-4 bg-primary/10 backdrop-blur-sm rounded-xl border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-sm text-primary mb-1">다운로드 대상</div>
+          <div className="text-3xl font-bold text-primary">{laws.length * 2}</div>
+          <div className="text-xs text-muted-foreground mt-1">시행령 + 시행규칙</div>
+        </div>
+        <div className="p-4 bg-accent/10 backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-sm text-accent mb-1">다운로드됨</div>
+          <div className="text-3xl font-bold text-accent">{completedCount}</div>
+        </div>
+        <div className="p-4 bg-warning/10 backdrop-blur-sm rounded-xl border border-warning/20 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-sm text-warning mb-1">남은 파일</div>
+          <div className="text-3xl font-bold text-warning">{laws.length * 2 - completedCount}</div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+        <div className="text-sm text-muted-foreground">
+          {laws.length}개 법령 · 각 법령당 2개 파일 (시행령, 시행규칙)
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={loadLaws} disabled={loading} variant="outline" size="default" className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </Button>
+          <Button onClick={downloadAllLaws} disabled={isDownloading || laws.length === 0} className="gap-2 shadow-lg shadow-primary/20 h-10" size="default">
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                처리 중
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                다운로드
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Laws List */}
@@ -292,49 +285,49 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
           const ruleStatus = progress.find((p) => p.type === '시행규칙')
 
           return (
-            <Card key={law.lawId} className="p-4 bg-gray-800 border-gray-700">
+            <div
+              key={law.lawId}
+              className="p-4 bg-card/30 backdrop-blur-sm rounded-xl border border-border/50 hover:bg-card/50 transition-all"
+            >
               <div className="flex items-start justify-between gap-4">
-                {/* Law Info */}
                 <div className="flex-1">
-                  <h3 className="font-medium text-white">{law.lawName}</h3>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <h3 className="font-medium text-foreground">{law.lawName}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
                     {law.articleCount}개 조문 · 시행일: {law.effectiveDate}
                   </p>
 
-                  {/* Download Status */}
                   {progress.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {decreeStatus && (
                         <div className="flex items-center gap-2 text-sm">
                           {getStatusIcon(decreeStatus.status)}
-                          <span className="text-gray-300">시행령</span>
-                          <span className="text-gray-500">·</span>
-                          <span className="text-gray-400">{getStatusText(decreeStatus.status)}</span>
+                          <span className="text-foreground">시행령</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{getStatusText(decreeStatus.status)}</span>
                           {decreeStatus.articleCount && (
-                            <span className="text-gray-500">({decreeStatus.articleCount}개 조문)</span>
+                            <span className="text-muted-foreground">({decreeStatus.articleCount}개 조문)</span>
                           )}
                           {decreeStatus.error && (
-                            <span className="text-red-400 text-xs">({decreeStatus.error})</span>
+                            <span className="text-destructive text-xs">({decreeStatus.error})</span>
                           )}
                         </div>
                       )}
                       {ruleStatus && (
                         <div className="flex items-center gap-2 text-sm">
                           {getStatusIcon(ruleStatus.status)}
-                          <span className="text-gray-300">시행규칙</span>
-                          <span className="text-gray-500">·</span>
-                          <span className="text-gray-400">{getStatusText(ruleStatus.status)}</span>
+                          <span className="text-foreground">시행규칙</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{getStatusText(ruleStatus.status)}</span>
                           {ruleStatus.articleCount && (
-                            <span className="text-gray-500">({ruleStatus.articleCount}개 조문)</span>
+                            <span className="text-muted-foreground">({ruleStatus.articleCount}개 조문)</span>
                           )}
-                          {ruleStatus.error && <span className="text-red-400 text-xs">({ruleStatus.error})</span>}
+                          {ruleStatus.error && <span className="text-destructive text-xs">({ruleStatus.error})</span>}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Download Button */}
                 <Button
                   onClick={() => downloadAll(law.lawName)}
                   disabled={isDownloading}
@@ -350,17 +343,27 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                   다운로드
                 </Button>
               </div>
-            </Card>
+            </div>
           )
         })}
       </div>
 
       {laws.length === 0 && (
-        <Card className="p-8 bg-gray-800 border-gray-700 text-center">
-          <p className="text-gray-400">저장된 법령이 없습니다</p>
-          <p className="text-sm text-gray-500 mt-1">먼저 &quot;파싱&quot; 탭에서 법령을 다운로드하세요</p>
-        </Card>
+        <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
+          <p className="text-muted-foreground">저장된 법령이 없습니다</p>
+          <p className="text-sm text-muted-foreground mt-1">먼저 법령을 다운로드하세요</p>
+        </div>
       )}
+
+      {/* Info */}
+      <div className="p-4 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
+        <div className="text-sm text-muted-foreground space-y-1">
+          <div>• law.go.kr API에서 시행령/시행규칙 검색 및 다운로드</div>
+          <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-laws/</code></div>
+          <div>• 자동으로 법령명 기반 매칭</div>
+          <div>• RAG 청킹을 위한 메타데이터 포함</div>
+        </div>
+      </div>
     </div>
   )
 }

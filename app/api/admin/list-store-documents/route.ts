@@ -24,15 +24,19 @@ export async function GET(request: NextRequest) {
 
     console.log('[List Store Documents API] Fetching documents from store...')
 
-    // List documents with pagination
+    // List documents with pagination (increased page size for better performance)
     const allDocuments: any[] = []
     let pageToken: string | undefined = undefined
     let hasMore = true
+    let pageCount = 0
 
     while (hasMore) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${
+      pageCount++
+      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=100${
         pageToken ? `&pageToken=${pageToken}` : ''
       }`
+
+      console.log(`[List Store Documents API] Fetching page ${pageCount}...`)
 
       const response = await fetch(url, {
         headers: {

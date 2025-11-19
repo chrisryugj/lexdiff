@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Loader2, Upload } from 'lucide-react'
 
 interface ParsedLawFile {
   fileName: string
@@ -99,6 +100,24 @@ export function UploadProgressPanel({ onUploadComplete }: UploadProgressPanelPro
 
   function clearSelection() {
     setSelectedFiles(new Set())
+  }
+
+  function forceResetUploadStatus() {
+    if (
+      !confirm(
+        '⚠️ 업로드 상태를 강제로 초기화하시겠습니까?\n\n이 작업은 다음을 수행합니다:\n• 모든 법령을 "미업로드" 상태로 변경\n• 실제 File Search Store의 파일은 삭제되지 않음\n• 이미 업로드된 파일을 다시 업로드하면 중복이 발생할 수 있음'
+      )
+    ) {
+      return
+    }
+
+    try {
+      localStorage.removeItem('uploadedLaws')
+      setUploadedFiles(new Set())
+      alert('✅ 업로드 상태가 초기화되었습니다')
+    } catch (error: any) {
+      alert('❌ 초기화 실패: ' + error.message)
+    }
   }
 
   async function uploadSingleFile(fileName: string): Promise<UploadResult> {
@@ -196,26 +215,44 @@ export function UploadProgressPanel({ onUploadComplete }: UploadProgressPanelPro
         </div>
         <div className="flex gap-2">
           <Button
+            onClick={forceResetUploadStatus}
+            disabled={uploading}
+            variant="outline"
+            size="default"
+          >
+            강제 초기화
+          </Button>
+          <Button
             onClick={loadParsedLaws}
             disabled={loading || uploading}
             variant="outline"
-            size="sm"
-            className="border-gray-600 text-gray-300"
+            size="default"
           >
-            {loading ? '새로고침 중...' : '🔄 새로고침'}
+            {loading ? '새로고침 중' : '새로고침'}
           </Button>
-          <Button onClick={selectAll} variant="outline" size="sm" className="border-gray-600 text-gray-300">
+          <Button onClick={selectAll} variant="outline" size="default">
             전체 선택
           </Button>
-          <Button onClick={clearSelection} variant="outline" size="sm" className="border-gray-600 text-gray-300">
+          <Button onClick={clearSelection} variant="outline" size="default">
             선택 해제
           </Button>
           <Button
             onClick={startUpload}
             disabled={selectedCount === 0 || uploading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="gap-2 shadow-lg shadow-primary/20 min-w-[140px]"
+            size="default"
           >
-            {uploading ? '업로드 중...' : '업로드 시작'}
+            {uploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                업로드 중...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                업로드 시작
+              </>
+            )}
           </Button>
         </div>
       </div>

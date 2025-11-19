@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Loader2, Upload, Pause, Play, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import LogImport from '@/admin/components/log-import'
 
 interface ParsedOrdinanceFile {
@@ -125,6 +126,24 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
       setUploadedFiles(files)
     } catch (error) {
       console.error('Failed to save uploaded files:', error)
+    }
+  }
+
+  function forceResetUploadStatus() {
+    if (
+      !confirm(
+        '⚠️ 조례 업로드 상태를 강제로 초기화하시겠습니까?\n\n이 작업은 다음을 수행합니다:\n• 모든 조례를 "미업로드" 상태로 변경\n• 실제 File Search Store의 파일은 삭제되지 않음\n• 이미 업로드된 파일을 다시 업로드하면 중복이 발생할 수 있음'
+      )
+    ) {
+      return
+    }
+
+    try {
+      localStorage.removeItem('uploadedOrdinances')
+      setUploadedFiles(new Set())
+      alert('✅ 조례 업로드 상태가 초기화되었습니다')
+    } catch (error: any) {
+      alert('❌ 초기화 실패: ' + error.message)
     }
   }
 
@@ -509,28 +528,58 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
   const selectedCount = uploading && totalFiles > 0 ? totalFiles : selectedFiles.size
   const successCount = results.filter((r) => r.status === 'success').length
   const errorCount = results.filter((r) => r.status === 'error').length
+  const progress = uploading && totalFiles > 0 ? (currentIndex / totalFiles) * 100 : 0
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-white mb-2">📤 조례 File Search Store 업로드</h2>
-        <p className="text-sm text-gray-400">
-          <code>data/parsed-ordinances</code> 폴더의 조례 마크다운 파일을 File Search Store에 업로드합니다.
-        </p>
-      </div>
+    <div className="space-y-6">
+      {/* Progress Monitor */}
+      {uploading && (
+        <div className="relative overflow-hidden p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-xl backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 shadow-sm">
+                {paused ? (
+                  <Pause className="h-5 w-5 text-warning" />
+                ) : (
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                )}
+              </div>
+              <div>
+                <div className="font-medium text-foreground">
+                  {paused ? '일시중지됨' : '업로드 중...'} ({currentIndex} / {selectedCount})
+                </div>
+                <div className="text-sm text-muted-foreground">동시 업로드: {concurrency}개 병렬 처리</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-foreground">{Math.round(progress)}%</div>
+              <div className="text-sm text-muted-foreground">남은 파일: {selectedCount - currentIndex}개</div>
+            </div>
+          </div>
+          <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
+              style={{ width: '50%' }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* District Multi-Select Filter */}
-      <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
+      <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <label className="text-sm font-medium text-gray-300">
-            🏛️ 자치구 필터 ({selectedDistricts.size === 0 ? '전체' : `${selectedDistricts.size}개 선택`})
+          <label className="text-sm font-medium text-muted-foreground">
+            자치구 필터 ({selectedDistricts.size === 0 ? '전체' : `${selectedDistricts.size}개 선택`})
           </label>
           <div className="flex gap-2">
             <Button
               onClick={selectAllDistricts}
               variant="outline"
               size="sm"
-              className="border-gray-600 text-gray-300 text-xs"
               disabled={loading || uploading}
             >
               전체 선택
@@ -539,7 +588,6 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
               onClick={clearDistrictSelection}
               variant="outline"
               size="sm"
-              className="border-gray-600 text-gray-300 text-xs"
               disabled={loading || uploading || selectedDistricts.size === 0}
             >
               선택 해제
@@ -548,7 +596,7 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
-          {districts.map((district) => {
+          {districts.map((district, index) => {
             const count = parsedOrdinances.filter((o) => o.districtName === district).length
             const pendingCount = parsedOrdinances.filter(
               (o) => o.districtName === district && !uploadedFiles.has(getFileKey(o))
@@ -559,21 +607,27 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
               <div
                 key={district}
                 onClick={() => !loading && !uploading && toggleDistrictSelection(district)}
-                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                  isSelected
-                    ? 'bg-blue-900/30 border-blue-700'
-                    : 'bg-gray-900 border-gray-700 hover:border-gray-600'
-                } ${loading || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`
+                  p-3 border rounded-xl cursor-pointer transition-all
+                  ${isSelected
+                    ? 'bg-primary/10 border-primary/30 ring-2 ring-primary/20 shadow-md'
+                    : 'bg-card/30 border-border/50 hover:border-primary/30 hover:bg-card/50 hover:shadow-sm'
+                  }
+                  ${loading || uploading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                style={{
+                  animation: `fadeInUp 0.3s ease-out ${index * 20}ms both`
+                }}
               >
-                <div className="text-sm font-medium text-white truncate" title={district}>
+                <div className="text-sm font-medium text-foreground truncate" title={district}>
                   {district}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-muted-foreground mt-1">
                   전체 {count}개 · 대기 {pendingCount}개
                 </div>
                 {isSelected && (
                   <div className="mt-2">
-                    <span className="px-2 py-1 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
+                    <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
                       ✓ 선택됨
                     </span>
                   </div>
@@ -583,21 +637,20 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
           })}
         </div>
 
-        <p className="text-xs text-gray-500 mt-3">
+        <p className="text-xs text-muted-foreground mt-3">
           💡 여러 자치구를 선택하면 해당 자치구의 조례만 필터링됩니다
         </p>
       </div>
 
       {/* Batch Settings */}
-      <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-300 mb-3">⚙️ 배치 업로드 설정</h3>
+      <div className="p-4 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">배치 크기 (묶음 단위)</label>
+            <label className="text-xs text-muted-foreground mb-1 block">배치 크기 (묶음 단위)</label>
             <select
               value={batchSize}
               onChange={(e) => setBatchSize(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white text-sm"
+              className="w-full px-3 py-2 bg-card/50 border border-border/50 rounded text-foreground text-sm"
               disabled={uploading}
             >
               <option value={10}>10개씩</option>
@@ -607,11 +660,11 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">동시 업로드 수</label>
+            <label className="text-xs text-muted-foreground mb-1 block">동시 업로드 수</label>
             <select
               value={concurrency}
               onChange={(e) => setConcurrency(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white text-sm"
+              className="w-full px-3 py-2 bg-card/50 border border-border/50 rounded text-foreground text-sm"
               disabled={uploading}
             >
               <option value={1}>1개 (안전)</option>
@@ -621,17 +674,25 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
             </select>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           💡 동시 업로드: {concurrency}개씩 병렬 처리 · 배치 저장: {batchSize}개마다 진행 상황 저장
         </p>
       </div>
 
       {/* Selection Controls */}
-      <div className="flex items-center justify-between p-4 bg-gray-800 border border-gray-700 rounded-lg">
-        <div className="text-sm text-gray-300">
-          {selectedCount > 0 ? `${selectedCount}개 선택됨` : '선택된 파일 없음'}
+      <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+        <div className="text-sm text-muted-foreground">
+          {selectedCount > 0 ? `${selectedCount}개 선택됨` : <>선택된<br />파일 없음</>}
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={forceResetUploadStatus}
+            disabled={uploading}
+            variant="outline"
+            size="default"
+          >
+            강제 초기화
+          </Button>
           <Button
             onClick={async () => {
               await loadParsedOrdinances()
@@ -639,76 +700,64 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
             }}
             disabled={loading || uploading}
             variant="outline"
-            size="sm"
-            className="border-gray-600 text-gray-300"
+            size="default"
           >
-            {loading ? '새로고침 중...' : '🔄 새로고침'}
+            {loading ? '새로고침 중' : '새로고침'}
           </Button>
           <LogImport onImport={handleLogImport} />
-          <Button onClick={selectAll} variant="outline" size="sm" className="border-gray-600 text-gray-300">
-            전체 선택
-          </Button>
-          <Button onClick={clearSelection} variant="outline" size="sm" className="border-gray-600 text-gray-300">
-            선택 해제
+          <Button
+            onClick={selectedCount > 0 ? clearSelection : selectAll}
+            variant="outline"
+            size="default"
+          >
+            {selectedCount > 0 ? '선택 해제' : '전체 선택'}
           </Button>
           {uploading && !paused ? (
-            <Button onClick={pauseUpload} variant="outline" className="border-yellow-600 text-yellow-400">
-              ⏸ 일시정지
+            <Button onClick={pauseUpload} variant="outline" size="default" className="border-warning/30 text-warning hover:bg-warning/10 gap-2">
+              <Pause className="w-4 h-4" />
+              일시중지
             </Button>
           ) : uploading && paused ? (
-            <Button onClick={resumeUpload} className="bg-green-600 hover:bg-green-700">
-              ▶️ 재개
+            <Button onClick={resumeUpload} size="default" className="shadow-lg shadow-accent/20 bg-accent hover:bg-accent/90 gap-2">
+              <Play className="w-4 h-4" />
+              재개
             </Button>
           ) : (
             <Button
               onClick={startUpload}
               disabled={selectedCount === 0}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="shadow-lg shadow-primary/20 gap-2"
+              size="default"
             >
-              🚀 업로드 시작
+              <Upload className="w-4 h-4" />
+              업로드
             </Button>
           )}
         </div>
       </div>
 
-      {/* Upload Progress */}
-      {uploading && (
-        <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-300">
-                {paused ? '⏸ 일시정지됨' : '🚀 업로드 중...'} ({currentIndex}/{selectedCount})
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                동시 업로드: {concurrency}개씩 병렬 처리 중
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-blue-400">{Math.round((currentIndex / selectedCount) * 100)}%</p>
-              <p className="text-xs text-gray-500">남은 파일: {selectedCount - currentIndex}개</p>
-            </div>
-          </div>
-          <Progress value={(currentIndex / selectedCount) * 100} className="h-2" />
-        </div>
-      )}
-
       {/* Upload Results */}
       {results.length > 0 && (
-        <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <h3 className="font-medium text-white mb-2">업로드 결과</h3>
-          <div className="space-y-1 text-sm">
-            <p className="text-green-400">✓ 성공: {successCount}개</p>
-            <p className="text-red-400">✗ 실패: {errorCount}개</p>
+        <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+          <div className="space-y-1 text-sm mb-3">
+            <p className="flex items-center gap-2 text-accent">
+              <CheckCircle2 className="w-4 h-4" />
+              성공: {successCount}개
+            </p>
+            <p className="flex items-center gap-2 text-warning">
+              <XCircle className="w-4 h-4" />
+              실패: {errorCount}개
+            </p>
           </div>
 
           {errorCount > 0 && (
             <div className="mt-3 space-y-2">
-              <p className="text-sm text-gray-300">실패한 파일:</p>
+              <p className="text-sm text-muted-foreground">실패한 파일:</p>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {results
                   .filter((r) => r.status === 'error')
                   .map((r, idx) => (
-                    <div key={idx} className="text-xs text-red-400 bg-red-900/20 p-2 rounded">
+                    <div key={idx} className="text-xs text-warning bg-warning/10 p-2 rounded">
                       {r.districtName}/{r.ordinanceName || r.fileName}: {r.error}
                     </div>
                   ))}
@@ -720,23 +769,24 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
 
       {/* Pending Ordinances List */}
       <div className="space-y-2">
-        <h3 className="font-medium text-white">📁 업로드 대기 ({pendingOrdinances.length}개 파일)</h3>
         {loading ? (
-          <div className="p-8 bg-gray-800 border border-gray-700 rounded-lg text-center">
-            <p className="text-gray-400">로딩 중...</p>
+          <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
+            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
+            <p className="text-muted-foreground">로딩 중...</p>
           </div>
         ) : pendingOrdinances.length === 0 ? (
-          <div className="p-8 bg-gray-800 border border-gray-700 rounded-lg text-center">
-            <p className="text-gray-500">
+          <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">
               {selectedDistricts.size === 0
                 ? '업로드 대기 중인 파일이 없습니다'
                 : '선택한 자치구에 업로드 대기 중인 파일이 없습니다'}
             </p>
-            <p className="text-sm text-gray-600 mt-1">모든 파일이 업로드되었습니다</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">모든 파일이 업로드되었습니다</p>
           </div>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {pendingOrdinances.map((ordinance) => {
+            {pendingOrdinances.map((ordinance, index) => {
               const key = getFileKey(ordinance)
               const isSelected = selectedFiles.has(key)
               const uploadResult = results.find(
@@ -747,38 +797,43 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
                 <div
                   key={key}
                   onClick={() => !uploading && toggleSelection(ordinance)}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-blue-900/30 border-blue-700'
-                      : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                  } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`
+                    p-4 border rounded-xl cursor-pointer transition-all
+                    ${isSelected
+                      ? 'bg-primary/10 border-primary/30 ring-2 ring-primary/20 shadow-md'
+                      : uploadResult?.status === 'success'
+                        ? 'bg-accent/10 border-accent/30 shadow-sm'
+                        : uploadResult?.status === 'error'
+                          ? 'bg-warning/10 border-warning/30 shadow-sm'
+                          : 'bg-card/30 border-border/50 hover:border-primary/30 hover:bg-card/50 hover:shadow-sm'
+                    }
+                    ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                  style={{
+                    animation: `fadeInUp 0.3s ease-out ${index * 10}ms both`
+                  }}
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="font-medium text-white">{ordinance.ordinanceName}</div>
-                      <div className="text-sm text-gray-400 mt-1">
-                        📍 {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)}{' '}
-                        KB
+                      <div className="font-medium text-foreground">{ordinance.ordinanceName}</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-muted-foreground/70 mt-1">
                         수정: {new Date(ordinance.lastModified).toLocaleString()}
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
                       {isSelected && !uploadResult && (
-                        <span className="px-2 py-1 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
+                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
                           선택됨
                         </span>
                       )}
                       {uploadResult?.status === 'success' && (
-                        <span className="px-2 py-1 bg-green-900/30 border border-green-700 rounded text-xs text-green-400">
-                          ✓ 업로드 완료
-                        </span>
+                        <CheckCircle2 className="w-5 h-5 text-accent" />
                       )}
                       {uploadResult?.status === 'error' && (
-                        <span className="px-2 py-1 bg-red-900/30 border border-red-700 rounded text-xs text-red-400">
-                          ✗ 실패
-                        </span>
+                        <XCircle className="w-5 h-5 text-warning" />
                       )}
                     </div>
                   </div>
@@ -791,31 +846,38 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
 
       {/* Uploaded Ordinances List */}
       {uploadedOrdinances.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="font-medium text-white">✅ 업로드됨 ({uploadedOrdinances.length}개 파일)</h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {uploadedOrdinances.map((ordinance) => {
-              const key = getFileKey(ordinance)
-              return (
-                <div key={key} className="p-4 border border-green-900/30 bg-green-900/10 rounded-lg opacity-75">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium text-white">{ordinance.ordinanceName}</div>
-                      <div className="text-sm text-gray-400 mt-1">
-                        📍 {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)}{' '}
-                        KB
-                      </div>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {uploadedOrdinances.map((ordinance) => {
+            const key = getFileKey(ordinance)
+            return (
+              <div key={key} className="p-4 border border-accent/20 bg-accent/10 rounded-xl opacity-75">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-medium text-foreground">{ordinance.ordinanceName}</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
                     </div>
-                    <span className="px-2 py-1 bg-green-900/30 border border-green-700 rounded text-xs text-green-400">
-                      ✓ 업로드됨
-                    </span>
                   </div>
+                  <CheckCircle2 className="w-5 h-5 text-accent" />
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   )
 }

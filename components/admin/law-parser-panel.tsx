@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Loader2, Search } from 'lucide-react'
 
 interface ParsedLaw {
   lawId: string
@@ -86,46 +87,60 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-white mb-2">📝 법령 검색 및 파싱</h2>
-        <p className="text-sm text-gray-400">
-          법령명 또는 법령 ID를 입력하세요. 정확히 일치하면 바로 파싱되고, 여러 후보가 있으면 선택할 수 있습니다.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="space-y-6">
+      {/* Search Form */}
+      <form onSubmit={handleSubmit} className="space-y-3">
         <Input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="예: 관세법, 소득세법, 001556..."
-          className="flex-1 bg-gray-800 border-gray-700 text-white"
+          placeholder="법령명 또는 법령 ID 입력 (예: 관세법, 001556, 소득세...)"
+          className="bg-card/50 backdrop-blur-sm border-border/50 text-foreground h-12"
           disabled={loading}
         />
-        <Button type="submit" disabled={loading || !query.trim()} className="bg-blue-600 hover:bg-blue-700">
-          {loading ? '검색 중...' : '검색'}
+        <Button
+          type="submit"
+          disabled={loading || !query.trim()}
+          className="w-full gap-2 shadow-lg shadow-primary/20"
+          size="default"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              검색 중...
+            </>
+          ) : (
+            <>
+              <Search className="h-4 w-4" />
+              검색
+            </>
+          )}
         </Button>
       </form>
 
       {error && (
-        <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg">
-          <p className="text-red-400">❌ {error}</p>
+        <div className="p-4 bg-warning/10 backdrop-blur-sm border border-warning/30 rounded-xl">
+          <p className="text-warning text-sm">⚠ {error}</p>
         </div>
       )}
 
       {candidates.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm text-gray-300">🔍 {candidates.length}개의 후보를 찾았습니다. 선택하세요:</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{candidates.length}개의 후보를 찾았습니다</p>
+          </div>
           <div className="space-y-2 max-h-80 overflow-y-auto">
-            {candidates.map((candidate) => (
+            {candidates.map((candidate, index) => (
               <button
                 key={candidate.lawId}
                 onClick={() => handleSelectCandidate(candidate.lawId)}
-                className="w-full p-4 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-blue-500 rounded-lg text-left transition-colors"
+                className="w-full p-4 bg-card/30 hover:bg-card/50 backdrop-blur-sm border border-border/50 hover:border-primary/30 rounded-xl text-left transition-all duration-200 hover:shadow-md"
+                style={{
+                  animation: `fadeInUp 0.3s ease-out ${index * 50}ms both`
+                }}
               >
-                <div className="font-medium text-white">{candidate.lawName}</div>
-                <div className="text-sm text-gray-400 mt-1">
+                <div className="font-medium text-foreground">{candidate.lawName}</div>
+                <div className="text-sm text-muted-foreground mt-1">
                   법령 ID: {candidate.lawId}
                   {candidate.effectiveDate && ` · 시행일: ${formatDate(candidate.effectiveDate)}`}
                   {candidate.revisionType && ` · ${candidate.revisionType}`}
@@ -136,14 +151,26 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
         </div>
       )}
 
-      <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
-        <h3 className="font-medium text-white mb-2">💡 사용 예시:</h3>
-        <ul className="text-sm space-y-1 text-gray-300">
-          <li>• "관세법" - 법령명으로 검색</li>
-          <li>• "001556" - 법령 ID로 직접 조회</li>
-          <li>• "소득세" - 부분 검색 (여러 후보 표시)</li>
-        </ul>
+      <div className="p-4 bg-muted/30 backdrop-blur-sm border border-border/50 rounded-xl">
+        <div className="text-sm text-muted-foreground space-y-1">
+          <div>• "관세법" - 법령명으로 검색</div>
+          <div>• "001556" - 법령 ID로 직접 조회</div>
+          <div>• "소득세" - 부분 검색 (여러 후보 표시)</div>
+        </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   )
 }

@@ -8,6 +8,7 @@
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Loader2, Upload } from 'lucide-react'
 
 interface UploadResult {
   success: boolean
@@ -313,10 +314,20 @@ export function DocumentUploadPanel({ onUploadComplete }: DocumentUploadPanelPro
         <Button
           onClick={handleUpload}
           disabled={selectedFiles.length === 0 || uploading}
-          className="flex-1 bg-blue-600 hover:bg-blue-700"
-          size="lg"
+          className="flex-1 gap-2 shadow-lg shadow-primary/20"
+          size="default"
         >
-          {uploading ? '⏳ 업로드 중...' : `⬆️ ${selectedFiles.length}개 파일 업로드`}
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              업로드 중
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4" />
+              업로드 ({selectedFiles.length})
+            </>
+          )}
         </Button>
       </div>
 

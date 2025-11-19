@@ -74,10 +74,9 @@ export default function LogImport({ onImport }: LogImportProps) {
       <Button
         onClick={() => setShowDialog(true)}
         variant="outline"
-        size="sm"
-        className="border-purple-600 text-purple-400 hover:bg-purple-900/30"
+        size="default"
       >
-        📋 로그 임포트
+        로그 임포트
       </Button>
 
       {showDialog && (
