@@ -407,11 +407,10 @@ function styleDetailSection(text: string, sectionTitle: string): string {
 function linkifyRefsB(text: string): string {
   let t = text
 
-  // 1. 「법령명」 제X조 패턴 (항, 호 포함) - 임시 마커로 변환
-  // 링크는 조문까지만, 표시는 항·호 포함
+  // 1. 「법령명」 제X조 패턴 - 조문까지만 링크, 항/호는 표시만
   t = t.replace(/「([^」]+)」\s*제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?/g, (_m, lawName, art, _p1, branch, _p2, para, _p3, item) => {
-    const displayLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
-    const linkLabel = '제' + art + '조' + (branch ? '의' + branch : '')  // 항·호 제외
+    const linkLabel = '제' + art + '조' + (branch ? '의' + branch : '')  // 조문까지만
+    const displayLabel = '제' + art + '조' + (branch ? '의' + branch : '') + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')  // 전체 표시
     return '<<<LAWLINK_WITH_ARTICLE:' + lawName + '|||' + linkLabel + '|||' + displayLabel + '>>>'
   })
 
@@ -421,9 +420,9 @@ function linkifyRefsB(text: string): string {
   })
 
   // 3. 법령명 제X조 패턴 (꺽쇄 없음) - 임시 마커로 변환
-  // "법률 시행령"같이 법률 뒤에 다른 단어가 오는 경우 제외
+  // 복합 법령명 처리를 위해 개선된 패턴 (법률 시행령, 법 시행령 등)
   t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·]+(?:법률|법|령|규칙|조례))(?!\s+[가-힣]+령)\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
+    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:특별시|광역시|도|시|군|구)\s+[가-힣a-zA-Z0-9·\s]+(?:조례|규칙)|[가-힣a-zA-Z0-9·\s]+?(?:법률\s+시행령|법률\s+시행규칙|법\s+시행령|법\s+시행규칙|법률|법|령|규칙|조례))\s+제(\d+)조(의(\d+))?\s*(\([\[\]가-힣a-zA-Z0-9\s·ㆍ]+\))?/g,
     (_match, lawName, art, _p2, branch, title) => {
       const cleanLawName = lawName.trim()
       const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
@@ -439,14 +438,15 @@ function linkifyRefsB(text: string): string {
   })
 
   // 5. 대통령령, 시행령 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
-  // 법률 시행령, 법령 시행령 등 복합어 제외
+  // "법률 시행령" 처럼 앞에 한글과 공백이 있으면 제외
   t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가>])/g, (m) => {
     return '<<<DECREE:' + m + '>>>'
   })
 
   // 6. 부령, 시행규칙 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
-  // 법률 시행규칙 등 복합어 제외
-  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)((?:[가-힣]+)?부령|시행규칙)(?![으로로이가>])/g, (m) => {
+  // "법률 시행규칙" 처럼 앞에 한글과 공백이 있으면 제외
+  // 부령의 경우 전체 단어만 매칭
+  t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(?<![가-힣])([가-힣]+부령|시행규칙)(?![으로로이가>])/g, (m) => {
     return '<<<RULE:' + m + '>>>'
   })
 
