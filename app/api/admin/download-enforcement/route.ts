@@ -274,12 +274,39 @@ function parseLawJSON(jsonData: any) {
 
     // STEP 2: 항/호/목 추출
     let paraContent = ''
-    if (unit.항 && Array.isArray(unit.항)) {
-      paraContent = extractContentFromHangArray(unit.항, articleNum)
+
+    if (unit.항) {
+      // 항이 배열인 경우
+      if (Array.isArray(unit.항)) {
+        paraContent = extractContentFromHangArray(unit.항, articleNum)
+      }
+      // 항이 객체인 경우 (제55조 같은 경우: {"호": [...]})
+      else if (typeof unit.항 === 'object' && unit.항.호 && Array.isArray(unit.항.호)) {
+        // 호만 있는 경우: 직접 호 배열 처리
+        for (const ho of unit.항.호) {
+          if (ho.호내용) {
+            let hoContent = Array.isArray(ho.호내용) ? ho.호내용.join('\n') : ho.호내용
+            paraContent += '\n' + hoContent
+          }
+
+          if (ho.목 && Array.isArray(ho.목)) {
+            for (const mok of ho.목) {
+              if (mok.목내용) {
+                let mokContent = Array.isArray(mok.목내용) ? mok.목내용.join('\n') : mok.목내용
+                paraContent += '\n  ' + mokContent
+              }
+            }
+          }
+        }
+        paraContent = paraContent.trim()
+      }
 
       // DEBUG: 제55조 paraContent 확인
       if (articleNum === '55' || displayNumber.includes('55')) {
         console.log('[DEBUG-ADMIN] Article 55 paraContent:', {
+          항_type: typeof unit.항,
+          항_isArray: Array.isArray(unit.항),
+          항_hasHo: !!(unit.항 && typeof unit.항 === 'object' && unit.항.호),
           paraContent_length: paraContent.length,
           paraContent_sample: paraContent.substring(0, 200)
         })

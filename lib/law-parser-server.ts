@@ -236,7 +236,7 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
     if (unit.항 && Array.isArray(unit.항)) {
       paraContent = extractContentFromHangArray(unit.항)
     }
-    // Fallback: if 항 is an object with 호 array (old structure)
+    // Fallback: if 항 is an object with 호 array (제55조 같은 경우: {"호": [...]})
     else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
       if (Array.isArray(unit.항.호)) {
         for (const ho of unit.항.호) {
@@ -247,7 +247,21 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
             }
             paraContent += "\n" + hoContent
           }
+
+          // 목 처리 추가
+          if (ho.목 && Array.isArray(ho.목)) {
+            for (const mok of ho.목) {
+              if (mok.목내용) {
+                let mokContent = mok.목내용
+                if (Array.isArray(mokContent)) {
+                  mokContent = mokContent.join("\n")
+                }
+                paraContent += "\n  " + mokContent
+              }
+            }
+          }
         }
+        paraContent = paraContent.trim()
       }
     }
 

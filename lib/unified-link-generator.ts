@@ -326,9 +326,9 @@ export function linkifyRefsAI(escapedText: string): string {
     enableAdminRules: false
   })
 
-  // 3. 링크 태그 외의 부분만 재이스케이프
-  return linked.replace(/(<a[^>]*>.*?<\/a>)|([^<]+|<(?!a\s|\/a>))/g, (match, link, text) => {
-    if (link) return link // 링크는 그대로
+  // 3. HTML 태그는 보존하고 텍스트만 재이스케이프
+  return linked.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+    if (tag) return tag // 모든 HTML 태그 보존
     if (text) {
       return text
         .replace(/&/g, '&amp;')
