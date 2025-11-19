@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("법령 변경이력 API 호출", { lawId, mst })
-    console.log("[v0] [개정이력 API] Full URL:", url)
+    console.log("[개정이력 API] Full URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
@@ -44,8 +44,7 @@ export async function GET(request: Request) {
     }
 
     const text = await response.text()
-    console.log("[v0] [개정이력 API] Response length:", text.length)
-    console.log("[v0] [개정이력 API] XML sample (first 3000 chars):", text.substring(0, 3000))
+    console.log("[개정이력 API] Response length:", text.length)
 
     debugLogger.success("법령 변경이력 조회 완료", { length: text.length })
 
@@ -56,7 +55,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] [개정이력 API] Error:", error)
+    console.log("[개정이력 API] Error:", error)
     debugLogger.error("법령 변경이력 조회 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

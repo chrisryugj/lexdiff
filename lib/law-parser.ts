@@ -81,7 +81,6 @@ export function buildJO(input: string): string {
   const branchNum = components.branchNumber.toString().padStart(2, "0")
   const jo = `${articleNum}${branchNum}`
 
-  debugLogger.success("JO 파싱 완료", { input, jo })
   return jo
 }
 
@@ -131,14 +130,12 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
       parsed.subItem = subItemMatch[1]
     }
 
-    debugLogger.success("검색어 파싱 완료 (조문 포함)", parsed)
     return parsed
   }
 
   const trimmedLawName = normalizedQuery.trim()
   const lawNameResolution = resolveLawAlias(trimmedLawName)
 
-  debugLogger.info("검색어 파싱 완료 (법령명만)", {
     lawName: lawNameResolution.canonical,
     matchedAlias: lawNameResolution.matchedAlias,
   })
@@ -215,14 +212,13 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
   const items = doc.querySelectorAll("law")
   const history: RevisionHistoryItem[] = []
 
-  console.log("[v0] [조문이력] Found law items:", items.length)
 
   items.forEach((item, index) => {
     const lawInfo = item.querySelector("법령정보")
     const articleInfo = item.querySelector("조문정보")
 
     if (!lawInfo || !articleInfo) {
-      console.log(`[v0] [조문이력 ${index + 1}] Missing lawInfo or articleInfo, skipping`)
+      console.log(`[조문이력 ${index + 1}] Missing lawInfo or articleInfo, skipping`)
       return
     }
 
@@ -262,7 +258,7 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
 
     history.push(historyItem)
 
-    console.log(`[v0] [조문이력 ${index + 1}]`, {
+    console.log(`[조문이력 ${index + 1}]`, {
       date: historyItem.date,
       type: historyItem.type,
       reason: historyItem.changeReason,
@@ -270,7 +266,6 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
     })
   })
 
-  debugLogger.success("조문 변경이력 파싱 완료", { count: history.length })
   return history
 }
 

@@ -40,15 +40,14 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("자치법규 검색 API 호출", { query, knd, org, url })
-    console.log("[v0] Ordinance search URL:", url)
+    console.log("Ordinance search URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[v0] Ordinance search response status:", response.status)
-    console.log("[v0] Ordinance search response (first 500 chars):", text.substring(0, 500))
+    console.log("Ordinance search response status:", response.status)
 
     if (!response.ok) {
       debugLogger.error("자치법규 검색 API 오류", { status: response.status, body: text.substring(0, 200) })
@@ -64,7 +63,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] Ordinance search error:", error)
+    console.log("Ordinance search error:", error)
     debugLogger.error("자치법규 검색 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

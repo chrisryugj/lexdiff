@@ -33,15 +33,14 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("자치법규 본문 API 호출", { ordinId, ordinSeq, url })
-    console.log("[v0] Ordinance API URL:", url)
+    console.log("Ordinance API URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[v0] Ordinance response status:", response.status)
-    console.log("[v0] Ordinance response (first 2000 chars):", text.substring(0, 2000))
+    console.log("Ordinance response status:", response.status)
 
     if (!response.ok) {
       debugLogger.error("자치법규 본문 API 오류", { status: response.status, body: text.substring(0, 500) })
@@ -49,7 +48,7 @@ export async function GET(request: Request) {
     }
 
     if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
-      console.log("[v0] Received HTML error page instead of XML")
+      console.log("Received HTML error page instead of XML")
       debugLogger.error("자치법규 본문 API가 HTML 오류 페이지를 반환했습니다", { url })
       throw new Error("API가 오류 페이지를 반환했습니다. 자치법규 ID를 확인해주세요.")
     }
@@ -63,7 +62,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] Ordinance API error:", error)
+    console.log("Ordinance API error:", error)
     debugLogger.error("자치법규 본문 조회 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

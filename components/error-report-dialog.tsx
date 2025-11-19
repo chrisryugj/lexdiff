@@ -11,16 +11,7 @@ export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
   const [copied, setCopied] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
 
-  useEffect(() => {
-    console.log("[v0] [에러 다이얼로그] 상태 변경:", {
-      hasError: !!currentError,
-      showDialog: showErrorDialog,
-      errorId: currentError?.id,
-    })
-  }, [currentError, showErrorDialog])
-
   if (!currentError) {
-    console.log("[v0] [에러 다이얼로그] currentError가 없어서 렌더링 안 함")
     return null
   }
 
@@ -29,15 +20,12 @@ export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
     await navigator.clipboard.writeText(reportText)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-    console.log("[v0] 에러 리포트 복사 완료")
   }
 
   const handleClose = () => {
     clearCurrentError()
     onDismiss?.()
   }
-
-  console.log("[v0] [에러 다이얼로그] 렌더링 중:", { showErrorDialog, errorMessage: currentError.errorMessage })
 
   return (
     <Dialog open={showErrorDialog} onOpenChange={(open) => !open && handleClose()}>

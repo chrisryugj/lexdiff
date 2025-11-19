@@ -21,7 +21,6 @@ export function parseLawXML(xmlText: string): {
     const meta = extractMetadata(xmlDoc)
     const articles = extractArticles(xmlDoc)
 
-    debugLogger.success("XML 파싱 완료", { articleCount: articles.length })
 
     return { meta, articles }
   } catch (error) {

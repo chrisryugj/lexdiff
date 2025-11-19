@@ -30,16 +30,15 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("조문별 변경이력 API 호출", { lawId, jo })
-    console.log("[v0] [조문이력 API] Full URL:", url)
+    console.log("[조문이력 API] Full URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[v0] [조문이력 API] Response status:", response.status)
-    console.log("[v0] [조문이력 API] Response length:", text.length)
-    console.log("[v0] [조문이력 API] XML sample (first 2000 chars):", text.substring(0, 2000))
+    console.log("[조문이력 API] Response status:", response.status)
+    console.log("[조문이력 API] Response length:", text.length)
 
     // Check if it's an error HTML response
     if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
@@ -63,7 +62,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[v0] [조문이력 API] Error:", error)
+    console.log("[조문이력 API] Error:", error)
     debugLogger.error("조문별 변경이력 조회 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

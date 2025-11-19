@@ -21,17 +21,15 @@ export async function POST(request: Request) {
 
     debugLogger.info("AI 요약 생성 시작", { lawTitle, joNum, effectiveDate })
 
-    console.log("[v0] ========== AI에 전달되는 데이터 ==========")
-    console.log("[v0] 법령명:", lawTitle)
-    console.log("[v0] 조문:", joNum)
-    console.log("[v0] 시행일:", effectiveDate || "정보 없음")
-    console.log("[v0] 구법 내용 길이:", oldContent.length, "자")
-    console.log("[v0] 구법 내용 샘플 (처음 500자):")
+    console.log("========== AI에 전달되는 데이터 ==========")
+    console.log("법령명:", lawTitle)
+    console.log("조문:", joNum)
+    console.log("시행일:", effectiveDate || "정보 없음")
+    console.log("구법 내용 길이:", oldContent.length, "자")
     console.log(oldContent.substring(0, 500))
-    console.log("[v0] 신법 내용 길이:", newContent.length, "자")
-    console.log("[v0] 신법 내용 샘플 (처음 500자):")
+    console.log("신법 내용 길이:", newContent.length, "자")
     console.log(newContent.substring(0, 500))
-    console.log("[v0] ==========================================")
+    console.log("==========================================")
 
     const ai = new GoogleGenAI({ apiKey })
 
@@ -82,9 +80,9 @@ ${newContent.substring(0, 2000)}
 - 제2항에서 "기획재정부령"이 "기획재정부장관"으로 변경되었습니다. 이는 권한 주체를 부처의 규칙에서 장관으로 명확히 한 것입니다. (용어 변경)
 - 제4항에 국세의 정상가격과 관세의 과세가격 간의 조정 신청 절차가 신설되었습니다. 납세자는 통지를 받은 날로부터 30일 내에 기획재정부장관에게 조정을 신청할 수 있습니다. (실질 내용 변경)`
 
-    console.log("[v0] ========== Gemini에 전달되는 프롬프트 ==========")
+    console.log("========== Gemini에 전달되는 프롬프트 ==========")
     console.log(prompt)
-    console.log("[v0] ================================================")
+    console.log("================================================")
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",

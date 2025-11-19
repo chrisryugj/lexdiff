@@ -27,7 +27,7 @@ class DebugLogger {
       this.logs = this.logs.slice(0, this.maxLogs)
     }
 
-    console.log(`[v0] [${level.toUpperCase()}] ${message}`, details || "")
+    console.log(`[${level.toUpperCase()}] ${message}`, details || "")
     this.notifyListeners()
   }
 
