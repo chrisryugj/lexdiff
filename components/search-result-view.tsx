@@ -1158,11 +1158,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     debugLogger.info(isOrdinanceQuery ? "조례 검색 시작" : "법령 검색 시작", { lawName, articleNumber, jo })
 
-    // 🚀 Phase 7: IndexedDB 우선 체크 (일시 비활성화 - 검색어 기반 캐시가 잘못된 법령 반환)
-    // ⚠️ TODO: 캐시 키를 법령명으로 변경하여 재활성화
-    const PHASE_7_ENABLED = false
-
-    if (!isOrdinanceQuery && PHASE_7_ENABLED) {
+    // 🚀 Phase 7: IndexedDB 우선 체크 (법령만)
+    if (!isOrdinanceQuery) {
       const rawQuery = `${query.lawName}${query.article ? ` ${query.article}` : ''}`
 
       try {
@@ -1173,13 +1170,24 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         const t1 = performance.now()
 
         if (cachedContent) {
-          updateProgress('parsing', 70)
-          debugLogger.success(`💾 [Phase 7] IndexedDB 캐시 HIT (${Math.round(t1 - t0)}ms) - API 호출 없음!`, {
-            lawTitle: cachedContent.lawTitle,
-            articles: cachedContent.articles.length,
-          })
+          // ✅ 법령명 검증: 캐시된 법령이 검색어와 일치하는지 확인
+          const normalizedSearchName = query.lawName.replace(/\s+/g, "")
+          const normalizedCachedName = cachedContent.lawTitle.replace(/\s+/g, "")
 
-          // 조문 존재 확인 (Phase 7 버그 수정)
+          if (normalizedCachedName !== normalizedSearchName) {
+            console.warn(`⚠️ [Phase 7] 캐시 법령명 불일치 - 캐시 무시`, {
+              searched: query.lawName,
+              cached: cachedContent.lawTitle,
+            })
+            debugLogger.warning(`[Phase 7] 캐시 법령명 불일치: "${query.lawName}" ≠ "${cachedContent.lawTitle}" - 기본 검색 진행`)
+          } else {
+            updateProgress('parsing', 70)
+            debugLogger.success(`💾 [Phase 7] IndexedDB 캐시 HIT (${Math.round(t1 - t0)}ms) - API 호출 없음!`, {
+              lawTitle: cachedContent.lawTitle,
+              articles: cachedContent.articles.length,
+            })
+
+            // 조문 존재 확인 (Phase 7 버그 수정)
           let selectedJo: string | undefined = undefined
 
           if (query.jo) {
@@ -1217,18 +1225,19 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           const queryId = -Date.now()
           const resultId = -(Date.now() + 1)
 
-          setLawData({
-            meta: cachedContent.meta,
-            articles: cachedContent.articles,
-            selectedJo,
-            viewMode: 'full',
-            searchQueryId: queryId,
-            searchResultId: resultId,
-          })
+            setLawData({
+              meta: cachedContent.meta,
+              articles: cachedContent.articles,
+              selectedJo,
+              viewMode: 'full',
+              searchQueryId: queryId,
+              searchResultId: resultId,
+            })
 
-          setIsSearching(false)
-          updateProgress('complete', 100)
-          return // ← 여기서 종료! API 호출 없음!
+            setIsSearching(false)
+            updateProgress('complete', 100)
+            return // ← 여기서 종료! API 호출 없음!
+          }
         } else {
           debugLogger.info(`❌ [Phase 7] IndexedDB 캐시 MISS (${Math.round(t1 - t0)}ms) - 기본 검색 진행`)
         }
