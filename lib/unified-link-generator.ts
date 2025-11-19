@@ -103,7 +103,7 @@ function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawNam
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;">같은 법 ${fullLabel}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;">같은 법 ${fullLabel}</a>`
       })
     }
   }
@@ -157,7 +157,7 @@ function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawNam
         lawName: targetLawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${targetLawName}" data-article="${joLabel}">${refType} ${fullLabel}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${targetLawName}" data-article="${joLabel}">${refType} ${fullLabel}</a>`
       })
     }
   }
@@ -183,7 +183,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
       lawName,
       article: joLabel,
       displayText: match[0],
-      html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">「${lawName}」 ${fullLabel}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">「${lawName}」 ${fullLabel}</a>`
     })
   }
 
@@ -205,7 +205,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
         type: 'law-quoted',
         lawName,
         displayText: match[0],
-        html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law" data-law="${lawName}">${match[0]}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law" data-law="${lawName}">${match[0]}</a>`
       })
     }
   }
@@ -241,7 +241,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">${fullText}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">${fullText}</a>`
       })
     }
   }
@@ -282,7 +282,7 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
       type: 'article',
       article: joLabel,
       displayText: match[0],
-      html: `<a class="law-ref" data-ref="article" data-article="${joLabel}" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;">${fullLabel}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" data-ref="article" data-article="${joLabel}" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;">${fullLabel}</a>`
     })
 
     console.log('[collectInternalArticleMatches] Added:', { joLabel, fullLabel, index: match.index })
@@ -305,7 +305,7 @@ function collectDecreeMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'decree',
       displayText: match[0],
-      html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="related" data-kind="decree">${match[0]}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="related" data-kind="decree">${match[0]}</a>`
     })
   }
 }
@@ -324,7 +324,7 @@ function collectRuleMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'rule',
       displayText: match[0],
-      html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="related" data-kind="rule">${match[0]}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="related" data-kind="rule">${match[0]}</a>`
     })
   }
 }
@@ -343,7 +343,7 @@ function collectAdminRuleMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'rule',
       displayText: match[0],
-      html: `<a class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="regulation" data-kind="administrative">${match[0]}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="regulation" data-kind="administrative">${match[0]}</a>`
     })
   }
 }
