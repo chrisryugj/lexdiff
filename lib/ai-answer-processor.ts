@@ -109,7 +109,7 @@ function markLawQuotes(text: string): string {
     }
 
     // "📖 핵심 해석" 종료 - 블록 종료
-    if (inQuoteSection && trimmed === '📖 핵심 해석') {
+    if (inQuoteSection && (trimmed.includes('📖 핵심 해석') || trimmed.includes('핵심 해석'))) {
       // 수집된 조문 내용을 블록으로 감싸기
       if (currentQuoteLines.length > 0) {
         result.push('<<<QUOTE_START>>>')
@@ -143,7 +143,7 @@ function markLawQuotes(text: string): string {
           const nextLine = lines[i]
           const nextTrimmed = nextLine.trim()
 
-          if (nextTrimmed === '📖 핵심 해석') {
+          if (nextTrimmed.includes('📖 핵심 해석') || nextTrimmed.includes('핵심 해석')) {
             result.push(nextLine)
             inQuoteSection = false
             i++
@@ -413,39 +413,63 @@ function styleDetailSection(text: string, sectionTitle: string): string {
       }
 
       // 하위 섹션 제목 감지
-      if (trimmed === '⚖️ 조문 발췌') {
+      if (trimmed.includes('⚖️ 조문 발췌')) {
         currentSub = 'none'
         isFirstContentInSub = false
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem;">⚖️ 조문 발췌</div>`
         )
         return
       }
 
-      if (trimmed.startsWith('📖 핵심 해석')) {
+      const coreMatch = trimmed.match(/^[\s*#-]*(?:📖\s*)?핵심\s*해석\s*:?\s*(.*)/)
+      if (coreMatch) {
         currentSub = 'core'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">📖 핵심 해석</div>`
         )
+        const inlineContent = coreMatch[1].trim()
+        if (inlineContent) {
+          contentLines.push(
+            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+          )
+          isFirstContentInSub = false
+        }
         return
       }
 
-      if (trimmed.startsWith('📝 실무 적용')) {
+      const practiceMatch = trimmed.match(/^[\s*#-]*(?:📝\s*)?실무\s*적용\s*:?\s*(.*)/)
+      if (practiceMatch) {
         currentSub = 'practice'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">📝 실무 적용</div>`
         )
+        const inlineContent = practiceMatch[1].trim()
+        if (inlineContent) {
+          contentLines.push(
+            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+          )
+          isFirstContentInSub = false
+        }
         return
       }
 
-      if (trimmed.startsWith('🔴 조건·예외')) {
+      const conditionMatch = trimmed.match(/^[\s*#-]*(?:🔴\s*)?조건[·\.]?예외\s*:?\s*(.*)/)
+      if (conditionMatch) {
         currentSub = 'condition'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">${trimmed}</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">🔴 조건·예외</div>`
         )
+        const inlineContent = conditionMatch[1].trim()
+        if (inlineContent) {
+          contentLines.push(
+            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+          )
+          isFirstContentInSub = false
+        }
         return
       }
 
