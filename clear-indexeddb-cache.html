@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>IndexedDB 캐시 삭제</title>
+</head>
+<body>
+  <h1>IndexedDB 캐시 삭제 도구</h1>
+  <button id="clearBtn" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+    🗑️ 전체 캐시 삭제
+  </button>
+  <div id="result" style="margin-top: 20px; font-family: monospace;"></div>
+
+  <script>
+    document.getElementById('clearBtn').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '캐시 삭제 중...<br>';
+
+      try {
+        // LexDiffCache 데이터베이스 삭제
+        const deleteRequest = indexedDB.deleteDatabase('LexDiffCache');
+
+        deleteRequest.onsuccess = () => {
+          resultDiv.innerHTML += '✅ <strong>LexDiffCache 데이터베이스 삭제 완료!</strong><br>';
+          resultDiv.innerHTML += '<br>이제 페이지를 새로고침하고 "도로법 시행령 55조"를 검색하세요.<br>';
+          resultDiv.innerHTML += '캐시가 비워졌으므로 최신 파싱 로직으로 다시 로드됩니다.';
+        };
+
+        deleteRequest.onerror = (event) => {
+          resultDiv.innerHTML += '❌ 삭제 실패: ' + event.target.error + '<br>';
+        };
+
+        deleteRequest.onblocked = () => {
+          resultDiv.innerHTML += '⚠️ 다른 탭에서 데이터베이스를 사용 중입니다. 모든 탭을 닫고 다시 시도하세요.<br>';
+        };
+
+      } catch (error) {
+        resultDiv.innerHTML += '❌ 오류: ' + error.message + '<br>';
+      }
+    });
+  </script>
+</body>
+</html>
