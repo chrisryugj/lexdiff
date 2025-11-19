@@ -124,6 +124,16 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     }
 
     try {
+      // AI 모드일 때는 전체 쿼리를 그대로 전달
+      if (isAiMode) {
+        debugLogger.info("AI 검색 실행", { query })
+        saveRecentSearch(query.trim())
+        onSearch({ lawName: query.trim(), article: undefined, jo: undefined })
+        setShowRecent(false)
+        return
+      }
+
+      // 일반 법령 검색
       const parsed = parseSearchQuery(query)
       debugLogger.info("통합 검색 실행", parsed)
 
@@ -139,8 +149,15 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setQuery(search)
     setShowRecent(false)
     try {
-      const parsed = parseSearchQuery(search)
-      onSearch(parsed)
+      // 해당 검색어가 AI 모드인지 확인
+      const queryDetection = detectQueryType(search)
+      if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+        debugLogger.info("AI 검색 실행 (최근 검색)", { search })
+        onSearch({ lawName: search, article: undefined, jo: undefined })
+      } else {
+        const parsed = parseSearchQuery(search)
+        onSearch(parsed)
+      }
     } catch (error) {
       debugLogger.error("최근 검색 실행 실패", error)
     }
