@@ -138,12 +138,12 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
 
 /**
  * 「」 없는 법령명 패턴 수집 (aggressive 모드)
- * 단순 법령명만 처리 (복합 법령명은 「」 사용 권장)
+ * 단순 법령명 + 시행령/시행규칙 패턴 처리
  */
 function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
-  // 단순 법령명 패턴: 2-10 단어 + (법/령/규칙) + 조문
+  // 법령명 패턴: 기본 법령명 + 선택적 시행령/시행규칙
   // "관세법 제38조", "도로법 시행령 제55조" 등
-  const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례))\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+  const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
   let match: RegExpExecArray | null
 
   while ((match = simpleRegex.exec(text)) !== null) {
