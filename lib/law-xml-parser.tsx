@@ -280,7 +280,7 @@ function extractRevisionMarks(
   return uniqueRevisions
 }
 
-export function extractArticleText(article: LawArticle, isOrdinance = false): string {
+export function extractArticleText(article: LawArticle, isOrdinance = false, currentLawName?: string): string {
   let text = ""
 
   // CRITICAL FIX: article.content가 없어도 title이 있으면 표시
@@ -302,7 +302,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
       content = escapeHtml(article.content)
       content = applyRevisionStyling(content)
 
-      // 조문 제목 패턴 매치 - 제X조(제목) 형식
+      // 조문 제목 패턴 매치 - 제X조(제목) 형식 제거
       const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*([\s\S]*)$/)
 
       if (titleMatch) {
@@ -321,14 +321,12 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
           })
         }
 
-        // 제목 부분을 bold로
-        content = '<strong>' + titlePart + '</strong>'
-
-        // 본문이 있으면 추가 (제목만 있어도 OK - 호가 있을 수 있음)
+        // 제목 제거 - 본문만 사용 (헤더에 이미 표시됨)
         if (bodyPart && bodyPart.trim()) {
-          content += ' ' + bodyPart
+          content = bodyPart.trim()
+        } else {
+          content = ''  // 본문 없음 (호만 있는 경우)
         }
-        // else: 제목만 있는 경우도 OK (도로법 시행령 55조처럼 호만 있는 경우)
       }
       // else: 제목 형식이 아니면 전체를 그대로 유지
     } else if (article.title) {
@@ -342,7 +340,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
       content += '</strong>'
     }
 
-    content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content)
+    content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content, currentLawName)
 
     // Replace 2+ newlines before paragraph markers with single newline
     content = content.replace(/\n{2,}\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')

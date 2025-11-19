@@ -636,7 +636,7 @@ export function LawViewer({
             setRefModal({
               open: true,
               title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-              html: extractArticleText(found),
+              html: extractArticleText(found, false, meta.lawTitle),
               lawName: meta.lawTitle,
               articleNumber: formatJO(found.jo),
             })
@@ -1187,7 +1187,7 @@ export function LawViewer({
           processedContentLength: lawArticle.content?.length || 0
         })
 
-        const htmlContent = extractArticleText(lawArticle)
+        const htmlContent = extractArticleText(lawArticle, false, meta.lawTitle)
         console.log('[Citation] Extracted HTML length:', htmlContent.length)
         console.log('[Citation] HTML preview:', htmlContent.substring(0, 200))
 
@@ -1934,7 +1934,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance, meta.lawTitle) }}
                         />
                         <Separator className="my-1" />
                       </div>
@@ -1978,7 +1978,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(article) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, false, meta.lawTitle) }}
                         />
 
                         {article.hasChanges && (
@@ -2027,7 +2027,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2132,7 +2132,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2252,7 +2252,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2367,7 +2367,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2466,7 +2466,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2570,7 +2570,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2690,7 +2690,7 @@ export function LawViewer({
                             wordBreak: "break-word",
                           }}
                           onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                         />
                       </div>
 
@@ -2832,7 +2832,7 @@ export function LawViewer({
                           wordBreak: "break-word",
                         }}
                         onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle) }}
+                        dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                       />
 
                       {activeArticle.hasChanges && (
@@ -2951,7 +2951,7 @@ export function LawViewer({
                               <div
                                 className="law-content text-sm text-foreground leading-relaxed"
                                 style={{ fontSize: `${fontSize}px` }}
-                                dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle) }}
+                                dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle, false, comparisonLawMeta?.lawTitle) }}
                               />
                             </div>
                           )
