@@ -2060,6 +2060,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       const article = lawData.articles.find((a) => a.jo === jo)
       const joNum = article ? article.joNum : jo
 
+      debugLogger.success("신·구법 비교 데이터 로드 완료", {
         joNum,
         oldContentLength: comparison.oldVersion.content.length,
         newContentLength: comparison.newVersion.content.length,
