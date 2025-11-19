@@ -210,27 +210,44 @@
 
   a.law-ref {
     color: oklch(0.65 0.2 250);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+    text-decoration: none;
     cursor: pointer;
-    transition: all 0.2s ease;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   a.law-ref:hover {
     color: oklch(0.75 0.22 250);
-    text-decoration-thickness: 2px;
+    background-size: 100% 1.5px;
+    background-color: oklch(0.65 0.2 250 / 0.08);
+    box-shadow: 0 1px 4px oklch(0.65 0.2 250 / 0.3);
   }
 
   .prose a.law-ref {
     color: oklch(0.65 0.2 250);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
+    text-decoration: none;
     cursor: pointer;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .prose a.law-ref:hover {
     color: oklch(0.75 0.22 250);
+    background-size: 100% 1.5px;
+    background-color: oklch(0.65 0.2 250 / 0.08);
+    box-shadow: 0 1px 4px oklch(0.65 0.2 250 / 0.3);
   }
 
   a.law-html-link,

@@ -171,14 +171,14 @@ export function highlightDifferences(
   let oldHighlighted = oldContent
     .replace(
       /<P>/g,
-      '<span style="background-color: rgba(239, 68, 68, 0.2); color: rgb(220, 38, 38); font-weight: 600; padding: 2px 4px; border-radius: 3px;">',
+      '<span style="background: linear-gradient(to right, rgba(251, 113, 133, 0.15), rgba(251, 113, 133, 0.08)); color: rgb(244, 63, 94); font-weight: 500; padding: 2px 6px; border-radius: 4px; border-left: 2px solid rgba(244, 63, 94, 0.4);">',
     )
     .replace(/<\/P>/g, "</span>")
 
   let newHighlighted = newContent
     .replace(
       /<P>/g,
-      '<span style="background-color: rgba(34, 197, 94, 0.2); color: rgb(22, 163, 74); font-weight: 600; padding: 2px 4px; border-radius: 3px;">',
+      '<span style="background: linear-gradient(to right, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08)); color: rgb(16, 185, 129); font-weight: 500; padding: 2px 6px; border-radius: 4px; border-left: 2px solid rgba(16, 185, 129, 0.4);">',
     )
     .replace(/<\/P>/g, "</span>")
 

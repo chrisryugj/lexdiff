@@ -288,50 +288,43 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
     let content = ""
 
     if (article.content) {
-      // DEBUG: Log all article with jo = 005500
-      if (article.jo === '005500') {
-        console.log('[DEBUG-RAW] Article 55 BEFORE processing:', {
-          jo: article.jo,
-          joNum: article.joNum,
-          contentRaw: article.content.substring(0, 200),
-          hasParagraphs: !!article.paragraphs,
-          paragraphsLength: article.paragraphs?.length
-        })
-      }
+      // 조문 제목 패턴 매치 - 제X조(제목) 형식 제거 (escape 전에)
+      const titleMatch = article.content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*([\s\S]*)$/)
 
-      content = escapeHtml(article.content)
-      content = applyRevisionStyling(content)
-
-      // 조문 제목 패턴 매치 - 제X조(제목) 형식 제거
-      const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*([\s\S]*)$/)
-
+      let rawContent = article.content
       if (titleMatch) {
         const titlePart = titleMatch[1]  // 제X조(제목)
         const bodyPart = titleMatch[2]   // 나머지 본문
 
-        // DEBUG LOG
-        if (article.jo === '005500') {
-          console.log('[DEBUG-AFTER] Article 55 AFTER regex:', {
-            titlePart,
-            bodyPartLength: bodyPart.length,
-            bodyPartTrimmed: bodyPart.trim().substring(0, 100),
-            willAddBody: !!(bodyPart && bodyPart.trim()),
-            hasParagraphs: !!article.paragraphs,
-            paragraphsLength: article.paragraphs?.length
-          })
-        }
-
         // 제목 제거 - 본문만 사용 (헤더에 이미 표시됨)
         if (bodyPart && bodyPart.trim()) {
-          content = bodyPart.trim()
+          rawContent = bodyPart.trim()
         } else {
-          content = ''  // 본문 없음 (호만 있는 경우)
+          rawContent = ''  // 본문 없음 (호만 있는 경우)
         }
       }
-      // else: 제목 형식이 아니면 전체를 그대로 유지
+
+      // 1. 링크 생성 (escape 전에)
+      if (rawContent.includes('제9조') || rawContent.includes('제39조')) {
+        console.log('[extractArticleText] 제9조/제39조 발견! rawContent:', rawContent.substring(0, 500))
+        // Test regex directly
+        const testRegex = /(?<!「[^」]*)(?<!\S)(제\s*(\d+)\s*조(?:의\s*(\d+))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?!\s*[」])/g
+        const testMatches = Array.from(rawContent.matchAll(testRegex))
+        console.log('[extractArticleText] Regex test matches:', testMatches.length, testMatches.slice(0, 5).map(m => m[0]))
+      }
+      content = linkifyRefsB(rawContent, currentLawName)
+
+      // 2. HTML escape (링크 태그는 보존)
+      content = content.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+        if (tag) return tag  // HTML 태그 보존
+        if (text) return escapeHtml(text)  // 텍스트만 escape
+        return match
+      })
+
+      // 3. 개정 마커 스타일링
+      content = applyRevisionStyling(content)
     } else if (article.title) {
       // article.content가 없고 title만 있는 경우
-      // "제55조(점용허가를 받을 수 있는 공작물 등)" 형식으로 제목 생성
       const joDisplay = article.joNum || ('제' + article.jo + '조')
       content = '<strong>' + joDisplay
       if (article.title) {
@@ -339,8 +332,6 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       }
       content += '</strong>'
     }
-
-    content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content, currentLawName)
 
     // Replace 2+ newlines before paragraph markers with single newline
     content = content.replace(/\n{2,}\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
@@ -375,7 +366,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
         const startsWithNumber = paraContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
-        const styledParaContent = linkifyRefsB(applyRevisionStyling(escapeHtml(paraContent)))
+        // CORRECT order: linkify → selective escape → styling
+        let styledParaContent = linkifyRefsB(paraContent, currentLawName)
+        styledParaContent = styledParaContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+          if (tag) return tag
+          if (text) return escapeHtml(text)
+          return match
+        })
+        styledParaContent = applyRevisionStyling(styledParaContent)
 
         if (startsWithNumber) {
           text += "<br><br>" + styledParaContent + "<br>"
@@ -392,7 +390,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
             const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
-            const styledItemContent = linkifyRefsB(applyRevisionStyling(escapeHtml(itemContent)))
+            // CORRECT order: linkify → selective escape → styling
+            let styledItemContent = linkifyRefsB(itemContent, currentLawName)
+            styledItemContent = styledItemContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+              if (tag) return tag
+              if (text) return escapeHtml(text)
+              return match
+            })
+            styledItemContent = applyRevisionStyling(styledItemContent)
 
             if (startsWithNumber) {
               text += "  " + styledItemContent + "\n"
@@ -413,7 +418,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
         const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
-        const styledItemContent = linkifyRefsB(applyRevisionStyling(escapeHtml(itemContent)))
+        // CORRECT order: linkify → selective escape → styling
+        let styledItemContent = linkifyRefsB(itemContent, currentLawName)
+        styledItemContent = styledItemContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
+          if (tag) return tag
+          if (text) return escapeHtml(text)
+          return match
+        })
+        styledItemContent = applyRevisionStyling(styledItemContent)
 
         if (startsWithNumber) {
           text += styledItemContent + "\n"
@@ -433,14 +445,19 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
  * Format delegation/citation content with the same styling as main articles
  * (For plain text content without structured paragraphs/items)
  */
-export function formatDelegationContent(content: string): string {
+export function formatDelegationContent(content: string, currentLawName?: string): string {
   if (!content || content.trim().length === 0) {
     return ""
   }
 
-  let text = escapeHtml(content)
+  // CORRECT order: linkify → selective escape → styling
+  let text = linkifyRefsB(content, currentLawName)
+  text = text.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, txt) => {
+    if (tag) return tag
+    if (txt) return escapeHtml(txt)
+    return match
+  })
   text = applyRevisionStyling(text)
-  text = linkifyRefsB(text)
 
   // Add line break + spacing for paragraph markers (①②③) - skip first occurrence
   let isFirst = true

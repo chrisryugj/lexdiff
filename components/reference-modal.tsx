@@ -64,29 +64,64 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   // Attach event listener to the content div
   useEffect(() => {
-    const contentEl = contentRef.current
-    if (!contentEl || !onContentClick) return
+    // ⚠️ CRITICAL: isOpen이 false면 DOM이 렌더링되지 않음
+    if (!isOpen) return
 
-    const handleClick = (e: MouseEvent) => {
-      // 링크 클릭 시 기본 동작 차단 및 버블링 차단
-      const target = e.target as HTMLElement
-      if (target && target.tagName === "A") {
-        e.preventDefault()
-        e.stopPropagation()
+    // 🔥 CRITICAL FIX: DOM 렌더링 완료 대기
+    const timer = setTimeout(() => {
+      const contentEl = contentRef.current
+      if (!contentEl) {
+        console.log('[ReferenceModal] contentRef.current is null after timeout, skipping event listener')
+        return
       }
 
-      // Convert MouseEvent to React.MouseEvent-like object
-      const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
-      onContentClick(reactEvent)
-    }
+      const handleClick = (e: MouseEvent) => {
+        const target = e.target as HTMLElement
 
-    contentEl.addEventListener("click", handleClick)
-    return () => contentEl.removeEventListener("click", handleClick)
-  }, [onContentClick, html])
+        console.log('[ReferenceModal] Click detected:', {
+          tagName: target.tagName,
+          className: target.className,
+          href: target.getAttribute('href')
+        })
+
+        // ✅ CRITICAL: 링크인 경우에만 처리
+        if (target && target.tagName === "A") {
+          e.preventDefault()
+          e.stopPropagation()
+
+          console.log('[ReferenceModal] Link clicked:', {
+            href: target.getAttribute('href'),
+            dataRef: target.getAttribute('data-ref'),
+            dataArticle: target.getAttribute('data-article'),
+            dataLaw: target.getAttribute('data-law')
+          })
+
+          // onContentClick이 있으면 호출
+          if (onContentClick) {
+            const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
+            onContentClick(reactEvent)
+          }
+        }
+      }
+
+      console.log('[ReferenceModal] Attaching event listener to:', contentEl, 'HTML length:', contentEl.innerHTML.length)
+      contentEl.addEventListener("click", handleClick, true) // useCapture = true
+
+      // Cleanup function
+      return () => {
+        console.log('[ReferenceModal] Removing event listener')
+        contentEl.removeEventListener("click", handleClick, true)
+      }
+    }, 100) // 100ms 대기 (Dialog 애니메이션 완료 대기)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [isOpen, onContentClick, html])
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh]" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10" style={{ fontFamily: 'Pretendard, sans-serif' }}>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-1 min-w-0">

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, ArrowLeftRight, Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, History, X } from "lucide-react"
+import { Loader2, ArrowLeftRight, Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, History, X, GitCompare } from "lucide-react"
 import type { OldNewComparison } from "@/lib/law-types"
 import { parseOldNewXML, highlightDifferences } from "@/lib/oldnew-parser"
 import { parseRevisionHistoryXML, formatDate, type RevisionInfo } from "@/lib/revision-parser"
@@ -26,11 +26,11 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
   const [comparison, setComparison] = useState<OldNewComparison | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [syncScroll, setSyncScroll] = useState(true)
-  const [fontSize, setFontSize] = useState<"xs" | "sm" | "base">("xs")
+  const [fontSize, setFontSize] = useState(15)
   const [revisionHistory, setRevisionHistory] = useState<RevisionInfo[]>([])
   const [revisionStack, setRevisionStack] = useState<Array<{ date?: string; number?: string }>>([])
   const [currentRevisionIndex, setCurrentRevisionIndex] = useState(0)
-  const [showRevisionHistory, setShowRevisionHistory] = useState(false)
+  const [showRevisionHistory, setShowRevisionHistory] = useState(true)
 
   const oldScrollRef = useRef<HTMLDivElement>(null)
   const newScrollRef = useRef<HTMLDivElement>(null)
@@ -44,6 +44,13 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
       loadComparison()
     }
   }, [isOpen, lawId, mst])
+
+  useEffect(() => {
+    console.log('[ComparisonModal] revisionHistory 상태 변경:', {
+      count: revisionHistory.length,
+      revisions: revisionHistory
+    })
+  }, [revisionHistory])
 
   useEffect(() => {
     if (comparison && targetJo && oldScrollRef.current && newScrollRef.current) {
@@ -91,8 +98,9 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
       const xmlText = await response.text()
       const revisions = parseRevisionHistoryXML(xmlText)
 
+      console.log('[ComparisonModal] 개정이력 파싱 결과:', revisions)
       setRevisionHistory(revisions)
-      debugLogger.success("개정이력 조회 완료", { count: revisions.length })
+      debugLogger.success("개정이력 조회 완료", { count: revisions.length, revisions })
     } catch (err) {
       debugLogger.error("개정이력 조회 실패", err)
     }
@@ -182,28 +190,8 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     }, 50)
   }
 
-  const increaseFontSize = () => {
-    if (fontSize === "xs") setFontSize("sm")
-    else if (fontSize === "sm") setFontSize("base")
-  }
-
-  const decreaseFontSize = () => {
-    if (fontSize === "base") setFontSize("sm")
-    else if (fontSize === "sm") setFontSize("xs")
-  }
-
-  const getTextSizeClass = () => {
-    switch (fontSize) {
-      case "xs":
-        return "text-xs leading-relaxed"
-      case "sm":
-        return "text-sm leading-relaxed"
-      case "base":
-        return "text-base leading-relaxed"
-      default:
-        return "text-xs leading-relaxed"
-    }
-  }
+  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 20))
+  const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 12))
 
   const goToPreviousRevision = () => {
     if (!comparison?.oldVersion.promulgationDate) return
@@ -248,13 +236,16 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-[100vw] sm:max-w-[1200px] h-[95vh] p-0 flex flex-col">
-        <DialogHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 border-b border-border shrink-0">
+      <DialogContent className="w-full max-w-[100vw] sm:max-w-[950px] h-[65vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10">
+        <DialogHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-0 shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-base sm:text-2xl font-bold text-foreground mb-1 truncate">
-                {lawTitle}
-              </DialogTitle>
+              <div className="flex items-center gap-2 mb-1">
+                <GitCompare className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                <DialogTitle className="text-base sm:text-2xl font-bold text-foreground truncate">
+                  {lawTitle}
+                </DialogTitle>
+              </div>
               <DialogDescription className="text-xs text-muted-foreground hidden sm:block">
                 신·구법 대조표
               </DialogDescription>
@@ -361,17 +352,18 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                 variant="ghost"
                 size="sm"
                 onClick={decreaseFontSize}
-                disabled={fontSize === "xs"}
+                disabled={fontSize <= 12}
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-r-none border-r border-border"
               >
                 <ZoomOut className="h-3 w-3" />
               </Button>
+              <span className="text-xs text-muted-foreground px-2 min-w-[30px] text-center">{fontSize}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={increaseFontSize}
-                disabled={fontSize === "base"}
-                className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-l-none"
+                disabled={fontSize >= 20}
+                className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-l-none border-l border-border"
               >
                 <ZoomIn className="h-3 w-3" />
               </Button>
@@ -393,27 +385,50 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
               </div>
               <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
-                  {revisionHistory.map((revision, index) => (
-                    <button
-                      key={`${revision.promulgationDate}-${revision.promulgationNumber}`}
-                      onClick={() => handleRevisionSelect(revision)}
-                      className="w-full text-left p-3 rounded-md border transition-colors bg-card hover:bg-secondary border-border"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs">
-                          {revision.revisionType}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">#{revisionHistory.length - index}</span>
-                      </div>
-                      <div className="text-xs space-y-1">
-                        <div className="font-medium">공포: {formatDate(revision.promulgationDate)}</div>
-                        <div className="text-muted-foreground">{revision.promulgationNumber}</div>
-                        {revision.effectiveDate && (
-                          <div className="text-muted-foreground">시행: {formatDate(revision.effectiveDate)}</div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                  {revisionHistory.map((revision, index) => {
+                    const isCurrentNew = comparison?.newVersion.promulgationDate === revision.promulgationDate
+                    const isCurrentOld = comparison?.oldVersion.promulgationDate === revision.promulgationDate
+                    const isCurrent = isCurrentNew || isCurrentOld
+
+                    return (
+                      <button
+                        key={`${revision.promulgationDate}-${revision.promulgationNumber}`}
+                        onClick={() => handleRevisionSelect(revision)}
+                        className={`w-full text-left p-3 rounded-md border transition-all ${
+                          isCurrent
+                            ? 'bg-primary/10 border-primary/40 shadow-md'
+                            : 'bg-card hover:bg-secondary border-border hover:border-primary/20'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={isCurrent ? "default" : "outline"}
+                              className="text-xs"
+                            >
+                              {revision.revisionType}
+                            </Badge>
+                            {isCurrentNew && (
+                              <span className="text-[10px] font-semibold text-success">신법</span>
+                            )}
+                            {isCurrentOld && (
+                              <span className="text-[10px] font-semibold text-destructive">구법</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">#{revisionHistory.length - index}</span>
+                        </div>
+                        <div className="text-xs space-y-1">
+                          <div className={`font-medium ${isCurrent ? 'text-foreground' : ''}`}>
+                            공포: {formatDate(revision.promulgationDate)}
+                          </div>
+                          <div className="text-muted-foreground text-[11px]">{revision.promulgationNumber}</div>
+                          {revision.effectiveDate && (
+                            <div className="text-muted-foreground text-[11px]">시행: {formatDate(revision.effectiveDate)}</div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </ScrollArea>
             </div>
@@ -437,16 +452,14 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                 </div>
               </div>
             ) : comparison ? (
-              <div className="flex flex-col sm:grid sm:grid-cols-2 h-full">
-                <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full">
-                  <div className="bg-[var(--color-destructive)]/10 px-2 sm:px-4 py-1.5 sm:py-3 border-b border-border shrink-0">
-                    <h3 className="font-semibold text-[10px] sm:text-sm text-foreground flex items-center gap-1.5 sm:gap-2">
-                      <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[var(--color-destructive)]" />
-                      구법
-                      <span className="text-[9px] sm:text-xs text-muted-foreground">
-                        (
-                        {comparison.oldVersion.effectiveDate ? formatDate(comparison.oldVersion.effectiveDate) : "이전"}
-                        )
+              <div className="flex flex-col sm:grid sm:grid-cols-2 gap-0 h-full">
+                <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-rose-500/5 to-transparent">
+                  <div className="bg-gradient-to-r from-rose-500/15 via-rose-500/10 to-rose-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-rose-500/20 shrink-0">
+                    <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2 sm:gap-3">
+                      <span className="text-base sm:text-xl">📜</span>
+                      <span className="tracking-tight">구법</span>
+                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
+                        {comparison.oldVersion.effectiveDate ? formatDate(comparison.oldVersion.effectiveDate) : "이전 버전"}
                       </span>
                     </h3>
                   </div>
@@ -456,21 +469,20 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                     className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-6"
                   >
                     <div
-                      className={`${getTextSizeClass()} max-w-none text-foreground`}
+                      className="leading-relaxed max-w-none text-foreground"
+                      style={{ fontSize: `${fontSize}px`, fontFamily: 'Pretendard, sans-serif' }}
                       dangerouslySetInnerHTML={{ __html: oldHighlighted || "구법 내용이 없습니다." }}
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col min-h-0 h-1/2 sm:h-full">
-                  <div className="bg-[var(--color-success)]/10 px-2 sm:px-4 py-1.5 sm:py-3 border-b border-border shrink-0">
-                    <h3 className="font-semibold text-[10px] sm:text-sm text-foreground flex items-center gap-1.5 sm:gap-2">
-                      <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[var(--color-success)]" />
-                      신법
-                      <span className="text-[9px] sm:text-xs text-muted-foreground">
-                        (
-                        {comparison.newVersion.effectiveDate ? formatDate(comparison.newVersion.effectiveDate) : "현행"}
-                        )
+                <div className="flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-emerald-500/5 to-transparent">
+                  <div className="bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-emerald-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-emerald-500/20 shrink-0">
+                    <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2 sm:gap-3">
+                      <span className="text-base sm:text-xl">✨</span>
+                      <span className="tracking-tight">신법</span>
+                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
+                        {comparison.newVersion.effectiveDate ? formatDate(comparison.newVersion.effectiveDate) : "현행 버전"}
                       </span>
                     </h3>
                   </div>
@@ -480,7 +492,8 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                     className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-6"
                   >
                     <div
-                      className={`${getTextSizeClass()} max-w-none text-foreground`}
+                      className="leading-relaxed max-w-none text-foreground"
+                      style={{ fontSize: `${fontSize}px`, fontFamily: 'Pretendard, sans-serif' }}
                       dangerouslySetInnerHTML={{ __html: newHighlighted || "신법 내용이 없습니다." }}
                     />
                   </div>
@@ -491,21 +504,27 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
         </div>
 
         {comparison && (
-          <div className="px-2 sm:px-6 py-2 sm:py-4 border-t border-border bg-card/50 shrink-0">
-            <div className="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs">
-              <div className="flex items-center gap-1.5">
+          <div className="px-2 sm:px-6 py-2 sm:py-3 border-t border-border bg-card/30 shrink-0">
+            <div className="flex items-center justify-center gap-4 sm:gap-8 text-[10px] sm:text-xs">
+              <div className="flex items-center gap-2">
                 <div
-                  className="w-2.5 h-2.5 sm:w-4 sm:h-4 rounded"
-                  style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", border: "1px solid rgba(34, 197, 94, 0.3)" }}
+                  className="w-3 h-3 sm:w-5 sm:h-5 rounded"
+                  style={{
+                    background: "linear-gradient(to right, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08))",
+                    borderLeft: "2px solid rgba(16, 185, 129, 0.4)"
+                  }}
                 />
-                <span className="text-muted-foreground">신법</span>
+                <span className="text-muted-foreground font-medium">신법 추가</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <div
-                  className="w-2.5 h-2.5 sm:w-4 sm:h-4 rounded"
-                  style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.3)" }}
+                  className="w-3 h-3 sm:w-5 sm:h-5 rounded"
+                  style={{
+                    background: "linear-gradient(to right, rgba(251, 113, 133, 0.15), rgba(251, 113, 133, 0.08))",
+                    borderLeft: "2px solid rgba(244, 63, 94, 0.4)"
+                  }}
                 />
-                <span className="text-muted-foreground">구법</span>
+                <span className="text-muted-foreground font-medium">구법 삭제</span>
               </div>
             </div>
           </div>
