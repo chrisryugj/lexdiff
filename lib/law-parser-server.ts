@@ -239,13 +239,14 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
     // Fallback: if 항 is an object with 호 array (제55조 같은 경우: {"호": [...]})
     else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
       if (Array.isArray(unit.항.호)) {
+        const hoItems: string[] = []
         for (const ho of unit.항.호) {
           if (ho.호내용) {
             let hoContent = ho.호내용
             if (Array.isArray(hoContent)) {
               hoContent = hoContent.join("\n")
             }
-            paraContent += "\n" + hoContent
+            hoItems.push(hoContent)
           }
 
           // 목 처리 추가
@@ -256,12 +257,13 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
                 if (Array.isArray(mokContent)) {
                   mokContent = mokContent.join("\n")
                 }
-                paraContent += "\n  " + mokContent
+                hoItems.push("  " + mokContent)
               }
             }
           }
         }
-        paraContent = paraContent.trim()
+        // CRITICAL FIX: 호 사이에만 \n 추가 (첫 호 앞에는 없음)
+        paraContent = hoItems.join("\n")
       }
     }
 
@@ -269,6 +271,7 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
     if (mainContent) {
       content = mainContent
       if (paraContent) {
+        // CRITICAL FIX: 본문과 호 사이 \n 하나만 추가 (브라우저 자동 줄바꿈)
         content += "\n" + paraContent
       }
     } else {
