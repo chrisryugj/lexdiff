@@ -339,15 +339,31 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       }
       content = linkifyRefsB(rawContent, currentLawName)
 
-      // 2. HTML escape (링크 태그는 보존)
-      content = content.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
-        if (tag) return tag  // HTML 태그 보존
-        if (text) return escapeHtml(text)  // 텍스트만 escape
+      // 2. HTML escape (링크 태그만 보존, <개정> 같은 것은 escape)
+      content = content.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, text) => {
+        if (linkTag) return linkTag  // <a> 태그만 보존
+        if (otherTag) return escapeHtml(otherTag)  // <개정> 같은 것은 escape
+        if (text) return escapeHtml(text)  // 일반 텍스트도 escape
         return match
       })
 
       // 3. 개정 마커 스타일링
+      // DEBUG: 관세법 2조 개정 마커 확인
+      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+        console.log('[DEBUG applyRevisionStyling BEFORE]', {
+          contentLength: content.length,
+          개정마커샘플: content.match(/&lt;개정[^&]*&gt;/g)?.slice(0, 3),
+          contentSample: content.substring(0, 300)
+        })
+      }
       content = applyRevisionStyling(content)
+      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
+        console.log('[DEBUG applyRevisionStyling AFTER]', {
+          contentLength: content.length,
+          revMarkCount: (content.match(/class="rev-mark"/g) || []).length,
+          contentSample: content.substring(0, 300)
+        })
+      }
     } else if (article.title) {
       // article.content가 없고 title만 있는 경우
       const joDisplay = article.joNum || ('제' + article.jo + '조')
