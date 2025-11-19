@@ -1,4 +1,4 @@
-import type { LawArticle, LawParagraph, LawItem, LawMeta } from "./law-types"
+﻿import type { LawArticle, LawParagraph, LawItem, LawMeta } from "./law-types"
 import { debugLogger } from "./debug-logger"
 import { buildJO } from "./law-parser"
 
@@ -314,42 +314,70 @@ export function extractArticleText(article: LawArticle, isOrdinance = false): st
     text += content + "\n"
   }
 
-  if (article.paragraphs) {
-    article.paragraphs.forEach((para) => {
-      const paraContent = para.content || ""
-      const paraNum = para.num || ""
+  if (article.paragraphs && article.paragraphs.length > 0) {
+    // 먼저 항내용이 있는지 확인 (모달 로직과 동일하게)
+    const hasParaContent = article.paragraphs.some(para => para.content && para.content.trim())
 
-      const startsWithNumber = paraContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
+    // 모든 호 수집
+    const allItems = article.paragraphs.flatMap(para => para.items || [])
 
-      const styledParaContent = linkifyRefsB(applyRevisionStyling(escapeHtml(paraContent)))
+    if (hasParaContent) {
+      // 항내용이 있는 경우: 기존 로직
+      article.paragraphs.forEach((para) => {
+        const paraContent = para.content || ""
+        const paraNum = para.num || ""
 
-      if (startsWithNumber) {
-        text += "<br><br>" + styledParaContent + "<br>"
-      } else if (paraNum) {
-        text += "\n" + paraNum + ". " + styledParaContent + "\n"
-      } else {
-        text += "\n" + styledParaContent + "\n"
-      }
+        const startsWithNumber = paraContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
-      if (para.items) {
-        para.items.forEach((item) => {
-          const itemContent = item.content || ""
-          const itemNum = item.num || ""
+        const styledParaContent = linkifyRefsB(applyRevisionStyling(escapeHtml(paraContent)))
 
-          const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
+        if (startsWithNumber) {
+          text += "<br><br>" + styledParaContent + "<br>"
+        } else if (paraNum) {
+          text += "\n" + paraNum + ". " + styledParaContent + "\n"
+        } else {
+          text += "\n" + styledParaContent + "\n"
+        }
 
-          const styledItemContent = linkifyRefsB(applyRevisionStyling(escapeHtml(itemContent)))
+        if (para.items) {
+          para.items.forEach((item) => {
+            const itemContent = item.content || ""
+            const itemNum = item.num || ""
 
-          if (startsWithNumber) {
-            text += "  " + styledItemContent + "\n"
-          } else if (itemNum) {
-            text += "  " + itemNum + ". " + styledItemContent + "\n"
-          } else {
-            text += "  " + styledItemContent + "\n"
-          }
-        })
-      }
-    })
+            const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
+
+            const styledItemContent = linkifyRefsB(applyRevisionStyling(escapeHtml(itemContent)))
+
+            if (startsWithNumber) {
+              text += "  " + styledItemContent + "\n"
+            } else if (itemNum) {
+              text += "  " + itemNum + ". " + styledItemContent + "\n"
+            } else {
+              text += "  " + styledItemContent + "\n"
+            }
+          })
+        }
+      })
+    } else if (allItems.length > 0) {
+      // 항내용 없고 호만 있는 경우: 본문은 이미 위에서 처리했고, 호만 추가
+      // (도로법 시행령 제55조 같은 경우)
+      allItems.forEach((item) => {
+        const itemContent = item.content || ""
+        const itemNum = item.num || ""
+
+        const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
+
+        const styledItemContent = linkifyRefsB(applyRevisionStyling(escapeHtml(itemContent)))
+
+        if (startsWithNumber) {
+          text += styledItemContent + "\n"
+        } else if (itemNum) {
+          text += itemNum + ". " + styledItemContent + "\n"
+        } else {
+          text += styledItemContent + "\n"
+        }
+      })
+    }
   }
 
   return text.trim()
@@ -531,7 +559,8 @@ function linkifyRefsB(text: string): string {
   )
 
   // 9. 제X조 패턴 (현재 법령의 조문) - 「법령명」 뒤에 오는 경우 제외
-  t = t.replace(/(?<!」\s)제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?(?![제\d])/g, (m) => {
+  //     data-article 속성값 내부 중복 매칭 방지
+  t = t.replace(/(?<!data-article=")(?<!data-article=')(?<!」\s)제\s*([0-9]{1,4})\s*조(의\s*([0-9]{1,2}))?(?![제\d])/g, (m) => {
     const label = m
     const data = m.replace(/\s+/g, "")
     return '<a href="#" class="law-ref" data-ref="article" data-article="' + data + '">' + label + "</a>"
@@ -574,3 +603,12 @@ function linkifyOrdinanceRefs(text: string): string {
 
   return t
 }
+
+
+
+
+
+
+
+
+

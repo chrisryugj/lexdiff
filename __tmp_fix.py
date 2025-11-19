@@ -1,7 +1,7 @@
-from pathlib import Path
+ï»¿from pathlib import Path
 path = Path('lib/law-xml-parser.tsx')
 text = path.read_text(encoding='utf-8')
-old = '  t = t.replace(/(?<!\u300d\s)Á¦\s*([0-9]{1,4})\s*Á¶(Á¦\s*([0-9]{1,2}))?(?![Á¦\d])/g, (m) => {'
+old = '  t = t.replace(/(?<!\u300d\s)ï¿½ï¿½\s*([0-9]{1,4})\s*ï¿½ï¿½(ï¿½ï¿½\s*([0-9]{1,2}))?(?![ï¿½ï¿½\d])/g, (m) => {'
 new = '  t = t.replace(/(?<!data-article="\")(?<!data-article=\')(?![])/g, (m) => {'
 if old not in text:
     raise SystemExit('old pattern not found')
