@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clear IndexedDB</title>
+</head>
+<body>
+  <h1>Clear IndexedDB Cache</h1>
+  <button onclick="clearCache()">Clear Cache</button>
+  <pre id="log"></pre>
+  
+  <script>
+    async function clearCache() {
+      const log = document.getElementById('log');
+      log.textContent = 'Clearing IndexedDB...\n';
+      
+      try {
+        // LexDiffCache 데이터베이스 삭제
+        const dbRequest = indexedDB.deleteDatabase('LexDiffCache');
+        
+        dbRequest.onsuccess = () => {
+          log.textContent += 'SUCCESS: LexDiffCache deleted\n';
+        };
+        
+        dbRequest.onerror = (e) => {
+          log.textContent += 'ERROR: ' + e.target.error + '\n';
+        };
+        
+        dbRequest.onblocked = () => {
+          log.textContent += 'BLOCKED: Close all tabs using this database\n';
+        };
+        
+        // 모든 데이터베이스 확인
+        const databases = await indexedDB.databases();
+        log.textContent += '\nAll databases:\n';
+        databases.forEach(db => {
+          log.textContent += `- ${db.name} (version ${db.version})\n`;
+        });
+        
+      } catch (err) {
+        log.textContent += 'ERROR: ' + err.message + '\n';
+      }
+    }
+  </script>
+</body>
+</html>
