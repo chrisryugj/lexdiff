@@ -267,7 +267,21 @@ function styleLawQuotes(text: string): string {
 
       // blockquote 생성 (스타일은 law-viewer.tsx의 prose 클래스에서 적용)
       if (quoteLines.length > 0) {
-        let quoteContent = quoteLines.join('<br>')
+        // 호(1. 2. 3.) 분리를 위한 전처리
+        const expandedLines: string[] = []
+        for (const line of quoteLines) {
+          // 줄 내부에 호 번호가 있는 경우 분리 (예: "① 내용 1. 호1 2. 호2")
+          // 정규식: 공백 + 숫자 + 점 + 공백 패턴을 찾아 줄바꿈 추가
+          const parts = line.split(/(?=\s\d+\.\s)/)
+          for (const part of parts) {
+            const trimmed = part.trim()
+            if (trimmed) {
+              expandedLines.push(trimmed)
+            }
+          }
+        }
+
+        let quoteContent = expandedLines.join('<br>')
         // blockquote 내부에서 <strong> 태그 제거 (이탤릭은 prose 클래스에서 자동 적용)
         quoteContent = quoteContent.replace(/<strong>([^<]+)<\/strong>/g, '$1')
         result.push(`<blockquote>${quoteContent}</blockquote>`)
