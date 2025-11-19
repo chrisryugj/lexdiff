@@ -68,6 +68,13 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     if (!contentEl || !onContentClick) return
 
     const handleClick = (e: MouseEvent) => {
+      // 링크 클릭 시 기본 동작 차단 및 버블링 차단
+      const target = e.target as HTMLElement
+      if (target && target.tagName === "A") {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+
       // Convert MouseEvent to React.MouseEvent-like object
       const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
       onContentClick(reactEvent)
