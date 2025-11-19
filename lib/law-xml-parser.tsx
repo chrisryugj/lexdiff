@@ -91,6 +91,19 @@ function extractArticles(xmlDoc: Document): LawArticle[] {
     const joContent = joElement.querySelector("조문내용")?.textContent || ""
     const hasChanges = joElement.querySelector("조문변경여부")?.textContent === "Y"
 
+    // DEBUG: XML 원본 확인 (조문번호 55만)
+    if (joNum === "55" || joNum === "제55조") {
+      console.log("[DEBUG-XML-RAW] Article 55 XML extraction:", {
+        조문번호: joNum,
+        조문제목: joTitle,
+        조문내용_length: joContent.length,
+        조문내용_first200: joContent.substring(0, 200),
+        조문내용_starts_with: joContent.substring(0, 20),
+        has_title_in_content: joContent.includes("제55조"),
+        XML_innerHTML: joElement.innerHTML?.substring(0, 500)
+      })
+    }
+
     const revisionHistory = extractRevisionMarks(joContent, joElement)
 
     if (joContent && (!joNum.includes("조") || !joNum.includes("의"))) {

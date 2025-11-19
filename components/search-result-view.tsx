@@ -191,10 +191,38 @@ function parseLawJSON(jsonData: any): LawData {
         console.log(`📄 [파싱] 조의 조문: ${display} (JO: ${code}, articleNum: ${articleNum}, branchNum: ${branchNum})`)
       }
 
-      let content = ""
+      // CRITICAL: 본문 (조문내용) + 항/호 결합 로직 (law-parser-server.ts와 동일)
+      let mainContent = ""  // 조문내용에서 추출
+      let paraContent = ""  // 항/호에서 추출
 
+      // STEP 1: 본문 추출 (조문내용에서)
+      if (unit.조문내용 && typeof unit.조문내용 === "string") {
+        let rawContent = unit.조문내용.trim()
+
+        // 제목 패턴 매칭: 제X조(제목) 형식
+        const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)[\s\S]*/)
+
+        if (headerMatch) {
+          const headerPart = headerMatch[1]  // 제X조(제목)
+          const bodyPart = rawContent.substring(headerPart.length).trim()  // 나머지 본문
+
+          if (bodyPart) {
+            // 본문이 있으면 본문만 저장
+            mainContent = bodyPart
+          } else {
+            // 본문 없이 제목만 있는 경우 (도로법 시행령 55조)
+            // 제목 제거하지 않고 유지 (호가 있을 수 있음)
+            mainContent = headerPart
+          }
+        } else {
+          // 제목 형식이 아니면 전체를 본문으로
+          mainContent = rawContent
+        }
+      }
+
+      // STEP 2: 항/호 내용 추출
       if (unit.항 && Array.isArray(unit.항)) {
-        content = extractContentFromHangArray(unit.항)
+        paraContent = extractContentFromHangArray(unit.항)
       }
       // Fallback: if 항 is an object with 호 array (old structure)
       else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
@@ -205,19 +233,21 @@ function parseLawJSON(jsonData: any): LawData {
               if (Array.isArray(hoContent)) {
                 hoContent = hoContent.join("\n")
               }
-              content += "\n" + hoContent
+              paraContent += "\n" + hoContent
             }
           }
         }
-      } else if (unit.조문내용 && typeof unit.조문내용 === "string") {
-        let rawContent = unit.조문내용.trim()
+      }
 
-        // Remove the article header (e.g., "제28조(개별소비세의 사무 관할)")
-        // Pattern: 제N조(제목) or 제N조의M(제목)
-        const headerPattern = /^제\d+조(?:의\d+)?$$[^)]+$$\s*/
-        rawContent = rawContent.replace(headerPattern, "")
-
-        content = rawContent
+      // STEP 3: 본문 + 항/호 결합
+      let content = ""
+      if (mainContent) {
+        content = mainContent
+        if (paraContent) {
+          content += "\n" + paraContent
+        }
+      } else {
+        content = paraContent
       }
 
       articles.push({
@@ -692,7 +722,9 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         debugLogger.error('⚠️ lawData 저장 실패', cacheError)
       }
 
-      // 🚀 Phase 2: 성공한 검색 자동 학습 - API 라우트 사용
+      // 🚀 Phase 2: 성공한 검색 자동 학습 - DISABLED (2025-11-11)
+      // Phase 5/6과 함께 비활성화됨
+      /*
       try {
         debugLogger.info('📚 검색 학습 중...', { lawName: meta.lawTitle })
 
@@ -783,6 +815,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           searchResultId: tempResultId,
         } : null)
       }
+      */
 
       // ✅ 법령 콘텐츠 로딩 완료
       updateProgress('complete', 100)
