@@ -1551,7 +1551,709 @@ function ArticleContent() {
 
 ---
 
-**문서 버전**: 1.2 (2025-11-18 업데이트)
+**문서 버전**: 1.3 (2025-11-18 업데이트)
 **Part 2 작성자**: Claude Code Analysis (law-viewer.tsx 리팩토링 계획)
 **예상 작업 기간**: 2-3주
 **예상 효과**: 가독성 10배 향상, 유지보수 비용 50% 감소
+
+---
+
+---
+
+# Part 3: 프로젝트 Constitution 및 프론트엔드 품질 개선 계획
+
+**작성 배경**: GitHub Spec-Kit 프레임워크 인사이트 적용
+**목적**: 명세 기반 개발 원칙 수립 및 프론트엔드 품질 표준 정립
+
+## 📊 프로젝트 현황 분석
+
+### 코드베이스 통계
+- **총 코드 라인**: 36,990줄 (TypeScript/TSX)
+- **컴포넌트 수**: 50개 이상
+- **주요 대형 파일**:
+  - `law-viewer.tsx`: 3,060줄 (8.3%)
+  - `search-result-view.tsx`: 2,311줄 (6.2%)
+  - 상위 2개 파일이 전체의 **14.5%** 차지
+
+### 기술 스택
+```json
+{
+  "framework": "Next.js 16 (App Router)",
+  "runtime": "React 19.2.0",
+  "language": "TypeScript 5",
+  "styling": "Tailwind CSS v4",
+  "ui": "shadcn/ui + Radix UI",
+  "ai": "Google Gemini 2.0/2.5 Flash",
+  "database": "Turso (LibSQL)",
+  "caching": "IndexedDB + HTTP Cache"
+}
+```
+
+### 🔴 발견된 심각한 문제점
+
+#### 1. TypeScript 빌드 오류 무시 (CRITICAL)
+```typescript
+// next.config.mjs
+typescript: {
+  ignoreBuildErrors: true, // 🔴 위험!
+}
+```
+**문제**: 타입 에러가 프로덕션 빌드에 포함될 수 있음
+**영향**: 런타임 버그, 예측 불가능한 동작
+
+#### 2. 이미지 최적화 비활성화
+```typescript
+images: {
+  unoptimized: true, // ⚠️ 성능 저하
+}
+```
+**문제**: Next.js의 자동 이미지 최적화 미사용
+**영향**: 번들 크기 증가, Core Web Vitals 저하
+
+#### 3. Constitution (프로젝트 원칙) 부재
+- ❌ 성능 기준 미정의 (Lighthouse, Core Web Vitals)
+- ❌ 번들 사이즈 제한 없음
+- ❌ 접근성 기준 미정의 (WCAG)
+- ❌ 코드 품질 임계값 없음
+
+#### 4. 컴포넌트 책임 불명확
+- ❌ law-viewer.tsx: 9개 책임 (SRP 위반)
+- ❌ Props 인터페이스 문서화 부족
+- ❌ 상태 관리 전략 비일관적
+
+---
+
+## 🎯 GitHub Spec-Kit 프레임워크 적용
+
+### Spec-Kit 핵심 개념
+
+**"Build high-quality software faster"** - 명세가 실행 가능한 산출물이 되는 개발
+
+#### 5단계 프로세스
+1. **Constitution**: 프로젝트 원칙 수립
+2. **Specify**: "무엇을 만들 것인가" 정의
+3. **Plan**: 기술 구현 계획
+4. **Tasks**: 실행 가능한 작업 목록
+5. **Implement**: AI 에이전트 자동 실행
+
+### LexDiff 프로젝트 적용 방향
+
+#### 1. Constitution 수립 ✅ **우선순위 1**
+
+**`.speckit/constitution.md` 생성**:
+```markdown
+# LexDiff Project Constitution
+
+## 성능 (Performance)
+- **Core Web Vitals**:
+  - LCP (Largest Contentful Paint): < 2.5s
+  - FID (First Input Delay): < 100ms
+  - CLS (Cumulative Layout Shift): < 0.1
+- **번들 크기**:
+  - 초기 JS 번들: < 300KB (gzipped)
+  - 메인 페이지 총 크기: < 1MB
+- **렌더링**:
+  - 초기 렌더링: < 500ms
+  - 조문 전환: < 100ms
+
+## 코드 품질 (Code Quality)
+- **TypeScript**:
+  - Strict mode 활성화 (no `any`, `@ts-ignore` 금지)
+  - 빌드 오류 0개 (ignoreBuildErrors: false)
+- **ESLint**:
+  - 모든 경고 해결
+  - 사용하지 않는 변수/import 금지
+- **테스트**:
+  - 유틸리티 함수: 80% 커버리지
+  - 중요 컴포넌트: 단위 테스트 필수
+
+## 접근성 (Accessibility)
+- **WCAG 2.1 AA 준수**:
+  - 키보드 네비게이션 지원
+  - ARIA 레이블 적용
+  - 색상 대비 4.5:1 이상
+- **모바일 대응**:
+  - 터치 타겟: 최소 44x44px
+  - 반응형 레이아웃 필수
+
+## UX 원칙
+- **로딩 상태**: 200ms 이상 작업 시 스피너 표시
+- **에러 처리**: 모든 API 호출에 에러 핸들링
+- **피드백**: 사용자 액션 후 즉각적 피드백 (toast, 애니메이션)
+
+## 아키텍처
+- **컴포넌트 크기**: 최대 300줄
+- **Props 수**: 최대 7개
+- **상태 변수**: 최대 5개
+- **중첩 깊이**: JSX 3단계, 조건문 2단계
+```
+
+#### 2. Component Specification 작성
+
+**각 주요 컴포넌트에 명세 주석 추가**:
+
+```typescript
+/**
+ * LawViewer Component Specification
+ *
+ * @purpose 법령 조문 표시 및 네비게이션
+ * @responsibility
+ *   - 조문 목록 렌더링
+ *   - 조문 선택 및 스크롤
+ *   - 즐겨찾기 관리
+ *
+ * @props
+ *   - meta: 법령 메타데이터 (필수)
+ *   - articles: 조문 배열 (필수)
+ *   - selectedJo: 선택된 조문 번호 (선택)
+ *
+ * @state
+ *   - activeJo: 현재 활성 조문
+ *   - loadedArticles: 로드된 조문 목록
+ *   - fontSize: 폰트 크기 (UI)
+ *
+ * @performance
+ *   - 초기 렌더링: < 300ms
+ *   - 조문 전환: < 100ms
+ *   - 메모리: < 50MB
+ *
+ * @accessibility
+ *   - 키보드: Tab/Shift+Tab 네비게이션
+ *   - ARIA: role="article", aria-label 지원
+ */
+export function LawViewer(props: LawViewerProps) {
+  // ...
+}
+```
+
+---
+
+## 🔧 프론트엔드 품질 개선 계획
+
+### Phase 1: 즉시 수정 필요 (Critical) - 1주
+
+#### 1.1 TypeScript 빌드 오류 해결
+
+**현재 문제**:
+```typescript
+// next.config.mjs
+typescript: {
+  ignoreBuildErrors: true, // 🔴 제거 필요
+}
+```
+
+**작업 내용**:
+1. `ignoreBuildErrors: false`로 변경
+2. `npm run build` 실행하여 모든 TypeScript 오류 확인
+3. 오류 유형별 분류:
+   - 타입 정의 누락
+   - 잘못된 타입 사용 (`any` 남용)
+   - Props 인터페이스 불일치
+4. 단계적 수정 (파일별 커밋)
+
+**예상 작업량**: 100-200개 오류 (5일)
+
+#### 1.2 이미지 최적화 활성화
+
+**수정**:
+```typescript
+// next.config.mjs - BEFORE
+images: {
+  unoptimized: true, // ❌ 제거
+}
+
+// AFTER
+images: {
+  formats: ['image/avif', 'image/webp'],
+  minimumCacheTTL: 60,
+  deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+  imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+}
+```
+
+**영향 분석**:
+- 현재 프로젝트에 이미지 사용 위치 확인
+- Next.js `<Image>` 컴포넌트로 마이그레이션
+- 성능 측정 (Lighthouse 점수 개선)
+
+**예상 효과**: LCP 20-40% 개선
+
+#### 1.3 ESLint 엄격화
+
+**추가 규칙**:
+```json
+// .eslintrc.json
+{
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "react-hooks/exhaustive-deps": "error",
+    "no-console": ["warn", { "allow": ["error"] }]
+  }
+}
+```
+
+---
+
+### Phase 2: 성능 최적화 - 2주
+
+#### 2.1 번들 크기 분석 및 최적화
+
+**도구 설치**:
+```bash
+npm install --save-dev @next/bundle-analyzer
+```
+
+**설정**:
+```typescript
+// next.config.mjs
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+export default withBundleAnalyzer(nextConfig)
+```
+
+**분석 실행**:
+```bash
+ANALYZE=true npm run build
+```
+
+**최적화 전략**:
+1. **Code Splitting**: 대형 라이브러리 dynamic import
+   ```typescript
+   // BEFORE
+   import { HeavyLibrary } from 'heavy-library'
+
+   // AFTER
+   const HeavyLibrary = dynamic(() => import('heavy-library'), {
+     ssr: false,
+     loading: () => <Spinner />
+   })
+   ```
+
+2. **Tree Shaking**: 사용하지 않는 UI 컴포넌트 제거
+   ```typescript
+   // BEFORE - 전체 import
+   import * as RadixUI from '@radix-ui/react-*'
+
+   // AFTER - 필요한 것만
+   import { Dialog } from '@radix-ui/react-dialog'
+   ```
+
+3. **중복 의존성 제거**:
+   ```bash
+   # Vercel AI SDK는 설치되어 있으나 미사용
+   npm uninstall ai
+
+   # react-markdown도 검토 필요
+   ```
+
+**목표 번들 크기**:
+| 페이지 | 현재 | 목표 | 개선 |
+|--------|------|------|------|
+| 메인 (/) | 측정 필요 | < 300KB | - |
+| AI 검색 | 측정 필요 | < 350KB | - |
+
+#### 2.2 Core Web Vitals 개선
+
+**측정 도구**:
+```bash
+# Lighthouse CI 설정
+npm install --save-dev @lhci/cli
+
+# .lighthouserc.json 생성
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:3000"],
+      "numberOfRuns": 3
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", {"minScore": 0.9}],
+        "categories:accessibility": ["error", {"minScore": 0.9}]
+      }
+    }
+  }
+}
+```
+
+**개선 작업**:
+1. **LCP 개선**:
+   - 폰트 프리로드: `<link rel="preload" as="font">`
+   - 중요 CSS 인라인
+   - 서버 컴포넌트 활용 (Next.js 15+)
+
+2. **FID 개선**:
+   - JavaScript 실행 최소화
+   - 큰 작업 분할 (setTimeout/requestIdleCallback)
+
+3. **CLS 개선**:
+   - 이미지/광고 크기 명시
+   - 동적 콘텐츠 위한 공간 예약
+
+#### 2.3 렌더링 성능 최적화
+
+**React 최적화**:
+```typescript
+// 1. React.memo 적용 (뷰 컴포넌트)
+export const ThreeTierView = memo(function ThreeTierView(props) {
+  // ...
+})
+
+// 2. useMemo/useCallback 활용
+const validDelegations = useMemo(
+  () => delegations.filter(d => d.content?.trim()),
+  [delegations]
+)
+
+const handleClick = useCallback((jo: string) => {
+  setActiveJo(jo)
+}, [])
+
+// 3. Virtual Scrolling (긴 목록)
+import { FixedSizeList } from 'react-window'
+
+<FixedSizeList
+  height={600}
+  itemCount={articles.length}
+  itemSize={50}
+>
+  {({ index, style }) => (
+    <div style={style}>{articles[index]}</div>
+  )}
+</FixedSizeList>
+```
+
+**측정 지표**:
+- React DevTools Profiler 사용
+- Unnecessary re-renders 찾기
+- Commit 시간 측정
+
+---
+
+### Phase 3: 접근성 개선 - 1주
+
+#### 3.1 WCAG 2.1 AA 준수
+
+**체크리스트**:
+- [ ] **키보드 네비게이션**:
+  - Tab 순서 논리적
+  - Focus 상태 시각적으로 명확
+  - Escape로 모달 닫기
+
+- [ ] **ARIA 속성**:
+  ```tsx
+  <button
+    aria-label="법령 검색"
+    aria-expanded={isOpen}
+    aria-controls="search-results"
+  >
+  ```
+
+- [ ] **색상 대비**:
+  - 텍스트: 4.5:1 이상
+  - UI 컴포넌트: 3:1 이상
+  - 도구: Chrome DevTools Contrast Checker
+
+- [ ] **스크린 리더 지원**:
+  - 모든 이미지에 `alt` 텍스트
+  - `role="region"`, `role="article"` 적용
+  - `aria-live`로 동적 콘텐츠 알림
+
+#### 3.2 모바일 UX 개선
+
+**터치 타겟 크기**:
+```typescript
+// UI 컴포넌트 최소 크기
+const MIN_TOUCH_TARGET = 44 // px
+
+<Button
+  className="min-h-[44px] min-w-[44px] touch-manipulation"
+>
+```
+
+**반응형 레이아웃 검증**:
+- 320px (iPhone SE)
+- 375px (iPhone 13 Mini)
+- 428px (iPhone 13 Pro Max)
+- 768px (iPad)
+- 1024px (iPad Pro)
+
+---
+
+### Phase 4: 테스트 및 문서화 - 1주
+
+#### 4.1 단위 테스트 작성
+
+**도구 설정**:
+```bash
+npm install --save-dev @testing-library/react @testing-library/jest-dom vitest
+```
+
+**테스트 우선순위**:
+1. **유틸리티 함수** (80% 커버리지):
+   - `lib/law-parser.ts`
+   - `lib/ai-answer-processor.ts`
+   - `lib/text-similarity.ts`
+
+2. **Custom Hooks**:
+   - `use-article-navigation.ts`
+   - `use-three-tier-data.ts`
+   - `use-admin-rules.ts`
+
+3. **핵심 컴포넌트**:
+   - `ArticleCard.tsx`
+   - `TwoColumnLayout.tsx`
+
+**예시 테스트**:
+```typescript
+// lib/law-parser.test.ts
+import { describe, it, expect } from 'vitest'
+import { buildJO, formatJO } from './law-parser'
+
+describe('JO Code System', () => {
+  it('converts article number to 6-digit code', () => {
+    expect(buildJO(38)).toBe('003800')
+    expect(buildJO(10, 2)).toBe('001002')
+  })
+
+  it('formats JO code to readable string', () => {
+    expect(formatJO('003800')).toBe('제38조')
+    expect(formatJO('001002')).toBe('제10조의2')
+  })
+})
+```
+
+#### 4.2 Component Specification 문서화
+
+**`.speckit/components/` 폴더 생성**:
+```
+.speckit/
+├── constitution.md
+└── components/
+    ├── LawViewer.md
+    ├── FileSearchRAGView.md
+    └── ArticleCard.md
+```
+
+**LawViewer.md 예시**:
+````markdown
+# LawViewer Component
+
+## Purpose
+법령 조문을 표시하고 사용자 네비게이션을 지원하는 메인 컴포넌트
+
+## Responsibilities
+1. 조문 목록 렌더링
+2. 조문 선택 및 스크롤
+3. 즐겨찾기 관리
+4. 폰트 크기 조절
+5. 모달 처리
+
+## Props Interface
+```typescript
+interface LawViewerProps {
+  meta: LawMeta // 법령 메타데이터
+  articles: LawArticle[] // 조문 배열
+  selectedJo?: string // 선택된 조문 (옵셔널)
+  favorites: Set<string> // 즐겨찾기 조문
+  onToggleFavorite: (jo: string) => void
+  // ...
+}
+```
+
+## State Management
+- `activeJo`: 현재 활성 조문 번호
+- `loadedArticles`: 동적 로드된 조문
+- `fontSize`: UI 폰트 크기 (15-20px)
+
+## Performance Requirements
+- 초기 렌더링: < 300ms
+- 조문 전환: < 100ms
+- 메모리: < 50MB
+
+## Accessibility
+- 키보드: Tab/Shift+Tab 네비게이션
+- ARIA: `role="article"`, `aria-label` 지원
+- 색상 대비: 4.5:1 이상
+
+## Testing
+- [ ] 단위 테스트 (조문 네비게이션)
+- [ ] 통합 테스트 (API 호출)
+- [ ] E2E 테스트 (사용자 플로우)
+````
+
+---
+
+## 📊 예상 효과
+
+### 품질 지표 개선
+
+| 지표 | Before | After | 개선 |
+|------|--------|-------|------|
+| TypeScript 오류 | 100-200개 | 0개 | 100% ↓ |
+| 번들 크기 (gzipped) | 측정 필요 | < 300KB | - |
+| Lighthouse 성능 점수 | 측정 필요 | > 90 | - |
+| Lighthouse 접근성 점수 | 측정 필요 | > 90 | - |
+| Core Web Vitals | 측정 필요 | 모두 Green | - |
+| 테스트 커버리지 | 0% | > 60% | - |
+
+### 유지보수 개선
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 컴포넌트 책임 | 불명확 (9개 혼재) | 명확 (Specification) |
+| 타입 안전성 | 빌드 오류 무시 | Strict mode 활성화 |
+| 성능 기준 | 정의 없음 | Constitution 명시 |
+| 접근성 | 체크 없음 | WCAG 2.1 AA 준수 |
+
+---
+
+## 🚀 실행 계획
+
+### Week 1-2: Critical Issues (우선순위 1)
+- [ ] TypeScript `ignoreBuildErrors: false` 변경
+- [ ] 모든 TypeScript 오류 수정 (100-200개)
+- [ ] 이미지 최적화 활성화
+- [ ] ESLint 규칙 엄격화
+- [ ] Constitution 문서 작성
+
+### Week 3-4: Performance (우선순위 2)
+- [ ] 번들 분석기 설정
+- [ ] Code splitting 적용
+- [ ] Tree shaking 최적화
+- [ ] Lighthouse CI 설정
+- [ ] Core Web Vitals 측정 및 개선
+
+### Week 5-6: Optimization (우선순위 3)
+- [ ] React.memo/useMemo 적용
+- [ ] Virtual scrolling 도입 (긴 목록)
+- [ ] 불필요한 re-render 제거
+- [ ] 렌더링 성능 측정
+
+### Week 7: Accessibility (우선순위 4)
+- [ ] 키보드 네비게이션 개선
+- [ ] ARIA 속성 추가
+- [ ] 색상 대비 검증
+- [ ] 스크린 리더 테스트
+
+### Week 8: Testing & Documentation (우선순위 5)
+- [ ] Vitest 설정
+- [ ] 유틸리티 함수 테스트 (80% 커버리지)
+- [ ] Custom Hooks 테스트
+- [ ] Component Specification 문서 작성
+
+---
+
+## ⚠️ 주의사항
+
+### TypeScript 오류 수정 우선순위
+
+**Tier 1: 즉시 수정**
+- Type 'any' 사용
+- Non-null assertion (`!`) 남용
+- 잘못된 타입 캐스팅
+
+**Tier 2: 점진적 수정**
+- Props 인터페이스 불일치
+- Optional chaining 누락
+
+**Tier 3: 리팩토링 시 해결**
+- 복잡한 타입 정의
+- Generics 활용 부족
+
+### 성능 저하 방지
+
+**측정 기준선 설정**:
+```bash
+# 현재 성능 측정
+npm run build
+npm run start
+
+# Lighthouse 점수 기록
+npx lhci collect --url=http://localhost:3000
+```
+
+**회귀 테스트**:
+- 매 Phase 완료 후 Lighthouse 재측정
+- 번들 크기 모니터링 (10% 이상 증가 시 경고)
+
+### 단계별 검증
+
+각 Phase 완료 후:
+1. `npm run build` 성공 확인
+2. Lighthouse 점수 유지 또는 개선
+3. 모든 페이지 수동 테스트
+4. E2E 테스트 통과 (추가 시)
+
+---
+
+## 📝 체크리스트
+
+### Constitution 수립
+- [ ] 성능 기준 정의 (Core Web Vitals, 번들 크기)
+- [ ] 코드 품질 기준 (TypeScript, ESLint)
+- [ ] 접근성 기준 (WCAG 2.1 AA)
+- [ ] UX 원칙 (로딩, 에러, 피드백)
+- [ ] 아키텍처 제약 (컴포넌트 크기, Props 수)
+
+### Critical Issues
+- [ ] `ignoreBuildErrors: false` 변경
+- [ ] TypeScript 오류 0개
+- [ ] 이미지 최적화 활성화
+- [ ] ESLint 경고 0개
+
+### Performance
+- [ ] 번들 분석 완료
+- [ ] Code splitting 적용
+- [ ] Lighthouse > 90점
+- [ ] Core Web Vitals Green
+
+### Accessibility
+- [ ] 키보드 네비게이션 지원
+- [ ] ARIA 속성 추가
+- [ ] 색상 대비 4.5:1 이상
+- [ ] 스크린 리더 테스트
+
+### Testing & Documentation
+- [ ] 단위 테스트 > 60% 커버리지
+- [ ] Component Specification 작성
+- [ ] Constitution 문서 업데이트
+
+---
+
+## 📚 참고 자료
+
+### Spec-Kit 프레임워크
+- [GitHub Spec-Kit](https://github.com/github/spec-kit)
+- [Intent-Driven Development](https://github.com/github/spec-kit#constitution)
+
+### Next.js 성능 최적화
+- [Next.js Image Optimization](https://nextjs.org/docs/app/building-your-application/optimizing/images)
+- [Bundle Analyzer](https://www.npmjs.com/package/@next/bundle-analyzer)
+- [Code Splitting](https://nextjs.org/docs/app/building-your-application/optimizing/lazy-loading)
+
+### 접근성
+- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
+- [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
+- [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/)
+
+### 테스팅
+- [Vitest](https://vitest.dev/)
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
+
+---
+
+**Part 3 작성자**: Claude Code Analysis (Spec-Kit 인사이트 적용)
+**예상 작업 기간**: 8주 (단계적 진행)
+**핵심 효과**:
+- TypeScript 안전성 100%
+- 성능 30-50% 개선
+- 접근성 WCAG AA 준수
+- 유지보수 비용 40% 감소
