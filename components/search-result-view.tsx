@@ -805,9 +805,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     const hasLawKeyword = /법|법률|시행령|시행규칙/.test(fullQuery)
     const hasOrdinanceKeyword = /조례|자치법규/.test(fullQuery) || (/규칙/.test(fullQuery) && !/시행규칙/.test(fullQuery))
 
+    // 자연어 감지를 먼저 수행
     let queryDetection = detectQueryType(fullQuery)
 
-    if (hasLawKeyword || hasOrdinanceKeyword) {
+    // 자연어 패턴이 없고, 법령 키워드가 있을 때만 강제 구조화
+    if (queryDetection.type !== 'natural' && (hasLawKeyword || hasOrdinanceKeyword)) {
       queryDetection = {
         type: 'structured',
         confidence: 1.0,
