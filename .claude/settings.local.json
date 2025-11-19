@@ -95,7 +95,11 @@
       "Bash(set GEMINI_FILE_SEARCH_STORE_ID=fileSearchStores/lexdiff251117-upoqmkxiqfyy)",
       "Bash(cmd.exe /c \"dir /b .env*\")",
       "Bash(node scripts/check-ordinances.mjs:*)",
-      "Bash(node scripts/sync-ordinances-with-server.mjs:*)"
+      "Bash(node scripts/sync-ordinances-with-server.mjs:*)",
+      "Bash($null)",
+      "Bash(ConvertFrom-Json)",
+      "Bash(ConvertTo-Json -Depth 10)",
+      "Bash(Select-String -Pattern \"조문번호.*55|조문내용\" -Context 5,10)"
     ],
     "deny": [],
     "ask": []

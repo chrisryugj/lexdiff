@@ -268,30 +268,64 @@ function extractRevisionMarks(
 
 export function extractArticleText(article: LawArticle, isOrdinance = false): string {
   let text = ""
-  let hasMainContent = false
 
-  if (article.content) {
-    let content = escapeHtml(article.content)
-    content = applyRevisionStyling(content)
+  // CRITICAL FIX: article.content가 없어도 title이 있으면 표시
+  if (article.content || article.title) {
+    let content = ""
 
-    // 조문 제목 패턴 매치 - 제X조(제목) 형식
-    const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*(.*)$/s)
-
-    if (titleMatch) {
-      const titlePart = titleMatch[1]  // 제X조(제목)
-      const bodyPart = titleMatch[2]   // 나머지 본문
-
-      // 제목 부분을 bold로
-      content = '<strong>' + titlePart + '</strong>'
-
-      // 본문이 있으면 추가
-      if (bodyPart && bodyPart.trim()) {
-        content += ' ' + bodyPart
-        hasMainContent = true
+    if (article.content) {
+      // DEBUG: Log all article with jo = 005500
+      if (article.jo === '005500') {
+        console.log('[DEBUG-RAW] Article 55 BEFORE processing:', {
+          jo: article.jo,
+          joNum: article.joNum,
+          contentRaw: article.content.substring(0, 200),
+          hasParagraphs: !!article.paragraphs,
+          paragraphsLength: article.paragraphs?.length
+        })
       }
-    } else {
-      // 제목 형식이 아니면 전체를 본문으로 처리
-      hasMainContent = true
+
+      content = escapeHtml(article.content)
+      content = applyRevisionStyling(content)
+
+      // 조문 제목 패턴 매치 - 제X조(제목) 형식
+      const titleMatch = content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*(.*)$/s)
+
+      if (titleMatch) {
+        const titlePart = titleMatch[1]  // 제X조(제목)
+        const bodyPart = titleMatch[2]   // 나머지 본문
+
+        // DEBUG LOG
+        if (article.jo === '005500') {
+          console.log('[DEBUG-AFTER] Article 55 AFTER regex:', {
+            titlePart,
+            bodyPartLength: bodyPart.length,
+            bodyPartTrimmed: bodyPart.trim().substring(0, 100),
+            willAddBody: !!(bodyPart && bodyPart.trim()),
+            hasParagraphs: !!article.paragraphs,
+            paragraphsLength: article.paragraphs?.length
+          })
+        }
+
+        // 제목 부분을 bold로
+        content = '<strong>' + titlePart + '</strong>'
+
+        // 본문이 있으면 추가 (제목만 있어도 OK - 호가 있을 수 있음)
+        if (bodyPart && bodyPart.trim()) {
+          content += ' ' + bodyPart
+        }
+        // else: 제목만 있는 경우도 OK (도로법 시행령 55조처럼 호만 있는 경우)
+      }
+      // else: 제목 형식이 아니면 전체를 그대로 유지
+    } else if (article.title) {
+      // article.content가 없고 title만 있는 경우
+      // "제55조(점용허가를 받을 수 있는 공작물 등)" 형식으로 제목 생성
+      const joDisplay = article.joNum || ('제' + article.jo + '조')
+      content = '<strong>' + joDisplay
+      if (article.title) {
+        content += '(' + escapeHtml(article.title) + ')'
+      }
+      content += '</strong>'
     }
 
     content = isOrdinance ? linkifyOrdinanceRefs(content) : linkifyRefsB(content)
@@ -543,14 +577,45 @@ function linkifyRefsB(text: string): string {
     (m) => '<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative">' + m + "</a>",
   )
 
-  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
-  // "법률 시행령" 처럼 앞에 한글과 공백이 있으면 제외
+  // 6.5a. "법령명 + 시행규칙/시행령 + 제X조" 패턴 (조문 번호 있는 경우)
+  // "도로법 시행규칙 제29조" -> 법령 조문 링크 (모달로 표시)
   t = t.replace(
-    /(?<!">)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가<])/g,
-    (m) => '<a href="#" class="law-ref" data-ref="related" data-kind="decree">' + m + "</a>",
+    /(?<!")([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙))\s+(시행령|시행규칙)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?![<])/g,
+    (match, lawName, type, art, _p1, branch, _p2, para, _p3, item) => {
+      const trimmedName = lawName.trim()
+
+      // 조례는 제외
+      if (trimmedName.endsWith('조례')) {
+        return match
+      }
+
+      const fullLawName = trimmedName + ' ' + type
+      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
+      const fullLabel = joLabel + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
+
+      return '<a href="#" class="law-ref" data-ref="law-article" data-law="' + fullLawName + '" data-article="' + joLabel + '">' + fullLawName + ' ' + fullLabel + '</a>'
+    }
   )
 
-  // 8. 부령, 시행규칙 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
+  // 6.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
+  // "도로법 시행규칙" -> 법령 링크 (국가법령)
+  // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요)
+  t = t.replace(
+    /(?<!")([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?!\s*제)(?![으로로이가<])/g,
+    (match, lawName, type) => {
+      const trimmedName = lawName.trim()
+
+      // 조례 시행규칙은 국가법령 검색에서 찾을 수 없으므로 링크하지 않음
+      if (trimmedName.endsWith('조례')) {
+        return match
+      }
+
+      const fullLawName = trimmedName + ' ' + type
+      return '<a href="#" class="law-ref" data-ref="law" data-law="' + fullLawName + '">' + fullLawName + '</a>'
+    }
+  )
+
+  // 7. 대통령령, 시행령 단독 (이미 링크된 텍스트 제외, 복합 법령명 일부 제외)
   // "법률 시행규칙" 처럼 앞에 한글과 공백이 있으면 제외
   // 부령의 경우 전체 단어만 매칭 (국토교통부령 전체, 토교통부령 X)
   t = t.replace(

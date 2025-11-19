@@ -530,11 +530,31 @@ function linkifyRefsB(text: string): string {
     return '<<<ARTICLE:' + data + '>>>'
   })
 
-  // 5.5. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
+  // 5.5a. "법령명 + 시행규칙/시행령 + 제X조" 패턴 (조문 번호 있는 경우)
+  // "도로법 시행규칙 제29조" -> LAWLINK_ARTICLE (국가법령 조문 링크)
+  t = t.replace(
+    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙))\s+(시행령|시행규칙)\s+제(\d+)조(의(\d+))?(제(\d+)항)?(제(\d+)호)?(?![>])/g,
+    (match, lawName, type, art, _p1, branch, _p2, para, _p3, item) => {
+      const trimmedName = lawName.trim()
+
+      // 조례는 제외
+      if (trimmedName.endsWith('조례')) {
+        return match
+      }
+
+      const fullLawName = trimmedName + ' ' + type
+      const joLabel = '제' + art + '조' + (branch ? '의' + branch : '')
+      const displayLabel = joLabel + (para ? '제' + para + '항' : '') + (item ? '제' + item + '호' : '')
+
+      return '<<<LAWLINK_WITH_ARTICLE:' + fullLawName + '|||' + joLabel + '|||' + displayLabel + '>>>'
+    }
+  )
+
+  // 5.5b. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
   // "도로법 시행규칙" -> LAWLINK (국가법령)
   // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요하거나 현재 지원 미비)
   t = t.replace(
-    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?![으로로이가>])/g,
+    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?!\s*제)(?![으로로이가>])/g,
     (match, lawName, type) => {
       const trimmedName = lawName.trim()
 
