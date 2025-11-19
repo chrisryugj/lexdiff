@@ -2807,18 +2807,25 @@ export function LawViewer({
                         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none rounded-lg" />
 
                         <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-4">
-                          <div className="mb-3 pb-2 border-b border-purple-500/20 flex items-center gap-2">
-                            {/* Glowing AI Icon */}
-                            <div className="relative">
-                              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                              <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
-                                <Sparkles className="h-4 w-4 text-white" />
+                          <div className="mb-3 pb-2 border-b border-purple-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                              {/* Glowing AI Icon */}
+                              <div className="relative">
+                                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                                <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
+                                  <Sparkles className="h-4 w-4 text-white" />
+                                </div>
                               </div>
+                              <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
+                              <Badge variant="secondary" className="text-xs">
+                                File Search RAG
+                              </Badge>
                             </div>
-                            <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
-                            <Badge variant="secondary" className="text-xs">
-                              File Search RAG
-                            </Badge>
+                            {userQuery && (
+                              <div className="text-xs text-muted-foreground/80 pl-1">
+                                Q. {userQuery}
+                              </div>
+                            )}
                           </div>
 
                           {/* 검색 실패 경고 메시지 */}
@@ -2917,12 +2924,19 @@ export function LawViewer({
 
                       <div className="mb-1 pb-10 border-b border-border">
                         <div className="flex items-center justify-between gap-4 pt-2">
-                          <div className="flex items-center gap-2"   >
-                            <Sparkles className="h-5 w-5 text-primary" />
-                            <h3 className="text-xl font-bold text-foreground mb-0 ">AI 답변</h3>
-                            <Badge variant="outline" className="text-xs">
-                              File Search RAG
-                            </Badge>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-5 w-5 text-primary" />
+                              <h3 className="text-xl font-bold text-foreground mb-0 ">AI 답변</h3>
+                              <Badge variant="outline" className="text-xs">
+                                File Search RAG
+                              </Badge>
+                            </div>
+                            {userQuery && (
+                              <div className="text-sm text-muted-foreground font-medium pl-1">
+                                Q. {userQuery}
+                              </div>
+                            )}
                           </div>
 
                           {/* AI 답변 컨트롤 */}

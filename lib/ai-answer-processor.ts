@@ -530,6 +530,24 @@ function linkifyRefsB(text: string): string {
     return '<<<ARTICLE:' + data + '>>>'
   })
 
+  // 5.5. "법령명 + 시행규칙/시행령" 패턴 (조문 번호 없는 경우)
+  // "도로법 시행규칙" -> LAWLINK (국가법령)
+  // "OOO 조례 시행규칙" -> 링크 제외 (자치법규는 별도 처리 필요하거나 현재 지원 미비)
+  t = t.replace(
+    /(?<!<<<[^>]*)([가-힣a-zA-Z0-9·\s]+(?:법률|법|령|규칙|조례))\s+(시행령|시행규칙)(?![으로로이가>])/g,
+    (match, lawName, type) => {
+      const trimmedName = lawName.trim()
+
+      // 조례 시행규칙은 국가법령 검색에서 찾을 수 없으므로 링크하지 않음
+      if (trimmedName.endsWith('조례')) {
+        return match
+      }
+
+      const fullLawName = trimmedName + ' ' + type
+      return '<<<LAWLINK:' + fullLawName + '>>>'
+    }
+  )
+
   // 5. 대통령령, 시행령 - 임시 마커로 변환 (이미 마커 안의 텍스트 제외)
   // "법률 시행령" 처럼 앞에 한글과 공백이 있으면 제외
   t = t.replace(/(?<!<<<[^>]*)(?<![가-힣]\s)(대통령령|시행령)(?![으로로이가>])/g, (m) => {
