@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexDiff 캐시 초기화</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #b91c1c;
+    }
+    button.secondary {
+      background: #6b7280;
+    }
+    button.secondary:hover {
+      background: #4b5563;
+    }
+    #log {
+      background: #1f2937;
+      color: #10b981;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .error {
+      color: #ef4444;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🗑️ LexDiff 캐시 초기화</h1>
+
+    <div class="warning">
+      ⚠️ <strong>주의:</strong> 이 작업은 되돌릴 수 없습니다. 모든 저장된 검색 기록과 캐시가 삭제됩니다.
+    </div>
+
+    <button onclick="clearAllCache()">모든 캐시 삭제</button>
+    <button class="secondary" onclick="showDatabases()">데이터베이스 목록 보기</button>
+    <button class="secondary" onclick="clearLog()">로그 지우기</button>
+
+    <div id="log"></div>
+  </div>
+
+  <script>
+    const log = document.getElementById('log');
+
+    function appendLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString('ko-KR');
+      const prefix = type === 'success' ? '✓' : type === 'error' ? '✗' : '•';
+      const className = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
+
+      const line = document.createElement('div');
+      line.className = className;
+      line.textContent = `[${timestamp}] ${prefix} ${message}`;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+      log.innerHTML = '';
+      appendLog('로그 초기화됨');
+    }
+
+    async function showDatabases() {
+      try {
+        appendLog('IndexedDB 데이터베이스 목록 조회 중...');
+
+        const databases = await indexedDB.databases();
+
+        if (databases.length === 0) {
+          appendLog('데이터베이스가 없습니다.', 'success');
+          return;
+        }
+
+        appendLog(`총 ${databases.length}개의 데이터베이스 발견:`);
+        databases.forEach(db => {
+          appendLog(`  - ${db.name} (버전 ${db.version})`);
+        });
+      } catch (err) {
+        appendLog(`오류: ${err.message}`, 'error');
+      }
+    }
+
+    async function clearAllCache() {
+      if (!confirm('정말로 모든 캐시를 삭제하시겠습니까?')) {
+        appendLog('작업이 취소되었습니다.');
+        return;
+      }
+
+      appendLog('=== 캐시 삭제 시작 ===');
+
+      // 1. IndexedDB 삭제
+      try {
+        appendLog('IndexedDB 데이터베이스 조회 중...');
+        const databases = await indexedDB.databases();
+
+        if (databases.length === 0) {
+          appendLog('삭제할 IndexedDB 데이터베이스가 없습니다.');
+        } else {
+          appendLog(`${databases.length}개의 데이터베이스 발견`);
+
+          for (const db of databases) {
+            appendLog(`"${db.name}" 삭제 중...`);
+
+            await new Promise((resolve, reject) => {
+              const request = indexedDB.deleteDatabase(db.name);
+
+              request.onsuccess = () => {
+                appendLog(`"${db.name}" 삭제 완료`, 'success');
+                resolve();
+              };
+
+              request.onerror = (e) => {
+                appendLog(`"${db.name}" 삭제 실패: ${e.target.error}`, 'error');
+                reject(e.target.error);
+              };
+
+              request.onblocked = () => {
+                appendLog(`"${db.name}" 삭제 차단됨 (다른 탭에서 사용 중)`, 'error');
+                alert('다른 탭에서 LexDiff를 닫고 다시 시도해주세요.');
+                reject(new Error('Blocked'));
+              };
+            });
+          }
+        }
+      } catch (err) {
+        appendLog(`IndexedDB 삭제 실패: ${err.message}`, 'error');
+      }
+
+      // 2. localStorage 삭제
+      try {
+        const localStorageCount = localStorage.length;
+        if (localStorageCount > 0) {
+          appendLog(`localStorage 항목 ${localStorageCount}개 삭제 중...`);
+          localStorage.clear();
+          appendLog('localStorage 삭제 완료', 'success');
+        } else {
+          appendLog('삭제할 localStorage 항목이 없습니다.');
+        }
+      } catch (err) {
+        appendLog(`localStorage 삭제 실패: ${err.message}`, 'error');
+      }
+
+      // 3. sessionStorage 삭제
+      try {
+        const sessionStorageCount = sessionStorage.length;
+        if (sessionStorageCount > 0) {
+          appendLog(`sessionStorage 항목 ${sessionStorageCount}개 삭제 중...`);
+          sessionStorage.clear();
+          appendLog('sessionStorage 삭제 완료', 'success');
+        } else {
+          appendLog('삭제할 sessionStorage 항목이 없습니다.');
+        }
+      } catch (err) {
+        appendLog(`sessionStorage 삭제 실패: ${err.message}`, 'error');
+      }
+
+      // 4. Cache API 삭제 (Service Worker 캐시)
+      try {
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          if (cacheNames.length > 0) {
+            appendLog(`Cache API 항목 ${cacheNames.length}개 삭제 중...`);
+            for (const cacheName of cacheNames) {
+              await caches.delete(cacheName);
+              appendLog(`캐시 "${cacheName}" 삭제 완료`);
+            }
+            appendLog('Cache API 삭제 완료', 'success');
+          } else {
+            appendLog('삭제할 Cache API 항목이 없습니다.');
+          }
+        }
+      } catch (err) {
+        appendLog(`Cache API 삭제 실패: ${err.message}`, 'error');
+      }
+
+      appendLog('=== 모든 캐시 삭제 완료 ===', 'success');
+      appendLog('페이지를 새로고침하여 변경사항을 적용하세요.');
+
+      setTimeout(() => {
+        if (confirm('페이지를 새로고침하시겠습니까?')) {
+          window.location.href = '/';
+        }
+      }, 1000);
+    }
+
+    // 페이지 로드 시 데이터베이스 목록 표시
+    window.addEventListener('load', () => {
+      showDatabases();
+    });
+  </script>
+</body>
+</html>

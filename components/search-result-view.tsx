@@ -1158,8 +1158,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
     debugLogger.info(isOrdinanceQuery ? "조례 검색 시작" : "법령 검색 시작", { lawName, articleNumber, jo })
 
-    // 🚀 Phase 7: IndexedDB 우선 체크 (법령만)
-    if (!isOrdinanceQuery) {
+    // 🚀 Phase 7: IndexedDB 우선 체크 (일시 비활성화 - 검색어 기반 캐시가 잘못된 법령 반환)
+    // ⚠️ TODO: 캐시 키를 법령명으로 변경하여 재활성화
+    const PHASE_7_ENABLED = false
+
+    if (!isOrdinanceQuery && PHASE_7_ENABLED) {
       const rawQuery = `${query.lawName}${query.article ? ` ${query.article}` : ''}`
 
       try {
