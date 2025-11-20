@@ -10,7 +10,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RAGAnalysisView } from '@/components/rag-analysis-view'
-import { FileSearchRAGView } from '@/components/file-search-rag-view'
+import { AISearchView } from '@/components/ai-search-view'
 import { classifyQuery, logClassification, needsUserConfirmation } from '@/lib/query-classifier'
 
 export default function DevAITestPage() {
@@ -192,7 +192,7 @@ export default function DevAITestPage() {
       {/* RAG Analysis View - Mode에 따라 다른 컴포넌트 렌더링 */}
       {activeQuery && (
         useFileSearch
-          ? <FileSearchRAGView
+          ? <AISearchView
               initialQuery={activeQuery}
               onCitationClick={handleCitationClick}
             />

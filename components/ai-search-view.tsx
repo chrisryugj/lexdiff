@@ -1,6 +1,6 @@
 /**
- * File Search RAG View Component
- * Google File Search 기반 RAG 인터페이스
+ * AI Search View Component
+ * Google File Search 기반 AI 검색 인터페이스
  * law-viewer 기반으로 AI 답변 표시
  */
 
@@ -15,7 +15,7 @@ import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
 import { ModernProgressBar } from '@/components/ui/modern-progress-bar'
 
 
-export function FileSearchRAGView({
+export function AISearchView({
   initialQuery,
   onCitationClick
 }: {

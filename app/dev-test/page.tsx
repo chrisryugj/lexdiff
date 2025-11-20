@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator"
 import { ComparisonModal } from "@/components/comparison-modal"
 import { ReferenceModal } from "@/components/reference-modal"
 import { LawViewer } from "@/components/law-viewer"
-import { FileSearchRAGView } from "@/components/file-search-rag-view"
+import { AISearchView } from "@/components/ai-search-view"
 import {
   Loader2,
   FileText,
@@ -525,7 +525,7 @@ export default function DevTestPage() {
                       참조 파일 (5)
                     </summary>
                     <ul className="mt-2 space-y-1 pl-4 text-muted-foreground font-mono">
-                      <li>• components/file-search-rag-view.tsx</li>
+                      <li>• components/ai-search-view.tsx</li>
                       <li>• lib/file-search-client.ts</li>
                       <li>• lib/citation-verifier.ts</li>
                       <li>• app/api/rag-stream/route.ts</li>
@@ -534,7 +534,7 @@ export default function DevTestPage() {
                   </details>
 
                   <div className="border rounded-lg p-4 bg-card">
-                    <FileSearchRAGView
+                    <AISearchView
                       initialQuery="관세법 제38조에 대해 알려줘"
                       onCitationClick={(lawName, articleNum) => {
                         console.log('Citation clicked:', { lawName, articleNum })
