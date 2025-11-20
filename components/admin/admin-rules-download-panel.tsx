@@ -35,6 +35,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DownloadStatus[]>>(new Map())
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set())
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
+  const [currentLawName, setCurrentLawName] = useState<string>('')
 
   useEffect(() => {
     loadLaws()
@@ -202,11 +204,16 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
 
     setIsDownloading(true)
+    setBatchProgress({ current: 0, total: laws.length })
 
     let successCount = 0
     let errorCount = 0
 
-    for (const law of laws) {
+    for (let i = 0; i < laws.length; i++) {
+      const law = laws[i]
+      setCurrentLawName(law.lawName)
+      setBatchProgress({ current: i + 1, total: laws.length })
+
       try {
         await downloadAdminRulesForLaw(law.lawName)
         successCount++
@@ -218,6 +225,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
 
     setIsDownloading(false)
+    setCurrentLawName('')
+    setBatchProgress({ current: 0, total: 0 })
     alert(`✅ 행정규칙 다운로드 완료\n\n성공: ${successCount}개 법령\n실패: ${errorCount}개 법령`)
   }
 
@@ -278,13 +287,43 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         </div>
       </div>
 
+      {/* Batch Progress */}
+      {isDownloading && batchProgress.total > 0 && (
+        <div className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-xl backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <div>
+                <div className="font-medium text-foreground">
+                  일괄 다운로드 중... ({batchProgress.current} / {batchProgress.total})
+                </div>
+                {currentLawName && (
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    현재: {currentLawName}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-primary">
+              {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+            </div>
+          </div>
+          <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Action Bar */}
       <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
         <div className="text-sm text-muted-foreground">
           {laws.length}개 법령 · 각 법령의 모든 행정규칙 다운로드
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={loadLaws} disabled={loading} variant="outline" size="default" className="gap-2">
+          <Button onClick={loadLaws} disabled={loading || isDownloading} variant="outline" size="default" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </Button>
@@ -297,7 +336,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                다운로드
+                전체 다운로드
               </>
             )}
           </Button>
