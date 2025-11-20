@@ -29,6 +29,13 @@ interface AdminRulesDownloadPanelProps {
   refreshTrigger?: number
 }
 
+interface AdminRule {
+  name: string
+  id: string
+  serialNumber?: string
+  type: string
+}
+
 export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPanelProps = {}) {
   const [laws, setLaws] = useState<SavedLaw[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +44,12 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set())
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
   const [currentLawName, setCurrentLawName] = useState<string>('')
+
+  // Selection UI states
+  const [selectedLaw, setSelectedLaw] = useState<string | null>(null)
+  const [availableRules, setAvailableRules] = useState<AdminRule[]>([])
+  const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set())
+  const [loadingRules, setLoadingRules] = useState(false)
 
   useEffect(() => {
     loadLaws()
@@ -86,6 +99,112 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     } finally {
       setLoading(false)
     }
+  }
+
+  async function showRulesForLaw(lawName: string) {
+    setSelectedLaw(lawName)
+    setLoadingRules(true)
+    setAvailableRules([])
+    setSelectedRules(new Set())
+
+    try {
+      const hierarchyRes = await fetch(`/api/hierarchy?lawName=${encodeURIComponent(lawName)}`)
+      if (!hierarchyRes.ok) {
+        alert('체계도 조회 실패')
+        setSelectedLaw(null)
+        setLoadingRules(false)
+        return
+      }
+
+      const hierarchyXml = await hierarchyRes.text()
+      const parser = new DOMParser()
+      const hierarchyDoc = parser.parseFromString(hierarchyXml, 'text/xml')
+
+      const adminRules: AdminRule[] = []
+
+      // Extract all admin rule types
+      ;['고시', '예규', '훈령'].forEach((ruleType) => {
+        hierarchyDoc.querySelectorAll(ruleType).forEach((node) => {
+          const name = node.querySelector('행정규칙명')?.textContent
+          const id = node.querySelector('행정규칙ID')?.textContent
+          const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
+          if (name && id) {
+            adminRules.push({ name, id, serialNumber: serialNumber || undefined, type: ruleType })
+          }
+        })
+      })
+
+      if (adminRules.length === 0) {
+        alert(`${lawName}에 대한 행정규칙이 없습니다`)
+        setSelectedLaw(null)
+      } else {
+        setAvailableRules(adminRules)
+      }
+    } catch (error: any) {
+      alert(`행정규칙 목록 조회 실패: ${error.message}`)
+      setSelectedLaw(null)
+    } finally {
+      setLoadingRules(false)
+    }
+  }
+
+  async function downloadSelectedRules() {
+    if (selectedRules.size === 0 || !selectedLaw) return
+
+    setIsDownloading(true)
+
+    const rulesToDownload = availableRules.filter((r) => selectedRules.has(r.name))
+    const statuses: DownloadStatus[] = []
+
+    for (const rule of rulesToDownload) {
+      const status: DownloadStatus = {
+        lawName: selectedLaw,
+        ruleName: rule.name,
+        status: 'downloading'
+      }
+      statuses.push(status)
+      setDownloadProgress(new Map(downloadProgress.set(selectedLaw, [...statuses])))
+
+      try {
+        const downloadRes = await fetch('/api/admin/download-admin-rule', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            id: rule.id,
+            serialNumber: rule.serialNumber,
+            name: rule.name,
+            lawName: selectedLaw
+          })
+        })
+
+        const result = await downloadRes.json()
+
+        if (result.success) {
+          status.status = 'success'
+          setDownloadedFiles((prev) => new Set([...prev, rule.name]))
+        } else if (result.notFound) {
+          status.status = 'not_found'
+        } else {
+          status.status = 'error'
+          status.error = result.error || '다운로드 실패'
+        }
+      } catch (error: any) {
+        status.status = 'error'
+        status.error = error.message
+      }
+
+      setDownloadProgress(new Map(downloadProgress.set(selectedLaw, [...statuses])))
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+
+    setIsDownloading(false)
+    setSelectedLaw(null)
+    setSelectedRules(new Set())
+
+    const successCount = statuses.filter((s) => s.status === 'success').length
+    alert(`✅ 다운로드 완료\n\n성공: ${successCount}개\n실패: ${statuses.length - successCount}개`)
   }
 
   async function downloadAdminRulesForLaw(lawName: string) {
@@ -376,8 +495,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                 </div>
 
                 <Button
-                  onClick={() => downloadAdminRulesForLaw(law.lawName)}
-                  disabled={isDownloading}
+                  onClick={() => showRulesForLaw(law.lawName)}
+                  disabled={isDownloading || loadingRules}
                   size="default"
                   variant="outline"
                   className="gap-2"
@@ -387,7 +506,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
-                  다운로드
+                  목록 보기
                 </Button>
               </div>
             </div>
@@ -399,6 +518,135 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
           <p className="text-muted-foreground">저장된 법령이 없습니다</p>
           <p className="text-sm text-muted-foreground mt-1">먼저 법령을 다운로드하세요</p>
+        </div>
+      )}
+
+      {/* Selection Modal */}
+      {selectedLaw && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl border border-border shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">{selectedLaw}</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {loadingRules
+                      ? '행정규칙 목록 조회 중...'
+                      : `${availableRules.length}개 행정규칙 · ${selectedRules.size}개 선택됨`}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setSelectedLaw(null)
+                    setSelectedRules(new Set())
+                  }}
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloading}
+                >
+                  닫기
+                </Button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingRules ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Select All */}
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/10 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedRules.size === availableRules.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRules(new Set(availableRules.map((r) => r.name)))
+                        } else {
+                          setSelectedRules(new Set())
+                        }
+                      }}
+                      disabled={isDownloading}
+                      className="h-4 w-4"
+                    />
+                    <span className="font-medium text-primary">전체 선택</span>
+                  </label>
+
+                  {/* Rules List */}
+                  {availableRules.map((rule, index) => {
+                    const isSelected = selectedRules.has(rule.name)
+                    const isDownloaded = downloadedFiles.has(rule.name)
+
+                    return (
+                      <label
+                        key={index}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-primary/10 border-primary/30 shadow-sm'
+                            : isDownloaded
+                              ? 'bg-accent/10 border-accent/30 opacity-60'
+                              : 'bg-card/30 border-border/50 hover:bg-card/50 hover:border-primary/20'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedRules)
+                            if (e.target.checked) {
+                              newSet.add(rule.name)
+                            } else {
+                              newSet.delete(rule.name)
+                            }
+                            setSelectedRules(newSet)
+                          }}
+                          disabled={isDownloading || isDownloaded}
+                          className="h-4 w-4"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-foreground">{rule.name}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {rule.type} · ID: {rule.id}
+                          </div>
+                        </div>
+                        {isDownloaded && (
+                          <CheckCircle2 className="h-4 w-4 text-accent" />
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-border flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {selectedRules.size}개 선택됨
+              </div>
+              <Button
+                onClick={downloadSelectedRules}
+                disabled={selectedRules.size === 0 || isDownloading}
+                className="gap-2 shadow-lg shadow-primary/20"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    다운로드 중...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    다운로드 ({selectedRules.size})
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

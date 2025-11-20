@@ -51,78 +51,63 @@ async function fetchAdminRule(id: string) {
 }
 
 /**
- * Parse admin rule XML
+ * Parse admin rule XML (using DOMParser like frontend)
  */
 function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
   try {
+    const { DOMParser } = require('@xmldom/xmldom')
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xml, 'text/xml')
+
+    // AdmRulService 구조
+    const serviceNode = doc.querySelector('AdmRulService') || doc.getElementsByTagName('AdmRulService')[0]
+    if (!serviceNode) {
+      throw new Error('AdmRulService node not found')
+    }
+
+    const infoNode = serviceNode.querySelector('행정규칙기본정보') || serviceNode.getElementsByTagName('행정규칙기본정보')[0]
+    if (!infoNode) {
+      throw new Error('행정규칙기본정보 node not found')
+    }
+
     // Basic info
-    const idMatch = xml.match(/<행정규칙ID>(\d+)<\/행정규칙ID>/)
-    const nameMatch = xml.match(/<행정규칙명>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/행정규칙명>/)
-    const orgMatch = xml.match(/<소관부처>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/소관부처>/)
-    const effectiveDateMatch = xml.match(/<시행일자>(\d+)<\/시행일자>/)
-    const publishDateMatch = xml.match(/<발령일자>(\d+)<\/발령일자>/)
-    const publishNumberMatch = xml.match(/<발령번호>([^<]+)<\/발령번호>/)
+    const nameNode = infoNode.querySelector('행정규칙명') || infoNode.getElementsByTagName('행정규칙명')[0]
+    const idNode = infoNode.querySelector('행정규칙ID') || infoNode.getElementsByTagName('행정규칙ID')[0]
+    const orgNode = infoNode.querySelector('소관부처명') || infoNode.getElementsByTagName('소관부처명')[0]
+    const effectiveDateNode = infoNode.querySelector('시행일자') || infoNode.getElementsByTagName('시행일자')[0]
+    const publishDateNode = infoNode.querySelector('발령일자') || infoNode.getElementsByTagName('발령일자')[0]
+    const publishNumberNode = infoNode.querySelector('발령번호') || infoNode.getElementsByTagName('발령번호')[0]
 
-    const ruleId = idMatch ? idMatch[1] : 'unknown'
-    const name = nameMatch ? nameMatch[1] : ruleName
-    const org = orgMatch ? orgMatch[1] : ''
-    const effectiveDate = effectiveDateMatch ? effectiveDateMatch[1] : ''
-    const publishDate = publishDateMatch ? publishDateMatch[1] : ''
-    const publishNumber = publishNumberMatch ? publishNumberMatch[1] : ''
+    const ruleId = idNode?.textContent?.trim() || 'unknown'
+    const name = nameNode?.textContent?.trim() || ruleName
+    const org = orgNode?.textContent?.trim() || ''
+    const effectiveDate = effectiveDateNode?.textContent?.trim() || ''
+    const publishDate = publishDateNode?.textContent?.trim() || ''
+    const publishNumber = publishNumberNode?.textContent?.trim() || ''
 
-    // Articles - similar to ordinance parsing
+    // 조문내용 노드들 (각 <조문내용>이 이미 조문별로 분리되어 있음)
+    const contentNodes = Array.from(serviceNode.getElementsByTagName('조문내용'))
     const articles: any[] = []
-    const articleMatches = xml.matchAll(/<조[^>]*>([\s\S]*?)<\/조>/g)
 
-    for (const match of articleMatches) {
-      const articleXml = match[1]
+    contentNodes.forEach((node: any) => {
+      const text = node.textContent?.trim()
+      if (!text) return
 
-      const articleNumMatch = articleXml.match(/<조문번호>(\d+)<\/조문번호>/)
-      const titleMatch = articleXml.match(/<조문제목>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/조문제목>/)
-      const contentMatch = articleXml.match(/<조문내용>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/조문내용>/)
+      // 각 조문내용에서 제N조 패턴 추출
+      const match = text.match(/^(제\d+조(?:의\d+)?)\s*(?:\(([^)]+)\))?\s*([\s\S]*)/)
 
-      if (articleNumMatch) {
-        const articleNum = articleNumMatch[1]
-
-        // Skip 제0조
-        if (articleNum === '000000') {
-          continue
-        }
-
-        const title = titleMatch ? titleMatch[1].trim() : ''
-        let content = contentMatch ? contentMatch[1] : ''
-
-        // Clean content
-        content = content
-          .replace(/<[^>]+>/g, '')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&amp;/g, '&')
-          .trim()
-
-        // Convert 6-digit number
-        const joNum = Math.floor(parseInt(articleNum) / 100)
-        const jiBranch = parseInt(articleNum) % 100
-
-        let displayNumber
-        if (jiBranch === 0) {
-          displayNumber = `제${joNum}조`
-        } else {
-          displayNumber = `제${joNum}조의${jiBranch}`
-        }
-
-        // Remove title duplication
-        const firstLinePattern = new RegExp(`^${displayNumber}\\s*\\([^)]+\\)\\s*\n?`, 'm')
-        content = content.replace(firstLinePattern, '').trim()
+      if (match) {
+        const displayNumber = match[1] // "제1조"
+        const title = match[2] || '' // "목적"
+        const content = match[3].trim() // 나머지 모든 내용
 
         articles.push({
-          articleNumber: articleNum,
+          displayNumber,
           title,
-          content,
-          displayNumber
+          content
         })
       }
-    }
+    })
 
     return {
       ruleId,
@@ -195,9 +180,9 @@ function generateMarkdown(parsed: any): string {
       md += `**시행일**: ${formatDate(parsed.effectiveDate)}\n`
     }
 
-    md += `## ${article.displayNumber}`
+    md += `\n## ${article.displayNumber}`
     if (article.title) {
-      md += ` ${article.title}`
+      md += ` (${article.title})`
     }
     md += `\n\n`
 
@@ -230,8 +215,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Create subfolder for each law (sanitize law name for filesystem)
+    const sanitizedLawName = lawName.replace(/[<>:"/\\|?*]/g, '_')
     const fileName = `${name}.md`
-    const filePath = path.join(process.cwd(), 'data', 'parsed-admin-rules', fileName)
+    const filePath = path.join(process.cwd(), 'data', 'parsed-admin-rules', sanitizedLawName, fileName)
 
     // Create directory if not exists
     const dirPath = path.dirname(filePath)
