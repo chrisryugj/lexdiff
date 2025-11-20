@@ -191,7 +191,7 @@ export async function* queryFileSearchStream(
     throw new Error(`Invalid STORE_ID format: ${STORE_ID}. Must start with 'fileSearchStores/'`)
   }
 
-  // 법령 전문 AI 시스템 프롬프트
+  // 법령 전문 AI 시스템 프롬프트 (이모지 유지 - 프론트엔드에서 lucide로 렌더링)
   const systemInstruction = `법령 RAG AI. File Search Store 결과만 사용. 조문 없으면: "File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다"
 
 # 출력 구조 (각 항목 1줄, 간결, 괄호안 메시지 지시사항 출력금지 법령명은 「」로 감쌈)
