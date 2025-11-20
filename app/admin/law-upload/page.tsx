@@ -64,10 +64,12 @@ export default function AdminDashboard() {
     totalLaws: 0,
     totalOrdinances: 0,
     storeDocuments: 0,
-    lastUpdated: new Date()
+    lastUpdated: null as Date | null
   })
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
+    setIsClient(true)
     loadStats()
   }, [activeTab])
 
@@ -275,7 +277,9 @@ export default function AdminDashboard() {
                 </div>
                 <div className="pt-2 border-t border-border/50">
                   <div className="text-xs text-muted-foreground">최종 업데이트</div>
-                  <div className="text-xs font-medium text-foreground">{stats.lastUpdated.toLocaleTimeString('ko-KR')}</div>
+                  <div className="text-xs font-medium text-foreground">
+                    {isClient && stats.lastUpdated ? stats.lastUpdated.toLocaleTimeString('ko-KR') : '--:--:--'}
+                  </div>
                 </div>
               </div>
             </div>
