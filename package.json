@@ -63,6 +63,7 @@
     "date-fns": "4.1.0",
     "dotenv": "^17.2.3",
     "embla-carousel-react": "latest",
+    "framer-motion": "^12.23.24",
     "iconv-lite": "latest",
     "immer": "latest",
     "input-otp": "latest",
