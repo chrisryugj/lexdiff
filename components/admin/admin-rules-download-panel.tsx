@@ -305,8 +305,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       </div>
 
       {/* Laws List */}
-      <div className="space-y-3">
-        {laws.slice(0, 10).map((law) => {
+      <div className="space-y-3 max-h-[800px] overflow-y-auto">
+        {laws.map((law) => {
           const progress = downloadProgress.get(law.lawName) || []
 
           return (
