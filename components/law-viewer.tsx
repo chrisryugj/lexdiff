@@ -35,6 +35,8 @@ import {
   Calendar,
   ListOrdered,
   Building2,
+  GitMerge,
+  MessageCircleQuestion,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -1553,7 +1555,7 @@ export function LawViewer({
                       )}
                       {bothCount > 0 && (
                         <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          <GitMerge className="h-3 w-3 mr-1" />
                           둘 다 {bothCount}
                         </Badge>
                       )}
@@ -3051,8 +3053,9 @@ export function LawViewer({
                               </Badge>
                             </div>
                             {userQuery && (
-                              <div className="text-md text-muted-foreground font-medium pl-1">
-                                Q. {userQuery}
+                              <div className="text-md text-muted-foreground font-medium pl-1 flex items-center gap-2">
+                                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60" />
+                                {userQuery}
                               </div>
                             )}
                           </div>
