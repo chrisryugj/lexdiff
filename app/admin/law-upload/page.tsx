@@ -59,6 +59,7 @@ export default function AdminDashboard() {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('laws')
   const [parsedLaw, setParsedLaw] = useState<ParsedLaw | null>(null)
   const [savedLaws, setSavedLaws] = useState<SavedLaw[]>([])
+  const [headerButton, setHeaderButton] = useState<React.ReactNode>(null)
   const [stats, setStats] = useState({
     totalLaws: 0,
     totalOrdinances: 0,
@@ -327,17 +328,27 @@ export default function AdminDashboard() {
               {/* Processing Tab */}
               {activeTab === 'processing' && activeSubTab === 'upload-laws' && (
                 <div>
-                  <h2 className="text-xl font-bold text-foreground mb-2">법령 업로드</h2>
-                  <p className="text-sm text-muted-foreground mb-6">파싱된 법령, 시행령, 시행규칙, 행정규칙을 Gemini File Search에 업로드</p>
-                  <LawUploadPanelV2 />
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground mb-2">법령 업로드</h2>
+                      <p className="text-sm text-muted-foreground">파싱된 법령, 시행령, 시행규칙, 행정규칙을 Gemini File Search에 업로드</p>
+                    </div>
+                    {headerButton}
+                  </div>
+                  <LawUploadPanelV2 onRenderHeader={setHeaderButton} />
                 </div>
               )}
 
               {activeTab === 'processing' && activeSubTab === 'upload-ordinances' && (
                 <div>
-                  <h2 className="text-xl font-bold text-foreground mb-2">조례 업로드</h2>
-                  <p className="text-sm text-muted-foreground mb-6">조례 및 시행규칙을 벡터 스토어에 업로드</p>
-                  <OrdinanceUploadPanel />
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground mb-2">조례 업로드</h2>
+                      <p className="text-sm text-muted-foreground">조례 및 시행규칙을 벡터 스토어에 업로드</p>
+                    </div>
+                    {headerButton}
+                  </div>
+                  <OrdinanceUploadPanel onRenderHeader={setHeaderButton} />
                 </div>
               )}
 
