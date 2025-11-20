@@ -1,6 +1,8 @@
 /**
- * RAG Analysis Test Page
- * Phase 9 Pro Small RAG 기능 테스트
+ * AI Search Test Page (dev-test/ai)
+ * 개발용 AI 검색 테스트 페이지
+ * - File Search RAG
+ * - Manual RAG Analysis
  */
 
 'use client'
@@ -11,7 +13,7 @@ import { RAGAnalysisView } from '@/components/rag-analysis-view'
 import { FileSearchRAGView } from '@/components/file-search-rag-view'
 import { classifyQuery, logClassification, needsUserConfirmation } from '@/lib/query-classifier'
 
-export default function RAGTestPage() {
+export default function DevAITestPage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [activeQuery, setActiveQuery] = useState('')
