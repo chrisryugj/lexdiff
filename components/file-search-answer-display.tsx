@@ -7,6 +7,16 @@ import { Progress } from '@/components/ui/progress'
 import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
+import {
+  SECTION_CONFIGS,
+  ALERT_CONFIGS,
+  CONFIDENCE_CONFIGS,
+  DETAIL_SUBSECTION_CONFIGS,
+  detectSectionType,
+  detectDetailSubsectionType,
+  detectAlertType,
+  removeEmoji
+} from '@/lib/answer-section-icons'
 
 // 법령 조문 접기/펼치기 상태 관리 (전역)
 const lawArticleCollapseState = new Map<string, boolean>()
@@ -238,19 +248,55 @@ export function FileSearchAnswerDisplay({
         const text = childArray.join('')
         inRelatedLawsSection = text.includes('📖') && text.includes('관련')
 
+        // 섹션 타입 감지
+        const sectionType = detectSectionType(text)
+        const sectionConfig = sectionType ? SECTION_CONFIGS[sectionType] : null
+
+        if (sectionConfig) {
+          const Icon = sectionConfig.icon
+          const cleanText = removeEmoji(text)
+
+          return (
+            <h2 className="text-white flex items-center gap-1.5 flex-nowrap" style={{ fontSize: `clamp(18px, 5vw, 24px)`, fontWeight: 900, marginTop: 'clamp(12px, 3vw, 20px)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
+              <Icon className={`flex-shrink-0 ${sectionConfig.iconColor}`} style={{ width: 'clamp(20px, 5vw, 24px)', height: 'clamp(20px, 5vw, 24px)' }} />
+              <span className="whitespace-nowrap">{cleanText}</span>
+            </h2>
+          )
+        }
+
         return (
           <h2 className="text-white" style={{ fontSize: '24px', fontWeight: 900, marginTop: '20px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
             {children}
           </h2>
         )
       },
-      // H3 - 관련법령 섹션에서는 숨김 (CollapsibleBlockquote가 렌더링)
+      // H3 - 하위 섹션 (조문 발췌, 핵심 해석, 실무 적용, 조건·예외)
       h3: ({ children }) => {
         if (inRelatedLawsSection) {
           return null // 관련법령 섹션의 H3는 렌더링하지 않음
         }
+
+        const childArray = React.Children.toArray(children)
+        const text = childArray.join('')
+
+        // 하위 섹션 타입 감지
+        const subsectionType = detectDetailSubsectionType(text)
+        const subsectionConfig = subsectionType ? DETAIL_SUBSECTION_CONFIGS[subsectionType] : null
+
+        if (subsectionConfig) {
+          const Icon = subsectionConfig.icon
+          const cleanText = removeEmoji(text)
+
+          return (
+            <h3 className="text-gray-200 flex items-center gap-1.5 flex-nowrap" style={{ fontSize: 'clamp(14px, 4vw, 16px)', fontWeight: 700, marginTop: 'clamp(8px, 2vw, 12px)', marginBottom: '4px' }}>
+              <Icon className={`flex-shrink-0 ${subsectionConfig.iconColor}`} style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />
+              <span className="whitespace-nowrap">{cleanText}</span>
+            </h3>
+          )
+        }
+
         return (
-          <h3 className="text-cyan-300" style={{ fontSize: '16px', fontWeight: 700, marginTop: '8px', marginBottom: '2px' }}>
+          <h3 className="text-gray-200" style={{ fontSize: '16px', fontWeight: 700, marginTop: '12px', marginBottom: '4px' }}>
             {children}
           </h3>
         )
@@ -505,9 +551,9 @@ export function FileSearchAnswerDisplay({
   }, [citations])
 
   return (
-    <div className="w-full max-w-4xl space-y-4">
+    <div className="w-full max-w-4xl space-y-4 px-2 sm:px-4">
       {/* 질문 표시 - 다크테마 */}
-      <Card className="p-4 bg-gray-950 border-gray-800">
+      <Card className="p-3 sm:p-4 bg-gray-950 border-gray-800">
         <div className="flex items-start gap-3">
           <BookOpen className="w-5 h-5 text-cyan-400 mt-0.5" />
           <div className="flex-1">
@@ -546,12 +592,12 @@ export function FileSearchAnswerDisplay({
 
       {/* AI 답변 - 다크테마 + 컨트롤 버튼 */}
       {answer && (
-        <Card className="p-6 bg-gray-950 border-gray-800">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-xl flex items-center gap-2 text-white">
+        <Card className="p-3 sm:p-6 bg-gray-950 border-gray-800">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="font-semibold text-lg sm:text-xl flex items-center gap-2 text-white">
               💡 AI 법령 해설
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* 신뢰도 표시 - 실제 인용이 있을 때만 표시 */}
               {citations.length > 0 && (
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-700 rounded">
@@ -565,40 +611,40 @@ export function FileSearchAnswerDisplay({
                 size="sm"
                 onClick={decreaseFontSize}
                 disabled={fontSize <= 12}
-                className="p-1 h-7 w-7"
+                className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="글자 작게"
               >
-                <ZoomOut className="w-4 h-4" />
+                <ZoomOut className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
-              <span className="text-xs text-gray-400 min-w-[30px] text-center">{fontSize}</span>
+              <span className="text-xs text-gray-400 min-w-[24px] sm:min-w-[30px] text-center">{fontSize}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={increaseFontSize}
                 disabled={fontSize >= 20}
-                className="p-1 h-7 w-7"
+                className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="글자 크게"
               >
-                <ZoomIn className="w-4 h-4" />
+                <ZoomIn className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
               {/* 복사 버튼 */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleCopy}
-                className="p-1 h-7 w-7"
+                className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="답변 복사"
               >
                 {copied ? (
-                  <Check className="w-4 h-4 text-green-400" />
+                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
                 ) : (
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
                 )}
               </Button>
             </div>
           </div>
 
-          <div className="max-w-none">
+          <div className="max-w-none overflow-x-hidden">
             <ReactMarkdown components={markdownComponents}>{processedAnswer}</ReactMarkdown>
           </div>
         </Card>
