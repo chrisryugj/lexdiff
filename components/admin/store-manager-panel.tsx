@@ -69,20 +69,15 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
     loadAllStores()
     // Don't auto-load documents on mount - user must click button
 
-    // Cleanup on unmount
+    // Cleanup on unmount - ALWAYS abort ongoing requests
     return () => {
-      if (isLoadingDocuments && abortController) {
-        const shouldCancel = confirm(
-          '문서 조회가 진행 중입니다.\n\n조회를 취소하고 다른 탭으로 이동하시겠습니까?\n\n• 확인: 조회 취소하고 이동\n• 취소: 백그라운드에서 조회 계속'
-        )
-
-        if (shouldCancel) {
-          abortController.abort()
-        }
+      if (abortController) {
+        console.log('[Store Manager] Aborting ongoing document fetch due to component unmount')
+        abortController.abort()
       }
       onTabLeave?.()
     }
-  }, [])
+  }, [abortController, onTabLeave])
 
   async function loadStoreInfo() {
     try {
@@ -705,11 +700,6 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                   : '조회 버튼을 클릭하여 문서를 불러오세요'}
           </div>
           <div className="flex gap-2">
-            {isLoadingDocuments && (
-              <Button onClick={cancelLoadDocuments} variant="outline" className="border-warning/30 text-warning hover:bg-warning/10">
-                조회 취소
-              </Button>
-            )}
             <Button
               onClick={loadDocuments}
               disabled={isLoadingDocuments}
@@ -727,6 +717,29 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
             </Button>
           </div>
         </div>
+
+        {/* Loading Warning & Cancel Button */}
+        {isLoadingDocuments && (
+          <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <AlertCircle className="h-4 w-4 text-warning" />
+                <div className="text-xs text-warning">
+                  <strong>조회 진행 중</strong> - 다른 탭으로 이동하면 자동으로 취소됩니다
+                </div>
+              </div>
+              <Button
+                onClick={cancelLoadDocuments}
+                size="sm"
+                variant="outline"
+                className="border-warning/50 text-warning hover:bg-warning/20 ml-3"
+              >
+                <XCircle className="h-3 w-3 mr-1" />
+                조회 취소
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Performance Tip */}
         {documents.length === 0 && !isLoadingDocuments && (
