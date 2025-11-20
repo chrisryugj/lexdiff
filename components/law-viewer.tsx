@@ -2964,14 +2964,14 @@ export function LawViewer({
                           )}
 
                           <div
-                            className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
-                        [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
-                        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
+                            className="prose prose-sm max-w-none dark:prose-invert break-words overflow-x-hidden px-2 sm:px-0
+                        [&_h2]:text-[clamp(18px,5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-nowrap
+                        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-nowrap
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
-                        [&_ul]:my-3 [&_li]:my-1.5
-                        [&_ol]:my-3 [&_ol_li]:my-1.5
-                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
+                        [&_ul]:my-2 sm:[&_ul]:my-4 [&_li]:my-1
+                        [&_ol]:my-2 sm:[&_ol]:my-4 [&_ol_li]:my-1
+                        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words"
                             style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                             onClick={handleContentClick}
                             dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
@@ -3043,17 +3043,17 @@ export function LawViewer({
                       )}
 
                       <div className="mb-1 pb-5 border-b border-border">
-                        <div className="flex items-center justify-between gap-4 pt-2">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <Sparkles className="h-5 w-5 text-primary" />
-                              <h3 className="text-xl font-bold text-foreground mb-0 ">AI 답변</h3>
-                              <Badge variant="outline" className="text-xs">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 pt-2">
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                              <h3 className="text-lg sm:text-xl font-bold text-foreground mb-0">AI 답변</h3>
+                              <Badge variant="outline" className="text-xs whitespace-nowrap">
                                 File Search RAG
                               </Badge>
                             </div>
                             {userQuery && (
-                              <div className="text-md text-muted-foreground font-medium pl-1 flex items-center gap-2">
+                              <div className="text-sm sm:text-md text-muted-foreground font-medium pl-1 break-words">
                                 <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60" />
                                 {userQuery}
                               </div>
@@ -3061,7 +3061,7 @@ export function LawViewer({
                           </div>
 
                           {/* AI 답변 컨트롤 */}
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                               <ZoomOut className="h-4 w-4" />
                             </Button>
@@ -3135,14 +3135,14 @@ export function LawViewer({
                       </div>
 
                       <div
-                        className="prose prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere
-                        [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3
-                        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
+                        className="prose prose-sm max-w-none dark:prose-invert break-words overflow-x-hidden px-2 sm:px-0
+                        [&_h2]:text-[clamp(18px,5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-nowrap
+                        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-nowrap
+                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-2 sm:[&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
                         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
-                        [&_ul]:my-3 [&_li]:my-1.5
-                        [&_ol]:my-3 [&_ol_li]:my-1.5
-                        [&_p]:leading-relaxed [&_p]:my-3 [&_p]:break-words"
+                        [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
+                        [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1
+                        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words"
                         style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                         onClick={handleContentClick}
                         dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}

@@ -346,6 +346,7 @@ function styleLawQuotes(text: string): string {
 
 /**
  * 주요 섹션 헤더 스타일링 (📋/📄/💡/🔗)
+ * 모바일 최적화: 이모지와 텍스트가 함께 줄바꿈되지 않도록 white-space: nowrap 추가
  */
 function styleMainSectionHeadings(text: string): string {
   const mainSections = ['📋 핵심 요약', '📄 상세 내용', '💡 추가 참고', '🔗 관련 법령']
@@ -357,7 +358,7 @@ function styleMainSectionHeadings(text: string): string {
     const regex = new RegExp(`^(${escaped})$`, 'gm')
     result = result.replace(
       regex,
-      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border)); font-size: 1.05rem;">$1</div>`
+      `<div class="section-header" style="font-weight: bold; margin-top: 0.8rem; padding-top: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid hsl(var(--border)); font-size: 1.05rem; white-space: nowrap; overflow-x: auto;">$1</div>`
     )
   })
 
@@ -472,12 +473,12 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         return
       }
 
-      // 하위 섹션 제목 감지
+      // 하위 섹션 제목 감지 (모바일 최적화: white-space: nowrap 추가)
       if (trimmed.includes('⚖️ 조문 발췌')) {
         currentSub = 'none'
         isFirstContentInSub = false
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem;">⚖️ 조문 발췌</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem; white-space: nowrap;">⚖️ 조문 발췌</div>`
         )
         return
       }
@@ -487,7 +488,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         currentSub = 'core'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">📖 핵심 해석</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem; white-space: nowrap;">📖 핵심 해석</div>`
         )
         const inlineContent = coreMatch[1].trim()
         if (inlineContent) {
@@ -504,7 +505,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         currentSub = 'practice'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">📝 실무 적용</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem; white-space: nowrap;">📝 실무 적용</div>`
         )
         const inlineContent = practiceMatch[1].trim()
         if (inlineContent) {
@@ -521,7 +522,7 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         currentSub = 'condition'
         isFirstContentInSub = true
         contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem;">🔴 조건·예외</div>`
+          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.5rem; white-space: nowrap;">🔴 조건·예외</div>`
         )
         const inlineContent = conditionMatch[1].trim()
         if (inlineContent) {
