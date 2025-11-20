@@ -62,7 +62,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
   }, [refreshTrigger])
 
-  async function loadLaws() {
+  async function loadLaws(): Promise<Set<string> | null> {
     try {
       const [lawsResponse, filesResponse] = await Promise.all([
         fetch('/api/admin/list-parsed'),
@@ -90,29 +90,54 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
         // Use file metadata for downloaded files
         if (filesData.success) {
+          console.log('[loadLaws] 파일 목록 수신:', {
+            파일갯수: filesData.files.length,
+            파일목록: filesData.files.map((f: any) => f.ruleName)
+          })
+
           filesData.files.forEach((file: any) => {
             downloaded.add(file.ruleName)
             downloadDates.set(file.ruleName, file.downloadedAt)
           })
         }
 
+        console.log('[loadLaws] downloadedFiles 업데이트:', {
+          이전크기: downloadedFiles.size,
+          새크기: downloaded.size,
+          목록: Array.from(downloaded)
+        })
+
         setDownloadedFiles(downloaded)
 
         // Store download dates for later use
         ;(window as any).__adminRuleDownloadDates = downloadDates
+
+        // Return the downloaded set for immediate use
+        return downloaded
       }
+      return null
     } catch (error) {
       console.error('Failed to load laws:', error)
+      return null
     } finally {
       setLoading(false)
     }
   }
 
-  async function showRulesForLaw(lawName: string) {
+  async function showRulesForLaw(lawName: string, freshDownloadedFiles?: Set<string>) {
     setSelectedLaw(lawName)
     setLoadingRules(true)
     setAvailableRules([])
     setSelectedRules(new Set())
+
+    // Use provided fresh data or current state
+    const currentDownloaded = freshDownloadedFiles || downloadedFiles
+
+    console.log('[showRulesForLaw] 행정규칙 목록 조회 시작:', {
+      법령: lawName,
+      freshData제공됨: !!freshDownloadedFiles,
+      사용할downloaded크기: currentDownloaded.size
+    })
 
     try {
       const hierarchyRes = await fetch(`/api/hierarchy?lawName=${encodeURIComponent(lawName)}`)
@@ -128,17 +153,42 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       const hierarchyDoc = parser.parseFromString(hierarchyXml, 'text/xml')
 
       const adminRules: AdminRule[] = []
+      const seenKeys = new Map<string, AdminRule>()
 
-      // Extract all admin rule types
-      ;['고시', '예규', '훈령'].forEach((ruleType) => {
-        hierarchyDoc.querySelectorAll(ruleType).forEach((node) => {
+      // Extract all admin rule types (3단뷰와 동일: 고시, 예규, 훈령, 공고, 지침, 기타)
+      // 중복 제거: serialNumber 또는 id를 키로 사용
+      ;['고시', '예규', '훈령', '공고', '지침', '기타'].forEach((ruleType) => {
+        hierarchyDoc.querySelectorAll(`${ruleType} 기본정보`).forEach((node) => {
           const name = node.querySelector('행정규칙명')?.textContent
           const id = node.querySelector('행정규칙ID')?.textContent
           const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
+
           if (name && id) {
-            adminRules.push({ name, id, serialNumber: serialNumber || undefined, type: ruleType })
+            // Use serialNumber as unique key (fallback to id)
+            const uniqueKey = serialNumber || id
+
+            // Skip duplicates (same serialNumber/id)
+            if (!seenKeys.has(uniqueKey)) {
+              seenKeys.set(uniqueKey, {
+                name,
+                id,
+                serialNumber: serialNumber || undefined,
+                type: ruleType
+              })
+            }
           }
         })
+      })
+
+      // Convert map to array
+      adminRules.push(...Array.from(seenKeys.values()))
+
+      console.log('[showRulesForLaw] 행정규칙 목록 파싱:', {
+        법령: lawName,
+        행정규칙수: adminRules.length,
+        목록샘플: adminRules.slice(0, 5).map(r => r.name),
+        현재downloaded크기: currentDownloaded.size,
+        현재downloaded목록샘플: Array.from(currentDownloaded).slice(0, 5)
       })
 
       if (adminRules.length === 0) {
@@ -146,6 +196,18 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         setSelectedLaw(null)
       } else {
         setAvailableRules(adminRules)
+
+        // 각 규칙의 다운로드 상태 확인
+        const downloadStatus = adminRules.map(r => ({
+          name: r.name,
+          isDownloaded: currentDownloaded.has(r.name)
+        }))
+        const downloadedCount = downloadStatus.filter(s => s.isDownloaded).length
+        console.log('[showRulesForLaw] 체크박스 상태:', {
+          전체: adminRules.length,
+          다운로드됨: downloadedCount,
+          샘플: downloadStatus.slice(0, 10)
+        })
       }
     } catch (error: any) {
       alert(`행정규칙 목록 조회 실패: ${error.message}`)
@@ -161,7 +223,17 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     setIsDownloading(true)
 
     const rulesToDownload = availableRules.filter((r) => selectedRules.has(r.name))
+
+    console.log('[Download Selected] 다운로드 시작:', {
+      법령: selectedLaw,
+      선택갯수: selectedRules.size,
+      필터링후갯수: rulesToDownload.length,
+      선택목록: Array.from(selectedRules),
+      필터링후목록: rulesToDownload.map(r => r.name)
+    })
+
     const statuses: DownloadStatus[] = []
+    let actualSuccessCount = 0
 
     for (const rule of rulesToDownload) {
       const status: DownloadStatus = {
@@ -188,8 +260,12 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
         const result = await downloadRes.json()
 
+        console.log(`[Download Selected] "${rule.name}" 결과:`, result)
+
         if (result.success) {
           status.status = 'success'
+          actualSuccessCount++
+          // Only add to downloadedFiles if actually successful
           setDownloadedFiles((prev) => new Set([...prev, rule.name]))
         } else if (result.notFound) {
           status.status = 'not_found'
@@ -207,11 +283,18 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
 
     setIsDownloading(false)
-    setSelectedLaw(null)
-    setSelectedRules(new Set())
 
-    const successCount = statuses.filter((s) => s.status === 'success').length
-    alert(`✅ 다운로드 완료\n\n성공: ${successCount}개\n실패: ${statuses.length - successCount}개`)
+    console.log('[Download Selected] 파일 목록 새로고침 중...')
+    // Reload file list to update stats (but don't reload modal)
+    await loadLaws()
+
+    console.log('[Download Selected] 완료:', {
+      실제성공: actualSuccessCount,
+      선택총갯수: rulesToDownload.length
+    })
+
+    const failedCount = rulesToDownload.length - actualSuccessCount
+    alert(`✅ 다운로드 완료\n\n선택: ${rulesToDownload.length}개\n성공: ${actualSuccessCount}개\n실패: ${failedCount}개\n\n※ 모달을 닫았다 다시 열면 다운로드된 항목이 체크 표시됩니다.`)
   }
 
   async function downloadAdminRulesForLaw(lawName: string) {
@@ -242,18 +325,25 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       const hierarchyDoc = parser.parseFromString(hierarchyXml, 'text/xml')
 
       const adminRules: Array<{ name: string; id: string; serialNumber?: string }> = []
+      const seenKeys = new Map<string, { name: string; id: string; serialNumber?: string }>()
 
-      // Extract all admin rule types
-      ;['고시', '예규', '훈령'].forEach((ruleType) => {
-        hierarchyDoc.querySelectorAll(ruleType).forEach((node) => {
+      // Extract all admin rule types (3단뷰와 동일)
+      ;['고시', '예규', '훈령', '공고', '지침', '기타'].forEach((ruleType) => {
+        hierarchyDoc.querySelectorAll(`${ruleType} 기본정보`).forEach((node) => {
           const name = node.querySelector('행정규칙명')?.textContent
           const id = node.querySelector('행정규칙ID')?.textContent
           const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
+
           if (name && id) {
-            adminRules.push({ name, id, serialNumber: serialNumber || undefined })
+            const uniqueKey = serialNumber || id
+            if (!seenKeys.has(uniqueKey)) {
+              seenKeys.set(uniqueKey, { name, id, serialNumber: serialNumber || undefined })
+            }
           }
         })
       })
+
+      adminRules.push(...Array.from(seenKeys.values()))
 
       if (adminRules.length === 0) {
         setDownloadProgress(
@@ -569,18 +659,21 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   <label className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/10 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedRules.size === availableRules.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRules(new Set(availableRules.map((r) => r.name)))
-                        } else {
+                      checked={availableRules.length > 0 && selectedRules.size === availableRules.length}
+                      onChange={() => {
+                        // Toggle: if all selected, deselect all; otherwise select all
+                        if (selectedRules.size === availableRules.length) {
                           setSelectedRules(new Set())
+                        } else {
+                          setSelectedRules(new Set(availableRules.map((r) => r.name)))
                         }
                       }}
                       disabled={isDownloading}
                       className="h-4 w-4"
                     />
-                    <span className="font-medium text-primary">전체 선택</span>
+                    <span className="font-medium text-primary">
+                      전체 선택 {selectedRules.size > 0 && `(${selectedRules.size}/${availableRules.length})`}
+                    </span>
                   </label>
 
                   {/* Rules List */}
