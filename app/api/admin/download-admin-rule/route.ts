@@ -131,6 +131,35 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
 
     console.log(`[parseAdminRuleXML] Total articles parsed: ${articles.length}`)
 
+    // If no articles found, try to get full text content
+    if (articles.length === 0) {
+      console.log('[parseAdminRuleXML] No articles found, extracting full text content')
+
+      // Try to get all text content from service node
+      const allTextNodes = serviceNode.getElementsByTagName('*')
+      let fullText = ''
+
+      for (let i = 0; i < allTextNodes.length; i++) {
+        const tagName = allTextNodes[i].tagName
+        // Skip metadata tags, only get content tags
+        if (tagName === '조문내용' || tagName === '본문내용' || tagName === '내용') {
+          const text = allTextNodes[i].textContent?.trim()
+          if (text && text.length > 10) {
+            fullText += text + '\n\n'
+          }
+        }
+      }
+
+      if (fullText.trim()) {
+        console.log(`[parseAdminRuleXML] Found full text: ${fullText.length} chars`)
+        articles.push({
+          displayNumber: '전문',
+          title: '전체 내용',
+          content: fullText.trim()
+        })
+      }
+    }
+
     return {
       ruleId,
       ruleName: name,
