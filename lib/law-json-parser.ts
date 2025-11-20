@@ -24,7 +24,9 @@ export function parseLawJSON(jsonData: any): LawData {
 
     const articleNum = unit.조문번호 || "0"
     const mainNum = Number(articleNum)
-    const code = mainNum.toString().padStart(6, "0")
+    // ✅ 올바른 형식: 4자리(조문번호) + 2자리(지번호) = 6자리
+    // 예: 제2조 → "000200", 제102조 → "010200"
+    const code = mainNum.toString().padStart(4, "0") + "00"
     const display = "제" + mainNum + "조"
 
     articles.push({
