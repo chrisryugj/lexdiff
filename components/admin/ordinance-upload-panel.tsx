@@ -53,14 +53,14 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
 
   useEffect(() => {
     loadParsedOrdinances()
-    checkStoreIdAndSync()
+    // Don't auto-sync with server on mount - user must click sync button
   }, [])
 
   // Reload when refreshTrigger changes (tab switch)
   useEffect(() => {
     if (refreshTrigger !== undefined) {
       loadParsedOrdinances()
-      checkStoreIdAndSync()
+      // Don't auto-sync on tab switch - user must click sync button
     }
   }, [refreshTrigger])
 
@@ -686,6 +686,15 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
+            onClick={checkStoreIdAndSync}
+            disabled={uploading}
+            variant="outline"
+            size="default"
+            className="border-primary/30 text-primary hover:bg-primary/10"
+          >
+            스토어 동기화
+          </Button>
+          <Button
             onClick={forceResetUploadStatus}
             disabled={uploading}
             variant="outline"
@@ -694,10 +703,7 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
             강제 초기화
           </Button>
           <Button
-            onClick={async () => {
-              await loadParsedOrdinances()
-              await checkStoreIdAndSync()
-            }}
+            onClick={loadParsedOrdinances}
             disabled={loading || uploading}
             variant="outline"
             size="default"

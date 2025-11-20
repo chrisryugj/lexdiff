@@ -46,7 +46,7 @@ export function LawUploadPanelV2({ onUploadComplete }: LawUploadPanelProps) {
 
   useEffect(() => {
     loadParsedLaws()
-    checkStoreIdAndSync()
+    // Don't auto-sync with server on mount - user must click sync button
   }, [])
 
   /**
@@ -431,6 +431,15 @@ export function LawUploadPanelV2({ onUploadComplete }: LawUploadPanelProps) {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={checkStoreIdAndSync}
+            disabled={uploading}
+            variant="outline"
+            size="default"
+            className="border-primary/30 text-primary hover:bg-primary/10"
+          >
+            스토어 동기화
+          </Button>
           <Button
             onClick={forceResetUploadStatus}
             disabled={uploading}
