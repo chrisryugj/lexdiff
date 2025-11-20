@@ -62,6 +62,24 @@
   - 에이전트 자동 사용으로 작업 효율성 향상
 - **Reason**: 사용자 요청 (한글 번역 + KST 사용 + 에이전트 자동 제안)
 
+### [16:15 KST] Add server restart and browser cache refresh prohibition
+- **Files**:
+  - `CLAUDE_GLOBAL_SETTINGS.md` (modified)
+  - `task.md` (modified)
+- **Changes**:
+  - "서버 및 브라우저 관련 제안 금지" 섹션 추가
+  - 서버 재시작 직접 실행 금지 명시
+    - npm run dev 재실행, kill 명령, 개발 서버 stop/start
+  - 브라우저 캐시 새로고침 제안 금지 명시
+    - 캐시 지우기, 하드 리프레시, 시크릿 모드
+  - 대안 제시: "서버를 재시작해주세요" (사용자 요청)
+  - 이유: 사용자가 직접 제어, 환경별 차이, 간단한 요청이 더 효과적
+- **Impact**:
+  - Claude가 서버/브라우저를 직접 제어하려는 시도 방지
+  - 불필요한 기술적 지시 감소
+  - 사용자 중심의 간단한 소통 유도
+- **Reason**: 사용자 요청 (서버 재시작은 사용자에게 부탁, 브라우저 캐시 제안 금지)
+
 ---
 
 ## Archive
