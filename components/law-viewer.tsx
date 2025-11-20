@@ -32,6 +32,9 @@ import {
   AlertTriangle,
   FileSearch,
   Check,
+  Calendar,
+  ListOrdered,
+  Building2,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -1496,7 +1499,7 @@ export function LawViewer({
 
               <div className="border-b border-border p-4 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
+                  <Link2 className="h-5 w-5 text-primary" />
                   <h3 className="text-xl font-bold text-foreground">관련 법령 목록</h3>
                 </div>
                 {(() => {
@@ -1533,21 +1536,25 @@ export function LawViewer({
                   return (
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="secondary" className="text-xs">
+                        <FileText className="h-3 w-3 mr-1" />
                         전체 {uniqueCount}개
                       </Badge>
                       {excerptOnlyCount > 0 && (
                         <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
-                          ⚖️ 발췌 {excerptOnlyCount}
+                          <Bookmark className="h-3 w-3 mr-1" />
+                          발췌 {excerptOnlyCount}
                         </Badge>
                       )}
                       {relatedOnlyCount > 0 && (
                         <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
-                          🔗 관련 {relatedOnlyCount}
+                          <Link2 className="h-3 w-3 mr-1" />
+                          관련 {relatedOnlyCount}
                         </Badge>
                       )}
                       {bothCount > 0 && (
                         <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
-                          ⚖️🔗 둘 다 {bothCount}
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          둘 다 {bothCount}
                         </Badge>
                       )}
                     </div>
@@ -1612,10 +1619,10 @@ export function LawViewer({
                                 {/* 출처 아이콘 (중복 시 여러 개 표시) */}
                                 <div className="flex items-center gap-1 shrink-0">
                                   {sources.has('excerpt') && (
-                                    <span className="text-xs" title="발췌조문">⚖️</span>
+                                    <Bookmark className="h-3.5 w-3.5 text-purple-400" title="발췌조문" />
                                   )}
                                   {sources.has('related') && (
-                                    <span className="text-xs" title="관련법령">🔗</span>
+                                    <Link2 className="h-3.5 w-3.5 text-blue-400" title="관련법령" />
                                   )}
                                 </div>
                               </div>
@@ -1656,11 +1663,12 @@ export function LawViewer({
               {/* 헤더 - 본문 헤더와 동일한 디자인 */}
               <div className="border-b border-border p-4 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
+                  <ListOrdered className="h-5 w-5 text-primary" />
                   <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
                 </div>
                 <Badge variant="outline" className="text-xs">
-                  📋 {actualArticles.length}개 조문
+                  <FileText className="h-3 w-3 mr-1" />
+                  {actualArticles.length}개 조문
                 </Badge>
               </div>
 
@@ -1790,16 +1798,19 @@ export function LawViewer({
               <div className="flex flex-wrap gap-2">
                 {meta.latestEffectiveDate && (
                   <Badge variant="outline" className="text-xs">
-                    📅 시행: {meta.latestEffectiveDate}
+                    <Calendar className="h-3 w-3 mr-1" />
+                    시행: {meta.latestEffectiveDate}
                   </Badge>
                 )}
                 <Badge variant="outline" className="text-xs">
-                  📋 {articles.length}개 조문
+                  <FileText className="h-3 w-3 mr-1" />
+                  {articles.length}개 조문
                 </Badge>
 
                 {isOrdinance && (
                   <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
-                    🏛️ 자치법규
+                    <Building2 className="h-3 w-3 mr-1" />
+                    자치법규
                   </Badge>
                 )}
                 {meta.revisionType && (
@@ -2938,7 +2949,10 @@ export function LawViewer({
                               <div className="flex items-start gap-2">
                                 <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                  <p className="text-sm font-semibold text-red-300 mb-1">⚠️ 검색 결과 없음</p>
+                                  <p className="text-sm font-semibold text-red-300 mb-1 flex items-center gap-1.5">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    검색 결과 없음
+                                  </p>
                                   <p className="text-xs text-red-200/80">
                                     File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
                                   </p>
