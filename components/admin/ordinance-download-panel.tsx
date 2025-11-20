@@ -419,9 +419,11 @@ export function OrdinanceDownloadPanel() {
 function formatDate(isoDate: string): string {
   try {
     const date = new Date(isoDate)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
+    // Convert to KST (UTC+9)
+    const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+    const year = kstDate.getUTCFullYear()
+    const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(kstDate.getUTCDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   } catch {
     return isoDate
