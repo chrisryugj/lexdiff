@@ -13,6 +13,7 @@ import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
 import { ModernProgressBar } from '@/components/ui/modern-progress-bar'
+import { CONFIDENCE_CONFIGS, ALERT_CONFIGS, detectAlertType } from '@/lib/answer-section-icons'
 
 
 export function AISearchView({
@@ -263,35 +264,34 @@ export function AISearchView({
         <>
           {/* Confidence Badge */}
           <div className="mx-4 mt-4 flex items-center gap-2">
-            {confidenceLevel === 'high' && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-700 dark:text-green-300">신뢰도 높음</span>
-              </div>
-            )}
-            {confidenceLevel === 'medium' && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-full">
-                <span className="text-yellow-600 dark:text-yellow-500">⚠️</span>
-                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">신뢰도 보통</span>
-              </div>
-            )}
-            {confidenceLevel === 'low' && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full">
-                <span className="text-red-600 dark:text-red-500">❌</span>
-                <span className="text-sm font-medium text-red-700 dark:text-red-300">신뢰도 낮음</span>
-              </div>
-            )}
+            {(() => {
+              const config = CONFIDENCE_CONFIGS[confidenceLevel]
+              const Icon = config.icon
+
+              return (
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${config.bgColor} border ${config.borderColor} rounded-full`}>
+                  <Icon className={`h-4 w-4 ${config.iconColor}`} />
+                  <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Warning Banner */}
-          {warning && (
-            <div className="mx-4 mt-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <span className="text-yellow-600 dark:text-yellow-500">⚠️</span>
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
+          {warning && (() => {
+            const alertType = detectAlertType(warning)
+            const config = ALERT_CONFIGS[alertType]
+            const Icon = config.icon
+
+            return (
+              <div className={`mx-4 mt-2 ${config.bgColor} border ${config.borderColor} rounded-lg p-3`}>
+                <div className="flex items-start gap-2">
+                  <Icon className={`h-5 w-5 ${config.iconColor} flex-shrink-0 mt-0.5`} />
+                  <p className={`text-sm ${config.textColor}`}>{warning.replace(/⚠️|❌|✅/g, '').trim()}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           <LawViewer
             aiAnswerMode={true}

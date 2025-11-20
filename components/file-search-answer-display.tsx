@@ -7,6 +7,14 @@ import { Progress } from '@/components/ui/progress'
 import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
+import {
+  SECTION_CONFIGS,
+  ALERT_CONFIGS,
+  CONFIDENCE_CONFIGS,
+  detectSectionType,
+  detectAlertType,
+  removeEmoji
+} from '@/lib/answer-section-icons'
 
 // 법령 조문 접기/펼치기 상태 관리 (전역)
 const lawArticleCollapseState = new Map<string, boolean>()
@@ -237,6 +245,22 @@ export function FileSearchAnswerDisplay({
         const childArray = React.Children.toArray(children)
         const text = childArray.join('')
         inRelatedLawsSection = text.includes('📖') && text.includes('관련')
+
+        // 섹션 타입 감지
+        const sectionType = detectSectionType(text)
+        const sectionConfig = sectionType ? SECTION_CONFIGS[sectionType] : null
+
+        if (sectionConfig) {
+          const Icon = sectionConfig.icon
+          const cleanText = removeEmoji(text)
+
+          return (
+            <h2 className="text-white flex items-center gap-2" style={{ fontSize: '24px', fontWeight: 900, marginTop: '20px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              <Icon className={`h-6 w-6 ${sectionConfig.iconColor}`} />
+              <span>{cleanText}</span>
+            </h2>
+          )
+        }
 
         return (
           <h2 className="text-white" style={{ fontSize: '24px', fontWeight: 900, marginTop: '20px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
