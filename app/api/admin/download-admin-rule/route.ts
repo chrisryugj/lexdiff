@@ -62,11 +62,14 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
     // AdmRulService 구조
     const serviceNode = doc.getElementsByTagName('AdmRulService')[0]
     if (!serviceNode) {
+      console.error('[parseAdminRuleXML] AdmRulService node not found')
+      console.error('[parseAdminRuleXML] XML preview:', xml.substring(0, 500))
       throw new Error('AdmRulService node not found')
     }
 
     const infoNode = serviceNode.getElementsByTagName('행정규칙기본정보')[0]
     if (!infoNode) {
+      console.error('[parseAdminRuleXML] 행정규칙기본정보 node not found')
       throw new Error('행정규칙기본정보 node not found')
     }
 
@@ -96,9 +99,16 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
     const contentNodes = Array.from(serviceNode.getElementsByTagName('조문내용'))
     const articles: any[] = []
 
-    contentNodes.forEach((node: any) => {
+    console.log(`[parseAdminRuleXML] Found ${contentNodes.length} 조문내용 nodes`)
+
+    contentNodes.forEach((node: any, index: number) => {
       const text = node.textContent?.trim()
-      if (!text) return
+      if (!text) {
+        console.log(`[parseAdminRuleXML] Node ${index} is empty`)
+        return
+      }
+
+      console.log(`[parseAdminRuleXML] Node ${index} preview:`, text.substring(0, 100))
 
       // 각 조문내용에서 제N조 패턴 추출
       const match = text.match(/^(제\d+조(?:의\d+)?)\s*(?:\(([^)]+)\))?\s*([\s\S]*)/)
@@ -113,8 +123,13 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
           title,
           content
         })
+        console.log(`[parseAdminRuleXML] Parsed article: ${displayNumber} (${title})`)
+      } else {
+        console.log(`[parseAdminRuleXML] Node ${index} does not match article pattern`)
       }
     })
+
+    console.log(`[parseAdminRuleXML] Total articles parsed: ${articles.length}`)
 
     return {
       ruleId,
