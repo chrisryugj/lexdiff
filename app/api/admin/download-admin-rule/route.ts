@@ -60,23 +60,30 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
     const doc = parser.parseFromString(xml, 'text/xml')
 
     // AdmRulService 구조
-    const serviceNode = doc.querySelector('AdmRulService') || doc.getElementsByTagName('AdmRulService')[0]
+    const serviceNode = doc.getElementsByTagName('AdmRulService')[0]
     if (!serviceNode) {
       throw new Error('AdmRulService node not found')
     }
 
-    const infoNode = serviceNode.querySelector('행정규칙기본정보') || serviceNode.getElementsByTagName('행정규칙기본정보')[0]
+    const infoNode = serviceNode.getElementsByTagName('행정규칙기본정보')[0]
     if (!infoNode) {
       throw new Error('행정규칙기본정보 node not found')
     }
 
-    // Basic info
-    const nameNode = infoNode.querySelector('행정규칙명') || infoNode.getElementsByTagName('행정규칙명')[0]
-    const idNode = infoNode.querySelector('행정규칙ID') || infoNode.getElementsByTagName('행정규칙ID')[0]
-    const orgNode = infoNode.querySelector('소관부처명') || infoNode.getElementsByTagName('소관부처명')[0]
-    const effectiveDateNode = infoNode.querySelector('시행일자') || infoNode.getElementsByTagName('시행일자')[0]
-    const publishDateNode = infoNode.querySelector('발령일자') || infoNode.getElementsByTagName('발령일자')[0]
-    const publishNumberNode = infoNode.querySelector('발령번호') || infoNode.getElementsByTagName('발령번호')[0]
+    // Basic info (getElementsByTagName returns HTMLCollection, need [0])
+    const nameNodes = infoNode.getElementsByTagName('행정규칙명')
+    const idNodes = infoNode.getElementsByTagName('행정규칙ID')
+    const orgNodes = infoNode.getElementsByTagName('소관부처명')
+    const effectiveDateNodes = infoNode.getElementsByTagName('시행일자')
+    const publishDateNodes = infoNode.getElementsByTagName('발령일자')
+    const publishNumberNodes = infoNode.getElementsByTagName('발령번호')
+
+    const nameNode = nameNodes.length > 0 ? nameNodes[0] : null
+    const idNode = idNodes.length > 0 ? idNodes[0] : null
+    const orgNode = orgNodes.length > 0 ? orgNodes[0] : null
+    const effectiveDateNode = effectiveDateNodes.length > 0 ? effectiveDateNodes[0] : null
+    const publishDateNode = publishDateNodes.length > 0 ? publishDateNodes[0] : null
+    const publishNumberNode = publishNumberNodes.length > 0 ? publishNumberNodes[0] : null
 
     const ruleId = idNode?.textContent?.trim() || 'unknown'
     const name = nameNode?.textContent?.trim() || ruleName

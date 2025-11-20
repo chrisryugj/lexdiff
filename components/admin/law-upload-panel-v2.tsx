@@ -549,7 +549,9 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
                   />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-foreground truncate">{law.lawName}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{(law.fileSize / 1024).toFixed(1)} KB</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {(law.fileSize / 1024).toFixed(1)} KB · 다운로드: {formatDate(law.lastModified)}
+                    </div>
                   </div>
                   {result && (
                     <div className="ml-3">
@@ -580,7 +582,9 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
                 <CheckCircle2 className="w-4 h-4 text-accent mr-3" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-foreground truncate">{law.lawName}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{(law.fileSize / 1024).toFixed(1)} KB</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {(law.fileSize / 1024).toFixed(1)} KB · 다운로드: {formatDate(law.lastModified)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -615,4 +619,16 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
       `}</style>
     </div>
   )
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return isoDate
+  }
 }

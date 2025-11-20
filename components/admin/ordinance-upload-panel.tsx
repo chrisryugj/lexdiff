@@ -845,10 +845,10 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
                     <div>
                       <div className="font-medium text-foreground">{ordinance.ordinanceName}</div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
+                        {ordinance.districtName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
                       </div>
                       <div className="text-xs text-muted-foreground/70 mt-1">
-                        수정: {new Date(ordinance.lastModified).toLocaleString()}
+                        다운로드: {formatDate(ordinance.lastModified)}
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -883,7 +883,10 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
                   <div>
                     <div className="font-medium text-foreground">{ordinance.ordinanceName}</div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {ordinance.districtName} · {ordinance.fileName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
+                      {ordinance.districtName} · {(ordinance.fileSize / 1024).toFixed(2)} KB
+                    </div>
+                    <div className="text-xs text-muted-foreground/70 mt-1">
+                      다운로드: {formatDate(ordinance.lastModified)}
                     </div>
                   </div>
                   <CheckCircle2 className="w-5 h-5 text-accent" />
@@ -908,4 +911,16 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
       `}</style>
     </div>
   )
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return isoDate
+  }
 }
