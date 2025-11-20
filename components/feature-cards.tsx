@@ -52,8 +52,8 @@ export function FeatureCards() {
   return (
     <div className="w-full max-w-6xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-foreground mb-2" style={{ fontFamily: "Pretendard, sans-serif" }}>주요 기능</h3>
-        <p className="text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>LexDiff가 제공하는 강력한 법령 검색 도구</p>
+        <h3 className="text-7xl font-bold text-foreground mb-2" style={{ fontFamily: "Pretendard, sans-serif" }}>주요 기능</h3>
+        <p className="text-muted-foreground mb-20" style={{ fontFamily: "Pretendard, sans-serif" }}>LexDiff가 제공하는 강력한 법령 검색 도구</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

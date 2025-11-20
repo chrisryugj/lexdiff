@@ -32,6 +32,8 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
       onReset()
     }
     window.history.pushState({}, "", "/")
+    // 최상단으로 부드럽게 스크롤
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
