@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('[List Store Documents API] Fetching documents from store...')
+    console.log('[List Store Documents API] Fetching documents from store:', storeId)
 
     // List documents with pagination (increased page size for better performance)
     const allDocuments: any[] = []
@@ -32,11 +32,13 @@ export async function GET(request: NextRequest) {
 
     while (hasMore) {
       pageCount++
-      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=100${
+      // Note: Gemini File Search API max pageSize is 20
+      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${
         pageToken ? `&pageToken=${pageToken}` : ''
       }`
 
       console.log(`[List Store Documents API] Fetching page ${pageCount}...`)
+      console.log(`[List Store Documents API] URL: ${url}`)
 
       const response = await fetch(url, {
         headers: {
@@ -46,11 +48,22 @@ export async function GET(request: NextRequest) {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[List Store Documents API] ❌ Request failed:', errorText)
+        console.error('[List Store Documents API] ❌ Request failed:', response.status, errorText)
+        console.error('[List Store Documents API] ❌ URL:', url)
+
+        let errorMessage = `문서 목록 조회 실패: ${response.status}`
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.error?.message || errorMessage
+        } catch {
+          // errorText is not JSON
+        }
+
         return NextResponse.json(
           {
             success: false,
-            error: `문서 목록 조회 실패: ${response.status}`
+            error: errorMessage,
+            details: errorText
           },
           { status: response.status }
         )
