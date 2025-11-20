@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, CheckCircle2, XCircle, AlertCircle, FileText, DollarSign, Database, Eye, EyeOff } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, AlertCircle, FileText, DollarSign, Database, Eye, EyeOff, Filter, Search, Trash2 } from 'lucide-react'
 
 interface StoreDocument {
   id: string
@@ -17,6 +17,7 @@ interface StoreDocument {
   state: string
   createTime: string
   updateTime: string
+  customMetadata?: Array<{ key: string; stringValue?: string }>
 }
 
 interface StoreInfo {
@@ -56,6 +57,12 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState<string>('')
+
+  // Batch delete & filtering states
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set())
+  const [filterType, setFilterType] = useState<'all' | 'law' | 'ordinance'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isDeletingBatch, setIsDeletingBatch] = useState(false)
 
   useEffect(() => {
     loadStoreInfo()
@@ -232,6 +239,90 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
       alert('삭제 중 오류: ' + error.message)
     }
   }
+
+  async function batchDeleteDocuments() {
+    const count = selectedDocIds.size
+    if (count === 0) {
+      alert('삭제할 문서를 선택해주세요')
+      return
+    }
+
+    if (!confirm(`선택한 ${count}개 문서를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
+      return
+    }
+
+    setIsDeletingBatch(true)
+
+    try {
+      const response = await fetch('/api/admin/batch-delete-documents', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ documentIds: Array.from(selectedDocIds) })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(
+          `✅ 삭제 완료\n\n성공: ${data.successCount}개\n실패: ${data.failedCount}개`
+        )
+        setSelectedDocIds(new Set())
+        loadDocuments()
+        onRefresh?.()
+      } else {
+        alert('일괄 삭제 실패: ' + data.error)
+      }
+    } catch (error: any) {
+      alert('일괄 삭제 중 오류: ' + error.message)
+    } finally {
+      setIsDeletingBatch(false)
+    }
+  }
+
+  function toggleDocumentSelection(docId: string) {
+    setSelectedDocIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(docId)) {
+        newSet.delete(docId)
+      } else {
+        newSet.add(docId)
+      }
+      return newSet
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedDocIds.size === filteredDocuments.length) {
+      setSelectedDocIds(new Set())
+    } else {
+      setSelectedDocIds(new Set(filteredDocuments.map((doc) => doc.id)))
+    }
+  }
+
+  // Filtering logic
+  const filteredDocuments = documents.filter((doc) => {
+    // Type filter
+    if (filterType === 'law') {
+      const isLaw = doc.customMetadata?.some((m) => m.key === 'law_name')
+      if (!isLaw) return false
+    } else if (filterType === 'ordinance') {
+      const isOrdinance = doc.customMetadata?.some((m) => m.key === 'ordinance_name')
+      if (!isOrdinance) return false
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      return (
+        doc.lawName.toLowerCase().includes(query) ||
+        doc.displayName.toLowerCase().includes(query)
+      )
+    }
+
+    return true
+  })
 
   async function createNewStore() {
     if (!newStoreName.trim()) {
@@ -610,7 +701,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
               : isLoadingDocuments
                 ? '문서 조회 중...'
                 : documents.length > 0
-                  ? `${documents.length}개 문서`
+                  ? `${documents.length}개 문서 (필터링: ${filteredDocuments.length}개)`
                   : '조회 버튼을 클릭하여 문서를 불러오세요'}
           </div>
           <div className="flex gap-2">
@@ -640,10 +731,102 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
         {/* Performance Tip */}
         {documents.length === 0 && !isLoadingDocuments && (
           <div className="p-3 bg-primary/10 border border-primary/20 rounded text-xs text-primary">
-            💡 성능 향상: 페이지 크기를 100개로 증가시켜 조회 속도를 개선했습니다. 15000개 파일 기준 약 150번의 API 호출이 필요합니다.
+            💡 Gemini API 제한: 페이지 크기는 최대 20개입니다. 15,000개 파일 조회 시 약 750번의 API 호출이 필요하므로 시간이 소요될 수 있습니다.
           </div>
         )}
       </div>
+
+      {/* Filter & Batch Actions */}
+      {documents.length > 0 && (
+        <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm space-y-3">
+          {/* Filter Controls */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">필터:</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setFilterType('all')}
+                size="sm"
+                variant={filterType === 'all' ? 'default' : 'outline'}
+                className="text-xs"
+              >
+                전체 ({documents.length})
+              </Button>
+              <Button
+                onClick={() => setFilterType('law')}
+                size="sm"
+                variant={filterType === 'law' ? 'default' : 'outline'}
+                className="text-xs"
+              >
+                법령 ({documents.filter((d) => d.customMetadata?.some((m) => m.key === 'law_name')).length})
+              </Button>
+              <Button
+                onClick={() => setFilterType('ordinance')}
+                size="sm"
+                variant={filterType === 'ordinance' ? 'default' : 'outline'}
+                className="text-xs"
+              >
+                조례 ({documents.filter((d) => d.customMetadata?.some((m) => m.key === 'ordinance_name')).length})
+              </Button>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="문서명으로 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 bg-card/50 border-border/50 text-foreground text-sm"
+            />
+            {searchQuery && (
+              <Button onClick={() => setSearchQuery('')} size="sm" variant="outline" className="text-xs">
+                지우기
+              </Button>
+            )}
+          </div>
+
+          {/* Batch Actions */}
+          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filteredDocuments.length > 0 && selectedDocIds.size === filteredDocuments.length}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm text-foreground">
+                  전체 선택 ({selectedDocIds.size}/{filteredDocuments.length})
+                </span>
+              </label>
+            </div>
+            <Button
+              onClick={batchDeleteDocuments}
+              disabled={selectedDocIds.size === 0 || isDeletingBatch}
+              variant="outline"
+              className="border-warning/30 text-warning hover:bg-warning/10"
+              size="sm"
+            >
+              {isDeletingBatch ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  삭제 중...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  선택 항목 삭제 ({selectedDocIds.size})
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl">
@@ -676,17 +859,30 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
           </div>
         )}
 
-        {!loading && documents.length > 0 && (
+        {!loading && filteredDocuments.length > 0 && (
           <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {documents.map((doc, index) => (
+            {filteredDocuments.map((doc, index) => (
               <div
                 key={doc.id}
-                className="p-4 bg-card/30 border border-border/50 rounded-xl hover:bg-card/50 hover:shadow-sm transition-all"
+                className={`p-4 border rounded-xl transition-all ${
+                  selectedDocIds.has(doc.id)
+                    ? 'bg-primary/10 border-primary/30 shadow-md'
+                    : 'bg-card/30 border-border/50 hover:bg-card/50 hover:shadow-sm'
+                }`}
                 style={{
                   animation: `fadeInUp 0.3s ease-out ${index * 10}ms both`
                 }}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  {/* Checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={selectedDocIds.has(doc.id)}
+                    onChange={() => toggleDocumentSelection(doc.id)}
+                    className="mt-1 h-4 w-4 cursor-pointer"
+                  />
+
+                  {/* Document Info */}
                   <div className="flex-1">
                     <div className="font-medium text-foreground">{doc.lawName}</div>
                     <div className="text-sm text-muted-foreground mt-1">Display Name: {doc.displayName}</div>
@@ -694,7 +890,22 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                     <div className="text-xs text-muted-foreground/70 mt-1">
                       생성: {new Date(doc.createTime).toLocaleString()} · 상태: {doc.state}
                     </div>
+                    {/* Document Type Badge */}
+                    <div className="flex gap-2 mt-2">
+                      {doc.customMetadata?.some((m) => m.key === 'law_name') && (
+                        <span className="px-2 py-0.5 bg-primary/10 border border-primary/30 text-primary text-xs rounded">
+                          법령
+                        </span>
+                      )}
+                      {doc.customMetadata?.some((m) => m.key === 'ordinance_name') && (
+                        <span className="px-2 py-0.5 bg-accent/10 border border-accent/30 text-accent text-xs rounded">
+                          조례
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Actions */}
                   <div className="flex flex-col gap-2 ml-4">
                     <span
                       className={`px-2 py-1 rounded text-xs ${
@@ -724,6 +935,14 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {!loading && documents.length > 0 && filteredDocuments.length === 0 && (
+          <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">필터 조건에 맞는 문서가 없습니다</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">다른 필터를 선택하거나 검색어를 변경해보세요</p>
           </div>
         )}
       </div>
