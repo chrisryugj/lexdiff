@@ -28,6 +28,7 @@ import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { favoritesStore } from "@/lib/favorites-store"
 import { formatJO } from "@/lib/law-parser"
+import { parseLawJSON } from "@/lib/law-json-parser"
 import { useErrorReportStore } from "@/lib/error-report-store"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
+import type { VerifiedCitation } from "@/lib/citation-verifier"
 import { buildJO } from "@/lib/law-parser"
 import { HelpCircle, Scale, Brain } from "lucide-react"
 
@@ -137,146 +139,7 @@ function extractContentFromHangArray(hangArray: any[]): string {
   return content
 }
 
-function parseLawJSON(jsonData: any): LawData {
-
-  try {
-    const lawData = jsonData.법령
-
-    if (!lawData) {
-      throw new Error("법령 데이터가 없습니다")
-    }
-
-    const basicInfo = lawData.기본정보 || lawData
-    const meta = {
-      lawId: basicInfo.법령ID || basicInfo.법령키 || "unknown",
-      lawTitle: basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
-      latestEffectiveDate: basicInfo.최종시행일자 || basicInfo.시행일자 || "",
-      promulgation: {
-        date: basicInfo.공포일자 || "",
-        number: basicInfo.공포번호 || "",
-      },
-      revisionType: basicInfo.제개정구분명 || basicInfo.제개정구분 || "",
-      fetchedAt: new Date().toISOString(),
-    }
-
-
-    const articles: LawArticle[] = []
-    const articleUnits = lawData.조문?.조문단위 || []
-
-    debugLogger.info("전체 조문 단위: " + articleUnits.length + "개")
-
-    for (let i = 0; i < articleUnits.length; i++) {
-      const unit = articleUnits[i]
-
-      if (unit.조문여부 !== "조문") {
-        continue
-      }
-
-      const articleNum = unit.조문번호
-      const branchNum = unit.조문가지번호
-      const title = unit.조문제목 || ""
-
-      const result = convertArticleNumberToCode(articleNum, branchNum)
-      const code = result.code
-      const display = result.display
-
-      // Debug: Log article parsing for "조의" articles
-      if (branchNum && Number.parseInt(branchNum) > 0) {
-      }
-
-      // CRITICAL: 본문 (조문내용) + 항/호 결합 로직 (law-parser-server.ts와 동일)
-      let mainContent = ""  // 조문내용에서 추출
-      let paraContent = ""  // 항/호에서 추출
-
-      // STEP 1: 본문 추출 (조문내용에서)
-      if (unit.조문내용 && typeof unit.조문내용 === "string") {
-        let rawContent = unit.조문내용.trim()
-
-        // 제목 패턴 매칭: 제X조(제목) 형식
-        const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)[\s\S]*/)
-
-        if (headerMatch) {
-          const headerPart = headerMatch[1]  // 제X조(제목)
-          const bodyPart = rawContent.substring(headerPart.length).trim()  // 나머지 본문
-
-          if (bodyPart) {
-            // 본문이 있으면 본문만 저장
-            mainContent = bodyPart
-          } else {
-            // 본문 없이 제목만 있는 경우 (도로법 시행령 55조)
-            // 제목 제거하지 않고 유지 (호가 있을 수 있음)
-            mainContent = headerPart
-          }
-        } else {
-          // 제목 형식이 아니면 전체를 본문으로
-          mainContent = rawContent
-        }
-      }
-
-      // STEP 2: 항/호 내용 추출
-      if (unit.항 && Array.isArray(unit.항)) {
-        paraContent = extractContentFromHangArray(unit.항)
-      }
-      // Fallback: if 항 is an object with 호 array (old structure)
-      else if (unit.항 && typeof unit.항 === "object" && unit.항.호) {
-        if (Array.isArray(unit.항.호)) {
-          for (const ho of unit.항.호) {
-            if (ho.호내용) {
-              let hoContent = ho.호내용
-              if (Array.isArray(hoContent)) {
-                hoContent = hoContent.join("\n")
-              }
-              paraContent += "\n" + hoContent
-            }
-          }
-        }
-      }
-
-      // STEP 3: 본문 + 항/호 결합
-      let content = ""
-      if (mainContent) {
-        content = mainContent
-        if (paraContent) {
-          content += "\n" + paraContent
-        }
-      } else {
-        content = paraContent
-      }
-
-      articles.push({
-        jo: code,
-        joNum: display,
-        title: title,
-        content: content.trim(),
-        isPreamble: false,
-      })
-    }
-
-
-    // Debug: Show JO code range
-    if (articles.length > 0) {
-      console.log(`   JO 코드 범위: ${articles[0]?.jo} (${articles[0]?.joNum}) ~ ${articles[articles.length - 1]?.jo} (${articles[articles.length - 1]?.joNum})`)
-
-      // Show all "조의" articles
-      const branchArticles = articles.filter(a => {
-        const branchNum = parseInt(a.jo.slice(-2))
-        return branchNum > 0
-      })
-      if (branchArticles.length > 0) {
-        console.log(`   조의 조문 ${branchArticles.length}개:`, branchArticles.map(a => `${a.jo}(${a.joNum})`).join(', '))
-      }
-    }
-
-    return {
-      meta: meta,
-      articles: articles,
-      articleCount: articles.length,
-    }
-  } catch (error) {
-    debugLogger.error("JSON 파싱 오류", error)
-    throw error
-  }
-}
+// parseLawJSON은 이미 import되어 있음 (line 31)
 
 interface LawSearchResult {
   lawId?: string
@@ -368,7 +231,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   const [aiRelatedLaws, setAiRelatedLaws] = useState<any[]>([])
   const [isAiMode, setIsAiMode] = useState(false)
   const [fileSearchFailed, setFileSearchFailed] = useState(false) // 검색 실패 감지
-  const [aiCitations, setAiCitations] = useState<any[]>([]) // File Search Citations
+  const [aiCitations, setAiCitations] = useState<VerifiedCitation[]>([]) // ✅ 검증된 인용 목록
   const [userQuery, setUserQuery] = useState<string>('') // 사용자 질의
 
   // AI 모드 - 관련 법령 2단 비교 상태
@@ -1056,7 +919,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           })
         }
 
-        // AI 답변에서 관련 법령 추출
+        // ✅ 관련 법령 추출: AI 답변 마크다운에서 📜 발췌조문과 🔗 관련법령 추출
+        const { extractRelatedLaws } = await import('@/lib/law-parser')
         const relatedLaws = extractRelatedLaws(processedContent)
 
         debugLogger.success('✅ AI 답변 완료', {
@@ -1066,7 +930,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           citationDetails: receivedCitations.map(c => ({
             lawName: c.lawName,
             articleNum: c.articleNum,
-            source: c.source
+            verified: c.verified
           }))
         })
 
@@ -1959,74 +1823,15 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
   }
 
-  // AI 모드 - 관련 법령 클릭 핸들러 (2단 비교 표시)
+  // AI 모드 - 관련 법령 클릭 핸들러 (모달 표시)
+  // ✅ LawViewer의 openExternalLawArticleModal과 동일한 방식 사용
   const handleCitationClick = async (lawName: string, jo: string, article: string) => {
-    // AI 답변은 유지하고, 클릭한 법령을 2단 비교로 표시
-    debugLogger.info('관련 법령 클릭', { lawName, jo, article })
+    debugLogger.info('인용된 조문 클릭', { lawName, article })
 
-    try {
-      setIsLoadingComparison(true)
-
-      // 1. 법령 검색 (lawId 획득)
-      const searchUrl = `/api/law-search?query=${encodeURIComponent(lawName)}`
-      debugLogger.info('법령 검색 API 호출', { url: searchUrl })
-
-      const searchRes = await fetch(searchUrl)
-      if (!searchRes.ok) {
-        throw new Error('법령 검색 실패')
-      }
-
-      const searchData = await searchRes.json()
-      if (!searchData.success || !searchData.data || searchData.data.length === 0) {
-        throw new Error('법령을 찾을 수 없습니다')
-      }
-
-      const law = searchData.data[0]
-      const lawId = law.lawId || law.mst
-
-      debugLogger.success('법령 검색 성공', { lawId, lawTitle: law.lawTitle })
-
-      // 2. 법령 전문 로드
-      const eflawUrl = `/api/eflaw?lawId=${lawId}`
-      debugLogger.info('법령 전문 API 호출', { url: eflawUrl })
-
-      const eflawRes = await fetch(eflawUrl)
-      if (!eflawRes.ok) {
-        throw new Error('법령 전문 로드 실패')
-      }
-
-      const eflawData = await eflawRes.json()
-      if (!eflawData.success) {
-        throw new Error(eflawData.error || '법령 전문 로드 실패')
-      }
-
-      const { meta, articles } = eflawData
-
-      debugLogger.success('법령 전문 로드 성공', {
-        lawTitle: meta.lawTitle,
-        articleCount: articles.length,
-        targetJo: jo
-      })
-
-      // 3. 비교 법령 상태 설정 (2단 비교 활성화)
-      setComparisonLaw({
-        meta,
-        articles,
-        selectedJo: jo
-      })
-
-      setIsLoadingComparison(false)
-
-    } catch (err) {
-      debugLogger.error('관련 법령 로드 실패', err)
-      console.error('Failed to load related law:', err)
-      setIsLoadingComparison(false)
-      toast({
-        title: "법령 로드 실패",
-        description: err instanceof Error ? err.message : '법령을 불러올 수 없습니다',
-        variant: "destructive"
-      })
-    }
+    // LawViewer 내부의 openExternalLawArticleModal은 내부 함수이므로 직접 호출 불가
+    // onRelatedArticleClick prop으로 전달하고, LawViewer에서 처리하도록 함
+    // 현재는 handleCitationClick이 onRelatedArticleClick으로 연결되어 있음
+    // 따라서 이 함수는 실제로 실행되지 않고, onRelatedArticleClick이 실행됨
   }
 
   const handleCompare = (jo: string) => {

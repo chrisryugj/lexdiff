@@ -28,6 +28,9 @@ import {
   RefreshCw,
   ShieldCheck,
   Copy,
+  CheckCircle2,
+  AlertTriangle,
+  FileSearch,
   Check,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
@@ -42,6 +45,7 @@ import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleConte
 import { useToast } from "@/hooks/use-toast"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
+import type { VerifiedCitation } from '@/lib/citation-verifier'
 
 interface LawViewerProps {
   meta?: LawMeta
@@ -60,7 +64,7 @@ interface LawViewerProps {
   relatedArticles?: ParsedRelatedLaw[]
   onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
   fileSearchFailed?: boolean  // 검색 실패 여부
-  aiCitations?: any[]  // File Search Citations
+  aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
 
@@ -889,29 +893,31 @@ export function LawViewer({
   // Helper: fetch external law article and show in modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
     try {
-      console.log('[Citation] Opening modal for:', { lawName, articleLabel })
+      // ✅ 법령명 정규화: 따옴표 제거 (「도로법」 → 도로법)
+      const cleanedLawName = lawName.replace(/[「」『』]/g, '').trim()
+      console.log('[Citation] Opening modal for:', { originalLawName: lawName, cleanedLawName, articleLabel })
 
       // 자치법규 여부 감지
       // "시행규칙", "시행령"은 국가법령이므로 제외
-      const isOrdinance = (/조례/.test(lawName) ||
-        (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName) && !/시행규칙|시행령/.test(lawName))) &&
-        !/시행규칙|시행령/.test(lawName)
-      console.log('[Citation] Is ordinance:', isOrdinance, 'for law:', lawName)
+      const isOrdinance = (/조례/.test(cleanedLawName) ||
+        (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(cleanedLawName) && !/시행규칙|시행령/.test(cleanedLawName))) &&
+        !/시행규칙|시행령/.test(cleanedLawName)
+      console.log('[Citation] Is ordinance:', isOrdinance, 'for law:', cleanedLawName)
 
       // 자치법규는 법제처 자치법규 페이지로 리다이렉트
       if (isOrdinance) {
-        const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}`
+        const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
         setRefModal({
           open: true,
-          title: `${lawName} ${articleLabel}`,
-          html: `<div class="space-y-3"><p>자치법규는 법제처 자치법규 페이지에서 확인하실 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`,
-          lawName: lawName,
+          title: `${cleanedLawName} ${articleLabel}`,
+          html: `<div class="space-y-3"><p>자치법규는 법제처 자치법규 페이지에서 확인하실 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} ${articleLabel} 보기 →</a></div></div>`,
+          lawName: cleanedLawName,
           articleNumber: articleLabel,
         })
         return
       }
 
-      const qs = new URLSearchParams({ query: lawName })
+      const qs = new URLSearchParams({ query: cleanedLawName })
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
 
@@ -922,7 +928,7 @@ export function LawViewer({
 
       // ✅ 모든 법령 검색하고 가장 짧은 이름 선택 (정확 매칭 우선)
       const allLaws = Array.from(searchDoc.querySelectorAll("law"))
-      const normalizedSearchName = lawName.replace(/\s+/g, "")
+      const normalizedSearchName = cleanedLawName.replace(/\s+/g, "")
 
       const exactMatches = allLaws.filter(lawNode => {
         const nodeLawName = lawNode.querySelector("법령명한글")?.textContent || ""
@@ -938,7 +944,7 @@ export function LawViewer({
         : allLaws[0]
 
       console.log('[Citation] Law matching:', {
-        searched: lawName,
+        searched: cleanedLawName,
         found: lawNode?.querySelector("법령명한글")?.textContent,
         exactMatches: exactMatches.length,
         totalResults: allLaws.length
@@ -954,8 +960,8 @@ export function LawViewer({
         console.log('[Citation] No law ID found')
         setRefModal({
           open: true,
-          title: lawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
+          title: cleanedLawName,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
         })
         return
       }
@@ -980,7 +986,7 @@ export function LawViewer({
       }
       // ⚠️ jo 파라미터 제거 - API가 잘못된 조문을 반환하는 버그 방지
       // 전체 법령을 가져온 후 클라이언트에서 필터링
-      console.log("[citation] Fetching full law, will filter on client:", { lawName, articleLabel, joCode })
+      console.log("[citation] Fetching full law, will filter on client:", { cleanedLawName, articleLabel, joCode })
       // ⚠️ efYd를 사용하지 않음 - 최신 시행 버전 조회
       // 타법개정으로 인한 조문 누락 방지
 
@@ -1015,7 +1021,7 @@ export function LawViewer({
 
         // 🔍 디버깅: 조문 검색 상세 로그
         debugLogger.info('[citation] Article search details', {
-          lawName,
+          lawName: cleanedLawName,
           articleLabel,
           joCode,
           normalizedJo,
@@ -1074,7 +1080,7 @@ export function LawViewer({
 
         if (!targetUnit) {
           console.warn("[citation] Article not found in JSON response", {
-            lawName,
+            lawName: cleanedLawName,
             articleLabel,
             joCode,
             normalizedJo,
@@ -1085,8 +1091,8 @@ export function LawViewer({
           })
           setRefModal({
             open: true,
-            title: `${lawName} ${articleLabel}`,
-            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
+            title: `${cleanedLawName} ${articleLabel}`,
+            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
           })
           return
         }
@@ -3060,20 +3066,53 @@ export function LawViewer({
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
-                            {aiCitations && aiCitations.length > 0 && (
-                              <div className={`flex items-center gap-1.5 text-xs ml-2 ${
-                                aiConfidenceLevel === 'high'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : aiConfidenceLevel === 'medium'
-                                  ? 'text-yellow-600 dark:text-yellow-400'
-                                  : 'text-red-600 dark:text-red-400'
-                              }`}>
-                                <ShieldCheck className="h-3.5 w-3.5" />
-                                <span>
-                                  {aiConfidenceLevel === 'high' ? '신뢰도 높음' : '신뢰도 보통'}
-                                </span>
-                              </div>
-                            )}
+                            {aiCitations && aiCitations.length > 0 && (() => {
+                              // 중복 제거된 개수 계산
+                              const uniqueCitations = new Map()
+                              aiCitations.forEach(c => {
+                                const key = `${c.lawName}|${c.articleNum}`
+                                if (!uniqueCitations.has(key)) {
+                                  uniqueCitations.set(key, c)
+                                }
+                              })
+                              const verifiedCount = Array.from(uniqueCitations.values()).filter(c => c.verified).length
+                              const totalUnique = uniqueCitations.size
+
+                              return (
+                                <div
+                                  className={`
+                                    relative flex items-center gap-1.5 ml-2 px-2 py-1 rounded-md cursor-help
+                                    transition-colors duration-200
+                                    ${aiConfidenceLevel === 'high'
+                                      ? 'bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/30 hover:border-blue-500/50 dark:hover:border-blue-400/50'
+                                      : aiConfidenceLevel === 'medium'
+                                      ? 'bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/30 dark:border-yellow-400/30 hover:border-yellow-500/50 dark:hover:border-yellow-400/50'
+                                      : 'bg-red-500/10 dark:bg-red-400/10 border border-red-500/30 dark:border-red-400/30 hover:border-red-500/50 dark:hover:border-red-400/50'
+                                    }
+                                  `}
+                                  title={`AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`}
+                                >
+                                  <ShieldCheck className={`h-4 w-4 ${
+                                    aiConfidenceLevel === 'high'
+                                      ? 'text-blue-400 dark:text-blue-300'
+                                      : aiConfidenceLevel === 'medium'
+                                      ? 'text-yellow-500 dark:text-yellow-400'
+                                      : 'text-red-500 dark:text-red-400'
+                                  }`} />
+                                  <div className={`flex items-baseline gap-0.5 font-bold ${
+                                    aiConfidenceLevel === 'high'
+                                      ? 'text-blue-400 dark:text-blue-300'
+                                      : aiConfidenceLevel === 'medium'
+                                      ? 'text-yellow-500 dark:text-yellow-400'
+                                      : 'text-red-500 dark:text-red-400'
+                                  }`}>
+                                    <span className="text-base tabular-nums leading-none">{verifiedCount}</span>
+                                    <span className="opacity-40 text-xs leading-none">/</span>
+                                    <span className="text-base tabular-nums leading-none">{totalUnique}</span>
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
                       </div>
