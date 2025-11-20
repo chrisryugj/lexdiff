@@ -5,14 +5,14 @@ export function parseLawJSON(jsonData: any): LawData {
   const basicInfo = lawData.기본정보 || {}
 
   const meta = {
-    lawId: basicInfo.법령ID || "unknown",
-    lawTitle: basicInfo.법령명한글 || "제목 없음",
-    latestEffectiveDate: basicInfo.최종시행일자 || "",
+    lawId: basicInfo.법령ID || basicInfo.법령키 || "unknown",
+    lawTitle: basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
+    latestEffectiveDate: basicInfo.최종시행일자 || basicInfo.시행일자 || "",
     promulgation: {
       date: basicInfo.공포일자 || "",
       number: basicInfo.공포번호 || "",
     },
-    revisionType: basicInfo.제개정구분명 || "",
+    revisionType: basicInfo.제개정구분명 || basicInfo.제개정구분 || "",
     fetchedAt: new Date().toISOString(),
   }
 
