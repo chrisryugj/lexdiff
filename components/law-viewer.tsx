@@ -1536,25 +1536,25 @@ export function LawViewer({
                   ).length
 
                   return (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-xs">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      <Badge variant="secondary" className="text-xs whitespace-nowrap">
                         <FileText className="h-3 w-3 mr-1" />
                         전체 {uniqueCount}개
                       </Badge>
                       {excerptOnlyCount > 0 && (
-                        <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
+                        <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50 whitespace-nowrap">
                           <Bookmark className="h-3 w-3 mr-1" />
                           발췌 {excerptOnlyCount}
                         </Badge>
                       )}
                       {relatedOnlyCount > 0 && (
-                        <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
+                        <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50 whitespace-nowrap">
                           <Link2 className="h-3 w-3 mr-1" />
                           관련 {relatedOnlyCount}
                         </Badge>
                       )}
                       {bothCount > 0 && (
-                        <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
+                        <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50 whitespace-nowrap">
                           <GitMerge className="h-3 w-3 mr-1" />
                           둘 다 {bothCount}
                         </Badge>
@@ -2933,14 +2933,14 @@ export function LawViewer({
                                   <Sparkles className="h-4 w-4 text-white" />
                                 </div>
                               </div>
-                              <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI 답변</span>
-                              <Badge variant="secondary" className="text-xs">
+                              <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent whitespace-nowrap">AI 답변</span>
+                              <Badge variant="secondary" className="text-xs whitespace-nowrap">
                                 File Search RAG
                               </Badge>
                             </div>
                             {userQuery && (
-                              <div className="text-xs text-muted-foreground/80 pl-1">
-                                Q. {userQuery}
+                              <div className="text-xs text-muted-foreground/80">
+                                <span className="inline">Q. {userQuery}</span>
                               </div>
                             )}
                           </div>
@@ -3053,9 +3053,9 @@ export function LawViewer({
                               </Badge>
                             </div>
                             {userQuery && (
-                              <div className="text-sm sm:text-md text-muted-foreground font-medium pl-1 break-words">
-                                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60" />
-                                {userQuery}
+                              <div className="flex items-start gap-1.5 text-sm sm:text-md text-muted-foreground font-medium pl-1">
+                                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
+                                <span className="break-words">{userQuery}</span>
                               </div>
                             )}
                           </div>
