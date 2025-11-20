@@ -37,8 +37,9 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [selectedLawId, setSelectedLawId] = useState<string | null>(null)
 
-  async function handleSearch(searchQuery: string) {
+  async function handleSearch(searchQuery: string, fromCandidateSelection: boolean = false) {
     if (!searchQuery.trim()) {
       setError('검색어를 입력해주세요')
       return
@@ -46,7 +47,11 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
 
     setLoading(true)
     setError(null)
-    setCandidates([])
+
+    // Only clear candidates if this is a new search (not from candidate selection)
+    if (!fromCandidateSelection) {
+      setCandidates([])
+    }
 
     try {
       const response = await fetch('/api/admin/parse-law', {
@@ -60,9 +65,46 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
       const data = await response.json()
 
       if (data.success) {
-        // Successfully parsed
+        // Successfully parsed - now save it to file
+        const saveResponse = await fetch('/api/admin/save-parsed', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            lawId: data.law.lawId,
+            markdown: data.law.markdown,
+            metadata: {
+              lawId: data.law.lawId,
+              lawName: data.law.lawName,
+              effectiveDate: data.law.effectiveDate,
+              promulgationDate: data.law.promulgationDate,
+              promulgationNumber: data.law.promulgationNumber,
+              revisionType: data.law.revisionType,
+              articleCount: data.law.articleCount,
+              totalCharacters: data.law.totalCharacters
+            }
+          })
+        })
+
+        const saveData = await saveResponse.json()
+
+        if (!saveData.success) {
+          setError(`파싱은 성공했으나 저장 실패: ${saveData.error}`)
+          return
+        }
+
+        // Notify parent component
         onParsed(data.law)
+
+        // Clear candidates and show success
+        setCandidates([])
         setQuery('')
+        setError(null)
+
+        // Show brief success message
+        setError(`✅ "${data.law.lawName}" 다운로드 및 저장 완료 (${data.law.articleCount}개 조문)`)
+        setTimeout(() => setError(null), 3000)
       } else if (data.candidates && data.candidates.length > 0) {
         // Multiple candidates - show selection UI
         setCandidates(data.candidates)
@@ -81,9 +123,16 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
     handleSearch(query)
   }
 
-  function handleSelectCandidate(lawId: string) {
-    handleSearch(lawId)
-    setCandidates([])
+  async function handleSelectCandidate(lawId: string) {
+    // Mark this law as selected (for loading indicator)
+    setSelectedLawId(lawId)
+
+    // Pass true to indicate this is from candidate selection
+    // This will keep the candidates list visible while loading
+    await handleSearch(lawId, true)
+
+    // Clear selection after completion
+    setSelectedLawId(null)
   }
 
   return (
@@ -119,8 +168,16 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
       </form>
 
       {error && (
-        <div className="p-4 bg-warning/10 backdrop-blur-sm border border-warning/30 rounded-xl">
-          <p className="text-warning text-sm">⚠ {error}</p>
+        <div
+          className={`p-4 backdrop-blur-sm border rounded-xl ${
+            error.startsWith('✅')
+              ? 'bg-accent/10 border-accent/30'
+              : 'bg-warning/10 border-warning/30'
+          }`}
+        >
+          <p className={`text-sm ${error.startsWith('✅') ? 'text-accent' : 'text-warning'}`}>
+            {error.startsWith('✅') ? error : `⚠ ${error}`}
+          </p>
         </div>
       )}
 
@@ -130,23 +187,37 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
             <p className="text-sm text-muted-foreground">{candidates.length}개의 후보를 찾았습니다</p>
           </div>
           <div className="space-y-2 max-h-80 overflow-y-auto">
-            {candidates.map((candidate, index) => (
-              <button
-                key={candidate.lawId}
-                onClick={() => handleSelectCandidate(candidate.lawId)}
-                className="w-full p-4 bg-card/30 hover:bg-card/50 backdrop-blur-sm border border-border/50 hover:border-primary/30 rounded-xl text-left transition-all duration-200 hover:shadow-md"
-                style={{
-                  animation: `fadeInUp 0.3s ease-out ${index * 50}ms both`
-                }}
-              >
-                <div className="font-medium text-foreground">{candidate.lawName}</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  법령 ID: {candidate.lawId}
-                  {candidate.effectiveDate && ` · 시행일: ${formatDate(candidate.effectiveDate)}`}
-                  {candidate.revisionType && ` · ${candidate.revisionType}`}
-                </div>
-              </button>
-            ))}
+            {candidates.map((candidate, index) => {
+              const isLoading = selectedLawId === candidate.lawId
+
+              return (
+                <button
+                  key={candidate.lawId}
+                  onClick={() => handleSelectCandidate(candidate.lawId)}
+                  disabled={loading}
+                  className={`w-full p-4 backdrop-blur-sm border rounded-xl text-left transition-all duration-200 ${
+                    isLoading
+                      ? 'bg-primary/10 border-primary/30 shadow-md'
+                      : 'bg-card/30 hover:bg-card/50 border-border/50 hover:border-primary/30 hover:shadow-md'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  style={{
+                    animation: `fadeInUp 0.3s ease-out ${index * 50}ms both`
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">{candidate.lawName}</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        법령 ID: {candidate.lawId}
+                        {candidate.effectiveDate && ` · 시행일: ${formatDate(candidate.effectiveDate)}`}
+                        {candidate.revisionType && ` · ${candidate.revisionType}`}
+                      </div>
+                    </div>
+                    {isLoading && <Loader2 className="h-5 w-5 text-primary animate-spin ml-3" />}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
