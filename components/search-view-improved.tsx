@@ -50,9 +50,11 @@ export function SearchViewImproved({
 
   // Intersection Observer for scroll-reveal animations
   useEffect(() => {
+    // 반응형: 모바일(768px 미만)은 -100px, PC는 -300px
+    const isMobile = window.innerWidth < 768
     const observerOptions = {
       root: null,
-      rootMargin: '-300px 0px', // Trigger when section starts entering viewport
+      rootMargin: isMobile ? '-100px 0px' : '-300px 0px',
       threshold: 0.1
     }
 
