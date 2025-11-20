@@ -102,7 +102,18 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
     console.log(`[parseAdminRuleXML] Found ${contentNodes.length} 조문내용 nodes`)
 
     contentNodes.forEach((node: any, index: number) => {
-      const text = node.textContent?.trim()
+      // Handle CDATA sections properly
+      let text = ''
+
+      // Try different methods to extract text
+      if (node.textContent) {
+        text = node.textContent.trim()
+      } else if (node.nodeValue) {
+        text = node.nodeValue.trim()
+      } else if (node.firstChild && node.firstChild.data) {
+        text = node.firstChild.data.trim()
+      }
+
       if (!text) {
         console.log(`[parseAdminRuleXML] Node ${index} is empty`)
         return
