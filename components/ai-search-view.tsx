@@ -263,7 +263,7 @@ export function AISearchView({
       {analysis && !error && (
         <>
           {/* Confidence Badge */}
-          <div className="mx-4 mt-4 flex items-center gap-2">
+          <div className="mx-2 sm:mx-4 mt-4 flex items-center gap-2">
             {(() => {
               const config = CONFIDENCE_CONFIGS[confidenceLevel]
               const Icon = config.icon
@@ -284,10 +284,10 @@ export function AISearchView({
             const Icon = config.icon
 
             return (
-              <div className={`mx-4 mt-2 ${config.bgColor} border ${config.borderColor} rounded-lg p-3`}>
+              <div className={`mx-2 sm:mx-4 mt-2 ${config.bgColor} border ${config.borderColor} rounded-lg p-2 sm:p-3`}>
                 <div className="flex items-start gap-2">
-                  <Icon className={`h-5 w-5 ${config.iconColor} flex-shrink-0 mt-0.5`} />
-                  <p className={`text-sm ${config.textColor}`}>{warning.replace(/⚠️|❌|✅/g, '').trim()}</p>
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${config.iconColor} flex-shrink-0 mt-0.5`} />
+                  <p className={`text-xs sm:text-sm ${config.textColor}`}>{warning.replace(/⚠️|❌|✅/g, '').trim()}</p>
                 </div>
               </div>
             )

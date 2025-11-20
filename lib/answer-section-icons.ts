@@ -25,10 +25,19 @@ import {
  * AI 답변 섹션 타입
  */
 export type AnswerSectionType =
-  | 'summary'      // 📋 핵심 요약
-  | 'detail'       // 📄 상세 내용
-  | 'tip'          // 💡 추가 참고사항
-  | 'related_laws' // 📖 관련 법령
+  | 'summary'       // 핵심 요약
+  | 'detail'        // 상세 내용
+  | 'tip'           // 추가 참고
+  | 'related_laws'  // 관련 법령
+
+/**
+ * 상세 내용 하위 섹션 타입
+ */
+export type DetailSubsectionType =
+  | 'article_quote' // 조문 발췌
+  | 'interpretation' // 핵심 해석
+  | 'practice'      // 실무 적용
+  | 'conditions'    // 조건·예외
 
 /**
  * 경고/알림 타입
@@ -50,7 +59,6 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low'
 export const SECTION_CONFIGS: Record<AnswerSectionType, {
   icon: LucideIcon
   label: string
-  emoji: string
   iconColor: string
   bgColor: string
   borderColor: string
@@ -58,7 +66,6 @@ export const SECTION_CONFIGS: Record<AnswerSectionType, {
   summary: {
     icon: FileText,
     label: '핵심 요약',
-    emoji: '📋',
     iconColor: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-50 dark:bg-blue-950/20',
     borderColor: 'border-blue-200 dark:border-blue-800'
@@ -66,15 +73,13 @@ export const SECTION_CONFIGS: Record<AnswerSectionType, {
   detail: {
     icon: ScrollText,
     label: '상세 내용',
-    emoji: '📄',
     iconColor: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-50 dark:bg-purple-950/20',
     borderColor: 'border-purple-200 dark:border-purple-800'
   },
   tip: {
     icon: Lightbulb,
-    label: '추가 참고사항',
-    emoji: '💡',
+    label: '추가 참고',
     iconColor: 'text-amber-500 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/20',
     borderColor: 'border-amber-200 dark:border-amber-800'
@@ -82,10 +87,39 @@ export const SECTION_CONFIGS: Record<AnswerSectionType, {
   related_laws: {
     icon: BookOpen,
     label: '관련 법령',
-    emoji: '📖',
     iconColor: 'text-cyan-500 dark:text-cyan-400',
     bgColor: 'bg-cyan-50 dark:bg-cyan-950/20',
     borderColor: 'border-cyan-200 dark:border-cyan-800'
+  }
+}
+
+/**
+ * 상세 내용 하위 섹션 아이콘 정의
+ */
+export const DETAIL_SUBSECTION_CONFIGS: Record<DetailSubsectionType, {
+  icon: LucideIcon
+  label: string
+  iconColor: string
+}> = {
+  article_quote: {
+    icon: FileText,
+    label: '조문 발췌',
+    iconColor: 'text-gray-600 dark:text-gray-400'
+  },
+  interpretation: {
+    icon: Lightbulb,
+    label: '핵심 해석',
+    iconColor: 'text-blue-600 dark:text-blue-400'
+  },
+  practice: {
+    icon: CheckCircle2,
+    label: '실무 적용',
+    iconColor: 'text-green-600 dark:text-green-400'
+  },
+  conditions: {
+    icon: AlertCircle,
+    label: '조건·예외',
+    iconColor: 'text-red-600 dark:text-red-400'
   }
 }
 
@@ -177,15 +211,30 @@ export const LAW_TYPE_ICONS = {
 } as const
 
 /**
- * 텍스트에서 섹션 타입 자동 감지
+ * 텍스트에서 섹션 타입 자동 감지 (이모지 제거)
  */
 export function detectSectionType(text: string): AnswerSectionType | null {
-  const trimmed = text.trim()
+  const trimmed = text.trim().toLowerCase()
 
-  if (trimmed.includes('📋') || trimmed.includes('핵심 요약')) return 'summary'
-  if (trimmed.includes('📄') || trimmed.includes('상세 내용')) return 'detail'
-  if (trimmed.includes('💡') || trimmed.includes('추가 참고')) return 'tip'
-  if (trimmed.includes('📖') || trimmed.includes('관련 법령')) return 'related_laws'
+  // 이모지가 있을 수도 있고 없을 수도 있음
+  if (trimmed.includes('핵심 요약') || trimmed.includes('핵심요약')) return 'summary'
+  if (trimmed.includes('상세 내용') || trimmed.includes('상세내용')) return 'detail'
+  if (trimmed.includes('추가 참고') || trimmed.includes('추가참고')) return 'tip'
+  if (trimmed.includes('관련 법령') || trimmed.includes('관련법령')) return 'related_laws'
+
+  return null
+}
+
+/**
+ * 텍스트에서 상세 내용 하위 섹션 타입 감지
+ */
+export function detectDetailSubsectionType(text: string): DetailSubsectionType | null {
+  const trimmed = text.trim().toLowerCase()
+
+  if (trimmed.includes('조문 발췌') || trimmed.includes('조문발췌') || trimmed.includes('조문 인용')) return 'article_quote'
+  if (trimmed.includes('핵심 해석') || trimmed.includes('핵심해석')) return 'interpretation'
+  if (trimmed.includes('실무 적용') || trimmed.includes('실무적용')) return 'practice'
+  if (trimmed.includes('조건') && trimmed.includes('예외')) return 'conditions'
 
   return null
 }
