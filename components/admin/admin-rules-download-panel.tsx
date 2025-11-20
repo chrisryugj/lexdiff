@@ -174,7 +174,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
           if (result.success) {
             status.status = 'success'
-            setDownloadedFiles(new Set([...downloadedFiles, rule.name]))
+            setDownloadedFiles((prev) => new Set([...prev, rule.name]))
           } else if (result.notFound) {
             status.status = 'not_found'
           } else {
