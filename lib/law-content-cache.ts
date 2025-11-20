@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 5 // Version bump to force DB recreation (v5: complete rebuild)
+const DB_VERSION = 6 // Version bump to force DB recreation (v6: fix version error)
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 
@@ -46,25 +46,21 @@ async function openDB(): Promise<IDBDatabase> {
 
       console.log(`📦 IndexedDB upgrade needed: v${oldVersion} → v${DB_VERSION}`)
 
-      // Version 5: 완전 재생성 (트랜잭션 에러 해결)
-      if (oldVersion < 5) {
-        // 기존 스토어가 있다면 삭제
-        if (db.objectStoreNames.contains(CONTENT_STORE)) {
-          db.deleteObjectStore(CONTENT_STORE)
-          console.log(`🗑️ Deleted old ${CONTENT_STORE} store for clean rebuild`)
-        }
+      // Version 6: 버전 충돌 해결 - 항상 완전 재생성
+      // 기존 스토어가 있다면 삭제
+      if (db.objectStoreNames.contains(CONTENT_STORE)) {
+        db.deleteObjectStore(CONTENT_STORE)
+        console.log(`🗑️ Deleted old ${CONTENT_STORE} store for clean rebuild`)
       }
 
-      // 스토어가 없으면 새로 생성
-      if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-        const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
-        contentStore.createIndex("timestamp", "timestamp", { unique: false })
-        contentStore.createIndex("lawId", "lawId", { unique: false })
-        contentStore.createIndex("lawTitle", "lawTitle", { unique: false })
-        contentStore.createIndex("searchKey", "searchKey", { unique: false })
-        contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
-        console.log(`✅ Created fresh ${CONTENT_STORE} object store with all indexes`)
-      }
+      // 스토어 새로 생성
+      const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
+      contentStore.createIndex("timestamp", "timestamp", { unique: false })
+      contentStore.createIndex("lawId", "lawId", { unique: false })
+      contentStore.createIndex("lawTitle", "lawTitle", { unique: false })
+      contentStore.createIndex("searchKey", "searchKey", { unique: false })
+      contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
+      console.log(`✅ Created fresh ${CONTENT_STORE} object store with all indexes`)
     }
   })
 }
@@ -118,6 +114,14 @@ export async function setLawContentCache(
     }
 
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache save.`)
+      db.close()
+      return
+    }
+
     const key = `${lawId}_${effectiveDate}`
 
     // Phase 7: 검색어 키 생성
@@ -163,6 +167,13 @@ export async function setLawContentCache(
         tx.onerror = () => reject(tx.error)
       }
       putRequest.onerror = () => reject(putRequest.error)
+
+      // ✅ 트랜잭션 중단(abort) 에러 핸들링
+      tx.onabort = () => {
+        const error = tx.error
+        console.warn(`⚠️ Transaction aborted:`, error)
+        reject(error || new Error('Transaction aborted'))
+      }
     })
 
     db.close()
@@ -172,6 +183,11 @@ export async function setLawContentCache(
     // 백그라운드로 만료된 캐시 정리
     cleanExpiredCache().catch(console.error)
   } catch (error) {
+    // ✅ VersionError는 조용히 무시 (DB 업그레이드 중)
+    if (error instanceof Error && error.name === 'VersionError') {
+      console.warn("⚠️ IndexedDB version mismatch detected. Cache will be rebuilt on next access.")
+      return
+    }
     console.error("❌ 캐시 저장 실패:", error)
   }
 }
