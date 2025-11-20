@@ -53,8 +53,9 @@ export default function DevTestPage() {
     law: {
       name: '관세법 제38조 (법률)',
       status: 'idle',
-      apiPath: '/api/eflaw?lawName=관세법&jo=제38조',
+      apiPath: '1. /api/law-search?query=관세법 → 2. /api/eflaw?lawId=...&JO=제38조',
       files: [
+        'app/api/law-search/route.ts',
         'app/api/eflaw/route.ts',
         'lib/law-json-parser.ts',
         'lib/law-types.ts',
@@ -64,8 +65,9 @@ export default function DevTestPage() {
     enforcement: {
       name: '관세법 시행령 제38조',
       status: 'idle',
-      apiPath: '/api/eflaw?lawName=관세법 시행령&jo=제38조',
+      apiPath: '1. /api/law-search?query=관세법 시행령 → 2. /api/eflaw?lawId=...&JO=제38조',
       files: [
+        'app/api/law-search/route.ts',
         'app/api/eflaw/route.ts',
         'lib/law-json-parser.ts',
         'components/law-viewer.tsx'
@@ -74,8 +76,9 @@ export default function DevTestPage() {
     rule: {
       name: '관세법 시행규칙 제38조',
       status: 'idle',
-      apiPath: '/api/eflaw?lawName=관세법 시행규칙&jo=제38조',
+      apiPath: '1. /api/law-search?query=관세법 시행규칙 → 2. /api/eflaw?lawId=...&JO=제38조',
       files: [
+        'app/api/law-search/route.ts',
         'app/api/eflaw/route.ts',
         'lib/law-json-parser.ts',
         'components/law-viewer.tsx'
@@ -84,10 +87,11 @@ export default function DevTestPage() {
     admin: {
       name: '납부기한의 연장 및 분할납부에 관한 고시',
       status: 'idle',
-      apiPath: '/api/ordin?query=납부기한의 연장 및 분할납부에 관한 고시',
+      apiPath: '1. /api/admrul-search?query=... → 2. /api/admrul?id=...',
       files: [
-        'app/api/ordin/route.ts',
-        'lib/ordin-parser.ts',
+        'app/api/admrul-search/route.ts',
+        'app/api/admrul/route.ts',
+        'lib/admrul-parser.ts',
         'components/law-viewer.tsx'
       ]
     },
@@ -97,18 +101,65 @@ export default function DevTestPage() {
   const [referenceOpen, setReferenceOpen] = useState(false)
   const [aiSearchOpen, setAISearchOpen] = useState(false)
 
+  // Helper: 법령명 → lawId 조회 → eflaw 호출
+  const fetchLawByName = async (lawName: string, jo?: string) => {
+    // Step 1: law-search로 lawId 찾기
+    const searchRes = await fetch(`/api/law-search?query=${encodeURIComponent(lawName)}`)
+    if (!searchRes.ok) throw new Error(`law-search failed: ${searchRes.status}`)
+
+    const xmlText = await searchRes.text()
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
+
+    const laws = xmlDoc.getElementsByTagName('law')
+    if (laws.length === 0) throw new Error(`법령을 찾을 수 없습니다: ${lawName}`)
+
+    const firstLaw = laws[0]
+    const lawId = firstLaw.getElementsByTagName('법령ID')[0]?.textContent?.trim()
+    if (!lawId) throw new Error('법령 ID를 찾을 수 없습니다')
+
+    // Step 2: eflaw로 본문 조회
+    const params = new URLSearchParams({ lawId })
+    if (jo) params.append('JO', jo)
+
+    const eflawRes = await fetch(`/api/eflaw?${params.toString()}`)
+    if (!eflawRes.ok) throw new Error(`eflaw failed: ${eflawRes.status}`)
+
+    return await eflawRes.json()
+  }
+
+  // Helper: 행정규칙명 → admrul-search → admrul 호출
+  const fetchAdminRuleByName = async (ruleName: string) => {
+    // Step 1: admrul-search로 ID 찾기
+    const searchRes = await fetch(`/api/admrul-search?query=${encodeURIComponent(ruleName)}`)
+    if (!searchRes.ok) throw new Error(`admrul-search failed: ${searchRes.status}`)
+
+    const xmlText = await searchRes.text()
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
+
+    const rules = xmlDoc.getElementsByTagName('law')
+    if (rules.length === 0) throw new Error(`행정규칙을 찾을 수 없습니다: ${ruleName}`)
+
+    const firstRule = rules[0]
+    const ruleId = firstRule.getElementsByTagName('행정규칙ID')[0]?.textContent?.trim()
+    if (!ruleId) throw new Error('행정규칙 ID를 찾을 수 없습니다')
+
+    // Step 2: admrul로 본문 조회
+    const admrulRes = await fetch(`/api/admrul?id=${ruleId}`)
+    if (!admrulRes.ok) throw new Error(`admrul failed: ${admrulRes.status}`)
+
+    return await admrulRes.json()
+  }
+
   // 관세법 제38조 법률 조회
   const testLaw = async () => {
     updateStatus('law', 'loading')
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/eflaw?lawName=관세법&jo=제38조')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const data = await response.json()
+      const data = await fetchLawByName('관세법', '제38조')
       const duration = Date.now() - start
-
       updateStatus('law', 'success', data, undefined, duration)
     } catch (error: any) {
       updateStatus('law', 'error', undefined, error.message)
@@ -121,12 +172,8 @@ export default function DevTestPage() {
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/eflaw?lawName=관세법 시행령&jo=제38조')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const data = await response.json()
+      const data = await fetchLawByName('관세법 시행령', '제38조')
       const duration = Date.now() - start
-
       updateStatus('enforcement', 'success', data, undefined, duration)
     } catch (error: any) {
       updateStatus('enforcement', 'error', undefined, error.message)
@@ -139,12 +186,8 @@ export default function DevTestPage() {
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/eflaw?lawName=관세법 시행규칙&jo=제38조')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const data = await response.json()
+      const data = await fetchLawByName('관세법 시행규칙', '제38조')
       const duration = Date.now() - start
-
       updateStatus('rule', 'success', data, undefined, duration)
     } catch (error: any) {
       updateStatus('rule', 'error', undefined, error.message)
@@ -157,12 +200,8 @@ export default function DevTestPage() {
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/ordin?query=납부기한의 연장 및 분할납부에 관한 고시')
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const data = await response.json()
+      const data = await fetchAdminRuleByName('납부기한의 연장 및 분할납부에 관한 고시')
       const duration = Date.now() - start
-
       updateStatus('admin', 'success', data, undefined, duration)
     } catch (error: any) {
       updateStatus('admin', 'error', undefined, error.message)
@@ -411,7 +450,14 @@ export default function DevTestPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <LawViewer lawData={result.data} targetJo="" />
+                      <LawViewer
+                        meta={result.data.meta}
+                        articles={result.data.articles}
+                        selectedJo=""
+                        favorites={new Set()}
+                        isOrdinance={false}
+                        viewMode="full"
+                      />
                     </CardContent>
                   </Card>
                 )
