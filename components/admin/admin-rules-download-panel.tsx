@@ -23,6 +23,7 @@ interface DownloadStatus {
   ruleName: string
   status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error'
   error?: string
+  downloadedAt?: string
 }
 
 interface AdminRulesDownloadPanelProps {
@@ -63,11 +64,16 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
   async function loadLaws() {
     try {
-      const response = await fetch('/api/admin/list-parsed')
-      const data = await response.json()
+      const [lawsResponse, filesResponse] = await Promise.all([
+        fetch('/api/admin/list-parsed'),
+        fetch('/api/admin/list-admin-rule-files')
+      ])
 
-      if (data.success) {
-        const allLaws = data.laws || []
+      const lawsData = await lawsResponse.json()
+      const filesData = await filesResponse.json()
+
+      if (lawsData.success) {
+        const allLaws = lawsData.laws || []
         const baseLaws = allLaws.filter(
           (law: SavedLaw) =>
             !law.lawName.includes('시행령') &&
@@ -80,19 +86,20 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         setLaws(baseLaws)
 
         const downloaded = new Set<string>()
-        allLaws.forEach((law: SavedLaw) => {
-          if (
-            law.lawName.includes('고시') ||
-            law.lawName.includes('예규') ||
-            law.lawName.includes('훈령') ||
-            law.lawName.includes('규정') ||
-            law.lawName.includes('지침')
-          ) {
-            downloaded.add(law.lawName)
-          }
-        })
+        const downloadDates = new Map<string, string>()
+
+        // Use file metadata for downloaded files
+        if (filesData.success) {
+          filesData.files.forEach((file: any) => {
+            downloaded.add(file.ruleName)
+            downloadDates.set(file.ruleName, file.downloadedAt)
+          })
+        }
 
         setDownloadedFiles(downloaded)
+
+        // Store download dates for later use
+        ;(window as any).__adminRuleDownloadDates = downloadDates
       }
     } catch (error) {
       console.error('Failed to load laws:', error)
@@ -580,6 +587,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   {availableRules.map((rule, index) => {
                     const isSelected = selectedRules.has(rule.name)
                     const isDownloaded = downloadedFiles.has(rule.name)
+                    const downloadDates = (window as any).__adminRuleDownloadDates as Map<string, string> | undefined
+                    const downloadedAt = downloadDates?.get(rule.name)
 
                     return (
                       <label
@@ -611,6 +620,9 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                           <div className="font-medium text-foreground">{rule.name}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">
                             {rule.type} · ID: {rule.id}
+                            {isDownloaded && downloadedAt && (
+                              <span className="ml-2">· 다운로드: {formatDate(downloadedAt)}</span>
+                            )}
                           </div>
                         </div>
                         {isDownloaded && (
@@ -655,10 +667,23 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         <div className="text-sm text-muted-foreground space-y-1">
           <div>• 고시, 예규, 훈령 등 법령 체계도의 행정규칙을 다운로드합니다</div>
           <div>• 각 법령의 모든 행정규칙을 다운로드합니다 (제한 없음)</div>
-          <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-admin-rules/</code></div>
+          <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-admin-rules/(법령명)/</code></div>
           <div>• 전체 다운로드는 저장된 모든 법령을 처리합니다</div>
+          <div>• 다운로드 시점: 파일 생성일 기준 표시</div>
         </div>
       </div>
     </div>
   )
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return isoDate
+  }
 }

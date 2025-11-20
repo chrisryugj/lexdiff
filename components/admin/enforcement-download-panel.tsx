@@ -24,6 +24,7 @@ interface DownloadStatus {
   status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error'
   articleCount?: number
   error?: string
+  downloadedAt?: string
 }
 
 interface EnforcementDownloadPanelProps {
@@ -51,21 +52,30 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
 
   async function loadLaws() {
     try {
-      const response = await fetch('/api/admin/list-parsed')
-      const data = await response.json()
+      const [lawsResponse, filesResponse] = await Promise.all([
+        fetch('/api/admin/list-parsed'),
+        fetch('/api/admin/list-enforcement-files')
+      ])
 
-      if (data.success) {
-        const allLaws = data.laws || []
+      const lawsData = await lawsResponse.json()
+      const filesData = await filesResponse.json()
+
+      if (lawsData.success) {
+        const allLaws = lawsData.laws || []
         const baseLaws = allLaws.filter(
           (law: SavedLaw) => !law.lawName.includes('시행령') && !law.lawName.includes('시행규칙')
         )
 
         const downloaded = new Set<string>()
-        allLaws.forEach((law: SavedLaw) => {
-          if (law.lawName.includes('시행령') || law.lawName.includes('시행규칙')) {
-            downloaded.add(law.lawName)
-          }
-        })
+        const downloadDates = new Map<string, string>()
+
+        // Use file metadata for downloaded files
+        if (filesData.success) {
+          filesData.files.forEach((file: any) => {
+            downloaded.add(file.lawName)
+            downloadDates.set(file.lawName, file.downloadedAt)
+          })
+        }
 
         setLaws(baseLaws)
         setDownloadedFiles(downloaded)
@@ -83,19 +93,21 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
             `${law.lawName.trim()} 시행규칙`
           ]
 
-          const hasDecree = patterns.some((pattern) => downloaded.has(pattern))
-          const hasRule = rulePatterns.some((pattern) => downloaded.has(pattern))
+          const decreePattern = patterns.find((pattern) => downloaded.has(pattern))
+          const rulePattern = rulePatterns.find((pattern) => downloaded.has(pattern))
 
           initialProgress.set(law.lawName, [
             {
               lawName: law.lawName,
               type: '시행령',
-              status: hasDecree ? 'success' : 'pending'
+              status: decreePattern ? 'success' : 'pending',
+              downloadedAt: decreePattern ? downloadDates.get(decreePattern) : undefined
             },
             {
               lawName: law.lawName,
               type: '시행규칙',
-              status: hasRule ? 'success' : 'pending'
+              status: rulePattern ? 'success' : 'pending',
+              downloadedAt: rulePattern ? downloadDates.get(rulePattern) : undefined
             }
           ])
         })
@@ -346,6 +358,11 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                           {decreeStatus.articleCount && (
                             <span className="text-muted-foreground">({decreeStatus.articleCount}개 조문)</span>
                           )}
+                          {decreeStatus.downloadedAt && (
+                            <span className="text-muted-foreground text-xs">
+                              다운로드: {formatDate(decreeStatus.downloadedAt)}
+                            </span>
+                          )}
                           {decreeStatus.error && (
                             <span className="text-destructive text-xs">({decreeStatus.error})</span>
                           )}
@@ -359,6 +376,11 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                           <span className="text-muted-foreground">{getStatusText(ruleStatus.status)}</span>
                           {ruleStatus.articleCount && (
                             <span className="text-muted-foreground">({ruleStatus.articleCount}개 조문)</span>
+                          )}
+                          {ruleStatus.downloadedAt && (
+                            <span className="text-muted-foreground text-xs">
+                              다운로드: {formatDate(ruleStatus.downloadedAt)}
+                            </span>
                           )}
                           {ruleStatus.error && <span className="text-destructive text-xs">({ruleStatus.error})</span>}
                         </div>
@@ -401,8 +423,21 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
           <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-laws/</code></div>
           <div>• 자동으로 법령명 기반 매칭</div>
           <div>• RAG 청킹을 위한 메타데이터 포함</div>
+          <div>• 다운로드 시점: 파일 생성일 기준 표시</div>
         </div>
       </div>
     </div>
   )
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return isoDate
+  }
 }

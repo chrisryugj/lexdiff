@@ -32,9 +32,10 @@ interface UploadResult {
 interface OrdinanceUploadPanelProps {
   onUploadComplete?: () => void
   refreshTrigger?: number // Optional prop to trigger refresh
+  onRenderHeader?: (syncButton: React.ReactNode) => void
 }
 
-export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: OrdinanceUploadPanelProps) {
+export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRenderHeader }: OrdinanceUploadPanelProps) {
   const [parsedOrdinances, setParsedOrdinances] = useState<ParsedOrdinanceFile[]>([])
   const [districts, setDistricts] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<Set<string>>(new Set())
@@ -55,6 +56,24 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
     loadParsedOrdinances()
     // Don't auto-sync with server on mount - user must click sync button
   }, [])
+
+  useEffect(() => {
+    // Pass sync button to parent if callback provided
+    if (onRenderHeader) {
+      const syncButton = (
+        <Button
+          onClick={checkStoreIdAndSync}
+          disabled={uploading}
+          variant="outline"
+          size="sm"
+          className="border-primary/30 text-primary hover:bg-primary/10"
+        >
+          스토어 동기화
+        </Button>
+      )
+      onRenderHeader(syncButton)
+    }
+  }, [uploading, onRenderHeader])
 
   // Reload when refreshTrigger changes (tab switch)
   useEffect(() => {
@@ -685,15 +704,18 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger }: Ordin
           {selectedCount > 0 ? `${selectedCount}개 선택됨` : <>선택된<br />파일 없음</>}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            onClick={checkStoreIdAndSync}
-            disabled={uploading}
-            variant="outline"
-            size="default"
-            className="border-primary/30 text-primary hover:bg-primary/10"
-          >
-            스토어 동기화
-          </Button>
+          {/* Sync button moved to header - only show if not using callback */}
+          {!onRenderHeader && (
+            <Button
+              onClick={checkStoreIdAndSync}
+              disabled={uploading}
+              variant="outline"
+              size="default"
+              className="border-primary/30 text-primary hover:bg-primary/10"
+            >
+              스토어 동기화
+            </Button>
+          )}
           <Button
             onClick={forceResetUploadStatus}
             disabled={uploading}

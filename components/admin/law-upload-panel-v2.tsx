@@ -28,9 +28,10 @@ interface UploadResult {
 
 interface LawUploadPanelProps {
   onUploadComplete?: () => void
+  onRenderHeader?: (syncButton: React.ReactNode) => void
 }
 
-export function LawUploadPanelV2({ onUploadComplete }: LawUploadPanelProps) {
+export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUploadPanelProps) {
   const [parsedLaws, setParsedLaws] = useState<ParsedLawFile[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
@@ -48,6 +49,24 @@ export function LawUploadPanelV2({ onUploadComplete }: LawUploadPanelProps) {
     loadParsedLaws()
     // Don't auto-sync with server on mount - user must click sync button
   }, [])
+
+  useEffect(() => {
+    // Pass sync button to parent if callback provided
+    if (onRenderHeader) {
+      const syncButton = (
+        <Button
+          onClick={checkStoreIdAndSync}
+          disabled={uploading}
+          variant="outline"
+          size="sm"
+          className="border-primary/30 text-primary hover:bg-primary/10"
+        >
+          스토어 동기화
+        </Button>
+      )
+      onRenderHeader(syncButton)
+    }
+  }, [uploading, onRenderHeader])
 
   /**
    * Check ENV store ID and sync with server
@@ -431,15 +450,18 @@ export function LawUploadPanelV2({ onUploadComplete }: LawUploadPanelProps) {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            onClick={checkStoreIdAndSync}
-            disabled={uploading}
-            variant="outline"
-            size="default"
-            className="border-primary/30 text-primary hover:bg-primary/10"
-          >
-            스토어 동기화
-          </Button>
+          {/* Sync button moved to header - only show if not using callback */}
+          {!onRenderHeader && (
+            <Button
+              onClick={checkStoreIdAndSync}
+              disabled={uploading}
+              variant="outline"
+              size="default"
+              className="border-primary/30 text-primary hover:bg-primary/10"
+            >
+              스토어 동기화
+            </Button>
+          )}
           <Button
             onClick={forceResetUploadStatus}
             disabled={uploading}

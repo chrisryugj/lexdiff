@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Download, CheckCircle2, XCircle, Play } from 'lucide-react'
@@ -46,6 +46,7 @@ interface DistrictStatus {
   ordinanceCount?: number
   error?: string
   startTime?: number
+  lastDownloaded?: string
 }
 
 export function OrdinanceDownloadPanel() {
@@ -54,6 +55,37 @@ export function OrdinanceDownloadPanel() {
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DistrictStatus>>(new Map())
   const [currentDistrict, setCurrentDistrict] = useState<string | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [districtDownloadDates, setDistrictDownloadDates] = useState<Map<string, string>>(new Map())
+
+  // Load existing ordinance files on mount
+  useEffect(() => {
+    loadExistingFiles()
+  }, [])
+
+  async function loadExistingFiles() {
+    try {
+      const response = await fetch('/api/admin/list-parsed-ordinances')
+      const data = await response.json()
+
+      if (data.success) {
+        // Group by district and find latest download date
+        const datesByDistrict = new Map<string, string>()
+
+        data.ordinances.forEach((file: any) => {
+          const districtName = file.districtName
+          const existing = datesByDistrict.get(districtName)
+
+          if (!existing || new Date(file.lastModified) > new Date(existing)) {
+            datesByDistrict.set(districtName, file.lastModified)
+          }
+        })
+
+        setDistrictDownloadDates(datesByDistrict)
+      }
+    } catch (error) {
+      console.error('Failed to load ordinance files:', error)
+    }
+  }
 
   function toggleDistrict(code: string) {
     if (isDownloading) return
@@ -346,6 +378,12 @@ export function OrdinanceDownloadPanel() {
                   ✗ {status.error}
                 </div>
               )}
+
+              {!status && districtDownloadDates.has(district.name) && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  최근: {formatDate(districtDownloadDates.get(district.name)!)}
+                </div>
+              )}
             </button>
           )
         })}
@@ -358,6 +396,7 @@ export function OrdinanceDownloadPanel() {
           <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-ordinances/(자치구명)/</code></div>
           <div>• 자치구당 약 2분 소요 (API 속도 제한)</div>
           <div>• RAG 청킹을 위한 메타데이터 포함</div>
+          <div>• 최근 다운로드: 파일 생성일 기준 표시</div>
         </div>
       </div>
 
@@ -375,4 +414,16 @@ export function OrdinanceDownloadPanel() {
       `}</style>
     </div>
   )
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch {
+    return isoDate
+  }
 }

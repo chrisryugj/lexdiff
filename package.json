@@ -53,6 +53,7 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@vercel/analytics": "latest",
+    "@xmldom/xmldom": "^0.8.11",
     "ai": "5.0.82",
     "autoprefixer": "^10.4.20",
     "cheerio": "latest",
