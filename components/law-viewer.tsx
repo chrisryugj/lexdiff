@@ -361,7 +361,8 @@ export function LawViewer({
 
         const response = await fetch(`/api/three-tier?${params.toString()}`)
         if (!response.ok) {
-          console.error("[v0] [3단비교] API 응답 오류:", response.status)
+          const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] [3단비교] API 응답 오류:", response.status, errorData)
           return
         }
 

@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 6 // Version bump to force DB recreation (v6: fix version error)
+const DB_VERSION = 7 // Version bump to force DB recreation (v7: fix object store not found error)
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 
@@ -46,12 +46,13 @@ async function openDB(): Promise<IDBDatabase> {
 
       console.log(`📦 IndexedDB upgrade needed: v${oldVersion} → v${DB_VERSION}`)
 
-      // Version 6: 버전 충돌 해결 - 항상 완전 재생성
-      // 기존 스토어가 있다면 삭제
-      if (db.objectStoreNames.contains(CONTENT_STORE)) {
-        db.deleteObjectStore(CONTENT_STORE)
-        console.log(`🗑️ Deleted old ${CONTENT_STORE} store for clean rebuild`)
-      }
+      // Version 7: 스키마 불일치 해결 - 모든 기존 스토어 완전 삭제
+      // 기존 스토어가 있다면 모두 삭제 (이전 버전 호환 문제 방지)
+      const existingStores = Array.from(db.objectStoreNames)
+      existingStores.forEach((storeName) => {
+        db.deleteObjectStore(storeName)
+        console.log(`🗑️ Deleted old store: ${storeName}`)
+      })
 
       // 스토어 새로 생성
       const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
@@ -188,6 +189,19 @@ export async function setLawContentCache(
       console.warn("⚠️ IndexedDB version mismatch detected. Cache will be rebuilt on next access.")
       return
     }
+
+    // NotFoundError: object store not found - IndexedDB 스키마 불일치
+    if (error instanceof DOMException && error.name === "NotFoundError") {
+      console.warn("⚠️ IndexedDB 스키마 불일치 감지, 데이터베이스를 재생성합니다...")
+      try {
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log("🗑️ IndexedDB 삭제 완료, 다음 요청 시 자동으로 재생성됩니다")
+      } catch (deleteError) {
+        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+      }
+      return
+    }
+
     console.error("❌ 캐시 저장 실패:", error)
   }
 }
@@ -253,6 +267,18 @@ export async function getLawContentCacheByQuery(
     return entry
   } catch (error) {
     console.error("❌ 캐시 조회 실패 (검색어):", error)
+
+    // NotFoundError: object store not found - IndexedDB 스키마 불일치
+    if (error instanceof DOMException && error.name === "NotFoundError") {
+      console.warn("⚠️ IndexedDB 스키마 불일치 감지, 데이터베이스를 재생성합니다...")
+      try {
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log("🗑️ IndexedDB 삭제 완료, 다음 요청 시 자동으로 재생성됩니다")
+      } catch (deleteError) {
+        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+      }
+    }
+
     return null
   }
 }
@@ -316,6 +342,19 @@ export async function getLawContentCache(
     return entry
   } catch (error) {
     console.error("❌ 캐시 조회 실패:", error)
+
+    // NotFoundError: object store not found - IndexedDB 스키마 불일치
+    if (error instanceof DOMException && error.name === "NotFoundError") {
+      console.warn("⚠️ IndexedDB 스키마 불일치 감지, 데이터베이스를 재생성합니다...")
+      try {
+        // 기존 DB 삭제
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log("🗑️ IndexedDB 삭제 완료, 다음 요청 시 자동으로 재생성됩니다")
+      } catch (deleteError) {
+        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+      }
+    }
+
     return null
   }
 }
