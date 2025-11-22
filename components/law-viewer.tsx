@@ -49,6 +49,7 @@ import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
+import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent, formatAdminRuleHTML } from "@/lib/admrul-parser"
@@ -173,6 +174,9 @@ export function LawViewer({
     }
     return 35
   })
+
+  // Swipe tutorial and hints
+  const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
 
   // AI 답변 HTML 변환 (섹션별 링크 처리)
   const aiAnswerHTML = useMemo(() => {
@@ -490,6 +494,7 @@ export function LawViewer({
     const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
     if (currentIndex < actualArticles.length - 1) {
       const nextArticle = actualArticles[currentIndex + 1]
+      setSwipeHint({ direction: "left" }) // Show hint
       handleArticleClick(nextArticle.jo)
     }
   }
@@ -499,6 +504,7 @@ export function LawViewer({
     const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
     if (currentIndex > 0) {
       const prevArticle = actualArticles[currentIndex - 1]
+      setSwipeHint({ direction: "right" }) // Show hint
       handleArticleClick(prevArticle.jo)
     }
   }
@@ -1885,6 +1891,22 @@ export function LawViewer({
             !aiAnswerMode && !isOrdinance && activeArticle && (
               <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
                 <div className="flex flex-wrap gap-1.5">
+                  {/* 조문 목록 버튼 (데스크탑만 표시, 모바일은 FAB 사용) */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsArticleListExpanded(true)}
+                    className="hidden md:inline-flex h-7 px-2"
+                    title={`전체 ${articles.length}개 조문 보기`}
+                  >
+                    <ListOrdered className="h-3.5 w-3.5 mr-1" />
+                    조문 목록
+                    {articles.length > 0 && (
+                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
+                        {articles.length}
+                      </Badge>
+                    )}
+                  </Button>
                   <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
                     <GitCompare className="h-3.5 w-3.5 mr-1" />
                     신·구법 비교
@@ -3537,7 +3559,18 @@ export function LawViewer({
             }
           }}
         />
-      </div >
+      </div>
+
+      {/* Swipe Tutorial (첫 방문 시 표시) */}
+      <SwipeTutorial onComplete={() => {}} />
+
+      {/* Swipe Hint (스와이프 시 힌트 표시) */}
+      {swipeHint && (
+        <SwipeHint
+          direction={swipeHint.direction}
+          onDismiss={() => setSwipeHint(null)}
+        />
+      )}
     </>
   )
 }
