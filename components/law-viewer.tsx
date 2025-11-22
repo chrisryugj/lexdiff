@@ -1838,8 +1838,8 @@ export function LawViewer({
         {/* Floating Action Button (Mobile only) */}
         <FloatingActionButton
           onClick={() => setIsArticleListExpanded(true)}
-          icon={<ListOrdered className="h-6 w-6" />}
-          badge={aiAnswerMode ? relatedArticles.length : actualArticles.length}
+          icon={<ListOrdered className="h-5 w-5" />}
+          count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
           label={aiAnswerMode ? "관련 법령 목록 열기" : "조문 목록 열기"}
         />
 
