@@ -132,21 +132,21 @@ export function SearchViewImproved({
 
         {/* Hero Section - Fixed */}
         <section className={`hero-gradient border-b border-border/50 hero-section ${heroVisible ? 'is-visible' : ''}`}>
-          <div className="container mx-auto px-6 pt-[100px] pb-[20px]">
-            <div className="flex flex-col items-center text-center space-y-8">
+          <div className="container mx-auto px-6 pt-[40px] md:pt-[100px] pb-[10px] md:pb-[20px]">
+            <div className="flex flex-col items-center text-center space-y-4 md:space-y-8">
               {/* Title & Subtitle */}
-              <div className="space-y-4">
+              <div className="space-y-2 md:space-y-4">
                 <h1
-                  className="text-6xl md:text-7xl font-bold text-foreground tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
+                  className="text-5xl md:text-7xl font-bold text-foreground tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ fontFamily: "GiantsInline, sans-serif" }}
                   onClick={handleLogoClick}
                 >
                   LexDiff
                 </h1>
-                <p className="text-xl md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "InkLiquid, sans-serif" }}>
+                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "InkLiquid, sans-serif" }}>
                   Your AI-Powered Legal Companion
                 </p>
-                <p className="text-base md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                <p className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
                   법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
                 </p>
               </div>
@@ -187,12 +187,12 @@ export function SearchViewImproved({
       </div>
 
       {/* Spacer for fixed header + hero */}
-      <div style={{ height: 'calc(64px + 100px + 60px + 14rem)' }} />
+      <div className="h-[calc(64px+40px+60px+12rem)] md:h-[calc(64px+100px+60px+14rem)]" />
 
       {/* Scrollable Content */}
       <main className="flex-1 relative z-10">
-        {/* Extra spacing before Stats Section (100px down) */}
-        <div style={{ height: '50px' }} />
+        {/* Extra spacing before Stats Section */}
+        <div className="h-[20px] md:h-[50px]" />
 
         {/* Stats Section - Blur and fade in on scroll */}
         <section
