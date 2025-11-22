@@ -53,6 +53,7 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@tanstack/react-virtual": "^3.13.12",
     "@vercel/analytics": "latest",
     "@xmldom/xmldom": "^0.8.11",
     "ai": "5.0.82",

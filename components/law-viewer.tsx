@@ -46,6 +46,7 @@ import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
+import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
@@ -1663,73 +1664,16 @@ export function LawViewer({
                 </Badge>
               </div>
 
-              <div className="flex-1 min-h-0">
-                <ScrollArea className="h-full">
-                  <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
-                    {actualArticles.map((article, index) => {
-                      const isLoading = loadingJo === article.jo
-                      const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
-
-                      return (
-                        <button
-                          key={`${article.jo}-${index}`}
-                          onClick={() => handleArticleClick(article.jo)}
-                          disabled={isLoading}
-                          className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${activeJo === article.jo
-                            ? "bg-primary text-primary-foreground font-bold"
-                            : "hover:bg-secondary text-foreground font-medium"
-                            } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="text-base font-bold">
-                                {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
-                              </div>
-                              {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
-                              {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
-                            </div>
-
-                            {/* 아이콘 영역 */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              {activeJo === article.jo ? (
-                                <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-                              ) : (
-                                <Bookmark className="h-3.5 w-3.5 opacity-40" />
-                              )}
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  onToggleFavorite?.(article.jo)
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                    onToggleFavorite?.(article.jo)
-                                  }
-                                }}
-                                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${favorites.has(article.jo)
-                                  ? "text-[var(--color-warning)]"
-                                  : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-                                  }`}
-                                aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                                aria-pressed={favorites.has(article.jo)}
-                                title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                              >
-                                <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
-                              </span>
-                              {article.hasChanges && (
-                                <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </ScrollArea>
+              <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
+                <VirtualizedArticleList
+                  articles={actualArticles}
+                  activeJo={activeJo}
+                  loadingJo={loadingJo}
+                  favorites={favorites}
+                  isOrdinance={isOrdinance}
+                  onArticleClick={handleArticleClick}
+                  onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
+                />
               </div>
             </>
           )
@@ -1873,71 +1817,19 @@ export function LawViewer({
                 </Badge>
               </div>
 
-              <div className="space-y-1">
-                {actualArticles.map((article, index) => {
-                  const isLoading = loadingJo === article.jo
-                  const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
-
-                  return (
-                    <button
-                      key={`${article.jo}-${index}`}
-                      onClick={() => {
-                        handleArticleClick(article.jo)
-                        setIsArticleListExpanded(false)
-                      }}
-                      disabled={isLoading}
-                      className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${activeJo === article.jo
-                        ? "bg-primary text-primary-foreground font-bold"
-                        : "hover:bg-secondary text-foreground font-medium"
-                        } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="text-base font-bold">
-                            {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
-                          </div>
-                          {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
-                          {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          {activeJo === article.jo ? (
-                            <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-                          ) : (
-                            <Bookmark className="h-3.5 w-3.5 opacity-40" />
-                          )}
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onToggleFavorite?.(article.jo)
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                onToggleFavorite?.(article.jo)
-                              }
-                            }}
-                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${favorites.has(article.jo)
-                              ? "text-[var(--color-warning)]"
-                              : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-                              }`}
-                            aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                            aria-pressed={favorites.has(article.jo)}
-                            title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                          >
-                            <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
-                          </span>
-                          {article.hasChanges && (
-                            <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+              <div className="h-[60vh]">
+                <VirtualizedArticleList
+                  articles={actualArticles}
+                  activeJo={activeJo}
+                  loadingJo={loadingJo}
+                  favorites={favorites}
+                  isOrdinance={isOrdinance}
+                  onArticleClick={(jo) => {
+                    handleArticleClick(jo)
+                    setIsArticleListExpanded(false)
+                  }}
+                  onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
+                />
               </div>
             </>
           )}
