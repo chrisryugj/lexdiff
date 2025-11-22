@@ -2014,55 +2014,58 @@ export function LawViewer({
           }
 
           <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full" ref={contentRef}>
-              <div className="px-5 pt-0 pb-0" ref={swipeRef}>
-                {isOrdinance ? (
-                  <div className="space-y-2">
-                    {preambles.map((preamble, index) => (
-                      <div
-                        key={`preamble-${index}`}
-                        className="mb-2"
-                        dangerouslySetInnerHTML={{ __html: preamble.content }}
-                      />
-                    ))}
-
-                    {actualArticles.map((article, index) => (
-                      <div
-                        key={`${article.jo}-${index}`}
-                        id={`article-${article.jo}`}
-                        ref={(el) => {
-                          articleRefs.current[article.jo] = el
-                        }}
-                        className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
-                      >
-                        {/* Header removed for ordinances - article number already in content */}
+            {/* 전문조회 모드: 자체 스크롤 관리 */}
+            {viewMode === "full" ? (
+              <div ref={swipeRef} className="h-full">
+                <VirtualizedFullArticleView
+                  articles={actualArticles}
+                  preambles={preambles}
+                  activeJo={activeJo}
+                  fontSize={fontSize}
+                  lawTitle={meta.lawTitle}
+                  onContentClick={handleContentClick}
+                  articleRefs={articleRefs}
+                />
+              </div>
+            ) : (
+              <ScrollArea className="h-full" ref={contentRef}>
+                <div className="px-5 pt-0 pb-0" ref={swipeRef}>
+                  {isOrdinance ? (
+                    <div className="space-y-2">
+                      {preambles.map((preamble, index) => (
                         <div
-                          className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance, meta.lawTitle) }}
+                          key={`preamble-${index}`}
+                          className="mb-2"
+                          dangerouslySetInnerHTML={{ __html: preamble.content }}
                         />
-                        <Separator className="my-1" />
-                      </div>
-                    ))}
-                  </div>
-                ) : viewMode === "full" ? (
-                  // 전문조회 모드: 가상화된 조문 리스트 (성능 최적화)
-                  <VirtualizedFullArticleView
-                    articles={actualArticles}
-                    preambles={preambles}
-                    activeJo={activeJo}
-                    fontSize={fontSize}
-                    lawTitle={meta.lawTitle}
-                    onContentClick={handleContentClick}
-                    articleRefs={articleRefs}
-                  />
-                ) : loadingJo ? (
+                      ))}
+
+                      {actualArticles.map((article, index) => (
+                        <div
+                          key={`${article.jo}-${index}`}
+                          id={`article-${article.jo}`}
+                          ref={(el) => {
+                            articleRefs.current[article.jo] = el
+                          }}
+                          className="prose prose-sm max-w-none dark:prose-invert scroll-mt-4"
+                        >
+                          {/* Header removed for ordinances - article number already in content */}
+                          <div
+                            className="whitespace-pre-wrap text-foreground leading-relaxed break-words"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: "1.8",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: extractArticleText(article, isOrdinance, meta.lawTitle) }}
+                          />
+                          <Separator className="my-1" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : loadingJo ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <p>조문을 불러오는 중...</p>
@@ -3486,10 +3489,11 @@ export function LawViewer({
                     />
                   </div>
                 )}
-              </div>
-            </ScrollArea>
+                </div>
+              </ScrollArea>
+            )}
           </div>
-        </Card >
+        </Card>
         <ReferenceModal
           isOpen={refModal.open}
           onClose={() => {
