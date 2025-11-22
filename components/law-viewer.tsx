@@ -47,6 +47,7 @@ import { RevisionHistory } from "@/components/revision-history"
 import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { VirtualizedArticleList } from "@/components/virtualized-article-list"
+import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
@@ -2405,16 +2406,20 @@ export function LawViewer({
                           </TabsContent>
 
                           <TabsContent value="decree" className="flex-1 overflow-y-auto mt-0">
-                            <div className="mb-4 pb-3 border-b border-border">
-                              <div className="flex items-center gap-2 mb-2">
-                                <FileText className="h-4 w-4 text-foreground" />
-                                <h3 className="text-base font-bold text-foreground">시행령</h3>
-                              </div>
-                              <Badge variant="secondary" className="text-xs">
-                                {validDelegations.filter((d) => d.type === "시행령").length}개
-                              </Badge>
-                            </div>
-                            <div className="space-y-3">
+                            {isLoadingThreeTier ? (
+                              <DelegationLoadingSkeleton />
+                            ) : (
+                              <>
+                                <div className="mb-4 pb-3 border-b border-border">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <FileText className="h-4 w-4 text-foreground" />
+                                    <h3 className="text-base font-bold text-foreground">시행령</h3>
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {validDelegations.filter((d) => d.type === "시행령").length}개
+                                  </Badge>
+                                </div>
+                                <div className="space-y-3">
                               {validDelegations
                                 .filter((d) => d.type === "시행령")
                                 .map((delegation, idx) => (
@@ -2445,19 +2450,25 @@ export function LawViewer({
                               {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
                                 <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
                               )}
-                            </div>
+                                </div>
+                              </>
+                            )}
                           </TabsContent>
 
                           <TabsContent value="rule" className="flex-1 overflow-y-auto mt-0">
-                            <div className="mb-4 pb-3 border-b border-border">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="text-base font-bold text-foreground">시행규칙</h3>
-                              </div>
-                              <Badge variant="secondary" className="text-xs">
-                                {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
-                              </Badge>
-                            </div>
-                            <div className="space-y-3">
+                            {isLoadingThreeTier ? (
+                              <DelegationLoadingSkeleton />
+                            ) : (
+                              <>
+                                <div className="mb-4 pb-3 border-b border-border">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h3 className="text-base font-bold text-foreground">시행규칙</h3>
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
+                                  </Badge>
+                                </div>
+                                <div className="space-y-3">
                               {validDelegations
                                 .filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
                                 .map((delegation, idx) => (
@@ -2488,13 +2499,19 @@ export function LawViewer({
                               {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length === 0 && (
                                 <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                               )}
-                            </div>
+                                </div>
+                              </>
+                            )}
                           </TabsContent>
                         </Tabs>
                       </div>
 
                       {/* Desktop: 3-column grid view */}
-                      <div className="hidden md:grid grid-cols-3 gap-3 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      <div className="hidden md:block overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                        {isLoadingThreeTier ? (
+                          <DelegationLoadingSkeleton />
+                        ) : (
+                          <div className="grid grid-cols-3 gap-3 h-full">
                         {/* Left: Main article (law) */}
                         <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2 h-full">
                           <div className="mb-4 pb-3 border-b border-border">
@@ -2605,6 +2622,8 @@ export function LawViewer({
                             )}
                           </div>
                         </div>
+                          </div>
+                        )}
                       </div>
                     </>
                     // Priority 4: 2-tier delegation view (위임조문 2단 뷰)
