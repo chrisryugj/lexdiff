@@ -2,6 +2,8 @@
  * 행정규칙 파싱 유틸리티
  */
 
+import { linkifyRefsB } from "./unified-link-generator"
+
 export interface AdminRuleListItem {
   name: string // 행정규칙명
   id: string // 행정규칙ID
@@ -392,4 +394,114 @@ export function filterMatchingAdminRules(
     if (!purpose) return false
     return checkLawArticleReference(purpose.content, lawName, articleNumber)
   })
+}
+
+/**
+ * 행정규칙 조문 내용을 HTML로 포맷팅
+ * 일반 법령과 동일한 파이프라인 적용:
+ * 1. 법령 참조 링크 생성
+ * 2. HTML escape (링크 태그만 보존)
+ * 3. 개정 마커 스타일링
+ * 4. 줄바꿈 → <br> 변환
+ * 5. 문단 마커 스타일링
+ */
+export function formatAdminRuleHTML(content: string, baseLawName?: string): string {
+  if (!content || content.trim().length === 0) {
+    return ""
+  }
+
+  // 1. 링크 생성 (법령 참조 정규화 후)
+  const normalized = baseLawName ? normalizeLawReferences(content, baseLawName) : content
+  let text = linkifyRefsB(normalized, baseLawName)
+
+  // 2. HTML escape (링크 태그만 보존)
+  text = text.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, plainText) => {
+    if (linkTag) return linkTag  // <a> 태그 보존
+    if (otherTag) return escapeHtml(otherTag)  // <개정> 등은 escape
+    if (plainText) return escapeHtml(plainText)  // 일반 텍스트 escape
+    return match
+  })
+
+  // 3. 개정 마커 스타일링
+  text = applyRevisionStyling(text)
+
+  // 4. 줄바꿈 → <br> 변환 (개정 마커 스타일링 후)
+  text = text.replace(/\n/g, '<br>')
+
+  // 5. 문단 마커 스타일링 (①②③) - 첫 번째는 건너뜀
+  let isFirst = true
+  text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
+    if (isFirst) {
+      isFirst = false
+      return match
+    }
+    return '<br><span class="para-marker">' + match + '</span>'
+  })
+
+  // 6. 번호 항목 줄바꿈 (1., 2., 3.) - 날짜 제외
+  text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
+
+  // 7. 하위 항목 줄바꿈 (가., 나., 다.)
+  text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
+
+  return text
+}
+
+/**
+ * HTML 특수문자 이스케이프
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+}
+
+/**
+ * 개정 마커 스타일링
+ */
+function applyRevisionStyling(text: string): string {
+  let styled = text
+
+  // <개정>, ＜개정＞ 형식
+  styled = styled.replace(
+    /&lt;(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
+    '<span class="rev-mark">＜$1 $2＞</span>',
+  )
+
+  styled = styled.replace(
+    /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g,
+    '<span class="rev-mark">＜$1 $2＞</span>',
+  )
+
+  // "삭제<날짜>" 또는 "삭제 <날짜>" 형식
+  styled = styled.replace(
+    /(삭제)\s*&lt;([0-9., ]+)&gt;/g,
+    '<span class="rev-mark">$1 ＜$2＞</span>',
+  )
+
+  styled = styled.replace(
+    /(삭제)\s*＜([0-9., ]+)＞/g,
+    '<span class="rev-mark">$1 ＜$2＞</span>',
+  )
+
+  // [본조신설], [종전 ~ 이동], [제X조에서 이동] 형식
+  styled = styled.replace(
+    /\[(본조신설|본조삭제)[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
+  )
+
+  styled = styled.replace(
+    /\[종전[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
+  )
+
+  styled = styled.replace(
+    /\[제\d+조[^\]]*에서 이동[^\]]*\]/g,
+    '<span class="rev-mark">$&</span>',
+  )
+
+  return styled
 }

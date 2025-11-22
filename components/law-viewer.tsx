@@ -50,7 +50,7 @@ import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
-import { parseAdminRuleContent } from "@/lib/admrul-parser"
+import { parseAdminRuleContent, formatAdminRuleHTML } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { useSwipe } from "@/hooks/use-swipe"
@@ -828,7 +828,7 @@ export function LawViewer({
         htmlParts.push('</div>')
       }
 
-      // Articles - format EXACTLY like law text using text + \n (not HTML blocks)
+      // Articles - format using formatAdminRuleHTML (includes links + styling)
       let textParts: string[] = []
 
       fullContent.articles.forEach((article, idx) => {
@@ -840,49 +840,10 @@ export function LawViewer({
         textParts.push(titleHtml)
         textParts.push('\n') // 제목 뒤 줄바꿈 1개
 
-        // Article content - process like law text
-        let content = article.content
-
-        // Escape HTML
-        content = content
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;")
-
-        // Apply revision styling
-        content = content.replace(
-          /&lt;(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
-          '<span class="rev-mark">＜$1 $2＞</span>'
-        )
-        content = content.replace(
-          /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g,
-          '<span class="rev-mark">＜$1 $2＞</span>'
-        )
-
-        // NOTE: 법령 링크는 law-xml-parser.tsx의 linkifyRefsB()에서 처리됨
-
-        // Check if content has paragraph markers (①②③) or numbered items (1. 2. 3.)
-        const hasParagraphMarkers = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(content)
-        const hasNumberedItems = /\d+\.\s+/.test(content)
-
-        if (hasParagraphMarkers || hasNumberedItems) {
-          // Split by paragraph markers OR numbered items (1. 2. 3.)
-          // Use lookbehind to avoid splitting in dates like "2024. 1. 1."
-          const parts = content.split(/(?=[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])|(?<!\d\. )(?=\d+\.\s+)/)
-          parts.forEach((part, pIdx) => {
-            const trimmed = part.trim()
-            if (trimmed) {
-              if (pIdx > 0) textParts.push('\n') // 항/호 앞에 줄바꿈
-              textParts.push(trimmed)
-            }
-          })
-          textParts.push('\n') // 조문 끝 줄바꿈
-        } else {
-          textParts.push(content)
-          textParts.push('\n') // 조문 끝 줄바꿈
-        }
+        // Article content - format with links + styling + revision marks
+        const formattedContent = formatAdminRuleHTML(article.content, meta.lawTitle)
+        textParts.push(formattedContent)
+        textParts.push('\n') // 조문 끝 줄바꿈
 
         // Add spacing between articles (Separator)
         if (idx < fullContent.articles.length - 1) {
@@ -2532,7 +2493,7 @@ export function LawViewer({
                                     {adminRules.map((rule, idx) => (
                                       <button
                                         key={idx}
-                                        onClick={() => handleAdminRuleClick(rule)}
+                                        onClick={() => handleViewAdminRuleFullContent(rule)}
                                         className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
                                       >
                                         <div className="flex items-start justify-between gap-2">
@@ -2699,7 +2660,7 @@ export function LawViewer({
                               {adminRules.map((rule, idx) => (
                                 <button
                                   key={idx}
-                                  onClick={() => handleAdminRuleClick(rule)}
+                                  onClick={() => handleViewAdminRuleFullContent(rule)}
                                   className="w-full text-left p-3 rounded-lg border border-border hover:shadow-md hover:border-primary/50 transition-all"
                                 >
                                   <div className="flex items-start justify-between gap-2">
