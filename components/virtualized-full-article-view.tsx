@@ -62,8 +62,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   return (
     <div
       ref={parentRef}
-      className="overflow-y-auto h-full"
-      style={{ contain: "strict" }}
+      className="overflow-y-auto h-full w-full px-5"
     >
       <div
         style={{
