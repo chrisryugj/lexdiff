@@ -2341,12 +2341,12 @@ export function LawViewer({
                             <TabsTrigger value="admin" className="text-xs">
                               {loadingAdminRules ? (
                                 <>
-                                  규칙 <Loader2 className="h-3 w-3 ml-0.5 inline-block animate-spin" />
+                                  행정규칙 <Loader2 className="h-3 w-3 ml-0.5 inline-block animate-spin" />
                                 </>
                               ) : showAdminRules ? (
-                                `규칙 (${adminRules.length})`
+                                `행정규칙 (${adminRules.length})`
                               ) : (
-                                "규칙"
+                                "행정규칙"
                               )}
                             </TabsTrigger>
                           </TabsList>
@@ -2552,20 +2552,20 @@ export function LawViewer({
                           <TabsList className="w-full mb-2 grid grid-cols-4">
                             <TabsTrigger value="law" className="text-xs">법률</TabsTrigger>
                             <TabsTrigger value="decree" className="text-xs">
-                              령 ({validDelegations.filter((d) => d.type === "시행령").length})
+                              시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
                             </TabsTrigger>
                             <TabsTrigger value="rule" className="text-xs">
-                              규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
+                              시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
                             </TabsTrigger>
                             <TabsTrigger value="admin" className="text-xs">
                               {loadingAdminRules ? (
                                 <>
-                                  행정 <Loader2 className="h-3 w-3 ml-0.5 inline-block animate-spin" />
+                                  행정규칙 <Loader2 className="h-3 w-3 ml-0.5 inline-block animate-spin" />
                                 </>
                               ) : showAdminRules ? (
-                                `행정 (${adminRules.length})`
+                                `행정규칙 (${adminRules.length})`
                               ) : (
-                                "행정"
+                                "행정규칙"
                               )}
                             </TabsTrigger>
                           </TabsList>
