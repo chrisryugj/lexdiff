@@ -143,8 +143,8 @@ export function SearchViewImproved({
                 >
                   LexDiff
                 </h1>
-                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "InkLiquid, sans-serif" }}>
-                  Your AI-Powered Legal Companion
+                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                  Legal AI
                 </p>
                 <p className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
                   법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
