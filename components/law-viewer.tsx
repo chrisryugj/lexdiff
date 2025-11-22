@@ -2372,14 +2372,22 @@ export function LawViewer({
                       {/* Mobile: Tab-based view */}
                       <div className="md:hidden" style={{ height: 'calc(100vh - 250px)' }}>
                         <Tabs defaultValue="law" className="w-full h-full flex flex-col">
-                          <TabsList className="w-full grid grid-cols-3 mb-2">
+                          <TabsList className={cn(
+                            "w-full mb-2",
+                            showAdminRules && adminRules.length > 0 ? "grid grid-cols-4" : "grid grid-cols-3"
+                          )}>
                             <TabsTrigger value="law" className="text-xs">법률</TabsTrigger>
                             <TabsTrigger value="decree" className="text-xs">
                               시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
                             </TabsTrigger>
                             <TabsTrigger value="rule" className="text-xs">
-                              시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length})
+                              시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
                             </TabsTrigger>
+                            {showAdminRules && adminRules.length > 0 && (
+                              <TabsTrigger value="admin" className="text-xs">
+                                행정규칙 ({adminRules.length})
+                              </TabsTrigger>
+                            )}
                           </TabsList>
 
                           <TabsContent value="law" className="flex-1 overflow-y-auto mt-0">
@@ -2496,22 +2504,69 @@ export function LawViewer({
                                     )}
                                   </div>
                                 ))}
-                              {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length === 0 && (
+                              {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
                                 <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                               )}
                                 </div>
                               </>
                             )}
                           </TabsContent>
+
+                          {/* Admin Rules Tab (4th tab) */}
+                          {showAdminRules && adminRules.length > 0 && (
+                            <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
+                              {loadingAdminRules ? (
+                                <DelegationLoadingSkeleton />
+                              ) : (
+                                <>
+                                  <div className="mb-4 pb-3 border-b border-border">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <FileText className="h-4 w-4 text-foreground" />
+                                      <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                                    </div>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {adminRules.length}개
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {adminRules.map((rule, idx) => (
+                                      <button
+                                        key={idx}
+                                        onClick={() => handleAdminRuleClick(rule)}
+                                        className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="flex-1">
+                                            <p className="font-semibold text-sm text-foreground mb-1">
+                                              {rule.name}
+                                            </p>
+                                            {rule.articleNumber && (
+                                              <p className="text-xs text-muted-foreground">
+                                                관련 조문: {rule.articleNumber}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </TabsContent>
+                          )}
                         </Tabs>
                       </div>
 
-                      {/* Desktop: 3-column grid view */}
+                      {/* Desktop: 3 or 4-column grid view */}
                       <div className="hidden md:block overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                        {isLoadingThreeTier ? (
+                        {isLoadingThreeTier || loadingAdminRules ? (
                           <DelegationLoadingSkeleton />
                         ) : (
-                          <div className="grid grid-cols-3 gap-3 h-full">
+                          <div className={cn(
+                            "grid gap-3 h-full",
+                            showAdminRules && adminRules.length > 0 ? "grid-cols-4" : "grid-cols-3"
+                          )}>
                         {/* Left: Main article (law) */}
                         <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2 h-full">
                           <div className="mb-4 pb-3 border-b border-border">
@@ -2617,11 +2672,49 @@ export function LawViewer({
                                   )}
                                 </div>
                               ))}
-                            {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length === 0 && (
+                            {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
                               <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                             )}
                           </div>
                         </div>
+
+                        {/* 4th Column: Admin Rules (행정규칙) - shown when enabled */}
+                        {showAdminRules && adminRules.length > 0 && (
+                          <div className="border-l border-border pl-3 overflow-y-auto h-full">
+                            <div className="mb-4 pb-3 border-b border-border">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-4 w-4 text-foreground" />
+                                <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {adminRules.length}개
+                              </Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {adminRules.map((rule, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleAdminRuleClick(rule)}
+                                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-sm text-foreground mb-1">
+                                        {rule.name}
+                                      </p>
+                                      {rule.articleNumber && (
+                                        <p className="text-xs text-muted-foreground">
+                                          관련: {rule.articleNumber}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                           </div>
                         )}
                       </div>
