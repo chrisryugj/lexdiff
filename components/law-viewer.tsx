@@ -45,6 +45,7 @@ import { buildJO, formatJO, type ParsedRelatedLaw, parseRelatedLawTitle } from "
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
@@ -1913,32 +1914,16 @@ export function LawViewer({
           )}
         </ArticleBottomSheet>
 
+        {/* Floating Action Button (Mobile only) */}
+        <FloatingActionButton
+          onClick={() => setIsArticleListExpanded(true)}
+          icon={<ListOrdered className="h-6 w-6" />}
+          badge={aiAnswerMode ? relatedArticles.length : actualArticles.length}
+          label={aiAnswerMode ? "관련 법령 목록 열기" : "조문 목록 열기"}
+        />
+
         {/* Right panel - Article content */}
         < Card className="flex flex-col" >
-          {/* Mobile article list toggle */}
-          < div className="lg:hidden p-3 border-b border-border bg-muted/30" >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsArticleListExpanded(!isArticleListExpanded)}
-              className="w-full"
-            >
-              {isArticleListExpanded ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-2" />
-                  조문 목록 닫기
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  {aiAnswerMode
-                    ? `답변 속 법령 보기 (${relatedArticles.length}개)`
-                    : `조문 목록 보기 (${actualArticles.length}개)`}
-                </>
-              )}
-            </Button>
-          </div>
-
           {/* Header - Hidden in AI Answer Mode */}
           {!aiAnswerMode && (
             <div className="border-b border-border px-4 pt-2 pb-5">
