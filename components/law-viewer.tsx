@@ -48,6 +48,7 @@ import { RevisionHistory } from "@/components/revision-history"
 import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { VirtualizedArticleList } from "@/components/virtualized-article-list"
+import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
@@ -1928,12 +1929,16 @@ export function LawViewer({
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
                     원문 보기
                   </Button>
-                  {/* 위임법령 보기 버튼 (2단 뷰 토글) - 개수 표시 + 0이면 비활성화 */}
+                  {/* 위임법령 보기 버튼 (2단 뷰 토글) - 개수 표시 + 데이터 로드 후 0이면 비활성화 */}
                   {!isOrdinance && !aiAnswerMode && (
                     <Button
                       variant={tierViewMode === "2-tier" ? "default" : "outline"}
                       size="sm"
-                      disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && totalDelegationCount === 0)}
+                      disabled={
+                        isLoadingThreeTier ||
+                        loadingAdminRules ||
+                        (tierViewMode === "1-tier" && threeTierDelegation !== null && totalDelegationCount === 0)
+                      }
                       onClick={async () => {
                         if (tierViewMode === "1-tier") {
                           // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
@@ -2047,64 +2052,16 @@ export function LawViewer({
                     ))}
                   </div>
                 ) : viewMode === "full" ? (
-                  <div className="space-y-4">
-                    {preambles.map((preamble, index) => (
-                      <div
-                        key={`preamble-${index}`}
-                        className="mb-8 text-xl font-bold text-center"
-                        dangerouslySetInnerHTML={{ __html: preamble.content }}
-                      />
-                    ))}
-
-                    {actualArticles.map((article, index) => (
-                      <div
-                        key={`${article.jo}-${index}`}
-                        id={`article-${article.jo}`}
-                        ref={(el) => {
-                          articleRefs.current[article.jo] = el
-                        }}
-                        className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
-                      >
-                        <div className="mb-2 pb-1 border-b border-border">
-                          <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-                            {formatSimpleJo(article.jo)}
-                            {article.title && <span className="text-muted-foreground">({article.title})</span>}
-                            {activeJo === article.jo && (
-                              <BookmarkCheck className="h-5 w-5 text-primary ml-2" title="현재 선택된 조문" />
-                            )}
-                          </h3>
-                        </div>
-
-                        <div
-                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(article, false, meta.lawTitle) }}
-                        />
-
-                        {article.hasChanges && (
-                          <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
-                            <div className="flex items-start gap-2">
-                              <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-semibold text-foreground">변경된 조문</p>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  이 조문은 최근 개정되었습니다. 신·구법 비교를 통해 변경 내용을 확인하세요.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {index < actualArticles.length - 1 && <Separator className="my-3" />}
-                      </div>
-                    ))}
-                  </div>
+                  // 전문조회 모드: 가상화된 조문 리스트 (성능 최적화)
+                  <VirtualizedFullArticleView
+                    articles={actualArticles}
+                    preambles={preambles}
+                    activeJo={activeJo}
+                    fontSize={fontSize}
+                    lawTitle={meta.lawTitle}
+                    onContentClick={handleContentClick}
+                    articleRefs={articleRefs}
+                  />
                 ) : loadingJo ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
