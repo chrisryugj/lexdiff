@@ -1941,10 +1941,10 @@ export function LawViewer({
                       }
                       onClick={async () => {
                         if (tierViewMode === "1-tier") {
-                          // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
+                          // 2단 뷰로 전환 (시행령/시행규칙만 먼저 로드)
                           if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
                           setTierViewMode("2-tier")
-                          setShowAdminRules(true) // 행정규칙도 함께 활성화
+                          // 행정규칙은 탭 클릭 시 로드 (단계적 로딩)
                         } else {
                           // 1단 뷰로 복귀
                           setTierViewMode("1-tier")
@@ -2320,11 +2320,17 @@ export function LawViewer({
                     <>
                       {/* Mobile: Tab-based view */}
                       <div className="md:hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                        <Tabs defaultValue="law" className="w-full h-full flex flex-col">
-                          <TabsList className={cn(
-                            "w-full mb-2",
-                            showAdminRules && adminRules.length > 0 ? "grid grid-cols-4" : "grid grid-cols-3"
-                          )}>
+                        <Tabs
+                          defaultValue="law"
+                          className="w-full h-full flex flex-col"
+                          onValueChange={(value) => {
+                            // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
+                            if (value === "admin" && !showAdminRules) {
+                              setShowAdminRules(true)
+                            }
+                          }}
+                        >
+                          <TabsList className="w-full mb-2 grid grid-cols-4">
                             <TabsTrigger value="law" className="text-xs">법률</TabsTrigger>
                             <TabsTrigger value="decree" className="text-xs">
                               시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
@@ -2332,11 +2338,17 @@ export function LawViewer({
                             <TabsTrigger value="rule" className="text-xs">
                               시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
                             </TabsTrigger>
-                            {showAdminRules && adminRules.length > 0 && (
-                              <TabsTrigger value="admin" className="text-xs">
-                                행정규칙 ({adminRules.length})
-                              </TabsTrigger>
-                            )}
+                            <TabsTrigger value="admin" className="text-xs">
+                              {loadingAdminRules ? (
+                                <>
+                                  규칙 <Loader2 className="h-3 w-3 ml-0.5 inline-block animate-spin" />
+                                </>
+                              ) : showAdminRules ? (
+                                `규칙 (${adminRules.length})`
+                              ) : (
+                                "규칙"
+                              )}
+                            </TabsTrigger>
                           </TabsList>
 
                           <TabsContent value="law" className="flex-1 overflow-y-auto mt-0">
@@ -2461,49 +2473,64 @@ export function LawViewer({
                             )}
                           </TabsContent>
 
-                          {/* Admin Rules Tab (4th tab) */}
-                          {showAdminRules && adminRules.length > 0 && (
-                            <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
-                              {loadingAdminRules ? (
-                                <DelegationLoadingSkeleton />
-                              ) : (
-                                <>
-                                  <div className="mb-4 pb-3 border-b border-border">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <FileText className="h-4 w-4 text-foreground" />
-                                      <h3 className="text-base font-bold text-foreground">행정규칙</h3>
-                                    </div>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {adminRules.length}개
-                                    </Badge>
+                          {/* Admin Rules Tab (4th tab) - 단계적 로딩 */}
+                          <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
+                            {!showAdminRules ? (
+                              // 아직 로드 안 함 (탭 클릭 대기 중)
+                              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <FileText className="h-12 w-12 mb-4 opacity-30" />
+                                <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
+                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                  클릭 시 자동으로 로드됩니다
+                                </p>
+                              </div>
+                            ) : loadingAdminRules ? (
+                              // 로딩 중
+                              <DelegationLoadingSkeleton />
+                            ) : adminRules.length > 0 ? (
+                              // 결과 있음
+                              <>
+                                <div className="mb-4 pb-3 border-b border-border">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <FileText className="h-4 w-4 text-foreground" />
+                                    <h3 className="text-base font-bold text-foreground">행정규칙</h3>
                                   </div>
-                                  <div className="space-y-3">
-                                    {adminRules.map((rule, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => handleViewAdminRuleFullContent(rule)}
-                                        className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="flex-1">
-                                            <p className="font-semibold text-sm text-foreground mb-1">
-                                              {rule.name}
+                                  <Badge variant="secondary" className="text-xs">
+                                    {adminRules.length}개
+                                  </Badge>
+                                </div>
+                                <div className="space-y-3">
+                                  {adminRules.map((rule, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => handleViewAdminRuleFullContent(rule)}
+                                      className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                          <p className="font-semibold text-sm text-foreground mb-1">
+                                            {rule.name}
+                                          </p>
+                                          {rule.articleNumber && (
+                                            <p className="text-xs text-muted-foreground">
+                                              관련 조문: {rule.articleNumber}
                                             </p>
-                                            {rule.articleNumber && (
-                                              <p className="text-xs text-muted-foreground">
-                                                관련 조문: {rule.articleNumber}
-                                              </p>
-                                            )}
-                                          </div>
-                                          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                                          )}
                                         </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </>
-                              )}
-                            </TabsContent>
-                          )}
+                                        <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              // 결과 없음
+                              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
+                                <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
+                              </div>
+                            )}
+                          </TabsContent>
                         </Tabs>
                       </div>
                     </>
@@ -2658,22 +2685,34 @@ export function LawViewer({
 
                           {/* Right Panel: Tabs for 시행령/시행규칙/행정규칙 */}
                           <Panel>
-                            <Tabs defaultValue="decree" className="w-full h-full flex flex-col pl-4">
-                              <TabsList className={cn(
-                                "w-full grid mb-2",
-                                showAdminRules && adminRules.length > 0 ? "grid-cols-3" : "grid-cols-2"
-                              )}>
+                            <Tabs
+                              defaultValue="decree"
+                              className="w-full h-full flex flex-col pl-4"
+                              onValueChange={(value) => {
+                                // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
+                                if (value === "admin" && !showAdminRules) {
+                                  setShowAdminRules(true)
+                                }
+                              }}
+                            >
+                              <TabsList className="w-full grid grid-cols-3 mb-2">
                                 <TabsTrigger value="decree" className="text-xs">
                                   시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
                                 </TabsTrigger>
                                 <TabsTrigger value="rule" className="text-xs">
                                   시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
                                 </TabsTrigger>
-                                {showAdminRules && adminRules.length > 0 && (
-                                  <TabsTrigger value="admin" className="text-xs">
-                                    행정규칙 ({adminRules.length})
-                                  </TabsTrigger>
-                                )}
+                                <TabsTrigger value="admin" className="text-xs">
+                                  {loadingAdminRules ? (
+                                    <>
+                                      행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
+                                    </>
+                                  ) : showAdminRules ? (
+                                    `행정규칙 (${adminRules.length})`
+                                  ) : (
+                                    "행정규칙"
+                                  )}
+                                </TabsTrigger>
                               </TabsList>
 
                               {/* Decree Tab */}
@@ -2772,49 +2811,63 @@ export function LawViewer({
                                 )}
                               </TabsContent>
 
-                              {/* Admin Rules Tab */}
-                              {showAdminRules && adminRules.length > 0 && (
-                                <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
-                                  {loadingAdminRules ? (
-                                    <DelegationLoadingSkeleton />
-                                  ) : (
-                                    <>
-                                      <div className="mb-4 pb-3 border-b border-border">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <FileText className="h-4 w-4 text-foreground" />
-                                          <h3 className="text-base font-bold text-foreground">행정규칙</h3>
-                                        </div>
-                                        <Badge variant="secondary" className="text-xs">
-                                          {adminRules.length}개
-                                        </Badge>
+                              {/* Admin Rules Tab - 항상 표시 (단계적 로딩) */}
+                              <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
+                                {!showAdminRules ? (
+                                  // 아직 로드 안 함 (탭 클릭 대기 중)
+                                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                    <FileText className="h-12 w-12 mb-4 opacity-30" />
+                                    <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
+                                    <p className="text-xs mt-2 text-muted-foreground/70">
+                                      클릭 시 자동으로 로드됩니다
+                                    </p>
+                                  </div>
+                                ) : loadingAdminRules ? (
+                                  // 로딩 중
+                                  <DelegationLoadingSkeleton />
+                                ) : adminRules.length > 0 ? (
+                                  // 결과 있음
+                                  <>
+                                    <div className="mb-4 pb-3 border-b border-border">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <FileText className="h-4 w-4 text-foreground" />
+                                        <h3 className="text-base font-bold text-foreground">행정규칙</h3>
                                       </div>
-                                      <div className="space-y-3">
-                                        {adminRules.map((rule, idx) => (
-                                          <button
-                                            key={idx}
-                                            onClick={() => handleViewAdminRuleFullContent(rule)}
-                                            className="w-full text-left py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors rounded px-2"
-                                          >
-                                            <div className="flex items-start justify-between gap-2">
-                                              <div className="flex-1">
-                                                <p className="font-semibold text-sm text-foreground mb-1">
-                                                  {rule.name}
+                                      <Badge variant="secondary" className="text-xs">
+                                        {adminRules.length}개
+                                      </Badge>
+                                    </div>
+                                    <div className="space-y-3">
+                                      {adminRules.map((rule, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => handleViewAdminRuleFullContent(rule)}
+                                          className="w-full text-left py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors rounded px-2"
+                                        >
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1">
+                                              <p className="font-semibold text-sm text-foreground mb-1">
+                                                {rule.name}
+                                              </p>
+                                              {rule.articleNumber && (
+                                                <p className="text-xs text-muted-foreground">
+                                                  관련: {rule.articleNumber}
                                                 </p>
-                                                {rule.articleNumber && (
-                                                  <p className="text-xs text-muted-foreground">
-                                                    관련: {rule.articleNumber}
-                                                  </p>
-                                                )}
-                                              </div>
-                                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                                              )}
                                             </div>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </>
-                                  )}
-                                </TabsContent>
-                              )}
+                                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                                          </div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                ) : (
+                                  // 결과 없음
+                                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                    <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
+                                    <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
+                                  </div>
+                                )}
                             </Tabs>
                           </Panel>
                         </PanelGroup>
