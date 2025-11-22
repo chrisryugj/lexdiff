@@ -1454,7 +1454,7 @@ export function LawViewer({
 
   return (
     <>
-      <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] overflow-hidden" style={{ fontFamily: "Pretendard, sans-serif" }}>
+      <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:overflow-hidden" style={{ fontFamily: "Pretendard, sans-serif" }}>
         {/* Mobile overlay backdrop */}
         {isArticleListExpanded && (
           <div
