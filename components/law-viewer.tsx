@@ -806,7 +806,7 @@ export function LawViewer({
         setAdminRuleTitle(cached.title)
         setAdminRuleHtml(cached.html)
         setAdminRuleViewMode("detail")
-        setTierViewMode("2-tier")
+        // Don't change tierViewMode - stay in tab view
         return
       }
 
@@ -816,7 +816,7 @@ export function LawViewer({
       setAdminRuleTitle(rule.name)
       setAdminRuleHtml('<div style="text-align: center; padding: 2rem 0; color: hsl(var(--muted-foreground));"><div style="display: inline-block; width: 2rem; height: 2rem; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div><p style="margin-top: 1rem;">로딩 중...</p><style>@keyframes spin { to { transform: rotate(360deg); }}</style></div>')
       setAdminRuleViewMode("detail")
-      setTierViewMode("2-tier")
+      // Don't change tierViewMode - stay in tab view
 
       console.log("[law-viewer] Fetching admin rule content:", idParam)
 
@@ -2487,8 +2487,39 @@ export function LawViewer({
                             ) : loadingAdminRules ? (
                               // 로딩 중
                               <DelegationLoadingSkeleton />
+                            ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
+                              // 상세 뷰
+                              <>
+                                <div className="mb-3 pb-2 border-b border-border">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-foreground" />
+                                      <h3 className="text-sm font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setAdminRuleViewMode("list")}
+                                      className="h-7"
+                                    >
+                                      ← 목록
+                                    </Button>
+                                  </div>
+                                </div>
+                                <div
+                                  className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                  style={{
+                                    fontSize: `${fontSize}px`,
+                                    lineHeight: "1.8",
+                                    overflowWrap: "break-word",
+                                    wordBreak: "break-word",
+                                  }}
+                                  onClick={handleContentClick}
+                                  dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                                />
+                              </>
                             ) : adminRules.length > 0 ? (
-                              // 결과 있음
+                              // 목록 뷰
                               <>
                                 <div className="mb-3 pb-2 border-b border-border">
                                   <div className="flex items-center gap-2 mb-1">
@@ -2706,8 +2737,39 @@ export function LawViewer({
                             ) : loadingAdminRules ? (
                               // 로딩 중
                               <DelegationLoadingSkeleton />
+                            ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
+                              // 상세 뷰
+                              <>
+                                <div className="mb-3 pb-2 border-b border-border">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-foreground" />
+                                      <h3 className="text-sm font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setAdminRuleViewMode("list")}
+                                      className="h-7"
+                                    >
+                                      ← 목록
+                                    </Button>
+                                  </div>
+                                </div>
+                                <div
+                                  className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                  style={{
+                                    fontSize: `${fontSize}px`,
+                                    lineHeight: "1.8",
+                                    overflowWrap: "break-word",
+                                    wordBreak: "break-word",
+                                  }}
+                                  onClick={handleContentClick}
+                                  dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                                />
+                              </>
                             ) : adminRules.length > 0 ? (
-                              // 결과 있음
+                              // 목록 뷰
                               <>
                                 <div className="mb-3 pb-2 border-b border-border">
                                   <div className="flex items-center gap-2 mb-1">
@@ -3346,26 +3408,27 @@ export function LawViewer({
                   ) : (
                     // 1-tier view: Normal single article view
                     <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <div className="mb-6 pb-4 border-b border-border">
-                        <div className="flex items-center justify-between gap-4">
-                          <h3 className="text-lg font-bold text-foreground mb-0">
+                      <div className="mb-3 pb-2 md:mb-6 md:pb-4 border-b border-border">
+                        {/* Mobile: 제목과 버튼을 별도 줄로 분리 */}
+                        <div className="block md:flex md:items-center md:justify-between md:gap-4">
+                          <h3 className="text-sm md:text-lg font-bold text-foreground mb-1 md:mb-0 leading-tight">
                             {formatSimpleJo(activeArticle.jo)}
-                            {activeArticle.title && <span className="text-muted-foreground"> ({activeArticle.title})</span>}
+                            {activeArticle.title && <span className="text-muted-foreground text-xs md:text-base block md:inline mt-0.5 md:mt-0"> {activeArticle.title}</span>}
                           </h3>
                           {/* 글자 크기 조절 및 복사 */}
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게">
-                              <ZoomOut className="h-4 w-4" />
+                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 md:h-9">
+                              <ZoomOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기">
+                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 md:h-9">
                               <RotateCcw className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게">
-                              <ZoomIn className="h-4 w-4" />
+                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 md:h-9">
+                              <ZoomIn className="h-3.5 w-3.5 md:h-4 md:w-4" />
                             </Button>
                             <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
-                            <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사">
-                              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            <Button variant="ghost" size="sm" onClick={handleCopy} title="내용 복사" className="h-7 md:h-9">
+                              {copied ? <Check className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-500" /> : <Copy className="h-3.5 w-3.5 md:h-4 md:w-4" />}
                             </Button>
                           </div>
                         </div>
