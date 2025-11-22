@@ -51,6 +51,7 @@ import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
 import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
+import { useSwipe } from "@/hooks/use-swipe"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
@@ -460,6 +461,34 @@ export function LawViewer({
       console.log("단일 조문 뷰 - activeJo 설정 완료")
     }
   }
+
+  // Swipe navigation handlers (mobile only)
+  const handleSwipeLeft = () => {
+    // Swipe left = next article
+    const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
+    if (currentIndex < actualArticles.length - 1) {
+      const nextArticle = actualArticles[currentIndex + 1]
+      handleArticleClick(nextArticle.jo)
+    }
+  }
+
+  const handleSwipeRight = () => {
+    // Swipe right = previous article
+    const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
+    if (currentIndex > 0) {
+      const prevArticle = actualArticles[currentIndex - 1]
+      handleArticleClick(prevArticle.jo)
+    }
+  }
+
+  // Apply swipe gestures to content area (mobile only)
+  const swipeRef = useSwipe<HTMLDivElement>({
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
+  }, {
+    threshold: 80, // Require 80px swipe distance
+    timeThreshold: 400, // Within 400ms
+  })
 
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 2, 24))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 2, 10))
@@ -2118,7 +2147,7 @@ export function LawViewer({
 
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full" ref={contentRef}>
-              <div className="px-5 pt-0 pb-0">
+              <div className="px-5 pt-0 pb-0" ref={swipeRef}>
                 {isOrdinance ? (
                   <div className="space-y-2">
                     {preambles.map((preamble, index) => (
