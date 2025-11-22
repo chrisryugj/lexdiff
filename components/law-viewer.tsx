@@ -44,6 +44,7 @@ import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parse
 import { buildJO, formatJO, type ParsedRelatedLaw, parseRelatedLawTitle } from "@/lib/law-parser"
 import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
+import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
 import { parseAdminRuleContent } from "@/lib/admrul-parser"
@@ -1464,26 +1465,11 @@ export function LawViewer({
           />
         )}
 
-        {/* Left sidebar - AI 답변 모드 or 조문 목록 */}
-        <Card className={`p-4 flex-col overflow-hidden ${isArticleListExpanded
-          ? 'flex fixed lg:relative top-4 left-4 right-4 bottom-4 z-50 lg:z-auto'
-          : 'hidden lg:flex'
-          }`}>
+        {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
+        <Card className="hidden lg:flex p-4 flex-col overflow-hidden">
           {aiAnswerMode ? (
             // ========== AI 모드: 왼쪽은 관련 법령 목록 ==========
             <>
-              {/* Mobile close button */}
-              {isArticleListExpanded && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsArticleListExpanded(false)}
-                  className="lg:hidden mb-2 w-full"
-                >
-                  닫기
-                </Button>
-              )}
-
               <div className="border-b border-border p-4 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Link2 className="h-5 w-5 text-primary" />
@@ -1635,18 +1621,6 @@ export function LawViewer({
           ) : (
             // ========== 기존 조문 목록 ==========
             <>
-              {/* Mobile close button - top */}
-              {isArticleListExpanded && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsArticleListExpanded(false)}
-                  className="lg:hidden mb-2 w-full"
-                >
-                  닫기
-                </Button>
-              )}
-
               {/* 헤더 - 본문 헤더와 동일한 디자인 */}
               <div className="border-b border-border p-4 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
@@ -1727,22 +1701,217 @@ export function LawViewer({
                   </div>
                 </ScrollArea>
               </div>
-
-              {/* Mobile close button - bottom */}
-              {isArticleListExpanded && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsArticleListExpanded(false)}
-                  className="lg:hidden mt-2 w-full"
-                >
-                  닫기
-                </Button>
-              )}
             </>
           )
           }
         </Card >
+
+        {/* Mobile Bottom Sheet for Article List */}
+        <ArticleBottomSheet
+          isOpen={isArticleListExpanded}
+          onClose={() => setIsArticleListExpanded(false)}
+          title={aiAnswerMode ? "관련 법령 목록" : "조문 목록"}
+          snapPoints={[40, 70, 90]}
+        >
+          {aiAnswerMode ? (
+            // AI 모드: 관련 법령 목록
+            <>
+              {(() => {
+                // 중복 제거를 위한 그룹화 (카운트 계산용)
+                const grouped = new Map<string, { source: Set<string> }>()
+                relatedArticles.forEach(law => {
+                  const key = `${law.lawName}|${law.jo}`
+                  const existing = grouped.get(key)
+                  if (existing) {
+                    existing.source.add(law.source)
+                  } else {
+                    grouped.set(key, { source: new Set([law.source]) })
+                  }
+                })
+
+                const uniqueCount = grouped.size
+                const excerptOnlyCount = Array.from(grouped.values()).filter(
+                  g => g.source.has('excerpt') && g.source.size === 1
+                ).length
+                const relatedOnlyCount = Array.from(grouped.values()).filter(
+                  g => g.source.has('related') && g.source.size === 1
+                ).length
+                const bothCount = Array.from(grouped.values()).filter(
+                  g => g.source.size === 2
+                ).length
+
+                return (
+                  <div className="flex items-center gap-2 flex-wrap mb-4">
+                    <Badge variant="secondary" className="text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      전체 {uniqueCount}개
+                    </Badge>
+                    {excerptOnlyCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50">
+                        <Bookmark className="h-3 w-3 mr-1" />
+                        발췌 {excerptOnlyCount}
+                      </Badge>
+                    )}
+                    {relatedOnlyCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50">
+                        <Link2 className="h-3 w-3 mr-1" />
+                        관련 {relatedOnlyCount}
+                      </Badge>
+                    )}
+                    {bothCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50">
+                        <GitMerge className="h-3 w-3 mr-1" />
+                        둘 다 {bothCount}
+                      </Badge>
+                    )}
+                  </div>
+                )
+              })()}
+
+              <div className="space-y-2">
+                {relatedArticles.length > 0 ? (
+                  (() => {
+                    const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
+                    relatedArticles.forEach(law => {
+                      const key = `${law.lawName}|${law.jo}`
+                      const existing = grouped.get(key)
+                      if (existing) {
+                        existing.sources.add(law.source)
+                      } else {
+                        grouped.set(key, { law, sources: new Set([law.source]) })
+                      }
+                    })
+
+                    return Array.from(grouped.values()).map(({ law, sources }, idx) => {
+                      const handleClick = () => {
+                        setIsArticleListExpanded(false)
+                        openExternalLawArticleModal(law.lawName, law.article)
+                          .then(() => {
+                            setLastExternalRef({ lawName: law.lawName, joLabel: law.article })
+                          })
+                          .catch((err) => {
+                            debugLogger.error('모달 열기 실패', err)
+                          })
+                      }
+
+                      return (
+                        <button
+                          key={`${law.lawName}-${law.jo}-${idx}`}
+                          onClick={handleClick}
+                          className="w-full text-left pl-4 pr-5 py-3 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <ExternalLink className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
+                              <span className="font-medium text-blue-300 group-hover:text-blue-200 text-base">
+                                {law.lawName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {sources.has('excerpt') && (
+                                <Bookmark className="h-3.5 w-3.5 text-purple-400" title="발췌조문" />
+                              )}
+                              {sources.has('related') && (
+                                <Link2 className="h-3.5 w-3.5 text-blue-400" title="관련법령" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-sm text-muted-foreground pl-5">
+                            {law.article}
+                            {law.title && (
+                              <span className="text-blue-400/70 ml-1">{law.title}</span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })
+                  })()
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    관련 법령이 없습니다
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // 일반 모드: 조문 목록
+            <>
+              <div className="mb-4">
+                <Badge variant="outline" className="text-xs">
+                  <FileText className="h-3 w-3 mr-1" />
+                  {actualArticles.length}개 조문
+                </Badge>
+              </div>
+
+              <div className="space-y-1">
+                {actualArticles.map((article, index) => {
+                  const isLoading = loadingJo === article.jo
+                  const isLoaded = loadedArticles.some((a) => a.jo === article.jo)
+
+                  return (
+                    <button
+                      key={`${article.jo}-${index}`}
+                      onClick={() => {
+                        handleArticleClick(article.jo)
+                        setIsArticleListExpanded(false)
+                      }}
+                      disabled={isLoading}
+                      className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${activeJo === article.jo
+                        ? "bg-primary text-primary-foreground font-bold"
+                        : "hover:bg-secondary text-foreground font-medium"
+                        } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="text-base font-bold">
+                            {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
+                          </div>
+                          {article.title && <div className="text-sm opacity-80 mt-0.5">({article.title})</div>}
+                          {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {activeJo === article.jo ? (
+                            <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
+                          ) : (
+                            <Bookmark className="h-3.5 w-3.5 opacity-40" />
+                          )}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onToggleFavorite?.(article.jo)
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                onToggleFavorite?.(article.jo)
+                              }
+                            }}
+                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${favorites.has(article.jo)
+                              ? "text-[var(--color-warning)]"
+                              : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                              }`}
+                            aria-label={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                            aria-pressed={favorites.has(article.jo)}
+                            title={favorites.has(article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                          >
+                            <Star className={`h-3 w-3 ${favorites.has(article.jo) ? "fill-current" : ""}`} />
+                          </span>
+                          {article.hasChanges && (
+                            <AlertCircle className="h-3 w-3 text-[var(--color-warning)]" title="변경된 조문" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </ArticleBottomSheet>
 
         {/* Right panel - Article content */}
         < Card className="flex flex-col" >
