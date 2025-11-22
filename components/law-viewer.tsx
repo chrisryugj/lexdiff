@@ -2563,13 +2563,17 @@ export function LawViewer({
                         {isLoadingThreeTier || loadingAdminRules ? (
                           <DelegationLoadingSkeleton />
                         ) : (
-                          <div className={cn(
-                            "grid gap-3 h-full",
-                            showAdminRules && adminRules.length > 0 ? "grid-cols-4" : "grid-cols-3"
-                          )}>
+                          <div
+                            className="grid gap-3 h-full"
+                            style={{
+                              gridTemplateColumns: showAdminRules && adminRules.length > 0
+                                ? "35% 25% 25% 15%"  // 4-tier: 법률 35%, 시행령 25%, 시행규칙 25%, 행정규칙 15%
+                                : "40% 30% 30%"      // 3-tier: 법률 40%, 시행령 30%, 시행규칙 30%
+                            }}
+                          >
                         {/* Left: Main article (law) */}
                         <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2 h-full">
-                          <div className="mb-4 pb-3 border-b border-border">
+                          <div className="sticky top-0 bg-background z-10 mb-4 pb-3 border-b border-border">
                             <h3 className="text-base font-bold text-foreground mb-2">
                               {formatSimpleJo(activeArticle.jo)}
                               {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
@@ -2591,7 +2595,7 @@ export function LawViewer({
 
                         {/* Middle: Decrees (시행령) */}
                         <div className="border-l border-r border-border px-3 overflow-y-auto h-full">
-                          <div className="mb-4 pb-3 border-b border-border">
+                          <div className="sticky top-0 bg-background z-10 mb-4 pb-3 border-b border-border">
                             <div className="flex items-center gap-2 mb-2">
                               <FileText className="h-4 w-4 text-foreground" />
                               <h3 className="text-base font-bold text-foreground">시행령</h3>
@@ -2600,13 +2604,13 @@ export function LawViewer({
                               {validDelegations.filter((d) => d.type === "시행령").length}개
                             </Badge>
                           </div>
-                          <div className="space-y-0">
+                          <div className="space-y-3">
                             {validDelegations
                               .filter((d) => d.type === "시행령")
                               .map((delegation, idx) => (
                                 <div
                                   key={idx}
-                                  className="p-3 rounded-lg border border-border"
+                                  className="p-3 rounded-lg border border-border hover:shadow-md hover:border-primary/50 transition-all cursor-default"
                                 >
                                   {delegation.title && (
                                     <p className="font-semibold text-sm text-foreground mb-2">
@@ -2636,21 +2640,22 @@ export function LawViewer({
 
                         {/* Right: Rules (시행규칙, 행정규칙) */}
                         <div className="border-l border-border pl-3 overflow-y-auto h-full">
-                          <div className="mb-4 pb-3 border-b border-border">
+                          <div className="sticky top-0 bg-background z-10 mb-4 pb-3 border-b border-border">
                             <div className="flex items-center gap-2 mb-2">
+                              <FileText className="h-4 w-4 text-foreground" />
                               <h3 className="text-base font-bold text-foreground">시행규칙</h3>
                             </div>
                             <Badge variant="secondary" className="text-xs">
                               {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
                             </Badge>
                           </div>
-                          <div className="space-y-0">
+                          <div className="space-y-3">
                             {validDelegations
                               .filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
                               .map((delegation, idx) => (
                                 <div
                                   key={idx}
-                                  className="p-3 rounded-lg border border-border"
+                                  className="p-3 rounded-lg border border-border hover:shadow-md hover:border-primary/50 transition-all cursor-default"
                                 >
                                   {delegation.title && (
                                     <p className="font-semibold text-sm text-foreground mb-2">
@@ -2681,7 +2686,7 @@ export function LawViewer({
                         {/* 4th Column: Admin Rules (행정규칙) - shown when enabled */}
                         {showAdminRules && adminRules.length > 0 && (
                           <div className="border-l border-border pl-3 overflow-y-auto h-full">
-                            <div className="mb-4 pb-3 border-b border-border">
+                            <div className="sticky top-0 bg-background z-10 mb-4 pb-3 border-b border-border">
                               <div className="flex items-center gap-2 mb-2">
                                 <FileText className="h-4 w-4 text-foreground" />
                                 <h3 className="text-base font-bold text-foreground">행정규칙</h3>
@@ -2690,12 +2695,12 @@ export function LawViewer({
                                 {adminRules.length}개
                               </Badge>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               {adminRules.map((rule, idx) => (
                                 <button
                                   key={idx}
                                   onClick={() => handleAdminRuleClick(rule)}
-                                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                                  className="w-full text-left p-3 rounded-lg border border-border hover:shadow-md hover:border-primary/50 transition-all"
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1">
