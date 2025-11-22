@@ -2104,8 +2104,14 @@ export function LawViewer({
                 ) : activeArticle ? (
                   // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
                   showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
-                    // Admin rules detail view: 2-tier (law | admin rule content)
-                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                    // Admin rules detail view: 2-tier (law 35% | admin rule content 65%)
+                    <div
+                      className="grid gap-4 overflow-hidden"
+                      style={{
+                        height: 'calc(100vh - 250px)',
+                        gridTemplateColumns: '35% 65%'
+                      }}
+                    >
                       {/* Left: Main article */}
                       <div className="overflow-y-auto pr-2">
                         <div className="mb-4 pb-3 border-b border-border">
@@ -3118,7 +3124,14 @@ export function LawViewer({
                     // 중복 블록 제거됨 - 위임조문 2단 뷰는 위로 이동됨
                   ) : false ? (
                     // 2-tier view: Split horizontally - left: main article, right: delegations/citations/admin rules
-                    <div className="grid grid-cols-2 gap-4 h-full">
+                    <div
+                      className="grid gap-4 h-full"
+                      style={{
+                        gridTemplateColumns: adminRuleViewMode === "detail" && adminRuleHtml
+                          ? "35% 65%"  // Admin rule detail: 법률 35%, 행정규칙 65%
+                          : "50% 50%"  // Delegation/Citation: 50% 50%
+                      }}
+                    >
                       {/* Left: Main article */}
                       <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
                         <div className="mb-6 pb-4 border-b border-border">
