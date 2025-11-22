@@ -192,7 +192,7 @@ export function SearchViewImproved({
       {/* Scrollable Content */}
       <main className="flex-1 relative z-10">
         {/* Extra spacing before Stats Section */}
-        <div className="h-[20px] md:h-[50px]" />
+        <div className="h-[10px] md:h-[50px]" />
 
         {/* Stats Section - Blur and fade in on scroll */}
         <section
@@ -222,7 +222,8 @@ export function SearchViewImproved({
           <div className="container mx-auto px-6 py-24 md:py-32 text-center">
             <div className="space-y-8 max-w-3xl mx-auto">
               <h3 className="text-5xl md:text-7xl font-bold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
-                지금 바로 시작하세요
+                <span className="md:hidden">지금 바로<br />시작하세요</span>
+                <span className="hidden md:inline">지금 바로 시작하세요</span>
               </h3>
               <p className="text-xl md:text-2xl text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
                 복잡한 법령도 LexDiff와 함께라면 쉽습니다.<br />
