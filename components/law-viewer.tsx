@@ -215,6 +215,9 @@ export function LawViewer({
   const validDelegations = currentArticleDelegations.filter((d) => d.content && d.content.trim().length > 0)
   const validCitations = currentArticleCitations.filter((c) => c.content && c.content.trim().length > 0)
 
+  // Total delegation count (시행령 + 시행규칙 + 행정규칙)
+  const totalDelegationCount = validDelegations.length + (adminRules?.length || 0)
+
   // 디버깅: 현재 조문의 delegation 데이터 확인
   useEffect(() => {
     if (activeJo && currentArticleDelegations.length > 0) {
@@ -1903,12 +1906,12 @@ export function LawViewer({
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
                     원문 보기
                   </Button>
-                  {/* 위임법령 보기 버튼 (2단 뷰 토글) */}
+                  {/* 위임법령 보기 버튼 (2단 뷰 토글) - 개수 표시 + 0이면 비활성화 */}
                   {!isOrdinance && !aiAnswerMode && (
                     <Button
                       variant={tierViewMode === "2-tier" ? "default" : "outline"}
                       size="sm"
-                      disabled={isLoadingThreeTier}
+                      disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && totalDelegationCount === 0)}
                       onClick={async () => {
                         if (tierViewMode === "1-tier") {
                           // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
@@ -1921,15 +1924,23 @@ export function LawViewer({
                           setShowAdminRules(false)
                         }
                       }}
-                      title="위임법령 보기 (시행령/시행규칙/행정규칙)"
+                      title={
+                        isLoadingThreeTier
+                          ? "위임법령 로딩 중..."
+                          : totalDelegationCount === 0
+                          ? "이 조문에는 위임법령이 없습니다"
+                          : `위임법령 보기 (시행령 ${validDelegations.filter(d => d.type === "시행령").length}개, 시행규칙 ${validDelegations.filter(d => d.type === "시행규칙").length}개${adminRules.length > 0 ? `, 행정규칙 ${adminRules.length}개` : ""})`
+                      }
                       className="h-7 px-2"
                     >
-                      {isLoadingThreeTier ? (
+                      {isLoadingThreeTier || loadingAdminRules ? (
                         <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                       ) : (
                         <FileText className="h-3.5 w-3.5 mr-1" />
                       )}
-                      위임법령 {tierViewMode === "2-tier" && "닫기"}
+                      위임법령
+                      {!isLoadingThreeTier && !loadingAdminRules && totalDelegationCount > 0 && ` (${totalDelegationCount})`}
+                      {tierViewMode === "2-tier" && " 닫기"}
                     </Button>
                   )}
                   {/* Admin rules button removed - now integrated into 2-tier view tabs */}
