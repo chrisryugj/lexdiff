@@ -147,7 +147,8 @@ export function SearchViewImproved({
                   Legal AI
                 </p>
                 <p className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
-                  법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
+                  <span className="md:hidden">법령 검색부터 AI 분석까지,<br />대한민국 법률 정보를 가장 쉽고 빠르게</span>
+                  <span className="hidden md:inline">법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게</span>
                 </p>
               </div>
 
