@@ -211,10 +211,12 @@ export function ArticleBottomSheet({
           )}
         </div>
 
-        {/* Content */}
-        <div className="h-[calc(100%-4rem)] overflow-y-auto px-4 pb-4">
-          {children}
-        </div>
+        {/* Content - Only render when open */}
+        {isOpen && (
+          <div className="h-[calc(100%-4rem)] overflow-y-auto px-4 pb-4">
+            {children}
+          </div>
+        )}
       </div>
     </>
   )
