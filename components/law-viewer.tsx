@@ -334,55 +334,39 @@ export function LawViewer({
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance])
 
-  // Fetch 3-tier comparison data when law is loaded
-  useEffect(() => {
-    const fetchThreeTierData = async () => {
-      if (aiAnswerMode) {
+  // Fetch 3-tier comparison data on demand (button click only)
+  const fetchThreeTierData = async () => {
+    if (aiAnswerMode || isOrdinance) return
+    if (!meta.lawId && !meta.mst) return
+
+    setIsLoadingThreeTier(true)
+    try {
+      const params = new URLSearchParams()
+      if (meta.lawId) params.append("lawId", meta.lawId)
+      else if (meta.mst) params.append("mst", meta.mst)
+
+      debugLogger.info("3단비교 데이터 조회 시작", { lawId: meta.lawId, mst: meta.mst })
+      const response = await fetch(`/api/three-tier?${params.toString()}`)
+      if (!response.ok) {
+        debugLogger.error("3단비교 API 오류", { status: response.status })
         return
       }
 
-      if (isOrdinance) {
-        return
+      const data = await response.json()
+      if (data.success) {
+        debugLogger.success("3단비교 완료", {
+          citation: data.citation?.articles?.length || 0,
+          delegation: data.delegation?.articles?.length || 0
+        })
+        setThreeTierCitation(data.citation)
+        setThreeTierDelegation(data.delegation)
       }
-
-      if (!meta.lawId && !meta.mst) {
-        return
-      }
-
-      setIsLoadingThreeTier(true)
-
-      try {
-        const params = new URLSearchParams()
-        if (meta.lawId) {
-          params.append("lawId", meta.lawId)
-        } else if (meta.mst) {
-          params.append("mst", meta.mst)
-        }
-
-        const response = await fetch(`/api/three-tier?${params.toString()}`)
-        if (!response.ok) {
-          console.error("[v0] [3단비교] API 응답 오류:", response.status)
-          return
-        }
-
-        const data = await response.json()
-        if (data.success) {
-          console.log("[3단비교] 데이터 로딩 완료", {
-            citationArticles: data.citation?.articles?.length || 0,
-            delegationArticles: data.delegation?.articles?.length || 0,
-          })
-          setThreeTierCitation(data.citation)
-          setThreeTierDelegation(data.delegation)
-        }
-      } catch (error) {
-        console.error("[v0] [3단비교] 데이터 로딩 실패:", error)
-      } finally {
-        setIsLoadingThreeTier(false)
-      }
+    } catch (error) {
+      debugLogger.error("3단비교 오류", error)
+    } finally {
+      setIsLoadingThreeTier(false)
     }
-
-    fetchThreeTierData()
-  }, [meta.lawId, meta.mst, isOrdinance, aiAnswerMode])
+  }
 
   // Auto-reset tier view mode if the current article doesn't support it
   useEffect(() => {
@@ -1470,7 +1454,7 @@ export function LawViewer({
 
   return (
     <>
-      <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)]" style={{ fontFamily: "Pretendard, sans-serif" }}>
+      <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] overflow-hidden" style={{ fontFamily: "Pretendard, sans-serif" }}>
         {/* Mobile overlay backdrop */}
         {isArticleListExpanded && (
           <div
@@ -1864,35 +1848,47 @@ export function LawViewer({
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
                     원문 보기
                   </Button>
-                  {/* Show 2-tier and 3-tier view buttons if valid 3-tier data exists */}
-                  {hasValidThreeTierData && (
+                  {/* 시행령/시행규칙 버튼 (클릭 시 API 호출) */}
+                  {!isOrdinance && !aiAnswerMode && (
                     <>
                       <Button
                         variant={tierViewMode === "2-tier" ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
-                        title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
+                        disabled={isLoadingThreeTier}
+                        onClick={async () => {
+                          if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
+                          setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")
+                        }}
+                        title="시행령 보기"
                         className="h-7 px-2"
                       >
-                        {threeTierDataType === "delegation" ? (
-                          <FileText className="h-3.5 w-3.5 mr-1" />
+                        {isLoadingThreeTier ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                         ) : (
-                          <Link2 className="h-3.5 w-3.5 mr-1" />
+                          <FileText className="h-3.5 w-3.5 mr-1" />
                         )}
                         시행령
                       </Button>
-                      {threeTierDataType === "delegation" && hasValidSihyungkyuchik && (
-                        <Button
-                          variant={tierViewMode === "3-tier" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
-                          title="시행규칙 보기"
-                          className="h-7 px-2"
-                        >
+                      <Button
+                        variant={tierViewMode === "3-tier" ? "default" : "outline"}
+                        size="sm"
+                        disabled={isLoadingThreeTier}
+                        onClick={async () => {
+                          if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
+                          if (hasValidSihyungkyuchik || !threeTierDelegation) {
+                            setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")
+                          }
+                        }}
+                        title="시행규칙 보기"
+                        className="h-7 px-2"
+                      >
+                        {isLoadingThreeTier ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
                           <FileText className="h-3.5 w-3.5 mr-1" />
-                          시행규칙
-                        </Button>
-                      )}
+                        )}
+                        시행규칙
+                      </Button>
                     </>
                   )}
                   {/* Admin rules button */}
@@ -2298,7 +2294,7 @@ export function LawViewer({
                     // 3-tier view: Split into three columns - law | decree (시행령) | rule (시행규칙) - only for delegations
                     <div className="grid grid-cols-3 gap-3 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                       {/* Left: Main article (law) */}
-                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
+                      <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2 h-full">
                         <div className="mb-4 pb-3 border-b border-border">
                           <h3 className="text-base font-bold text-foreground mb-2">
                             {formatSimpleJo(activeArticle.jo)}
@@ -2320,7 +2316,7 @@ export function LawViewer({
                       </div>
 
                       {/* Middle: Decrees (시행령) */}
-                      <div className="border-l border-r border-border px-3 overflow-y-auto">
+                      <div className="border-l border-r border-border px-3 overflow-y-auto h-full">
                         <div className="mb-4 pb-3 border-b border-border">
                           <div className="flex items-center gap-2 mb-2">
                             <FileText className="h-4 w-4 text-foreground" />
@@ -2365,7 +2361,7 @@ export function LawViewer({
                       </div>
 
                       {/* Right: Rules (시행규칙, 행정규칙) */}
-                      <div className="border-l border-border pl-3 overflow-y-auto">
+                      <div className="border-l border-border pl-3 overflow-y-auto h-full">
                         <div className="mb-4 pb-3 border-b border-border">
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="text-base font-bold text-foreground">시행규칙</h3>
