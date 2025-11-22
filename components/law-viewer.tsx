@@ -2868,6 +2868,7 @@ export function LawViewer({
                                     <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
                                   </div>
                                 )}
+                              </TabsContent>
                             </Tabs>
                           </Panel>
                         </PanelGroup>
