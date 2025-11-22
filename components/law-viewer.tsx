@@ -2800,8 +2800,14 @@ export function LawViewer({
                         </Tabs>
                       </div>
 
-                      {/* Desktop: 2-column grid view */}
-                      <div className="hidden md:grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Desktop: 2-column grid view (35:65 for better content space) */}
+                      <div
+                        className="hidden md:grid gap-4 overflow-hidden"
+                        style={{
+                          height: 'calc(100vh - 250px)',
+                          gridTemplateColumns: '35% 65%'
+                        }}
+                      >
                         {/* Left: Main article */}
                         <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2">
                           <div className="mb-6 pb-4 border-b border-border">
@@ -2842,7 +2848,7 @@ export function LawViewer({
                             </Badge>
                           </div>
 
-                          <div className="space-y-0">
+                          <div className="space-y-3">
                             {tierItems.map((item, idx) => (
                               <div
                                 key={idx}
