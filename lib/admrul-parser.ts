@@ -425,10 +425,7 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
   // 3. 개정 마커 스타일링
   text = applyRevisionStyling(text)
 
-  // 4. 줄바꿈 → <br> 변환 (개정 마커 스타일링 후)
-  text = text.replace(/\n/g, '<br>')
-
-  // 5. 문단 마커 스타일링 (①②③) - 첫 번째는 건너뜀
+  // 4. 문단 마커 스타일링 (①②③) - 첫 번째는 건너뜀
   let isFirst = true
   text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
     if (isFirst) {
@@ -438,12 +435,13 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
     return '<br><span class="para-marker">' + match + '</span>'
   })
 
-  // 6. 번호 항목 줄바꿈 (1., 2., 3.) - 날짜 제외
+  // 5. 번호 항목 줄바꿈 (1., 2., 3.) - 날짜 제외
   text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
 
-  // 7. 하위 항목 줄바꿈 (가., 나., 다.)
+  // 6. 하위 항목 줄바꿈 (가., 나., 다.)
   text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
 
+  // NOTE: \n → <br> 변환은 하지 않음 (whitespace-pre-wrap으로 처리)
   return text
 }
 
