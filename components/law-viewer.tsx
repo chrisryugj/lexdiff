@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -156,6 +157,22 @@ export function LawViewer({
   const [adminRuleTitle, setAdminRuleTitle] = useState<string>("")
   // Admin rule cache - key: id or serialNumber, value: { title, html }
   const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
+
+  // Panel sizes for drag resize (2-tier views)
+  const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lawViewerDelegationSplit')
+      return saved ? parseInt(saved) : 35
+    }
+    return 35
+  })
+  const [adminRulePanelSize, setAdminRulePanelSize] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lawViewerAdminRuleSplit')
+      return saved ? parseInt(saved) : 35
+    }
+    return 35
+  })
 
   // AI 답변 HTML 변환 (섹션별 링크 처리)
   const aiAnswerHTML = useMemo(() => {
