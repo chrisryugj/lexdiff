@@ -173,11 +173,9 @@ export default function Home() {
           onProgressUpdate={(stage, progress) => {
             setSearchStage(stage)
             setSearchProgress(progress)
-            // 완료 시 약간의 딜레이 후 프로그레스 숨김
+            // 완료 시 즉시 프로그레스 숨김 (지연 제거)
             if (stage === 'complete') {
-              setTimeout(() => {
-                setIsSearching(false)
-              }, 500)
+              setIsSearching(false)
             }
           }}
           onModeChange={(mode) => {
