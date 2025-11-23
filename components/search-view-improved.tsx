@@ -143,7 +143,7 @@ export function SearchViewImproved({
                 >
                   LexDiff
                 </h1>
-                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "ReperepointSpecialItalic, sans-serif" }}>
                   Legal AI Platform
                 </p>
                 <p className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
