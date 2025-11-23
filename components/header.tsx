@@ -50,7 +50,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
             <h1 className="text-lg font-bold text-foreground mb-0" style={{ fontFamily: "GiantsInline, sans-serif" }}>
               LexDiff
             </h1>
-            <p className="text-md text-muted-foreground font-bold -mt-1" style={{ fontFamily: "InkLiquid, sans-serif" }}>Your AI-Powered Legal Companion</p>
+            <p className="text-md text-muted-foreground font-bold -mt-1" style={{ fontFamily: "Pretendard, sans-serif" }}>Legal AI</p>
           </div>
         </button>
 
