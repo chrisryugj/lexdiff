@@ -295,8 +295,8 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
  * 대통령령/시행령 패턴 수집
  */
 function collectDecreeMatches(text: string, matches: LinkMatch[]): void {
-  // 패턴: "대통령령으로 정하는"
-  const decreeRegex = /(대통령령)(?:으로|로)\s*정하는/g
+  // 패턴: "대통령령으로 정하는" 또는 "대통령령으로 정한다"
+  const decreeRegex = /(대통령령)(?:으로|로)\s*정(?:하는|한다)/g
   let match: RegExpExecArray | null
 
   while ((match = decreeRegex.exec(text)) !== null) {
@@ -314,8 +314,8 @@ function collectDecreeMatches(text: string, matches: LinkMatch[]): void {
  * 부령/시행규칙 패턴 수집
  */
 function collectRuleMatches(text: string, matches: LinkMatch[]): void {
-  // 패턴: "XXX부령으로 정하는"
-  const ruleRegex = /([가-힣]+부령)(?:으로|로)\s*정하는/g
+  // 패턴: "XXX부령으로 정하는" 또는 "XXX부령으로 정한다"
+  const ruleRegex = /([가-힣]+부령)(?:으로|로)\s*정(?:하는|한다)/g
   let match: RegExpExecArray | null
 
   while ((match = ruleRegex.exec(text)) !== null) {
