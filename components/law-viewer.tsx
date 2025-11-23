@@ -163,6 +163,8 @@ export function LawViewer({
   const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
   // Loaded admin rules count (행정규칙 한번 로드 후 개수 저장)
   const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
+  // Active tab for 2-tier delegation view (시행령/시행규칙/행정규칙)
+  const [delegationActiveTab, setDelegationActiveTab] = useState<"decree" | "rule" | "admin">("decree")
 
   // Panel sizes for drag resize (2-tier views)
   const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {
@@ -739,12 +741,13 @@ export function LawViewer({
       } else if (refType === "regulation") {
         const clickedText = target.textContent || ""
 
-        // Enable admin rules, set list view mode, and switch to 2-tier view
+        // Enable admin rules, set list view mode, switch to 2-tier view, and open admin tab
         if (!showAdminRules) {
           setShowAdminRules(true)
         }
         setAdminRuleViewMode("list")
         setTierViewMode("2-tier")
+        setDelegationActiveTab("admin") // 행정규칙 탭 자동 선택
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
@@ -3082,14 +3085,15 @@ export function LawViewer({
                           {/* Right Panel: Tabs for 시행령/시행규칙/행정규칙 */}
                           <Panel>
                             <Tabs
-                              defaultValue="decree"
-                              className="w-full h-full flex flex-col pl-4"
+                              value={delegationActiveTab}
                               onValueChange={(value) => {
+                                setDelegationActiveTab(value as "decree" | "rule" | "admin")
                                 // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
                                 if (value === "admin" && !showAdminRules) {
                                   setShowAdminRules(true)
                                 }
                               }}
+                              className="w-full h-full flex flex-col pl-4"
                             >
                               <TabsList className="w-full grid grid-cols-3 mb-2">
                                 <TabsTrigger value="decree" className="text-xs">
