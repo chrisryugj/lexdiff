@@ -169,7 +169,6 @@ export function LawViewer({
     adminRulePanelSize,
     setAdminRulePanelSize,
     loadedAdminRulesCount,
-    setLoadedAdminRulesCount,
     adminRules,
     loadingAdminRules,
     adminRulesError,
@@ -177,13 +176,6 @@ export function LawViewer({
     handleViewAdminRuleFullContent,
     getLawGoKrLink,
   } = useLawViewerAdminRules(activeArticleNumber || "", meta)
-
-  // Store admin rules count when loaded (행정규칙 로드 후 개수 저장)
-  useEffect(() => {
-    if (!loadingAdminRules && adminRules.length > 0) {
-      setLoadedAdminRulesCount(adminRules.length)
-    }
-  }, [adminRules, loadingAdminRules])
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
@@ -274,6 +266,15 @@ export function LawViewer({
   useEffect(() => {
     articleRefs.current = {}
   }, [articles])
+
+  // Reset delegation panel state when law changes
+  useEffect(() => {
+    setTierViewMode("1-tier")
+    setThreeTierCitation(null)
+    setThreeTierDelegation(null)
+    setShowAdminRules(false)
+    setAdminRuleViewMode("list")
+  }, [meta.lawTitle])
 
   const fetchRevisionHistory = async (jo: string) => {
     if (!meta.lawId || !jo) return
