@@ -741,6 +741,11 @@ export function LawViewer({
       } else if (refType === "regulation") {
         const clickedText = target.textContent || ""
 
+        // Load 3-tier data first if not loaded
+        if (!threeTierDelegation && !threeTierCitation) {
+          await fetchThreeTierData()
+        }
+
         // Enable admin rules, set list view mode, switch to 2-tier view, and open admin tab
         if (!showAdminRules) {
           setShowAdminRules(true)

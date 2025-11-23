@@ -104,6 +104,15 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
           ? rawArticle.시행령조문
           : [rawArticle.시행령조문]
 
+        debugLogger.debug(`조문 ${formatJoNum(jo)} 시행령 ${sihyungryung.length}개 파싱`, {
+          시행령데이터: sihyungryung.map(item => ({
+            조번호: item.조번호,
+            조가지번호: item.조가지번호,
+            조제목: item.조제목,
+            조내용길이: item.조내용?.length || 0
+          }))
+        })
+
         for (const item of sihyungryung) {
           delegations.push({
             type: "시행령",
@@ -114,6 +123,8 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
             content: item.조내용 || "",
           })
         }
+      } else {
+        debugLogger.debug(`조문 ${formatJoNum(jo)} 시행령 데이터 없음`)
       }
 
       // 시행규칙조문 파싱 (시행령조문과 동일한 레벨)
