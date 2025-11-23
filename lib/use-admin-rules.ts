@@ -38,7 +38,16 @@ export function useAdminRules(
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
   useEffect(() => {
-    if (!enabled || !lawName || !articleNumber) {
+    // enabled가 false면 fetch하지 않지만, 기존 데이터는 유지
+    if (!enabled) {
+      setLoading(false)
+      setError(null)
+      setProgress(null)
+      return
+    }
+
+    // lawName이나 articleNumber가 없으면 데이터 초기화
+    if (!lawName || !articleNumber) {
       setAdminRules([])
       setLoading(false)
       setError(null)
