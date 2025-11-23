@@ -150,6 +150,10 @@ export function LawViewer({
   const [adminRuleTitle, setAdminRuleTitle] = useState<string>("")
   // Admin rule cache - key: id or serialNumber, value: { title, html }
   const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
+  // Mobile tab state for admin rules (모바일에서 법령 본문 vs 행정규칙)
+  const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
+  // Loaded admin rules count (행정규칙 한번 로드 후 개수 저장)
+  const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
 
   // AI 답변 HTML 변환 (섹션별 링크 처리)
   const aiAnswerHTML = useMemo(() => {
@@ -171,6 +175,13 @@ export function LawViewer({
     activeArticleNumber,
     showAdminRules // Only fetch when enabled
   )
+
+  // Store admin rules count when loaded (행정규칙 로드 후 개수 저장)
+  useEffect(() => {
+    if (!loadingAdminRules && adminRules.length > 0) {
+      setLoadedAdminRulesCount(adminRules.length)
+    }
+  }, [adminRules, loadingAdminRules])
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
@@ -1906,6 +1917,7 @@ export function LawViewer({
                       if (newValue) {
                         // 행정규칙 활성화 시 목록 뷰로 설정
                         setAdminRuleViewMode("list")
+                        setAdminRuleMobileTab("law")
                       }
                     }}
                     disabled={loadingAdminRules}
@@ -1920,7 +1932,7 @@ export function LawViewer({
                     ) : (
                       <>
                         <FileText className="h-3.5 w-3.5 mr-1" />
-                        행정규칙 {adminRules.length > 0 && `(${adminRules.length})`}
+                        행정규칙 {loadedAdminRulesCount > 0 && `(${loadedAdminRulesCount})`}
                       </>
                     )}
                   </Button>
@@ -2071,96 +2083,40 @@ export function LawViewer({
                 ) : activeArticle ? (
                   // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
                   showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
-                    // Admin rules detail view: 2-tier (law | admin rule content)
-                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                      {/* Left: Main article */}
-                      <div className="overflow-y-auto pr-2">
-                        <div className="mb-4 pb-3 border-b border-border">
-                          <h3 className="text-base font-bold text-foreground mb-2">
-                            {formatSimpleJo(activeArticle.jo)}
-                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                          </h3>
-                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                        </div>
-                        <div
-                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
-                        />
+                    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Mobile tabs */}
+                      <div className="md:hidden flex gap-1 mb-3 border-b border-border pb-2">
+                        <Button
+                          variant={adminRuleMobileTab === "law" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setAdminRuleMobileTab("law")}
+                          className="flex-1"
+                        >
+                          법령 본문
+                        </Button>
+                        <Button
+                          variant={adminRuleMobileTab === "adminRule" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setAdminRuleMobileTab("adminRule")}
+                          className="flex-1"
+                        >
+                          {adminRuleTitle || "행정규칙"}
+                        </Button>
                       </div>
 
-                      {/* Right: Admin rule full content */}
-                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-5 w-5 text-foreground" />
-                              <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  // Go back to list view
-                                  setAdminRuleViewMode("list")
-                                }}
-                              >
-                                ← 목록
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  // Force refresh admin rule content
-                                  const currentRule = adminRules.find(r => r.name === adminRuleTitle)
-                                  if (currentRule) {
-                                    const idParam = currentRule.serialNumber || currentRule.id
-                                    if (idParam) {
-                                      // Clear cache
-                                      await clearAdminRuleContentCache(idParam)
-                                      console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
-
-                                      // Reset state
-                                      setAdminRuleHtml(null)
-
-                                      // Reload
-                                      await handleViewAdminRuleFullContent(currentRule)
-                                    }
-                                  }
-                                }}
-                                title="캐시 삭제 후 다시 로드"
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                              </Button>
-                              {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  asChild
-                                >
-                                  <a
-                                    href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                    법령 사이트
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
+                      {/* Desktop: 2-tier layout, Mobile: tab-based */}
+                      <div className="hidden md:grid md:grid-cols-2 gap-4 overflow-hidden flex-1">
+                        {/* Left: Main article */}
+                        <div className="overflow-y-auto pr-2">
+                          <div className="mb-4 pb-3 border-b border-border">
+                            <h3 className="text-base font-bold text-foreground mb-2">
+                              {formatSimpleJo(activeArticle.jo)}
+                              {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">법률 본문</Badge>
                           </div>
-                        </div>
-                        <div className="overflow-y-auto flex-1">
                           <div
-                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
                             style={{
                               fontSize: `${fontSize}px`,
                               lineHeight: "1.8",
@@ -2168,129 +2124,443 @@ export function LawViewer({
                               wordBreak: "break-word",
                             }}
                             onClick={handleContentClick}
-                            dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                            dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
                           />
                         </div>
+
+                        {/* Right: Admin rule full content */}
+                        <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                          <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-foreground" />
+                                <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setAdminRuleViewMode("list")
+                                  }}
+                                >
+                                  ← 목록
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                    if (currentRule) {
+                                      const idParam = currentRule.serialNumber || currentRule.id
+                                      if (idParam) {
+                                        await clearAdminRuleContentCache(idParam)
+                                        console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+                                        setAdminRuleHtml(null)
+                                        await handleViewAdminRuleFullContent(currentRule)
+                                      }
+                                    }
+                                  }}
+                                  title="캐시 삭제 후 다시 로드"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                                {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                  >
+                                    <a
+                                      href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      법령 사이트
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="overflow-y-auto flex-1">
+                            <div
+                              className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                              style={{
+                                fontSize: `${fontSize}px`,
+                                lineHeight: "1.8",
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
+                              }}
+                              onClick={handleContentClick}
+                              dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile: show only active tab */}
+                      <div className="md:hidden overflow-hidden flex-1">
+                        {adminRuleMobileTab === "law" ? (
+                          <div className="overflow-y-auto h-full">
+                            <div className="mb-4 pb-3 border-b border-border">
+                              <h3 className="text-base font-bold text-foreground mb-2">
+                                {formatSimpleJo(activeArticle.jo)}
+                                {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                              </h3>
+                              <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                            </div>
+                            <div
+                              className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                              style={{
+                                fontSize: `${fontSize}px`,
+                                lineHeight: "1.8",
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
+                              }}
+                              onClick={handleContentClick}
+                              dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col overflow-hidden h-full">
+                            <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-5 w-5 text-foreground" />
+                                  <h3 className="text-lg font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setAdminRuleViewMode("list")
+                                      setAdminRuleMobileTab("law")
+                                    }}
+                                  >
+                                    ← 목록
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      const currentRule = adminRules.find(r => r.name === adminRuleTitle)
+                                      if (currentRule) {
+                                        const idParam = currentRule.serialNumber || currentRule.id
+                                        if (idParam) {
+                                          await clearAdminRuleContentCache(idParam)
+                                          console.log("[law-viewer] Cache cleared, reloading admin rule:", idParam)
+                                          setAdminRuleHtml(null)
+                                          await handleViewAdminRuleFullContent(currentRule)
+                                        }
+                                      }
+                                    }}
+                                    title="캐시 삭제 후 다시 로드"
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                  {adminRuleHtml && getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      asChild
+                                    >
+                                      <a
+                                        href={getLawGoKrLink(adminRules.find(r => r.name === adminRuleTitle)?.serialNumber)!}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <ExternalLink className="h-3 w-3 mr-1" />
+                                        법령 사이트
+                                      </a>
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="overflow-y-auto flex-1">
+                              <div
+                                className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                style={{
+                                  fontSize: `${fontSize}px`,
+                                  lineHeight: "1.8",
+                                  overflowWrap: "break-word",
+                                  wordBreak: "break-word",
+                                }}
+                                onClick={handleContentClick}
+                                dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     // Priority 2: Admin rules list view (행정규칙 목록 뷰)
                   ) : showAdminRules && adminRuleViewMode === "list" && (loadingAdminRules || adminRules.length > 0) ? (
-                    // Admin rules list view: 2-tier (law | admin rules list)
-                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                      {/* Left: Main article */}
-                      <div className="overflow-y-auto pr-2 flex flex-col">
-                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                          <h3 className="text-base font-bold text-foreground mb-2">
-                            {formatSimpleJo(activeArticle.jo)}
-                            {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                          </h3>
-                          <Badge variant="secondary" className="text-xs">법률 본문</Badge>
-                        </div>
-                        <div
-                          className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: "1.8",
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                          onClick={handleContentClick}
-                          dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
-                        />
+                    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
+                      {/* Mobile tabs */}
+                      <div className="md:hidden flex gap-1 mb-3 border-b border-border pb-2">
+                        <Button
+                          variant={adminRuleMobileTab === "law" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setAdminRuleMobileTab("law")}
+                          className="flex-1"
+                        >
+                          법령 본문
+                        </Button>
+                        <Button
+                          variant={adminRuleMobileTab === "adminRule" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setAdminRuleMobileTab("adminRule")}
+                          className="flex-1"
+                        >
+                          행정규칙 목록
+                        </Button>
                       </div>
 
-                      {/* Right: Admin rules list */}
-                      <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
-                        <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FileText className="h-4 w-4 text-foreground" />
-                            <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                      {/* Desktop: 2-tier layout */}
+                      <div className="hidden md:grid md:grid-cols-2 gap-4 overflow-hidden flex-1">
+                        {/* Left: Main article */}
+                        <div className="overflow-y-auto pr-2 flex flex-col">
+                          <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                            <h3 className="text-base font-bold text-foreground mb-2">
+                              {formatSimpleJo(activeArticle.jo)}
+                              {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">법률 본문</Badge>
                           </div>
-                          {loadingAdminRules ? (
-                            <Badge variant="secondary" className="text-xs">
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              {adminRules.length}개 매칭
-                            </Badge>
-                          )}
+                          <div
+                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: "1.8",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
+                          />
                         </div>
-                        <div className="overflow-y-auto flex-1">
-                          {loadingAdminRules ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                              <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                              <p className="text-sm">행정규칙 검색 중...</p>
-                              {adminRulesProgress && (
-                                <p className="text-xs mt-2">
-                                  {adminRulesProgress.current} / {adminRulesProgress.total}
-                                </p>
-                              )}
+
+                        {/* Right: Admin rules list */}
+                        <div className="border-l border-border pl-4 flex flex-col overflow-hidden">
+                          <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="h-4 w-4 text-foreground" />
+                              <h3 className="text-base font-bold text-foreground">행정규칙</h3>
                             </div>
-                          ) : (
-                            <div className="space-y-3 pr-2">
-                              {adminRules.map((rule, idx) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 rounded-lg border border-border bg-card"
-                                >
-                                  <div className="flex items-start justify-between gap-2 mb-2">
-                                    <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
-                                    <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
-                                      {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
-                                    </Badge>
-                                  </div>
-                                  {rule.purpose.title && (
-                                    <p className="text-xs text-muted-foreground mb-2">
-                                      {rule.purpose.number} ({rule.purpose.title})
-                                    </p>
-                                  )}
+                            {loadingAdminRules ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                {adminRules.length}개 매칭
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="overflow-y-auto flex-1">
+                            {loadingAdminRules ? (
+                              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                                <p className="text-sm">행정규칙 검색 중...</p>
+                                {adminRulesProgress && (
+                                  <p className="text-xs mt-2">
+                                    {adminRulesProgress.current} / {adminRulesProgress.total}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-3 pr-2">
+                                {adminRules.map((rule, idx) => (
                                   <div
-                                    className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
-                                    style={{
-                                      display: "-webkit-box",
-                                      WebkitLineClamp: 3,
-                                      WebkitBoxOrient: "vertical",
-                                      overflow: "hidden",
-                                    }}
+                                    key={idx}
+                                    className="p-3 rounded-lg border border-border bg-card"
                                   >
-                                    {rule.purpose.content}
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      onClick={() => handleViewAdminRuleFullContent(rule)}
-                                      className="flex-1 text-xs h-7"
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
+                                      <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
+                                        {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
+                                      </Badge>
+                                    </div>
+                                    {rule.purpose.title && (
+                                      <p className="text-xs text-muted-foreground mb-2">
+                                        {rule.purpose.number} ({rule.purpose.title})
+                                      </p>
+                                    )}
+                                    <div
+                                      className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
+                                      style={{
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                      }}
                                     >
-                                      <Eye className="h-3 w-3 mr-1" />
-                                      본문 조회
-                                    </Button>
-                                    {getLawGoKrLink(rule.serialNumber) && (
+                                      {rule.purpose.content}
+                                    </div>
+                                    <div className="flex gap-2">
                                       <Button
                                         size="sm"
-                                        variant="outline"
-                                        asChild
+                                        variant="default"
+                                        onClick={() => {
+                                          handleViewAdminRuleFullContent(rule)
+                                          setAdminRuleMobileTab("adminRule")
+                                        }}
                                         className="flex-1 text-xs h-7"
                                       >
-                                        <a
-                                          href={getLawGoKrLink(rule.serialNumber)!}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                        >
-                                          <ExternalLink className="h-3 w-3 mr-1" />
-                                          법령 사이트
-                                        </a>
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        본문 조회
                                       </Button>
-                                    )}
+                                      {getLawGoKrLink(rule.serialNumber) && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          asChild
+                                          className="flex-1 text-xs h-7"
+                                        >
+                                          <a
+                                            href={getLawGoKrLink(rule.serialNumber)!}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            법령 사이트
+                                          </a>
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
+                      </div>
+
+                      {/* Mobile: show only active tab */}
+                      <div className="md:hidden overflow-hidden flex-1">
+                        {adminRuleMobileTab === "law" ? (
+                          <div className="overflow-y-auto h-full">
+                            <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                              <h3 className="text-base font-bold text-foreground mb-2">
+                                {formatSimpleJo(activeArticle.jo)}
+                                {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                              </h3>
+                              <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                            </div>
+                            <div
+                              className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm prose prose-sm max-w-none dark:prose-invert"
+                              style={{
+                                fontSize: `${fontSize}px`,
+                                lineHeight: "1.8",
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
+                              }}
+                              onClick={handleContentClick}
+                              dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col overflow-hidden h-full">
+                            <div className="mb-4 pb-3 border-b border-border flex-shrink-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-4 w-4 text-foreground" />
+                                <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                              </div>
+                              {loadingAdminRules ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  {adminRulesProgress ? `${adminRulesProgress.current}/${adminRulesProgress.total} 조회 중` : '로딩 중...'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">
+                                  {adminRules.length}개 매칭
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="overflow-y-auto flex-1">
+                              {loadingAdminRules ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                  <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                                  <p className="text-sm">행정규칙 검색 중...</p>
+                                  {adminRulesProgress && (
+                                    <p className="text-xs mt-2">
+                                      {adminRulesProgress.current} / {adminRulesProgress.total}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {adminRules.map((rule, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-3 rounded-lg border border-border bg-card"
+                                    >
+                                      <div className="flex items-start justify-between gap-2 mb-2">
+                                        <p className="font-semibold text-sm text-foreground leading-tight">{rule.name}</p>
+                                        <Badge variant={rule.matchType === "title" ? "default" : "secondary"} className="text-xs shrink-0">
+                                          {rule.matchType === "title" ? "제목 매칭" : "내용 매칭"}
+                                        </Badge>
+                                      </div>
+                                      {rule.purpose.title && (
+                                        <p className="text-xs text-muted-foreground mb-2">
+                                          {rule.purpose.number} ({rule.purpose.title})
+                                        </p>
+                                      )}
+                                      <div
+                                        className="text-xs text-muted-foreground leading-relaxed break-words mb-3"
+                                        style={{
+                                          display: "-webkit-box",
+                                          WebkitLineClamp: 3,
+                                          WebkitBoxOrient: "vertical",
+                                          overflow: "hidden",
+                                        }}
+                                      >
+                                        {rule.purpose.content}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          onClick={() => {
+                                            handleViewAdminRuleFullContent(rule)
+                                            setAdminRuleMobileTab("adminRule")
+                                          }}
+                                          className="flex-1 text-xs h-7"
+                                        >
+                                          <Eye className="h-3 w-3 mr-1" />
+                                          본문 조회
+                                        </Button>
+                                        {getLawGoKrLink(rule.serialNumber) && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            asChild
+                                            className="flex-1 text-xs h-7"
+                                          >
+                                            <a
+                                              href={getLawGoKrLink(rule.serialNumber)!}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                            >
+                                              <ExternalLink className="h-3 w-3 mr-1" />
+                                              법령 사이트
+                                            </a>
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
