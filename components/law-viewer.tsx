@@ -2054,8 +2054,8 @@ export function LawViewer({
                     <p>조문을 불러오는 중...</p>
                   </div>
                 ) : activeArticle ? (
-                  // Priority 1: Admin rules detail view (행정규칙 상세 뷰 - 최우선)
-                  showAdminRules && adminRuleViewMode === "detail" && adminRuleHtml ? (
+                  // 행정규칙은 이제 탭 내에서만 표시 (Priority 1, 2 비활성화)
+                  false ? (
                     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                       {/* Mobile tabs */}
                       <div className="md:hidden flex gap-1 mb-3 border-b border-border pb-2">
