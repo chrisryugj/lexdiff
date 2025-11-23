@@ -7,10 +7,12 @@
 
 ## 📋 현황 분석 (2025-11-21 기준)
 
-### 핵심 발견사항
+### 핵심 발견사항 ⚠️ **중요 업데이트**
 
-1. **2단 비교 뷰 코드**: law-viewer.tsx에 여전히 존재 (라인 2919-3027)
-2. **실제 사용 여부**: search-result-view.tsx에서만 `handleCitationClick`으로 연결 사용 중
+1. **2단 비교 뷰 코드**: law-viewer.tsx에 존재 (라인 2919-3027) - **❌ 실제로 사용되지 않음 (데드 코드)**
+2. **실제 사용 여부**:
+   - ❌ **search-result-view.tsx**: `comparisonLaw` state 선언만 있고 실제 set 안됨 (데드 코드)
+   - ❌ **file-search-answer-display.tsx**: 2단 비교 뷰 코드 없음 (단일 AI 답변 뷰만)
 3. **file-search 컴포넌트**: file-search-answer-display.tsx로 단순화됨 (기존 file-search-rag-view.tsx 없음)
 4. **코드 크기**: law-viewer.tsx (3205줄), search-result-view.tsx (2391줄)
 
@@ -134,88 +136,92 @@ law-viewer.tsx (onRelatedArticleClick 받음, 하지만 직접 사용 안함)
 
 ---
 
-## 📊 2단 비교 뷰 사용 현황 요약
+## 📊 2단 비교 뷰 사용 현황 요약 ⚠️ **검증 완료**
 
 | 항목 | search-result-view.tsx | file-search-answer-display.tsx | 비고 |
 |------|----------------------|-------------------------------|------|
-| handleCitationClick 정의 | ✅ 있음 (라인 1828) | ❌ 없음 | 2단 비교 핸들러 |
-| onRelatedArticleClick 전달 | ✅ 전달 (라인 2245, 2289) | ❌ 전달 안함 | LawViewer에 전달 |
-| 2단 비교 뷰 렌더링 | ✅ 사용 중 | ❌ 사용 안함 | comparisonLaw* props 사용 |
-| 모달 방식 처리 | ✅ 병행 사용 | ✅ 주로 사용 | openExternalLawArticleModal |
+| handleCitationClick 정의 | ❌ 사용 안함 (모달 방식) | ❌ 없음 | 모달로 처리 |
+| onRelatedArticleClick 전달 | ❌ 전달만 하고 사용 안함 | ❌ 전달 안함 | 데드 코드 |
+| 2단 비교 뷰 렌더링 | ❌ **사용 안함** (state만 선언) | ❌ 사용 안함 | **데드 코드 확정** |
+| comparisonLaw state | ❌ `setComparisonLaw(null)` 1회만 호출 | ❌ 없음 | **실제 데이터 할당 안됨** |
+| 모달 방식 처리 | ✅ 사용 중 | ✅ 사용 중 | openExternalLawArticleModal |
 
-**결론**:
-- **search-result-view.tsx**: 2단 비교 뷰 **사용 중** (관련 법령 클릭 시 우측에 표시)
-- **file-search-answer-display.tsx**: 2단 비교 뷰 **미사용** (모달 방식만 사용)
-- **law-viewer.tsx**: 2단 비교 뷰 코드 **유지 필요** (search-result-view.tsx에서 사용)
+**검증 결과**:
+- **search-result-view.tsx**:
+  - `comparisonLaw` state 선언 (라인 238)
+  - `setComparisonLaw(null)` 초기화만 1회 호출 (라인 1000)
+  - **실제 데이터를 set하는 코드 없음** → 항상 `null` 상태 유지
+  - `comparisonLawMeta`, `comparisonLawArticles` props 전달하지만 의미 없음
+
+- **file-search-answer-display.tsx**: 2단 비교 뷰 **전혀 사용 안함** (독립 컴포넌트)
+
+- **law-viewer.tsx**:
+  - 2단 비교 뷰 조건: `comparisonLawMeta && comparisonLawArticles.length > 0`
+  - 항상 `false` → **절대 실행되지 않는 데드 코드**
+  - 실제로는 1단 AI 답변 뷰만 실행됨
 
 ---
 
-## 🎯 최적화 권장사항
+## 🎯 최적화 권장사항 ✅ **제거 가능 확정**
 
-### 1. ~~제거 가능한 코드~~ (주의: 제거하면 안됨!)
+### 1. 안전하게 제거 가능한 코드 (데드 코드 확정)
 
-~~law-viewer.tsx의 2단 비교 뷰 코드 (라인 2919-3027)~~
+**✅ 제거 가능**: 모든 2단 비교 뷰 관련 코드가 실제로 사용되지 않음!
 
-**❌ 제거 불가**: search-result-view.tsx에서 실제로 사용 중!
+### 2. 제거해야 할 코드 목록
 
-### 2. 개선 가능한 부분
-
-#### A. Props 명확화
+#### A. search-result-view.tsx
 
 ```typescript
-// law-viewer.tsx에서 명확히 주석 추가
-interface LawViewerProps {
-  // ...
+// 라인 238-242: comparisonLaw state 제거
+const [comparisonLaw, setComparisonLaw] = useState<{
+  meta: LawMeta | null
+  articles: LawArticle[]
+  selectedJo?: string
+} | null>(null)
 
-  // ⚠️ search-result-view.tsx에서만 사용 (file-search에서는 미사용)
-  onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
-  comparisonLawMeta?: LawMeta | null
-  comparisonLawArticles?: LawArticle[]
-  comparisonLawSelectedJo?: string
-  isLoadingComparison?: boolean
-}
+// 라인 243: isLoadingComparison state 제거
+const [isLoadingComparison, setIsLoadingComparison] = useState(false)
+
+// 라인 1000: 초기화 코드 제거
+setComparisonLaw(null)
+
+// 라인 1001: 초기화 코드 제거
+setIsLoadingComparison(false)
+
+// 라인 2247-2249, 2291-2293: props 전달 제거
+comparisonLawMeta={comparisonLaw?.meta || null}
+comparisonLawArticles={comparisonLaw?.articles || []}
+comparisonLawSelectedJo={comparisonLaw?.selectedJo}
+isLoadingComparison={isLoadingComparison}
 ```
 
-#### B. 컴포넌트 분리
-
-2단 비교 뷰를 별도 컴포넌트로 분리:
+#### B. law-viewer.tsx
 
 ```typescript
-// components/ai-comparison-view.tsx (새 파일)
-export function AIComparisonView({
-  aiAnswerHTML,
-  comparisonLawMeta,
-  comparisonLawArticles,
-  comparisonLawSelectedJo,
-  isLoadingComparison,
-  fontSize,
-  handleContentClick
-}: AIComparisonViewProps) {
-  // 라인 2919-3027 코드 이동
-}
+// 라인 77-80: Props 정의 제거
+comparisonLawMeta?: LawMeta | null
+comparisonLawArticles?: LawArticle[]
+comparisonLawSelectedJo?: string
+isLoadingComparison?: boolean
 
-// law-viewer.tsx에서 사용
-{aiAnswerMode && comparisonLawMeta ? (
-  <AIComparisonView {...props} />
-) : (
-  <div>기본 AI 답변</div>
-)}
+// 라인 98-101: 기본값 제거
+comparisonLawMeta = null,
+comparisonLawArticles = [],
+comparisonLawSelectedJo,
+isLoadingComparison = false,
+
+// 라인 2916-3027: 2단 비교 뷰 렌더링 블록 전체 제거
+// (조건문: comparisonLawMeta && comparisonLawArticles.length > 0 ? ... : ...)
+// 기본 1단 AI 답변 뷰만 유지
 ```
 
-#### C. 사용처 문서화
+#### C. 제거 후 영향
 
-```typescript
-// law-viewer.tsx 파일 상단 주석
-/**
- * LawViewer 컴포넌트
- *
- * AI 모드 2단 비교 뷰 사용처:
- * - search-result-view.tsx: ✅ 사용 중 (관련 법령 클릭 → 2단 비교)
- * - file-search-answer-display.tsx: ❌ 미사용 (모달 방식만 사용)
- *
- * ⚠️ 제거 금지: search-result-view.tsx 의존성 확인 필수
- */
-```
+**✅ 영향 없음**:
+- AI 답변 표시는 `FileSearchAnswerDisplay` 컴포넌트에서 독립적으로 처리
+- 실제 사용되는 1단 뷰는 2단 뷰 조건의 `else` 분기에 있음
+- 2단 뷰 조건이 항상 `false`이므로 현재도 1단 뷰만 실행 중
 
 ---
 
@@ -248,27 +254,31 @@ export function AIComparisonView({
 
 ---
 
-## 🚨 중요 주의사항
+## 🚨 중요 주의사항 ✅ **검증 완료**
 
-### 제거하면 안되는 코드
+### ✅ 제거 가능한 코드 (데드 코드)
 
-1. **law-viewer.tsx의 2단 비교 뷰 코드** (라인 2919-3027)
-   - **이유**: search-result-view.tsx에서 실제로 사용 중
-   - **영향**: 제거 시 관련 법령 클릭 기능 손상
+1. **law-viewer.tsx의 2단 비교 뷰 코드** (라인 2916-3027)
+   - **이유**: `comparisonLawMeta`가 항상 `null`이므로 조건문 통과 불가
+   - **영향**: 제거해도 현재 기능에 영향 없음 (데드 코드)
 
-2. **comparisonLaw* Props** (라인 77-80)
-   - **이유**: search-result-view.tsx에서 전달
-   - **영향**: 제거 시 타입 에러 발생
+2. **comparisonLaw* Props** (law-viewer.tsx 라인 77-80)
+   - **이유**: search-result-view.tsx에서 전달하지만 실제 데이터는 항상 `null`/`[]`
+   - **영향**: 제거해도 타입 에러 없음 (사용되지 않는 props)
 
-3. **onRelatedArticleClick Prop** (라인 70)
-   - **이유**: search-result-view.tsx에서 handleCitationClick 전달
-   - **영향**: 제거 시 관련 법령 클릭 이벤트 손실
+3. **comparisonLaw State** (search-result-view.tsx 라인 238-243)
+   - **이유**: `setComparisonLaw(null)` 초기화만 1회 호출, 실제 데이터 할당 코드 없음
+   - **영향**: 제거해도 기능 손상 없음
 
-### 안전하게 제거 가능한 코드
+### ⚠️ 주의해야 할 코드 (제거 금지)
 
-현재 상태에서는 **안전하게 제거 가능한 코드가 없음**.
+1. **onRelatedArticleClick Prop** (law-viewer.tsx)
+   - **이유**: search-result-view.tsx에서 일반 법령 뷰어에서는 사용할 수 있음
+   - **권장**: AI 모드에서만 제거 고려, 일반 모드는 유지
 
-모든 AI 관련 코드가 실제로 사용되고 있음.
+2. **FileSearchAnswerDisplay 컴포넌트**
+   - **이유**: 실제 AI 답변을 표시하는 유일한 컴포넌트
+   - **영향**: 제거 시 AI 답변 기능 완전 손상
 
 ---
 
@@ -385,11 +395,21 @@ interface LawViewerProps {
 
 ---
 
-**최종 결론**:
+**최종 결론** ✅ **검증 완료 (2025-11-21)**:
 
-현재 2단 비교 뷰 코드는 **search-result-view.tsx에서 실제로 사용 중**이므로 제거하면 안됩니다. file-search-answer-display.tsx에서는 모달 방식만 사용하지만, 두 컴포넌트가 동일한 law-viewer.tsx를 공유하므로 코드 유지가 필요합니다.
+AI 모드에서 2단 비교 뷰 코드는 **실제로 사용되지 않는 데드 코드**입니다. 제거해도 현재 기능에 영향이 없습니다.
 
-향후 최적화를 원한다면 **별도 컴포넌트 분리** 또는 **조건부 임포트** 방식을 고려하세요.
+**검증 근거**:
+1. `comparisonLaw` state는 선언만 되고 실제 데이터가 할당되지 않음
+2. `setComparisonLaw(null)` 초기화만 1회 호출됨
+3. law-viewer.tsx의 2단 뷰 조건문이 항상 `false`
+4. 실제 AI 답변은 `FileSearchAnswerDisplay` 컴포넌트에서 독립적으로 처리
 
-**문서 버전**: 2.0 (현행화 완료)
-**다음 업데이트**: 2단 비교 뷰 제거 또는 개선 시
+**제거 권장**:
+- search-result-view.tsx: `comparisonLaw`, `isLoadingComparison` state 및 관련 코드
+- law-viewer.tsx: `comparisonLaw*` props 및 2단 비교 뷰 렌더링 블록 (라인 2916-3027)
+- 예상 코드 감소: ~150줄
+
+**문서 버전**: 3.0 (데드 코드 확정)
+**검증 날짜**: 2025-11-21 15:45 KST
+**다음 단계**: 데드 코드 제거 후 테스트
