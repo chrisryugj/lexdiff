@@ -37,6 +37,11 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     showAdminRules // Only fetch when enabled
   )
 
+  // Sync loaded count with admin rules data
+  useEffect(() => {
+    setLoadedAdminRulesCount(adminRules.length)
+  }, [adminRules.length])
+
   // Handler: view admin rule full content
   const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {
     try {

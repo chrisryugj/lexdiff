@@ -1205,11 +1205,13 @@ export function LawViewer({
                           // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
                           if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
                           setTierViewMode("2-tier")
-                          // 행정규칙은 탭 클릭 시 lazy loading
+                          // 행정규칙 탭이 선택되어 있고 데이터가 로드된 적 있으면 자동으로 활성화
+                          if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
+                            setShowAdminRules(true)
+                          }
                         } else {
-                          // 1단 뷰로 복귀
+                          // 1단 뷰로 복귀 (showAdminRules는 유지 - 패널 재오픈 시 복원용)
                           setTierViewMode("1-tier")
-                          setShowAdminRules(false)
                         }
                       }}
                       title="위임법령 보기 (시행령/시행규칙/행정규칙)"
@@ -1603,8 +1605,8 @@ export function LawViewer({
                                     <>
                                       행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
                                     </>
-                                  ) : showAdminRules ? (
-                                    `행정규칙 (${adminRules.length})`
+                                  ) : loadedAdminRulesCount > 0 ? (
+                                    `행정규칙 (${loadedAdminRulesCount})`
                                   ) : (
                                     "행정규칙"
                                   )}
@@ -2898,8 +2900,8 @@ export function LawViewer({
                                     <>
                                       행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
                                     </>
-                                  ) : showAdminRules ? (
-                                    `행정규칙 (${adminRules.length})`
+                                  ) : loadedAdminRulesCount > 0 ? (
+                                    `행정규칙 (${loadedAdminRulesCount})`
                                   ) : (
                                     "행정규칙"
                                   )}
