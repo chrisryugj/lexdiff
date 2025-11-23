@@ -1996,10 +1996,11 @@ export function LawViewer({
                       {isLoadingThreeTier || loadingAdminRules ? (
                         <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                       ) : (
-                        <FileText className="h-3.5 w-3.5 mr-1" />
-                        행정규칙 {loadedAdminRulesCount > 0 && `(${loadedAdminRulesCount})`}
-                      </>
-                    )}
+                        <>
+                          <FileText className="h-3.5 w-3.5 mr-1" />
+                          행정규칙 {loadedAdminRulesCount > 0 && `(${loadedAdminRulesCount})`}
+                        </>
+                      )}
                   </Button>
                 </div>
               </div>
