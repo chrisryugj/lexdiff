@@ -232,7 +232,8 @@ export function LawViewer({
   const validCitations = currentArticleCitations.filter((c) => c.content && c.content.trim().length > 0)
 
   // Total delegation count (시행령 + 시행규칙 + 행정규칙)
-  const totalDelegationCount = validDelegations.length + (adminRules?.length || 0)
+  // 행정규칙은 lazy loading이므로 loadedAdminRulesCount 사용
+  const totalDelegationCount = validDelegations.length + (showAdminRules ? adminRules.length : loadedAdminRulesCount)
 
   // 디버깅: 현재 조문의 delegation 데이터 확인
   useEffect(() => {
@@ -3220,8 +3221,39 @@ export function LawViewer({
                                 ) : loadingAdminRules ? (
                                   // 로딩 중
                                   <DelegationLoadingSkeleton />
+                                ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
+                                  // 본문 뷰 (탭 내에서 표시)
+                                  <>
+                                    <div className="mb-2 pb-2 border-b border-border">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                          <FileText className="h-4 w-4 text-foreground" />
+                                          <h3 className="text-base font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setAdminRuleViewMode("list")}
+                                          className="h-7 px-2"
+                                        >
+                                          ← 목록
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <div
+                                      className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                      style={{
+                                        fontSize: `${fontSize}px`,
+                                        lineHeight: "1.8",
+                                        overflowWrap: "break-word",
+                                        wordBreak: "break-word",
+                                      }}
+                                      onClick={handleContentClick}
+                                      dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                                    />
+                                  </>
                                 ) : adminRules.length > 0 ? (
-                                  // 결과 있음
+                                  // 목록 뷰
                                   <>
                                     <div className="mb-2 pb-2 border-b border-border">
                                       <div className="flex items-center gap-2">
