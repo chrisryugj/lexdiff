@@ -45,7 +45,12 @@ export const ArticleListItem = React.memo(function ArticleListItem({
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
           </div>
           {article.title && (
-            <div className="text-sm opacity-80 mt-0.5 line-clamp-2">({article.title})</div>
+            <div
+              className="text-sm opacity-80 mt-0.5 truncate"
+              title={article.title}
+            >
+              ({article.title})
+            </div>
           )}
           {isLoading && <span className="text-xs opacity-60">로딩중...</span>}
         </div>
