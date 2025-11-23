@@ -1903,22 +1903,6 @@ export function LawViewer({
             !aiAnswerMode && !isOrdinance && activeArticle && (
               <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
                 <div className="flex flex-wrap gap-1.5">
-                  {/* 조문 목록 버튼 (데스크탑만 표시, 모바일은 FAB 사용) */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsArticleListExpanded(true)}
-                    className="hidden md:inline-flex h-7 px-2"
-                    title={`전체 ${articles.length}개 조문 보기`}
-                  >
-                    <ListOrdered className="h-3.5 w-3.5 mr-1" />
-                    조문 목록
-                    {articles.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
-                        {articles.length}
-                      </Badge>
-                    )}
-                  </Button>
                   <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
                     <GitCompare className="h-3.5 w-3.5 mr-1" />
                     신·구법 비교
@@ -1940,38 +1924,7 @@ export function LawViewer({
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
                     원문 보기
                   </Button>
-                  {/* Show 2-tier and 3-tier view buttons if valid 3-tier data exists */}
-                  {hasValidThreeTierData && (
-                    <>
-                      <Button
-                        variant={tierViewMode === "2-tier" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setTierViewMode(tierViewMode === "2-tier" ? "1-tier" : "2-tier")}
-                        title={threeTierDataType === "delegation" ? "시행령 보기" : "인용조문 보기"}
-                        className="h-7 px-2"
-                      >
-                        {threeTierDataType === "delegation" ? (
-                          <FileText className="h-3.5 w-3.5 mr-1" />
-                        ) : (
-                          <Link2 className="h-3.5 w-3.5 mr-1" />
-                        )}
-                        시행령
-                      </Button>
-                      {threeTierDataType === "delegation" && hasValidSihyungkyuchik && (
-                        <Button
-                          variant={tierViewMode === "3-tier" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTierViewMode(tierViewMode === "3-tier" ? "1-tier" : "3-tier")}
-                          title="시행규칙 보기"
-                          className="h-7 px-2"
-                        >
-                          <FileText className="h-3.5 w-3.5 mr-1" />
-                          시행규칙
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {/* 위임법령 보기 버튼 (2단 뷰 토글) */}
+                  {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
                   {!isOrdinance && !aiAnswerMode && (
                     <Button
                       variant={tierViewMode === "2-tier" ? "default" : "outline"}
@@ -1997,10 +1950,9 @@ export function LawViewer({
                       ) : (
                         <FileText className="h-3.5 w-3.5 mr-1" />
                       )}
-                      위임법령 {tierViewMode === "2-tier" && "닫기"}
+                      {tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${totalDelegationCount > 0 ? ` (${totalDelegationCount})` : ""}`}
                     </Button>
                   )}
-                  {/* Admin rules button removed - now integrated into 2-tier view tabs */}
                 </div>
               </div>
             )
@@ -3162,14 +3114,14 @@ export function LawViewer({
                                   <DelegationLoadingSkeleton />
                                 ) : (
                                   <>
-                                    <div className="mb-4 pb-3 border-b border-border">
-                                      <div className="flex items-center gap-2 mb-2">
+                                    <div className="mb-2 pb-2 border-b border-border">
+                                      <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-foreground" />
                                         <h3 className="text-base font-bold text-foreground">시행령</h3>
+                                        <Badge variant="secondary" className="text-xs">
+                                          {validDelegations.filter((d) => d.type === "시행령").length}개
+                                        </Badge>
                                       </div>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {validDelegations.filter((d) => d.type === "시행령").length}개
-                                      </Badge>
                                     </div>
                                     <div className="space-y-3">
                                       {validDelegations
@@ -3210,14 +3162,14 @@ export function LawViewer({
                                   <DelegationLoadingSkeleton />
                                 ) : (
                                   <>
-                                    <div className="mb-4 pb-3 border-b border-border">
-                                      <div className="flex items-center gap-2 mb-2">
+                                    <div className="mb-2 pb-2 border-b border-border">
+                                      <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-foreground" />
                                         <h3 className="text-base font-bold text-foreground">시행규칙</h3>
+                                        <Badge variant="secondary" className="text-xs">
+                                          {validDelegations.filter((d) => d.type === "시행규칙").length}개
+                                        </Badge>
                                       </div>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {validDelegations.filter((d) => d.type === "시행규칙").length}개
-                                      </Badge>
                                     </div>
                                     <div className="space-y-3">
                                       {validDelegations
@@ -3269,14 +3221,14 @@ export function LawViewer({
                                 ) : adminRules.length > 0 ? (
                                   // 결과 있음
                                   <>
-                                    <div className="mb-4 pb-3 border-b border-border">
-                                      <div className="flex items-center gap-2 mb-2">
+                                    <div className="mb-2 pb-2 border-b border-border">
+                                      <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-foreground" />
                                         <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                                        <Badge variant="secondary" className="text-xs">
+                                          {adminRules.length}개
+                                        </Badge>
                                       </div>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {adminRules.length}개
-                                      </Badge>
                                     </div>
                                     <div className="space-y-3">
                                       {adminRules.map((rule, idx) => (
