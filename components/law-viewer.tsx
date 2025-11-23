@@ -1935,7 +1935,7 @@ export function LawViewer({
                           // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
                           if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
                           setTierViewMode("2-tier")
-                          setShowAdminRules(true) // 행정규칙도 함께 활성화
+                          // 행정규칙은 탭 클릭 시 lazy loading
                         } else {
                           // 1단 뷰로 복귀
                           setTierViewMode("1-tier")
