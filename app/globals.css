@@ -510,3 +510,34 @@
 .animate-fade-in-scale {
   animation: fade-in-scale 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Swipe Tutorial Animations */
+@keyframes swipe-left {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(-30px);
+    opacity: 1;
+  }
+}
+
+@keyframes swipe-right {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(30px);
+    opacity: 1;
+  }
+}
+
+.animate-swipe-left {
+  animation: swipe-left 2s ease-in-out infinite;
+}
+
+.animate-swipe-right {
+  animation: swipe-right 2s ease-in-out infinite;
+}
