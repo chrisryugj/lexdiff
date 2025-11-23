@@ -9,7 +9,7 @@
 import type { AdminRuleMatch } from "./use-admin-rules"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 6 // Increased to handle version conflicts
+const DB_VERSION = 8 // Increased to handle version conflicts
 const LIST_STORE = "adminRulesListCache"
 const CONTENT_STORE = "adminRulesContentCache"
 const CACHE_EXPIRY_DAYS = 30 // 30일 후 자동 삭제
@@ -34,7 +34,19 @@ async function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
-    request.onerror = () => reject(request.error)
+    request.onerror = (event) => {
+      const error = (event.target as IDBOpenDBRequest).error
+
+      // VersionError 발생 시 DB 삭제 후 재시도
+      if (error?.name === 'VersionError') {
+        console.warn('[admin-rule-cache] VersionError detected, deleting database and retrying...')
+        indexedDB.deleteDatabase(DB_NAME)
+        // 재시도는 호출 측에서 처리 (무한 루프 방지)
+      }
+
+      reject(error)
+    }
+
     request.onsuccess = () => resolve(request.result)
 
     request.onupgradeneeded = (event) => {
