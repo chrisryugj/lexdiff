@@ -25,6 +25,11 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     }
   }, [showAdminRules])
 
+  // Reset count when article changes
+  useEffect(() => {
+    setLoadedAdminRulesCount(0)
+  }, [articleNumber])
+
   // Admin rules data
   const {
     adminRules,
