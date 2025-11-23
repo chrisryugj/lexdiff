@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAdminRules, type AdminRuleMatch } from '@/lib/use-admin-rules'
 import type { LawMeta } from '@/lib/law-types'
 import { parseAdminRuleContent, formatAdminRuleHTML } from '@/lib/admrul-parser'
@@ -17,6 +17,13 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     const saved = localStorage.getItem('adminRulePanelSize')
     return saved ? Number.parseInt(saved, 10) : 50
   })
+
+  // Reset view mode to list when panel is closed
+  useEffect(() => {
+    if (!showAdminRules) {
+      setAdminRuleViewMode("list")
+    }
+  }, [showAdminRules])
 
   // Admin rules data
   const {
