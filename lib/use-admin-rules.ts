@@ -55,6 +55,14 @@ export function useAdminRules(
       return
     }
 
+    // 이미 데이터가 있으면 다시 fetch하지 않음 (캐시 활용)
+    if (adminRules.length > 0) {
+      setLoading(false)
+      setError(null)
+      setProgress(null)
+      return
+    }
+
     let cancelled = false
 
     const fetchAdminRules = async () => {
