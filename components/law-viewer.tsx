@@ -3052,12 +3052,14 @@ export function LawViewer({
                             }}
                           >
                             <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto pr-2 h-full">
-                              <div className="mb-6 pb-4 border-b border-border">
-                                <h3 className="text-base font-bold text-foreground mb-2">
-                                  {formatSimpleJo(activeArticle.jo)}
-                                  {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
-                                </h3>
-                                <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                              <div className="mb-4 pb-2 border-b border-border">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-base font-bold text-foreground">
+                                    {formatSimpleJo(activeArticle.jo)}
+                                    {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                                  </h3>
+                                  <Badge variant="secondary" className="text-xs">법률 본문</Badge>
+                                </div>
                               </div>
                               <div
                                 className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
