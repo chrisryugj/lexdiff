@@ -82,9 +82,16 @@ export async function GET(request: Request) {
       },
     )
   } catch (error) {
-    debugLogger.error("3단비교 데이터 조회 실패", error)
+    const errorDetails = {
+      message: error instanceof Error ? error.message : "알 수 없는 오류",
+      stack: error instanceof Error ? error.stack : undefined,
+      lawId,
+      mst,
+    }
+    debugLogger.error("3단비교 데이터 조회 실패", errorDetails)
+    console.error("[three-tier API] Full error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "알 수 없는 오류" },
+      { error: errorDetails.message, details: errorDetails },
       { status: 500 },
     )
   }
