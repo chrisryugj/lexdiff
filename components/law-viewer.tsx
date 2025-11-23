@@ -1941,10 +1941,13 @@ export function LawViewer({
                       }
                       onClick={async () => {
                         if (tierViewMode === "1-tier") {
-                          // 2단 뷰로 전환 (시행령/시행규칙만 먼저 로드)
+                          // 2단 뷰로 전환 (시행령/시행규칙 + 행정규칙 모두 로드)
                           if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
+                          // 행정규칙도 함께 로드 (카운트에 포함하기 위해)
+                          if (!showAdminRules) {
+                            setShowAdminRules(true)
+                          }
                           setTierViewMode("2-tier")
-                          // 행정규칙은 탭 클릭 시 로드 (단계적 로딩)
                         } else {
                           // 1단 뷰로 복귀
                           setTierViewMode("1-tier")
