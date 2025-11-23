@@ -47,10 +47,9 @@ import { VirtualizedFullArticleView } from "@/components/virtualized-full-articl
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML } from "@/lib/revision-parser"
-import { useAdminRules, type AdminRuleMatch } from "@/lib/use-admin-rules"
-import { parseAdminRuleContent, formatAdminRuleHTML } from "@/lib/admrul-parser"
-import { getAdminRuleContentCache, setAdminRuleContentCache, clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
+import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
+import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
 import { useSwipe } from "@/hooks/use-swipe"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
@@ -76,12 +75,6 @@ interface LawViewerProps {
   aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
-
-  // AI 모드 - 관련 법령 2단 비교
-  comparisonLawMeta?: LawMeta | null
-  comparisonLawArticles?: LawArticle[]
-  comparisonLawSelectedJo?: string
-  isLoadingComparison?: boolean
 }
 
 export function LawViewer({
@@ -99,16 +92,13 @@ export function LawViewer({
   relatedArticles = [],
   onRelatedArticleClick,
   fileSearchFailed = false,
-  comparisonLawMeta = null,
-  comparisonLawArticles = [],
-  comparisonLawSelectedJo,
-  isLoadingComparison = false,
   aiCitations = [],
   userQuery = '',
   aiConfidenceLevel = 'high',
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
+
 
   const actualArticles = articles.filter((a) => !a.isPreamble)
   const preambles = articles.filter((a) => a.isPreamble)
@@ -137,17 +127,6 @@ export function LawViewer({
   // View mode: 1-tier (default) -> 2-tier (article + delegations with tabs)
   const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier">("1-tier")
 
-  // Admin rules state
-  const [showAdminRules, setShowAdminRules] = useState(false)
-  const [adminRuleViewMode, setAdminRuleViewMode] = useState<"list" | "detail">("list")
-  const [adminRuleHtml, setAdminRuleHtml] = useState<string>("")
-  const [adminRuleTitle, setAdminRuleTitle] = useState<string>("")
-  // Admin rule cache - key: id or serialNumber, value: { title, html }
-  const [adminRuleCache, setAdminRuleCache] = useState<Map<string, { title: string; html: string }>>(new Map())
-  // Mobile tab state for admin rules (모바일에서 법령 본문 vs 행정규칙)
-  const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
-  // Loaded admin rules count (행정규칙 한번 로드 후 개수 저장)
-  const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
   // Active tab for 2-tier delegation view (시행령/시행규칙/행정규칙)
   const [delegationActiveTab, setDelegationActiveTab] = useState<"decree" | "rule" | "admin">("decree")
 
@@ -155,13 +134,6 @@ export function LawViewer({
   const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lawViewerDelegationSplit')
-      return saved ? parseInt(saved) : 35
-    }
-    return 35
-  })
-  const [adminRulePanelSize, setAdminRulePanelSize] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lawViewerAdminRuleSplit')
       return saved ? parseInt(saved) : 35
     }
     return 35
@@ -184,12 +156,27 @@ export function LawViewer({
     return formatted // e.g., "제38조"
   }, [activeJo])
 
-  // Fetch admin rules for current article
-  const { adminRules, loading: loadingAdminRules, error: adminRulesError, progress: adminRulesProgress } = useAdminRules(
-    meta.lawTitle,
-    activeArticleNumber,
-    showAdminRules // Only fetch when enabled
-  )
+  // Admin Rules Hook
+  const {
+    showAdminRules,
+    setShowAdminRules,
+    adminRuleViewMode,
+    setAdminRuleViewMode,
+    adminRuleHtml,
+    adminRuleTitle,
+    adminRuleMobileTab,
+    setAdminRuleMobileTab,
+    adminRulePanelSize,
+    setAdminRulePanelSize,
+    loadedAdminRulesCount,
+    setLoadedAdminRulesCount,
+    adminRules,
+    loadingAdminRules,
+    adminRulesError,
+    adminRulesProgress,
+    handleViewAdminRuleFullContent,
+    getLawGoKrLink,
+  } = useLawViewerAdminRules(activeArticleNumber || "", meta)
 
   // Store admin rules count when loaded (행정규칙 로드 후 개수 저장)
   useEffect(() => {
@@ -560,6 +547,7 @@ export function LawViewer({
       e.preventDefault()
       e.stopPropagation() // 이벤트 버블링 차단
 
+
       const refType = target.getAttribute("data-ref")
       if (refType === "article") {
         const articleLabel = target.getAttribute("data-article") || ""
@@ -751,102 +739,6 @@ export function LawViewer({
     }
   }
 
-  // Admin rule handlers
-  const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {
-    try {
-      // Use serialNumber first, fallback to id (same as test page)
-      const idParam = rule.serialNumber || rule.id
-
-      // Check IndexedDB cache first
-      const cached = await getAdminRuleContentCache(idParam)
-      if (cached) {
-        setAdminRuleTitle(cached.title)
-        setAdminRuleHtml(cached.html)
-        setAdminRuleViewMode("detail")
-        // Don't change tierViewMode - stay in tab view
-        return
-      }
-
-      const contentParams = new URLSearchParams({ ID: idParam })
-
-      // Set loading state
-      setAdminRuleTitle(rule.name)
-      setAdminRuleHtml('<div style="text-align: center; padding: 2rem 0; color: hsl(var(--muted-foreground));"><div style="display: inline-block; width: 2rem; height: 2rem; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div><p style="margin-top: 1rem;">로딩 중...</p><style>@keyframes spin { to { transform: rotate(360deg); }}</style></div>')
-      setAdminRuleViewMode("detail")
-      // Don't change tierViewMode - stay in tab view
-
-      const contentResponse = await fetch(`/api/admrul?${contentParams.toString()}`, { cache: 'no-store' })
-      if (!contentResponse.ok) {
-        const errorText = await contentResponse.text()
-        throw new Error(`행정규칙 조회 실패: ${contentResponse.status}`)
-      }
-
-      const contentXml = await contentResponse.text()
-
-      const fullContent = parseAdminRuleContent(contentXml)
-
-      if (!fullContent) {
-        throw new Error("행정규칙 파싱 실패")
-      }
-
-      // Convert admin rule content to HTML - format like law text
-      const htmlParts: string[] = []
-
-      // Header with metadata
-      if (fullContent.department || fullContent.publishDate || fullContent.effectiveDate) {
-        htmlParts.push('<div style="padding: 12px; background: hsl(var(--secondary)); border-radius: 8px; margin-bottom: 24px; color: hsl(var(--foreground));">')
-        const metadata: string[] = []
-        if (fullContent.department) metadata.push(`<span style="font-size: 0.875rem;"><strong>소관부처:</strong> ${fullContent.department}</span>`)
-        if (fullContent.publishDate) metadata.push(`<span style="font-size: 0.875rem;"><strong>발령일자:</strong> ${fullContent.publishDate}</span>`)
-        if (fullContent.effectiveDate) metadata.push(`<span style="font-size: 0.875rem;"><strong>시행일자:</strong> ${fullContent.effectiveDate}</span>`)
-        htmlParts.push(metadata.join(' | '))
-        htmlParts.push('</div>')
-      }
-
-      // Articles - format using formatAdminRuleHTML (includes links + styling)
-      let textParts: string[] = []
-
-      fullContent.articles.forEach((article, idx) => {
-        // Article title - bold inline style
-        const titleHtml = '<strong style="font-size: 1rem;">' + article.number +
-          (article.title ? ' <span style="font-weight: 400; color: hsl(var(--muted-foreground));">(' + article.title + ')</span>' : '') +
-          '</strong>'
-
-        textParts.push(titleHtml)
-        textParts.push('\n') // 제목 뒤 줄바꿈 1개
-
-        // Article content - format with links + styling + revision marks
-        const formattedContent = formatAdminRuleHTML(article.content, meta.lawTitle)
-        textParts.push(formattedContent)
-        textParts.push('\n') // 조문 끝 줄바꿈
-
-        // Add spacing between articles (Separator)
-        if (idx < fullContent.articles.length - 1) {
-          textParts.push('<hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid hsl(var(--border));" />')
-        }
-      })
-
-      const articlesHtml = textParts.join('')
-      htmlParts.push(articlesHtml)
-      const finalHtml = htmlParts.join('')
-      const finalTitle = fullContent.name
-
-      setAdminRuleTitle(finalTitle)
-      setAdminRuleHtml(finalHtml)
-
-      // Cache the result to IndexedDB
-      await setAdminRuleContentCache(idParam, finalTitle, finalHtml, fullContent.effectiveDate)
-    } catch (error: any) {
-      setAdminRuleHtml(`<div style="text-align: center; padding: 2rem 0;"><p style="color: hsl(var(--destructive)); font-weight: 600; margin-bottom: 0.5rem;">전체 내용 조회 실패</p><p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">${error.message}</p></div>`)
-    }
-  }
-
-  const getLawGoKrLink = (serialNumber?: string) => {
-    // Use serialNumber if available (same as test page)
-    if (!serialNumber) return null
-    return `https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=${serialNumber}`
-  }
-
   // Helper: fetch external law article and show in modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
     try {
@@ -876,6 +768,7 @@ export function LawViewer({
       const searchRes = await fetch(`/api/law-search?${qs.toString()}`)
       const searchXml = await searchRes.text()
 
+
       const parser = new DOMParser()
       const searchDoc = parser.parseFromString(searchXml, "text/xml")
 
@@ -896,9 +789,11 @@ export function LawViewer({
           })
         : allLaws[0]
 
+
       const lawId = lawNode?.querySelector("법령ID")?.textContent || undefined
       const mst = lawNode?.querySelector("법령일련번호")?.textContent || undefined
       const effectiveDate = lawNode?.querySelector("시행일자")?.textContent || undefined
+
 
       if (!lawId && !mst) {
         setRefModal({
@@ -949,6 +844,7 @@ export function LawViewer({
             ? [rawArticleUnits]
             : []
 
+
         const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
 
         // 🔍 디버깅: 조문 검색 상세 로그
@@ -963,6 +859,7 @@ export function LawViewer({
             조문번호: articleUnits[0]?.조문번호
           } : null
         })
+
 
         // ⚠️ 조문여부가 "조문"인 것만 찾기 (전문 제외)
 
@@ -994,6 +891,7 @@ export function LawViewer({
         // ⚠️ 조문내용이 제목만 있는 경우가 많으므로 항 배열을 텍스트로 변환
         let rawContent = targetUnit.조문내용 || ""
         const title = targetUnit.조문제목 || ""
+
 
         // 먼저 조문내용에서 제목 부분 제거 (항/호 처리 전에)
         if (rawContent && title) {
@@ -1092,6 +990,7 @@ export function LawViewer({
         }
 
         const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
+
 
         const htmlContent = extractArticleText(lawArticle, false, meta.lawTitle)
 
@@ -1313,6 +1212,7 @@ export function LawViewer({
       })
     }
   }
+
 
   return (
     <>
@@ -4071,119 +3971,8 @@ export function LawViewer({
                     </div>
                   )
                 ) : aiAnswerMode && aiAnswerContent ? (
-                  // AI 모드: AI 답변 표시 (비교 법령이 있으면 2단 뷰)
-                  comparisonLawMeta && comparisonLawArticles.length > 0 ? (
-                    // 2단 비교 뷰: AI 답변 (좌) + 관련 법령 (우)
-                    <div className="grid grid-cols-2 gap-4 overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
-                      {/* Left: AI Answer with Glassmorphism */}
-                      <div className="overflow-y-auto pr-2 relative">
-                        {/* 🎨 배경 그라데이션 */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-cyan-500/10 pointer-events-none rounded-lg" />
-
-                        <div className="relative bg-card/50 backdrop-blur-xl border-2 border-purple-500/30 shadow-2xl shadow-purple-500/20 rounded-lg p-4">
-                          <div className="mb-3 pb-2 border-b border-purple-500/20">
-                            <div className="flex items-center gap-2 mb-1">
-                              {/* Glowing AI Icon */}
-                              <div className="relative">
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                                <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-1.5 rounded-lg shadow-lg">
-                                  <Sparkles className="h-4 w-4 text-white" />
-                                </div>
-                              </div>
-                              <span className="text-sm font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent whitespace-nowrap">AI 답변</span>
-                              <Badge variant="secondary" className="text-xs whitespace-nowrap">
-                                File Search RAG
-                              </Badge>
-                            </div>
-                            {userQuery && (
-                              <div className="text-xs text-muted-foreground/80">
-                                <span className="inline">Q. {userQuery}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 검색 실패 경고 메시지 */}
-                          {fileSearchFailed && (
-                            <div className="mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-lg">
-                              <div className="flex items-start gap-2">
-                                <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-semibold text-red-300 mb-1 flex items-center gap-1.5">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    검색 결과 없음
-                                  </p>
-                                  <p className="text-xs text-red-200/80">
-                                    File Search Store에서 관련 법령 조문을 찾지 못했습니다. 검색어를 다시 확인하거나 법령명과 조문 번호를 정확히 입력해주세요.
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div
-                            className="prose prose-sm max-w-none dark:prose-invert break-words overflow-x-hidden px-2 sm:px-0
-                        [&_h2]:text-[clamp(18px,5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-nowrap
-                        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-nowrap
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
-                        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
-                        [&_ul]:my-2 sm:[&_ul]:my-4 [&_li]:my-1
-                        [&_ol]:my-2 sm:[&_ol]:my-4 [&_ol_li]:my-1
-                        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words"
-                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                            onClick={handleContentClick}
-                            dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-                          />
-
-                          {/* AI 답변 주의사항 */}
-                          <div className="mt-4 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                            <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Comparison Law Article */}
-                      <div className="overflow-y-auto pr-2">
-                        {isLoadingComparison ? (
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                            <p>관련 법령을 불러오는 중...</p>
-                          </div>
-                        ) : (() => {
-                          const comparisonArticle = comparisonLawArticles.find(a => a.jo === comparisonLawSelectedJo) || comparisonLawArticles[0]
-                          if (!comparisonArticle) {
-                            return (
-                              <div className="flex items-center justify-center h-full text-muted-foreground">
-                                <p>관련 법령 조문을 찾을 수 없습니다</p>
-                              </div>
-                            )
-                          }
-
-                          return (
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                              <div className="mb-6 pb-4 border-b border-border">
-                                <h3 className="text-base font-bold text-foreground mb-2">
-                                  {formatSimpleJo(comparisonArticle.jo)}
-                                  {comparisonArticle.title && <span className="text-muted-foreground text-sm"> ({comparisonArticle.title})</span>}
-                                </h3>
-                                <Badge variant="outline" className="text-xs">
-                                  {comparisonLawMeta.lawTitle}
-                                </Badge>
-                              </div>
-
-                              <div
-                                className="law-content text-sm text-foreground leading-relaxed"
-                                style={{ fontSize: `${fontSize}px` }}
-                                dangerouslySetInnerHTML={{ __html: extractArticleText(comparisonArticle, false, comparisonLawMeta?.lawTitle) }}
-                              />
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </div>
-                  ) : (
-                    // 기본 AI 답변 (비교 법령 없음) - Editorial Clean Design
-                    <div className="animate-fade-in-up">
+                  // AI 모드: AI 답변 표시 - Editorial Clean Design
+                  <div className="animate-fade-in-up">
                       {/* 검색 실패 경고 메시지 - 간소화 */}
                       {fileSearchFailed && (
                         <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
@@ -4311,7 +4100,6 @@ export function LawViewer({
                         <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                       </div>
                     </div>
-                  )
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <p>조문을 선택하세요</p>
