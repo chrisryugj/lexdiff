@@ -2271,8 +2271,8 @@ export function LawViewer({
                       </div>
                     </div>
 
-                    // Priority 2: Admin rules list view (행정규칙 목록 뷰)
-                  ) : showAdminRules && adminRuleViewMode === "list" && (loadingAdminRules || adminRules.length > 0) ? (
+                    // Priority 2: Admin rules list view (비활성화 - 탭 사용)
+                  ) : false ? (
                     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 250px)' }}>
                       {/* Mobile tabs */}
                       <div className="md:hidden flex gap-1 mb-3 border-b border-border pb-2">
