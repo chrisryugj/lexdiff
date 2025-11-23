@@ -234,14 +234,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   const [aiCitations, setAiCitations] = useState<VerifiedCitation[]>([]) // ✅ 검증된 인용 목록
   const [userQuery, setUserQuery] = useState<string>('') // 사용자 질의
 
-  // AI 모드 - 관련 법령 2단 비교 상태
-  const [comparisonLaw, setComparisonLaw] = useState<{
-    meta: LawMeta | null
-    articles: LawArticle[]
-    selectedJo?: string
-  } | null>(null)
-  const [isLoadingComparison, setIsLoadingComparison] = useState(false)
-
   // 검색 모드 선택 다이얼로그 상태
   const [showChoiceDialog, setShowChoiceDialog] = useState(false)
   const [pendingQuery, setPendingQuery] = useState<{ lawName: string; article?: string; jo?: string } | null>(null)
@@ -997,8 +989,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     setAiRelatedLaws([])
     setIsAiMode(false)
     setFileSearchFailed(false) // 검색 실패 상태 초기화
-    setComparisonLaw(null) // 비교 법령 초기화
-    setIsLoadingComparison(false)
 
     const apiLogs: Array<{ url: string; method: string; status?: number; response?: string }> = []
 
@@ -2244,10 +2234,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                       relatedArticles={aiRelatedLaws}
                       onRelatedArticleClick={handleCitationClick}
                       fileSearchFailed={fileSearchFailed}
-                      comparisonLawMeta={comparisonLaw?.meta || null}
-                      comparisonLawArticles={comparisonLaw?.articles || []}
-                      comparisonLawSelectedJo={comparisonLaw?.selectedJo}
-                      isLoadingComparison={isLoadingComparison}
                       aiCitations={aiCitations}
                       userQuery={userQuery}
                     />
@@ -2288,10 +2274,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                   relatedArticles={aiRelatedLaws}
                   onRelatedArticleClick={handleCitationClick}
                   fileSearchFailed={fileSearchFailed}
-                  comparisonLawMeta={comparisonLaw?.meta || null}
-                  comparisonLawArticles={comparisonLaw?.articles || []}
-                  comparisonLawSelectedJo={comparisonLaw?.selectedJo}
-                  isLoadingComparison={isLoadingComparison}
                   aiCitations={aiCitations}
                   userQuery={userQuery}
                 />
