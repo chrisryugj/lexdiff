@@ -1983,20 +1983,8 @@ export function LawViewer({
                         setAdminRuleViewMode("list")
                         setAdminRuleMobileTab("law")
                       }
-                      onClick={async () => {
-                        if (tierViewMode === "1-tier") {
-                          // 2단 뷰로 전환 (시행령/시행규칙만 먼저 로드)
-                          if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
-                          setTierViewMode("2-tier")
-                          // 행정규칙은 탭 클릭 시 로드 (lazy loading)
-                          // 로드되면 totalDelegationCount가 자동 업데이트됨
-                        } else {
-                          // 1단 뷰로 복귀
-                          setTierViewMode("1-tier")
-                          setShowAdminRules(false)
-                        }
-                      }}
-                      title={
+                    }}
+                    title={
                         isLoadingThreeTier
                           ? "위임법령 로딩 중..."
                           : totalDelegationCount === 0
