@@ -42,6 +42,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 🤖 Claude Code 작업 지침
 
+### 🚨 파일 크기 제한 (CRITICAL)
+
+**25,000 토큰 제한**: Claude Code는 한 번에 25,000 토큰 이상의 파일을 읽을 수 없습니다.
+
+**필수 원칙**:
+1. ✅ **컴포넌트는 항상 작게**: 단일 파일은 **1,000줄 이하** 권장
+2. ✅ **조기 분리**: 500줄 넘으면 분리 검토 시작
+3. ✅ **책임 분리**: UI / 로직 / 유틸리티 파일 분리
+4. ❌ **거대 컴포넌트 금지**: 3,000줄 이상은 읽기/수정 불가능
+
+**컴포넌트 분리 기준**:
+```typescript
+// ❌ 나쁜 예: 하나의 거대한 컴포넌트
+components/
+  law-viewer.tsx (4,000줄) ← 읽기 불가능
+
+// ✅ 좋은 예: 작은 컴포넌트로 분리
+components/
+  law-viewer/
+    index.tsx (200줄) ← 메인 컴포넌트
+    article-list.tsx (150줄) ← 조문 목록
+    article-content.tsx (180줄) ← 조문 내용
+    modals/
+      reference-modal-handler.tsx (120줄) ← 모달 로직
+      external-law-loader.tsx (100줄) ← 외부 법령 로드
+    hooks/
+      use-article-navigation.tsx (80줄) ← 네비게이션 hook
+      use-modal-state.tsx (60줄) ← 모달 상태 hook
+```
+
+**리팩토링 시점**:
+- 📏 파일이 1,500줄 초과: 즉시 분리 계획 수립
+- 🔍 파일 읽기 실패: 긴급 분리 필요
+- 🐛 버그 수정 어려움: 복잡도 과다 신호
+
 ### 문서 참조 자동화
 
 **CRITICAL**: 작업 시작 시 항상 관련 문서를 먼저 읽으세요!
