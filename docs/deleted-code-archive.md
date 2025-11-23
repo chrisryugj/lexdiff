@@ -285,3 +285,94 @@ npm run build
 
 **최종 업데이트**: 2025-11-23 15:30 KST
 **다음 작업**: Phase 2 검토 (함수 분리) 또는 동작 검증 테스트
+
+---
+
+## [2025-11-23] Phase 0: 코드 다이어트 (안전한 최적화)
+
+### Phase 0.1: console.log 제거
+
+#### 원본 위치
+- 파일: `components/law-viewer.tsx`
+- 총 개수: 75개 (console.log: 67개, console.warn: 5개, console.error: 3개)
+
+#### 기능 설명
+디버깅용 로그 출력:
+- 렌더링 추적
+- API 응답 검증
+- 에러 추적
+- 데이터 플로우 확인
+
+#### 삭제 이유
+- **프로덕션 환경에서 불필요**: 개발 중에만 유용
+- **파일 크기 감소**: 약 75줄 제거
+- **성능 개선**: console 호출 제거로 미세한 성능 향상
+- **로그 노이즈 감소**: 브라우저 콘솔 정리
+
+#### 삭제 대상 라인 목록
+```
+라인 118: console.log("LawViewer 렌더링:", ...)
+라인 243: console.log("[3단비교 디버깅] 조문 delegation 데이터:", ...)
+라인 279: console.log("[개정이력] Active article revision history:", ...)
+라인 293: console.log("selectedJo 변경 감지 - activeJo 업데이트:", ...)
+라인 326: console.log("Fetching revision history for article:", ...)
+라인 333: console.warn("[v0] Article history API returned error:", ...)
+라인 336: console.error("[v0] Failed to fetch revision history:", ...)
+라인 343: console.log("Received revision history XML, length:", ...)
+라인 349: console.warn("[v0] Revision history not available for this article:", ...)
+라인 357-378: console.log("[개정이력 useEffect] 실행/종료 로그들", ...)
+라인 453: console.log("조문이 로드되지 않음 - 동적으로 로드:", ...)
+라인 487: console.error("[v0] 조문 로드 실패:", ...)
+라인 502: console.log("단일 조문 뷰 - activeJo 설정 완료")
+라인 553-567: console.log('[원문 보기] URL 로그들', ...)
+라인 625-1312: console.log/warn/error ('[handleContentClick] 및 모달 관련 로그들', ...)
+라인 1498: console.log("LawViewer 렌더링 완료:", ...)
+라인 2672, 2768, 3908: console.log("[law-viewer] Cache cleared, reloading admin rule:", ...)
+... (총 75개)
+```
+
+#### 대체 방법
+- **debugLogger 사용**: 이미 프로젝트에 `lib/debug-logger.ts` 존재
+- **필요시 복원 가능**: Git history 또는 이 아카이브에서 복원
+
+#### 의존성
+- **없음**: console.log는 디버깅 용도이며 프로그램 로직에 영향 없음
+
+#### 복원 시 주의사항
+1. **선택적 복원**: 필요한 로그만 복원 (전체 복원 지양)
+2. **debugLogger 사용 권장**: console.log 대신 debugLogger.log() 사용
+3. **조건부 로그**: 환경 변수로 제어 가능하도록 개선
+
+---
+
+### 예상 효과
+- **파일 크기**: 4,566줄 → 4,491줄 (75줄 감소, 1.6%↓)
+- **리스크**: 0% (로직 변경 없음)
+- **빌드**: 영향 없음
+- **성능**: 미세한 향상
+
+---
+
+**작업 시작**: 2025-11-23 16:30 KST
+**작업 완료**: 2025-11-23 16:45 KST
+**상태**: ✅ 완료
+
+---
+
+### 실제 결과
+- **제거된 console 라인**: 176개
+- **실제 파일 크기**: 4,567줄 → 4,379줄 (**188줄 감소, 4.1%↓**)
+- **빌드 결과**: ✅ 성공
+- **타입 에러**: 없음
+- **런타임 에러**: 없음 (예상)
+
+### 제거 방법
+- `remove-console-safe.mjs` 스크립트 사용
+- 라인별 분석으로 멀티라인 console 문 안전하게 제거
+- 괄호/중괄호 depth 추적으로 코드 구조 보존
+
+### 검증
+```bash
+npm run build
+# ✅ Compiled successfully in 3.3s
+```
