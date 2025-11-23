@@ -4,6 +4,28 @@
 
 ---
 
+## 2025-11-23
+
+### [21:45 KST] Fix 2-tier view scroll issues in law-viewer
+- **Files**:
+  - `components/law-viewer.tsx` (modified)
+  - `lib/three-tier-parser.ts` (modified - 중복 조문 병합)
+  - `lib/unified-link-generator.ts` (modified - 대통령령/부령 패턴 확장)
+- **Changes**:
+  - **핵심 문제**: Card 컴포넌트에 `overflow-hidden` 누락으로 인해 flex 자식들의 스크롤 범위가 제한되지 않음
+  - Card에 `overflow-hidden` 추가 (line 1866)
+  - Content wrapper를 `flex-1 min-h-0`로 유지 (flex item이 부모를 넘지 않도록)
+  - 전문조회 모드를 ScrollArea로 감싸서 스크롤 활성화
+  - 2단 뷰 본문에 FileText 아이콘 추가
+  - three-tier-parser: 같은 법 조문에 대해 여러 시행령/시행규칙이 API에서 개별 객체로 올 때 Map으로 병합 (관세법 제38조 사례)
+  - unified-link-generator: "대통령령으로 정하는" 외에 "정한다"도 캡처, "XXX부령으로 정한다"도 캡처
+- **Impact**:
+  - 1단 뷰, 2단 뷰, 전문조회 모드 모두에서 스크롤 정상 작동
+  - 각 Panel이 독립적으로 스크롤 가능
+  - 시행령/시행규칙 링크 클릭 시 해당 탭 자동 오픈
+  - 관세법처럼 복잡한 위임 구조도 정확히 병합
+- **Reason**: 사용자 피드백 ("2단뷰 스크롤 안됨", "1단뷰도 짤림", "전문도 없어짐")
+
 ## 2025-11-20
 
 ### [15:30] Create custom subagents system

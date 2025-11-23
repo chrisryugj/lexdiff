@@ -75,6 +75,10 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
 
     const articleArray = Array.isArray(rawArticles) ? rawArticles : [rawArticles]
 
+    // CRITICAL: 같은 법 조문에 대해 여러 시행령/시행규칙이 API에서 개별 객체로 올 수 있음
+    // 예: 관세법 제38조 → 시행령 32조, 32조의2, 32조의3, 시행규칙 8조
+    // 이들을 jo 코드별로 병합해야 함
+    const articleMap = new Map<string, ThreeTierArticle>()
 
     for (const rawArticle of articleArray) {
       const articleNum = rawArticle.조번호 || "0000"
@@ -96,7 +100,19 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         })
       }
 
-      const delegations: DelegationItem[] = []
+      // 기존 조문 데이터가 있으면 가져오기, 없으면 새로 생성
+      let article = articleMap.get(jo)
+      if (!article) {
+        article = {
+          jo,
+          joNum,
+          title,
+          content,
+          delegations: [],
+          citations: [],
+        }
+        articleMap.set(jo, article)
+      }
 
       // 시행령조문 파싱
       if (rawArticle.시행령조문) {
@@ -114,7 +130,7 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         })
 
         for (const item of sihyungryung) {
-          delegations.push({
+          article.delegations.push({
             type: "시행령",
             lawName: meta.sihyungryungName,
             jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
@@ -145,7 +161,7 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         })
 
         for (const item of sihyungkyuchik) {
-          delegations.push({
+          article.delegations.push({
             type: "시행규칙",
             lawName: item.법령명 || meta.sihyungkyuchikName,
             jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
@@ -165,7 +181,7 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
           : [rawArticle.위임행정규칙목록.위임행정규칙]
 
         for (const item of rules) {
-          delegations.push({
+          article.delegations.push({
             type: "행정규칙",
             lawName: item.위임행정규칙명 || "",
             jo: item.위임행정규칙조번호
@@ -179,17 +195,12 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
           })
         }
       }
+    }
 
-      // 조문 데이터 추가 (위임조문이 있는 경우에만)
-      if (delegations.length > 0) {
-        articles.push({
-          jo,
-          joNum,
-          title,
-          content,
-          delegations,
-          citations: [], // 위임조문 파싱에서는 인용조문 없음
-        })
+    // Map에서 배열로 변환 (위임조문이 있는 경우에만)
+    for (const article of articleMap.values()) {
+      if (article.delegations.length > 0) {
+        articles.push(article)
       }
     }
 
