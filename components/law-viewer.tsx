@@ -51,6 +51,7 @@ import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
 import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
+import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useSwipe } from "@/hooks/use-swipe"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
@@ -117,26 +118,6 @@ export function LawViewer({
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
-  // 3-tier comparison data
-  const [threeTierCitation, setThreeTierCitation] = useState<ThreeTierData | null>(null)
-  const [threeTierDelegation, setThreeTierDelegation] = useState<ThreeTierData | null>(null)
-  const [isLoadingThreeTier, setIsLoadingThreeTier] = useState(false)
-
-  // View mode: 1-tier (default) -> 2-tier (article + delegations with tabs)
-  const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier">("1-tier")
-
-  // Active tab for 2-tier delegation view (시행령/시행규칙/행정규칙)
-  const [delegationActiveTab, setDelegationActiveTab] = useState<"decree" | "rule" | "admin">("decree")
-
-  // Panel sizes for drag resize (2-tier views)
-  const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lawViewerDelegationSplit')
-      return saved ? parseInt(saved) : 35
-    }
-    return 35
-  })
-
   // Swipe tutorial and hints
   const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
 
@@ -188,6 +169,38 @@ export function LawViewer({
 
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
+  // Three-Tier hook (위임법령 데이터 및 로직)
+  const {
+    threeTierCitation,
+    threeTierDelegation,
+    isLoadingThreeTier,
+    tierViewMode,
+    setTierViewMode,
+    delegationActiveTab,
+    setDelegationActiveTab,
+    delegationPanelSize,
+    setDelegationPanelSize,
+    currentArticleDelegations,
+    currentArticleCitations,
+    validDelegations,
+    validCitations,
+    hasValidThreeTierData,
+    hasValidSihyungkyuchik,
+    threeTierDataType,
+    tierItems,
+    fetchThreeTierData,
+  } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance)
+
+  // Total delegation count (시행령 + 시행규칙 + 행정규칙)
+  // 행정규칙은 lazy loading이므로 loadedAdminRulesCount 사용
+  const totalDelegationCount = validDelegations.length + (showAdminRules ? adminRules.length : loadedAdminRulesCount)
+
+  // 디버깅: 현재 조문의 delegation 데이터 확인
+  useEffect(() => {
+    if (activeJo && currentArticleDelegations.length > 0) {
+    }
+  }, [activeJo, currentArticleDelegations])
+
   // Modals hook (must be after activeArticle is defined)
   const {
     refModal,
@@ -201,38 +214,6 @@ export function LawViewer({
     openLawHierarchyModal,
     handleRefModalBack,
   } = useLawViewerModals(meta, activeArticle)
-
-  // Get delegation and citation data for current article
-  const currentArticleDelegations = threeTierDelegation?.articles.find((a) => a.jo === activeJo)?.delegations || []
-  const currentArticleCitations = threeTierCitation?.articles.find((a) => a.jo === activeJo)?.citations || []
-
-  // Filter to only include items with actual content
-  // content가 비어있으면 실제로 내용이 없는 것이므로 필터링
-  const validDelegations = currentArticleDelegations.filter((d) => d.content && d.content.trim().length > 0)
-  const validCitations = currentArticleCitations.filter((c) => c.content && c.content.trim().length > 0)
-
-  // Total delegation count (시행령 + 시행규칙 + 행정규칙)
-  // 행정규칙은 lazy loading이므로 loadedAdminRulesCount 사용
-  const totalDelegationCount = validDelegations.length + (showAdminRules ? adminRules.length : loadedAdminRulesCount)
-
-  // 디버깅: 현재 조문의 delegation 데이터 확인
-  useEffect(() => {
-    if (activeJo && currentArticleDelegations.length > 0) {
-    }
-  }, [activeJo, currentArticleDelegations])
-
-  // Check if there are valid 시행규칙 items (for 3-tier view)
-  const hasValidSihyungkyuchik = validDelegations.some((d) => d.type === "시행규칙")
-
-  // Check if there's any valid 3-tier data
-  const hasValidThreeTierData = validDelegations.length > 0 || validCitations.length > 0
-
-  // Determine which type of 3-tier data to show (prioritize delegation over citation)
-  const threeTierDataType: "delegation" | "citation" | null =
-    validDelegations.length > 0 ? "delegation" : validCitations.length > 0 ? "citation" : null
-
-  // Get the items to display based on tier view mode
-  const tierItems = threeTierDataType === "delegation" ? validDelegations : validCitations
 
   useEffect(() => {
   }, [activeArticle])
@@ -267,14 +248,11 @@ export function LawViewer({
     articleRefs.current = {}
   }, [articles])
 
-  // Reset delegation panel state when law changes
+  // Reset admin rules state when law changes
   useEffect(() => {
-    setTierViewMode("1-tier")
-    setThreeTierCitation(null)
-    setThreeTierDelegation(null)
     setShowAdminRules(false)
     setAdminRuleViewMode("list")
-  }, [meta.lawTitle])
+  }, [meta.lawTitle, setShowAdminRules, setAdminRuleViewMode])
 
   const fetchRevisionHistory = async (jo: string) => {
     if (!meta.lawId || !jo) return
@@ -325,49 +303,6 @@ export function LawViewer({
 
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance])
-
-  // Fetch 3-tier comparison data on demand (button click only)
-  const fetchThreeTierData = async () => {
-    if (aiAnswerMode || isOrdinance) return
-    if (!meta.lawId && !meta.mst) return
-
-    setIsLoadingThreeTier(true)
-    try {
-      const params = new URLSearchParams()
-      if (meta.lawId) params.append("lawId", meta.lawId)
-      else if (meta.mst) params.append("mst", meta.mst)
-
-      debugLogger.info("3단비교 데이터 조회 시작", { lawId: meta.lawId, mst: meta.mst })
-      const response = await fetch(`/api/three-tier?${params.toString()}`)
-      if (!response.ok) {
-        debugLogger.error("3단비교 API 오류", { status: response.status })
-        return
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        debugLogger.success("3단비교 완료", {
-          citation: data.citation?.articles?.length || 0,
-          delegation: data.delegation?.articles?.length || 0
-        })
-        setThreeTierCitation(data.citation)
-        setThreeTierDelegation(data.delegation)
-      }
-    } catch (error) {
-      debugLogger.error("3단비교 오류", error)
-    } finally {
-      setIsLoadingThreeTier(false)
-    }
-  }
-
-  // Auto-reset tier view mode if the current article doesn't support it
-  useEffect(() => {
-    if (tierViewMode === "3-tier" && !hasValidSihyungkyuchik) {
-      setTierViewMode(hasValidThreeTierData ? "2-tier" : "1-tier")
-    } else if (tierViewMode === "2-tier" && !hasValidThreeTierData) {
-      setTierViewMode("1-tier")
-    }
-  }, [tierViewMode, hasValidSihyungkyuchik, hasValidThreeTierData, activeJo])
 
   const handleArticleClick = async (jo: string) => {
 
