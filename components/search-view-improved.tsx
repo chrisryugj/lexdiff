@@ -132,7 +132,7 @@ export function SearchViewImproved({
 
         {/* Hero Section - Fixed */}
         <section className={`hero-gradient border-b border-border/50 hero-section ${heroVisible ? 'is-visible' : ''}`}>
-          <div className="container mx-auto px-6 pt-[40px] md:pt-[100px] pb-[10px] md:pb-[20px]">
+          <div className="container mx-auto max-w-[1280px] px-6 pt-[40px] md:pt-[100px] pb-[10px] md:pb-[20px]">
             <div className="flex flex-col items-center text-center space-y-4 md:space-y-8">
               {/* Title & Subtitle */}
               <div className="space-y-2 md:space-y-4">
@@ -200,7 +200,7 @@ export function SearchViewImproved({
           ref={statsRef}
           className="stats-section bg-card/30 backdrop-blur-sm"
         >
-          <div className="container mx-auto px-6 py-24 md:py-32">
+          <div className="container mx-auto max-w-[1280px] px-6 py-24 md:py-32">
             <StatsSection />
           </div>
         </section>
@@ -210,7 +210,7 @@ export function SearchViewImproved({
           ref={featuresRef}
           className="features-section bg-background"
         >
-          <div className="container mx-auto px-6 py-32 md:py-40">
+          <div className="container mx-auto max-w-[1280px] px-6 py-32 md:py-40">
             <FeatureCards />
           </div>
         </section>
@@ -220,7 +220,7 @@ export function SearchViewImproved({
           ref={ctaRef}
           className="cta-section bg-card/20"
         >
-          <div className="container mx-auto px-6 py-24 md:py-32 text-center">
+          <div className="container mx-auto max-w-[1280px] px-6 py-24 md:py-32 text-center">
             <div className="space-y-8 max-w-3xl mx-auto">
               <h3 className="text-5xl md:text-7xl font-bold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
                 <span className="md:hidden">지금 바로<br />시작하세요</span>
@@ -237,7 +237,7 @@ export function SearchViewImproved({
 
       {/* Footer */}
       <footer className="border-t border-border py-8 bg-background relative z-[100]">
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto max-w-[1280px] px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
               © 2025 Chris ryu. All rights reserved.

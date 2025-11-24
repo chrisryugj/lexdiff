@@ -1,27 +1,11 @@
 import { useState, useEffect } from 'react'
-import type { LawMeta, Article } from '@/lib/law-types'
+import type { LawMeta, LawArticle, ThreeTierData, DelegationItem, CitationItem } from '@/lib/law-types'
 import { debugLogger } from '@/lib/debug-logger'
-
-export interface ThreeTierData {
-  articles: Array<{
-    jo: string
-    delegations?: Array<{
-      lawName: string
-      joLabel: string
-      content: string
-    }>
-    citations?: Array<{
-      lawName: string
-      joLabel: string
-      content: string
-    }>
-  }>
-}
 
 export function useLawViewerThreeTier(
   meta: LawMeta,
   activeJo: string,
-  activeArticle: Article | undefined,
+  activeArticle: LawArticle | undefined,
   aiAnswerMode: boolean,
   isOrdinance: boolean
 ) {
@@ -30,8 +14,8 @@ export function useLawViewerThreeTier(
   const [threeTierDelegation, setThreeTierDelegation] = useState<ThreeTierData | null>(null)
   const [isLoadingThreeTier, setIsLoadingThreeTier] = useState(false)
 
-  // View mode: 1-tier (default) -> 2-tier (article + delegations with tabs)
-  const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier">("1-tier")
+  // View mode: 1-tier (default) -> 2-tier (article + delegations with tabs) -> 3-tier (article + decree + rule)
+  const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier" | "3-tier">("1-tier")
 
   // Active tab for 2-tier delegation view (시행령/시행규칙/행정규칙)
   const [delegationActiveTab, setDelegationActiveTab] = useState<"decree" | "rule" | "admin">("decree")
@@ -87,8 +71,8 @@ export function useLawViewerThreeTier(
   }
 
   // Get delegation and citation data for current article
-  const currentArticleDelegations = threeTierDelegation?.articles.find((a) => a.jo === activeJo)?.delegations || []
-  const currentArticleCitations = threeTierCitation?.articles.find((a) => a.jo === activeJo)?.citations || []
+  const currentArticleDelegations: DelegationItem[] = threeTierDelegation?.articles.find((a) => a.jo === activeJo)?.delegations || []
+  const currentArticleCitations: CitationItem[] = threeTierCitation?.articles.find((a) => a.jo === activeJo)?.citations || []
 
   // Filter to only include items with actual content
   const validDelegations = currentArticleDelegations.filter((d) => d.content && d.content.trim() !== "")
@@ -105,7 +89,7 @@ export function useLawViewerThreeTier(
   const tierItems = threeTierDataType === "delegation" ? validDelegations : validCitations
 
   // Check if there are valid 시행규칙 items (for 3-tier view)
-  const hasValidSihyungkyuchik = validDelegations.some((d: any) => d.type === "시행규칙")
+  const hasValidSihyungkyuchik = validDelegations.some((d) => d.type === "시행규칙")
 
   // Auto-reset tier view mode if the current article doesn't support it
   useEffect(() => {

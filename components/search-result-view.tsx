@@ -1985,7 +1985,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
       <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
       <main className="flex-1">
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto max-w-[1280px] p-6">
           {lawSelectionState ? (
             <div className="py-4 md:py-8">
               {/* 헤더 섹션 - Glassmorphism */}

@@ -980,6 +980,9 @@ export function LawViewer({
                   adminRuleHtml={adminRuleHtml}
                   adminRuleTitle={adminRuleTitle}
                   handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
+                  increaseFontSize={increaseFontSize}
+                  decreaseFontSize={decreaseFontSize}
+                  resetFontSize={resetFontSize}
                   handleContentClick={handleContentClick}
                   isOrdinance={isOrdinance}
                 />
@@ -1035,6 +1038,9 @@ export function LawViewer({
                   adminRuleHtml={adminRuleHtml}
                   adminRuleTitle={adminRuleTitle}
                   handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
+                  increaseFontSize={increaseFontSize}
+                  decreaseFontSize={decreaseFontSize}
+                  resetFontSize={resetFontSize}
                   handleContentClick={handleContentClick}
                   isOrdinance={isOrdinance}
                 />
