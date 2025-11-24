@@ -5,8 +5,13 @@ import { parseAdminRuleContent, formatAdminRuleHTML } from '@/lib/admrul-parser'
 import { getAdminRuleContentCache, setAdminRuleContentCache } from '@/lib/admin-rule-cache'
 
 export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
-  // Admin rules state
-  const [showAdminRules, setShowAdminRules] = useState(false)
+  // Admin rules state - 세션 단위로 유지 (한 번 켜면 조문 이동해도 유지)
+  const [showAdminRules, setShowAdminRules] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = sessionStorage.getItem('showAdminRules')
+    return saved === 'true'
+  })
+
   const [adminRuleViewMode, setAdminRuleViewMode] = useState<"list" | "detail">("list")
   const [adminRuleHtml, setAdminRuleHtml] = useState<string | null>(null)
   const [adminRuleTitle, setAdminRuleTitle] = useState<string | null>(null)
@@ -18,6 +23,13 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     return saved ? Number.parseInt(saved, 10) : 50
   })
 
+  // showAdminRules 변경 시 sessionStorage에 저장
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('showAdminRules', showAdminRules.toString())
+    }
+  }, [showAdminRules])
+
   // Reset view mode to list when panel is closed
   useEffect(() => {
     if (!showAdminRules) {
@@ -26,6 +38,9 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
       setAdminRuleTitle(null)
     }
   }, [showAdminRules])
+
+  // ✅ 한 번이라도 행정규칙을 봤으면 enabled=true (조문 이동해도 계속 fetch)
+  const adminRulesEnabled = showAdminRules
 
   // Admin rules data
   const {
@@ -36,7 +51,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   } = useAdminRules(
     meta.lawTitle,
     articleNumber,
-    showAdminRules // Only fetch when enabled
+    adminRulesEnabled // ✅ showAdminRules=true면 조문 이동해도 계속 fetch
   )
 
   // Sync loaded count with admin rules data
@@ -46,56 +61,43 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
 
   // Handler: view admin rule full content
   const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {
-    console.log('[handleViewAdminRuleFullContent] Called with rule:', rule)
-    console.log('[handleViewAdminRuleFullContent] Current viewMode:', adminRuleViewMode)
     try {
       // Use serialNumber first, fallback to id (same as test page)
       const idParam = rule.serialNumber || rule.id
-      console.log('[handleViewAdminRuleFullContent] idParam:', idParam)
 
       if (!idParam) {
         throw new Error('행정규칙 ID가 없습니다')
       }
 
       // Check IndexedDB cache first
-      console.log('[handleViewAdminRuleFullContent] Checking cache...')
       const cached = await getAdminRuleContentCache(idParam)
       if (cached) {
-        console.log('[handleViewAdminRuleFullContent] Cache hit! Setting detail view')
         setAdminRuleTitle(cached.title)
         setAdminRuleHtml(cached.html)
         setAdminRuleViewMode("detail")
-        console.log('[handleViewAdminRuleFullContent] Detail view set from cache')
         // Don't change tierViewMode - stay in tab view
         return
       }
 
-      console.log('[handleViewAdminRuleFullContent] Cache miss, fetching from API...')
-
       const contentParams = new URLSearchParams({ ID: idParam })
 
       // Set loading state
-      console.log('[handleViewAdminRuleFullContent] Setting loading state...')
       setAdminRuleTitle(rule.name)
       setAdminRuleHtml('<div style="text-align: center; padding: 2rem 0; color: hsl(var(--muted-foreground));"><div style="display: inline-block; width: 2rem; height: 2rem; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div><p style="margin-top: 1rem;">로딩 중...</p><style>@keyframes spin { to { transform: rotate(360deg); }}</style></div>')
       setAdminRuleViewMode("detail")
-      console.log('[handleViewAdminRuleFullContent] Loading state set, viewMode: detail')
       // Don't change tierViewMode - stay in tab view
 
 
-      console.log('[handleViewAdminRuleFullContent] Fetching from API...')
       const contentResponse = await fetch(`/api/admrul?${contentParams.toString()}`, { cache: 'no-store' })
       if (!contentResponse.ok) {
         const errorText = await contentResponse.text()
-        console.error('[handleViewAdminRuleFullContent] API error:', contentResponse.status, errorText)
+        console.error('[행정규칙] API 오류:', contentResponse.status, errorText)
         throw new Error(`행정규칙 조회 실패: ${contentResponse.status}`)
       }
 
-      console.log('[handleViewAdminRuleFullContent] API response OK, parsing...')
       const contentXml = await contentResponse.text()
 
       const fullContent = parseAdminRuleContent(contentXml)
-      console.log('[handleViewAdminRuleFullContent] Parse result:', fullContent ? 'success' : 'failed')
 
       if (!fullContent) {
         throw new Error("행정규칙 파싱 실패")
@@ -144,16 +146,13 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
       const finalHtml = htmlParts.join('')
       const finalTitle = fullContent.name
 
-      console.log('[handleViewAdminRuleFullContent] Setting final HTML...')
       setAdminRuleTitle(finalTitle)
       setAdminRuleHtml(finalHtml)
-      console.log('[handleViewAdminRuleFullContent] HTML set successfully')
 
       // Cache the result to IndexedDB
       await setAdminRuleContentCache(idParam, finalTitle, finalHtml, fullContent.effectiveDate)
-      console.log('[handleViewAdminRuleFullContent] Cached to IndexedDB')
     } catch (error: any) {
-      console.error('[handleViewAdminRuleFullContent] Error:', error)
+      console.error('[행정규칙] 로드 실패:', error)
       setAdminRuleHtml(`<div style="text-align: center; padding: 2rem 0;"><p style="color: hsl(var(--destructive)); font-weight: 600; margin-bottom: 0.5rem;">전체 내용 조회 실패</p><p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">${error.message}</p></div>`)
     }
   }
