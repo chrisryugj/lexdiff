@@ -705,7 +705,7 @@ export function LawViewer({
   return (
     <>
       <div className="w-full mx-auto max-w-[1280px]">
-        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-auto lg:overflow-visible" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-[calc(100vh-12rem)]" style={{ fontFamily: "Pretendard, sans-serif" }}>
         {/* Mobile overlay backdrop */}
         {isArticleListExpanded && (
           <div
@@ -715,7 +715,7 @@ export function LawViewer({
         )}
 
         {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-        <Card className="hidden lg:flex p-4 flex-col overflow-hidden">
+        <Card className="hidden lg:flex flex-col overflow-hidden">
           {aiAnswerMode ? (
             <AIAnswerSidebar
               relatedArticles={relatedArticles}
@@ -725,7 +725,7 @@ export function LawViewer({
             // ========== 기존 조문 목록 ==========
             <>
               {/* 헤더 - 본문 헤더와 동일한 디자인 */}
-              <div className="border-b border-border p-4 flex-shrink-0">
+              <div className="border-b border-border px-4 pt-4 pb-3 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
                   <ListOrdered className="h-5 w-5 text-primary" />
                   <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
@@ -1047,8 +1047,8 @@ export function LawViewer({
               ) : (
                 <ScrollArea className="h-full" ref={contentRef}>
                   <div ref={swipeRef} className="p-6 pb-20">
-                    <div className="mb-6 pb-4 border-b border-border">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="mb-3 pb-2 border-b border-border">
+                      <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <h2 className="text-xl font-bold text-foreground">
                             {formatSimpleJo(activeArticle.jo, isOrdinance)}
