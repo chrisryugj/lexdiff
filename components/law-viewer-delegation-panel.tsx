@@ -5,6 +5,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     FileText,
     Loader2,
@@ -411,7 +412,7 @@ export function DelegationPanel({
                                         <DelegationLoadingSkeleton />
                                     ) : (
                                         <>
-                                            <div className="mb-2 pb-2 border-b border-border">
+                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <FileText className="h-4 w-4 text-foreground" />
@@ -450,7 +451,8 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
+                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <div className="space-y-3 pr-4">
                                                 {validDelegations
                                                     .filter((d) => d.type === "시행령")
                                                     .map((delegation, idx) => (
@@ -479,6 +481,7 @@ export function DelegationPanel({
                                                     <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
                                                 )}
                                             </div>
+                                            </ScrollArea>
                                         </>
                                     )}
                                 </TabsContent>
@@ -489,7 +492,7 @@ export function DelegationPanel({
                                         <DelegationLoadingSkeleton />
                                     ) : (
                                         <>
-                                            <div className="mb-2 pb-2 border-b border-border">
+                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <FileText className="h-4 w-4 text-foreground" />
@@ -528,7 +531,8 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
+                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <div className="space-y-3 pr-4">
                                                 {validDelegations
                                                     .filter((d) => d.type === "시행규칙")
                                                     .map((delegation, idx) => (
@@ -557,6 +561,7 @@ export function DelegationPanel({
                                                     <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                                                 )}
                                             </div>
+                                            </ScrollArea>
                                         </>
                                     )}
                                 </TabsContent>
@@ -575,7 +580,7 @@ export function DelegationPanel({
                                         <DelegationLoadingSkeleton />
                                     ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                                         <>
-                                            <div className="mb-2 pb-2 border-b border-border">
+                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <FileText className="h-4 w-4 text-foreground" />
@@ -616,8 +621,9 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
+                                            <ScrollArea className="h-[calc(100vh-14rem)]">
                                             <div
-                                                className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                                className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
                                                 style={{
                                                     fontSize: `${fontSize}px`,
                                                     lineHeight: "1.8",
@@ -627,10 +633,11 @@ export function DelegationPanel({
                                                 onClick={handleContentClick}
                                                 dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
                                             />
+                                            </ScrollArea>
                                         </>
                                     ) : adminRules.length > 0 ? (
                                         <>
-                                            <div className="mb-2 pb-2 border-b border-border">
+                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <FileText className="h-4 w-4 text-foreground" />
@@ -653,7 +660,8 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
+                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <div className="space-y-3 pr-4">
                                                 {adminRules.map((rule, idx) => (
                                                     <button
                                                         key={idx}
@@ -676,6 +684,7 @@ export function DelegationPanel({
                                                     </button>
                                                 ))}
                                             </div>
+                                            </ScrollArea>
                                         </>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">

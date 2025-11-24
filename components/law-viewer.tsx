@@ -715,7 +715,7 @@ export function LawViewer({
         )}
 
         {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-        <Card className="hidden lg:flex flex-col overflow-hidden lg:max-h-[calc(100vh-12rem)]">
+        <Card className="hidden lg:flex flex-col overflow-hidden lg:max-h-[calc(100vh-8rem)] lg:sticky lg:top-4">
           {aiAnswerMode ? (
             <AIAnswerSidebar
               relatedArticles={relatedArticles}
@@ -803,7 +803,7 @@ export function LawViewer({
         />
 
         {/* Right panel - Article content */}
-        <Card className="flex flex-col overflow-hidden lg:max-h-[calc(100vh-12rem)]">
+        <Card className="flex flex-col overflow-hidden">
           {/* Header - Hidden in AI Answer Mode */}
           {!aiAnswerMode && (
             <div className="border-b border-border px-4 pt-2 pb-5">
