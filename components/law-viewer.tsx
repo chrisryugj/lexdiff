@@ -1042,13 +1042,40 @@ export function LawViewer({
                 <ScrollArea className="h-full" ref={contentRef}>
                   <div ref={swipeRef} className="p-6 pb-20">
                     <div className="mb-6 pb-4 border-b border-border">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h2 className="text-xl font-bold text-foreground">
-                          {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                        </h2>
-                        {activeArticle.title && (
-                          <span className="text-muted-foreground text-lg">({activeArticle.title})</span>
-                        )}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-bold text-foreground">
+                            {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                          </h2>
+                          {activeArticle.title && (
+                            <span className="text-muted-foreground text-lg">({activeArticle.title})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                            <ZoomOut className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                            <ZoomIn className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
+                              navigator.clipboard.writeText(content)
+                              toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
+                            }}
+                            title="복사"
+                            className="h-7 px-2"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <Badge variant="outline" className="text-xs">
                         {isOrdinance ? "자치법규" : "법령"}
