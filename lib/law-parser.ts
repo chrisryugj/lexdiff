@@ -195,6 +195,57 @@ export function formatJO(jo: string): string {
 }
 
 /**
+ * Formats JO code to readable Korean with support for Ordinances
+ * Examples:
+ *   "003800" → "제38조"
+ *   "010000" (Ordinance) → "제1조"
+ *   "010100" (Ordinance) → "제1조의1"
+ */
+export function formatSimpleJo(jo: string, isOrdinance = false): string {
+  // Already formatted (e.g., "제1조", "제10조의2")
+  if (jo.startsWith("제") && jo.includes("조")) {
+    return jo
+  }
+
+  // Ordinance format: 6-digit AABBCC (AA = article, BB = branch, CC = sub)
+  // Example: "010000" = 제1조, "010100" = 제1조의1
+  if (isOrdinance && jo.length === 6 && /^\d{6}$/.test(jo)) {
+    const articleNum = Number.parseInt(jo.substring(0, 2), 10)
+    const branchNum = Number.parseInt(jo.substring(2, 4), 10)
+    const subNum = Number.parseInt(jo.substring(4, 6), 10)
+
+    let result = `제${articleNum}조`
+    if (branchNum > 0) result += `의${branchNum}`
+    if (subNum > 0) result += `-${subNum}`
+
+    return result
+  }
+
+  // Law format: 6-digit AAAABB (AAAA = article, BB = branch)
+  if (!isOrdinance && jo.length === 6 && /^\d{6}$/.test(jo)) {
+    const articleNum = Number.parseInt(jo.substring(0, 4), 10)
+    const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+    return branchNum === 0 ? `제${articleNum}조` : `제${articleNum}조의${branchNum}`
+  }
+
+  // 8-digit code format (fallback)
+  if (jo.length === 8 && /^\d{8}$/.test(jo)) {
+    const articleNum = Number.parseInt(jo.substring(0, 4), 10)
+    const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+    const subNum = Number.parseInt(jo.substring(6, 8), 10)
+
+    let result = `제${articleNum}조`
+    if (branchNum > 0) result += `의${branchNum}`
+    if (subNum > 0) result += `-${subNum}`
+
+    return result
+  }
+
+  // Fallback: return as-is
+  return jo
+}
+
+/**
  * Parses article revision history XML response
  */
 export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
