@@ -95,9 +95,9 @@ export function useLawViewerThreeTier(
   useEffect(() => {
     if (tierViewMode === "3-tier" && !hasValidSihyungkyuchik) {
       setTierViewMode(hasValidThreeTierData ? "2-tier" : "1-tier")
-    } else if (tierViewMode === "2-tier" && !hasValidThreeTierData) {
-      setTierViewMode("1-tier")
     }
+    // 2-tier 모드는 자동으로 리셋하지 않음 - 행정규칙이 있을 수 있기 때문
+    // 사용자가 "위임법령 닫기" 버튼을 눌러야만 1-tier로 복귀
   }, [tierViewMode, hasValidSihyungkyuchik, hasValidThreeTierData, activeJo])
 
   return {

@@ -131,7 +131,7 @@ export function SearchViewImproved({
         <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
 
         {/* Hero Section - Fixed */}
-        <section className={`hero-gradient border-b border-border/50 hero-section ${heroVisible ? 'is-visible' : ''}`}>
+        <section className={`hero-gradient hero-section ${heroVisible ? 'is-visible' : ''}`}>
           <div className="container mx-auto max-w-[1280px] px-6 pt-[40px] md:pt-[100px] pb-[10px] md:pb-[20px]">
             <div className="flex flex-col items-center text-center space-y-4 md:space-y-8">
               {/* Title & Subtitle */}

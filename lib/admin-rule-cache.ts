@@ -9,7 +9,7 @@
 import type { AdminRuleMatch } from "./use-admin-rules"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 8 // Increased to handle version conflicts
+const DB_VERSION = 9 // Force schema reset (NotFoundError fix)
 const LIST_STORE = "adminRulesListCache"
 const CONTENT_STORE = "adminRulesContentCache"
 const CACHE_EXPIRY_DAYS = 30 // 30일 후 자동 삭제
@@ -51,18 +51,25 @@ async function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
+      const oldVersion = event.oldVersion
 
-      // 행정규칙 목록 캐시 스토어
-      if (!db.objectStoreNames.contains(LIST_STORE)) {
-        const listStore = db.createObjectStore(LIST_STORE, { keyPath: "key" })
-        listStore.createIndex("timestamp", "timestamp", { unique: false })
-      }
+      console.log(`[admin-rule-cache] Upgrade v${oldVersion} → v${DB_VERSION}`)
 
-      // 행정규칙 내용 캐시 스토어
-      if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-        const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
-        contentStore.createIndex("timestamp", "timestamp", { unique: false })
-      }
+      // 기존 스토어 모두 삭제 (스키마 충돌 방지)
+      Array.from(db.objectStoreNames).forEach((storeName) => {
+        console.log(`[admin-rule-cache] Deleting old store: ${storeName}`)
+        db.deleteObjectStore(storeName)
+      })
+
+      // 행정규칙 목록 캐시 스토어 (새로 생성)
+      const listStore = db.createObjectStore(LIST_STORE, { keyPath: "key" })
+      listStore.createIndex("timestamp", "timestamp", { unique: false })
+      console.log(`[admin-rule-cache] Created store: ${LIST_STORE}`)
+
+      // 행정규칙 내용 캐시 스토어 (새로 생성)
+      const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
+      contentStore.createIndex("timestamp", "timestamp", { unique: false })
+      console.log(`[admin-rule-cache] Created store: ${CONTENT_STORE}`)
     }
   })
 }
@@ -141,8 +148,20 @@ export async function getAdminRulesListCache(
         reject(request.error)
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[admin-rule-cache] Error reading list cache:", error)
+
+    // NotFoundError 발생 시 DB 삭제 후 재시도
+    if (error?.name === 'NotFoundError') {
+      console.warn('[admin-rule-cache] Object store not found, deleting database...')
+      try {
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log('[admin-rule-cache] Database deleted, please refresh the page')
+      } catch (deleteError) {
+        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+      }
+    }
+
     return null
   }
 }
@@ -217,8 +236,20 @@ export async function getAdminRuleContentCache(
         reject(request.error)
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[admin-rule-cache] Error reading content cache:", error)
+
+    // NotFoundError 발생 시 DB 삭제 후 재시도
+    if (error?.name === 'NotFoundError') {
+      console.warn('[admin-rule-cache] Object store not found, deleting database...')
+      try {
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log('[admin-rule-cache] Database deleted, please refresh the page')
+      } catch (deleteError) {
+        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+      }
+    }
+
     return null
   }
 }
