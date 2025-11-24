@@ -2,6 +2,7 @@
 
 import { Sparkles, GitCompare, Star, Scale, Zap, Shield } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { useEffect, useRef } from "react"
 
 const features = [
   {
@@ -49,6 +50,32 @@ const features = [
 ]
 
 export function FeatureCards() {
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    // Intersection Observer for scroll-based fade-in (Apple style)
+    const isMobile = window.innerWidth < 768
+    const observerOptions = {
+      root: null,
+      rootMargin: isMobile ? '-50px 0px' : '-100px 0px',
+      threshold: 0.2
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        }
+      })
+    }, observerOptions)
+
+    cardRefs.current.forEach((card) => {
+      if (card) observer.observe(card)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div className="w-full max-w-6xl mx-auto">
       <div className="text-center mb-8">
@@ -62,8 +89,8 @@ export function FeatureCards() {
           return (
             <Card
               key={index}
-              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border/50 animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
+              ref={(el) => { cardRefs.current[index] = el }}
+              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border/50 feature-card"
             >
               <CardContent className="p-4 md:p-6">
                 <div className={`${feature.bgColor} w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
@@ -76,6 +103,21 @@ export function FeatureCards() {
           )
         })}
       </div>
+
+      <style jsx>{`
+        /* Feature Cards - Apple-style scroll fade-in */
+        :global(.feature-card) {
+          opacity: 0;
+          transform: translateY(30px);
+          transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                      transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        :global(.feature-card.is-visible) {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      `}</style>
     </div>
   )
 }

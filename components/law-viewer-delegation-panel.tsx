@@ -451,7 +451,7 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <ScrollArea className="h-[calc(100vh-12rem)]">
                                             <div className="space-y-3 pr-4">
                                                 {validDelegations
                                                     .filter((d) => d.type === "시행령")
@@ -531,7 +531,7 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <ScrollArea className="h-[calc(100vh-12rem)]">
                                             <div className="space-y-3 pr-4">
                                                 {validDelegations
                                                     .filter((d) => d.type === "시행규칙")
@@ -621,7 +621,7 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <ScrollArea className="h-[calc(100vh-12rem)]">
                                             <div
                                                 className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
                                                 style={{
@@ -660,7 +660,7 @@ export function DelegationPanel({
                                                     </div>
                                                 </div>
                                             </div>
-                                            <ScrollArea className="h-[calc(100vh-14rem)]">
+                                            <ScrollArea className="h-[calc(100vh-12rem)]">
                                             <div className="space-y-3 pr-4">
                                                 {adminRules.map((rule, idx) => (
                                                     <button

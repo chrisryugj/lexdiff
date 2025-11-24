@@ -1,6 +1,7 @@
 "use client"
 
 import { FileText, Search, Zap, Award } from "lucide-react"
+import { useEffect, useRef } from "react"
 
 const stats = [
   {
@@ -30,6 +31,32 @@ const stats = [
 ]
 
 export function StatsSection() {
+  const statRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    // Intersection Observer for scroll-based fade-in (Apple style)
+    const isMobile = window.innerWidth < 768
+    const observerOptions = {
+      root: null,
+      rootMargin: isMobile ? '-50px 0px' : '-100px 0px',
+      threshold: 0.3
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        }
+      })
+    }, observerOptions)
+
+    statRefs.current.forEach((stat) => {
+      if (stat) observer.observe(stat)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -38,8 +65,8 @@ export function StatsSection() {
           return (
             <div
               key={index}
-              className="text-center animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
+              ref={(el) => { statRefs.current[index] = el }}
+              className="text-center stat-item"
             >
               <div className="flex justify-center mb-3">
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-full p-3">
@@ -52,6 +79,21 @@ export function StatsSection() {
           )
         })}
       </div>
+
+      <style jsx>{`
+        /* Stat Items - Apple-style scroll fade-in */
+        :global(.stat-item) {
+          opacity: 0;
+          transform: translateY(20px) scale(0.95);
+          transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                      transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        :global(.stat-item.is-visible) {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      `}</style>
     </div>
   )
 }

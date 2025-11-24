@@ -192,8 +192,8 @@ export function SearchViewImproved({
 
       {/* Scrollable Content */}
       <main className="flex-1 relative z-10">
-        {/* Extra spacing before Stats Section */}
-        <div className="h-[10px] md:h-[50px]" />
+        {/* Extra spacing before Stats Section - reduced to 50% */}
+        <div className="h-[5px] md:h-[25px]" />
 
         {/* Stats Section - Blur and fade in on scroll */}
         <section
