@@ -60,6 +60,12 @@ export function useAdminRules(
       return
     }
 
+    // ✅ CRITICAL: Clear old results immediately on article change
+    setAdminRules([])
+    setLoading(false)
+    setError(null)
+    setProgress(null)
+
     let cancelled = false
 
     const fetchAdminRules = async () => {
