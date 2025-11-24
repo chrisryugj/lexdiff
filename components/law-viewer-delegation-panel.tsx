@@ -279,9 +279,7 @@ export function DelegationPanel({
                     </TabsContent>
 
                     <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
-                        {loadingAdminRules ? (
-                            <DelegationLoadingSkeleton />
-                        ) : !showAdminRules ? (
+                        {!showAdminRules ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <FileText className="h-12 w-12 mb-4 opacity-30" />
                                 <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
@@ -289,6 +287,8 @@ export function DelegationPanel({
                                     클릭 시 자동으로 로드됩니다
                                 </p>
                             </div>
+                        ) : loadingAdminRules ? (
+                            <DelegationLoadingSkeleton />
                         ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
@@ -614,9 +614,7 @@ export function DelegationPanel({
 
                                 {/* Admin Rules Tab */}
                                 <TabsContent value="admin" className="mt-0">
-                                    {loadingAdminRules ? (
-                                        <DelegationLoadingSkeleton />
-                                    ) : !showAdminRules ? (
+                                    {!showAdminRules ? (
                                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                             <FileText className="h-12 w-12 mb-4 opacity-30" />
                                             <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
@@ -624,6 +622,8 @@ export function DelegationPanel({
                                                 클릭 시 자동으로 로드됩니다
                                             </p>
                                         </div>
+                                    ) : loadingAdminRules ? (
+                                        <DelegationLoadingSkeleton />
                                     ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                                         <>
                                             <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
