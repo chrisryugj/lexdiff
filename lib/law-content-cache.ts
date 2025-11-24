@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 9 // Force schema reset (NotFoundError fix)
+const DB_VERSION = 10 // 2단계 행정규칙 캐시 구조 (법령별 제1조 + 조문별 매칭 인덱스)
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 
@@ -46,7 +46,7 @@ async function openDB(): Promise<IDBDatabase> {
 
       console.log(`📦 IndexedDB upgrade needed: v${oldVersion} → v${DB_VERSION}`)
 
-      // Version 9: 모든 스토어 재생성 (admin-rule-cache와 동일)
+      // Version 10: 2단계 행정규칙 캐시 구조 추가
       // 기존 스토어가 있다면 모두 삭제 (이전 버전 호환 문제 방지)
       const existingStores = Array.from(db.objectStoreNames)
       existingStores.forEach((storeName) => {
@@ -65,10 +65,17 @@ async function openDB(): Promise<IDBDatabase> {
       contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
       console.log(`✅ Created ${CONTENT_STORE} (v${DB_VERSION})`)
 
-      // 행정규칙 목록 캐시 스토어 (admin-rule-cache와 공유)
-      const adminListStore = db.createObjectStore("adminRulesListCache", { keyPath: "key" })
-      adminListStore.createIndex("timestamp", "timestamp", { unique: false })
-      console.log(`✅ Created adminRulesListCache (v${DB_VERSION})`)
+      // 행정규칙 법령별 제1조 캐시 스토어 (admin-rule-cache와 공유)
+      const purposeStore = db.createObjectStore("lawAdminRulesPurposeCache", { keyPath: "key" })
+      purposeStore.createIndex("timestamp", "timestamp", { unique: false })
+      purposeStore.createIndex("lawName", "lawName", { unique: false })
+      console.log(`✅ Created lawAdminRulesPurposeCache (v${DB_VERSION})`)
+
+      // 행정규칙 조문별 매칭 인덱스 스토어 (admin-rule-cache와 공유)
+      const matchIndexStore = db.createObjectStore("articleMatchIndexCache", { keyPath: "key" })
+      matchIndexStore.createIndex("timestamp", "timestamp", { unique: false })
+      matchIndexStore.createIndex("lawName", "lawName", { unique: false })
+      console.log(`✅ Created articleMatchIndexCache (v${DB_VERSION})`)
 
       // 행정규칙 내용 캐시 스토어 (admin-rule-cache와 공유)
       const adminContentStore = db.createObjectStore("adminRulesContentCache", { keyPath: "key" })

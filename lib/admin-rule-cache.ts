@@ -1,24 +1,44 @@
 /**
  * IndexedDB를 사용한 행정규칙 캐싱 시스템
  *
- * 캐시 구조:
- * - adminRulesListCache: 행정규칙 목록 캐시 (법령명 + 조문번호 기준)
- * - adminRulesContentCache: 행정규칙 전체 내용 캐시 (규칙ID + 시행일자 기준)
+ * 2단계 캐시 구조:
+ * - lawAdminRulesPurposeCache: 법령별 전체 행정규칙 제1조 캐시 (법령명 기준)
+ * - articleMatchIndexCache: 조문별 매칭 결과 인덱스 (법령명 + 조문번호 기준)
+ * - adminRulesContentCache: 행정규칙 전체 내용 캐시 (규칙ID 기준)
  */
 
 import type { AdminRuleMatch } from "./use-admin-rules"
+import type { AdminRuleArticle } from "./admrul-parser"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 9 // Force schema reset (NotFoundError fix)
-const LIST_STORE = "adminRulesListCache"
+const DB_VERSION = 10 // 2단계 캐시 구조 도입
+const PURPOSE_STORE = "lawAdminRulesPurposeCache" // 법령별 제1조 캐시
+const MATCH_INDEX_STORE = "articleMatchIndexCache" // 조문별 매칭 인덱스
 const CONTENT_STORE = "adminRulesContentCache"
-const CACHE_EXPIRY_DAYS = 30 // 30일 후 자동 삭제
+const CACHE_EXPIRY_DAYS = 7 // 30일 → 7일로 단축
 
-interface ListCacheEntry {
-  key: string // "${lawName}_${articleNumber}"
+// 법령별 전체 행정규칙의 제1조 캐시
+interface LawAdminRulesPurposeCache {
+  key: string // "${lawName}"
+  lawName: string
+  mst: string // 법령 버전
   timestamp: number
-  rules: AdminRuleMatch[]
-  hierarchyVersion: string // 체계도 MST 또는 날짜
+  rules: Array<{
+    id: string
+    name: string
+    serialNumber?: string
+    purpose: AdminRuleArticle | null // 제1조(목적)
+  }>
+}
+
+// 조문별 매칭 결과 인덱스 (가벼움)
+interface ArticleMatchIndex {
+  key: string // "${lawName}_${articleNumber}"
+  lawName: string
+  articleNumber: string
+  mst: string // 법령 버전
+  timestamp: number
+  matchedRuleIds: string[] // 매칭된 규칙 ID 배열 (참조)
 }
 
 interface ContentCacheEntry {
@@ -26,7 +46,7 @@ interface ContentCacheEntry {
   timestamp: number
   title: string
   html: string
-  effectiveDate?: string // 시행일자
+  effectiveDate?: string
 }
 
 // IndexedDB 초기화
@@ -41,7 +61,6 @@ async function openDB(): Promise<IDBDatabase> {
       if (error?.name === 'VersionError') {
         console.warn('[admin-rule-cache] VersionError detected, deleting database and retrying...')
         indexedDB.deleteDatabase(DB_NAME)
-        // 재시도는 호출 측에서 처리 (무한 루프 방지)
       }
 
       reject(error)
@@ -61,12 +80,19 @@ async function openDB(): Promise<IDBDatabase> {
         db.deleteObjectStore(storeName)
       })
 
-      // 행정규칙 목록 캐시 스토어 (새로 생성)
-      const listStore = db.createObjectStore(LIST_STORE, { keyPath: "key" })
-      listStore.createIndex("timestamp", "timestamp", { unique: false })
-      console.log(`[admin-rule-cache] Created store: ${LIST_STORE}`)
+      // 법령별 제1조 캐시 스토어
+      const purposeStore = db.createObjectStore(PURPOSE_STORE, { keyPath: "key" })
+      purposeStore.createIndex("timestamp", "timestamp", { unique: false })
+      purposeStore.createIndex("lawName", "lawName", { unique: false })
+      console.log(`[admin-rule-cache] Created store: ${PURPOSE_STORE}`)
 
-      // 행정규칙 내용 캐시 스토어 (새로 생성)
+      // 조문별 매칭 인덱스 스토어
+      const matchIndexStore = db.createObjectStore(MATCH_INDEX_STORE, { keyPath: "key" })
+      matchIndexStore.createIndex("timestamp", "timestamp", { unique: false })
+      matchIndexStore.createIndex("lawName", "lawName", { unique: false })
+      console.log(`[admin-rule-cache] Created store: ${MATCH_INDEX_STORE}`)
+
+      // 행정규칙 내용 캐시 스토어
       const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
       contentStore.createIndex("timestamp", "timestamp", { unique: false })
       console.log(`[admin-rule-cache] Created store: ${CONTENT_STORE}`)
@@ -80,15 +106,30 @@ async function cleanExpiredCache(): Promise<void> {
     const db = await openDB()
     const expiryTime = Date.now() - CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
 
-    // 목록 캐시 정리
-    const listTx = db.transaction(LIST_STORE, "readwrite")
-    const listStore = listTx.objectStore(LIST_STORE)
-    const listIndex = listStore.index("timestamp")
-    const listRange = IDBKeyRange.upperBound(expiryTime)
-    const listRequest = listIndex.openCursor(listRange)
+    // 제1조 캐시 정리
+    const purposeTx = db.transaction(PURPOSE_STORE, "readwrite")
+    const purposeStore = purposeTx.objectStore(PURPOSE_STORE)
+    const purposeIndex = purposeStore.index("timestamp")
+    const purposeRange = IDBKeyRange.upperBound(expiryTime)
+    const purposeRequest = purposeIndex.openCursor(purposeRange)
 
-    listRequest.onsuccess = () => {
-      const cursor = listRequest.result
+    purposeRequest.onsuccess = () => {
+      const cursor = purposeRequest.result
+      if (cursor) {
+        cursor.delete()
+        cursor.continue()
+      }
+    }
+
+    // 매칭 인덱스 정리
+    const matchIndexTx = db.transaction(MATCH_INDEX_STORE, "readwrite")
+    const matchIndexStore = matchIndexTx.objectStore(MATCH_INDEX_STORE)
+    const matchIndexIndex = matchIndexStore.index("timestamp")
+    const matchIndexRange = IDBKeyRange.upperBound(expiryTime)
+    const matchIndexRequest = matchIndexIndex.openCursor(matchIndexRange)
+
+    matchIndexRequest.onsuccess = () => {
+      const cursor = matchIndexRequest.result
       if (cursor) {
         cursor.delete()
         cursor.continue()
@@ -116,29 +157,42 @@ async function cleanExpiredCache(): Promise<void> {
   }
 }
 
-// 행정규칙 목록 캐시 조회
-export async function getAdminRulesListCache(
+// ========================================
+// 법령별 제1조 캐시 (새로운 1단계 캐시)
+// ========================================
+
+/**
+ * 법령별 전체 행정규칙의 제1조 캐시 조회
+ */
+export async function getLawAdminRulesPurposeCache(
   lawName: string,
-  articleNumber: string
-): Promise<AdminRuleMatch[] | null> {
+  currentMst: string
+): Promise<LawAdminRulesPurposeCache["rules"] | null> {
   try {
     const db = await openDB()
-    const key = `${lawName}_${articleNumber}`
+    const key = lawName
 
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(LIST_STORE, "readonly")
-      const store = tx.objectStore(LIST_STORE)
+      const tx = db.transaction(PURPOSE_STORE, "readonly")
+      const store = tx.objectStore(PURPOSE_STORE)
       const request = store.get(key)
 
       request.onsuccess = () => {
-        const entry = request.result as ListCacheEntry | undefined
+        const entry = request.result as LawAdminRulesPurposeCache | undefined
         db.close()
 
         if (entry) {
-          console.log("[admin-rule-cache] List cache HIT:", key)
+          // MST 버전 확인
+          if (entry.mst !== currentMst) {
+            console.log("[admin-rule-cache] Purpose cache MST mismatch, invalidating")
+            resolve(null)
+            return
+          }
+
+          console.log("[admin-rule-cache] Purpose cache HIT:", key, entry.rules.length, "rules")
           resolve(entry.rules)
         } else {
-          console.log("[admin-rule-cache] List cache MISS:", key)
+          console.log("[admin-rule-cache] Purpose cache MISS:", key)
           resolve(null)
         }
       }
@@ -149,9 +203,8 @@ export async function getAdminRulesListCache(
       }
     })
   } catch (error: any) {
-    console.error("[admin-rule-cache] Error reading list cache:", error)
+    console.error("[admin-rule-cache] Error reading purpose cache:", error)
 
-    // NotFoundError 발생 시 DB 삭제 후 재시도
     if (error?.name === 'NotFoundError') {
       console.warn('[admin-rule-cache] Object store not found, deleting database...')
       try {
@@ -166,32 +219,34 @@ export async function getAdminRulesListCache(
   }
 }
 
-// 행정규칙 목록 캐시 저장
-export async function setAdminRulesListCache(
+/**
+ * 법령별 전체 행정규칙의 제1조 캐시 저장
+ */
+export async function setLawAdminRulesPurposeCache(
   lawName: string,
-  articleNumber: string,
-  rules: AdminRuleMatch[],
-  hierarchyVersion: string = ""
+  mst: string,
+  rules: LawAdminRulesPurposeCache["rules"]
 ): Promise<void> {
   try {
     const db = await openDB()
-    const key = `${lawName}_${articleNumber}`
+    const key = lawName
 
-    const entry: ListCacheEntry = {
+    const entry: LawAdminRulesPurposeCache = {
       key,
+      lawName,
+      mst,
       timestamp: Date.now(),
       rules,
-      hierarchyVersion,
     }
 
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(LIST_STORE, "readwrite")
-      const store = tx.objectStore(LIST_STORE)
+      const tx = db.transaction(PURPOSE_STORE, "readwrite")
+      const store = tx.objectStore(PURPOSE_STORE)
       const request = store.put(entry)
 
       request.onsuccess = () => {
         db.close()
-        console.log("[admin-rule-cache] List cache saved:", key, rules.length, "rules")
+        console.log("[admin-rule-cache] Purpose cache saved:", key, rules.length, "rules")
         resolve()
       }
 
@@ -201,11 +256,123 @@ export async function setAdminRulesListCache(
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error saving list cache:", error)
+    console.error("[admin-rule-cache] Error saving purpose cache:", error)
   }
 }
 
-// 행정규칙 내용 캐시 조회
+// ========================================
+// 조문별 매칭 인덱스 (새로운 2단계 캐시)
+// ========================================
+
+/**
+ * 조문별 매칭 결과 인덱스 조회
+ */
+export async function getArticleMatchIndex(
+  lawName: string,
+  articleNumber: string,
+  currentMst: string
+): Promise<string[] | null> {
+  try {
+    const db = await openDB()
+    const key = `${lawName}_${articleNumber}`
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MATCH_INDEX_STORE, "readonly")
+      const store = tx.objectStore(MATCH_INDEX_STORE)
+      const request = store.get(key)
+
+      request.onsuccess = () => {
+        const entry = request.result as ArticleMatchIndex | undefined
+        db.close()
+
+        if (entry) {
+          // MST 버전 확인
+          if (entry.mst !== currentMst) {
+            console.log("[admin-rule-cache] Match index MST mismatch, invalidating")
+            resolve(null)
+            return
+          }
+
+          console.log("[admin-rule-cache] Match index HIT:", key, entry.matchedRuleIds.length, "matches")
+          resolve(entry.matchedRuleIds)
+        } else {
+          console.log("[admin-rule-cache] Match index MISS:", key)
+          resolve(null)
+        }
+      }
+
+      request.onerror = () => {
+        db.close()
+        reject(request.error)
+      }
+    })
+  } catch (error: any) {
+    console.error("[admin-rule-cache] Error reading match index:", error)
+
+    if (error?.name === 'NotFoundError') {
+      console.warn('[admin-rule-cache] Object store not found, deleting database...')
+      try {
+        indexedDB.deleteDatabase(DB_NAME)
+        console.log('[admin-rule-cache] Database deleted, please refresh the page')
+      } catch (deleteError) {
+        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+      }
+    }
+
+    return null
+  }
+}
+
+/**
+ * 조문별 매칭 결과 인덱스 저장
+ */
+export async function setArticleMatchIndex(
+  lawName: string,
+  articleNumber: string,
+  mst: string,
+  matchedRuleIds: string[]
+): Promise<void> {
+  try {
+    const db = await openDB()
+    const key = `${lawName}_${articleNumber}`
+
+    const entry: ArticleMatchIndex = {
+      key,
+      lawName,
+      articleNumber,
+      mst,
+      timestamp: Date.now(),
+      matchedRuleIds,
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MATCH_INDEX_STORE, "readwrite")
+      const store = tx.objectStore(MATCH_INDEX_STORE)
+      const request = store.put(entry)
+
+      request.onsuccess = () => {
+        db.close()
+        console.log("[admin-rule-cache] Match index saved:", key, matchedRuleIds.length, "matches")
+        resolve()
+      }
+
+      request.onerror = () => {
+        db.close()
+        reject(request.error)
+      }
+    })
+  } catch (error) {
+    console.error("[admin-rule-cache] Error saving match index:", error)
+  }
+}
+
+// ========================================
+// 행정규칙 내용 캐시 (기존 유지)
+// ========================================
+
+/**
+ * 행정규칙 내용 캐시 조회
+ */
 export async function getAdminRuleContentCache(
   ruleId: string
 ): Promise<{ title: string; html: string } | null> {
@@ -239,7 +406,6 @@ export async function getAdminRuleContentCache(
   } catch (error: any) {
     console.error("[admin-rule-cache] Error reading content cache:", error)
 
-    // NotFoundError 발생 시 DB 삭제 후 재시도
     if (error?.name === 'NotFoundError') {
       console.warn('[admin-rule-cache] Object store not found, deleting database...')
       try {
@@ -254,7 +420,9 @@ export async function getAdminRuleContentCache(
   }
 }
 
-// 행정규칙 내용 캐시 저장
+/**
+ * 행정규칙 내용 캐시 저장
+ */
 export async function setAdminRuleContentCache(
   ruleId: string,
   title: string,
@@ -294,7 +462,9 @@ export async function setAdminRuleContentCache(
   }
 }
 
-// 개별 행정규칙 내용 캐시 삭제
+/**
+ * 개별 행정규칙 내용 캐시 삭제
+ */
 export async function clearAdminRuleContentCache(ruleId: string): Promise<void> {
   try {
     const db = await openDB()
@@ -321,13 +491,18 @@ export async function clearAdminRuleContentCache(ruleId: string): Promise<void> 
   }
 }
 
-// 전체 캐시 삭제 (디버깅용)
+/**
+ * 전체 캐시 삭제 (디버깅용)
+ */
 export async function clearAllAdminRuleCache(): Promise<void> {
   try {
     const db = await openDB()
 
-    const listTx = db.transaction(LIST_STORE, "readwrite")
-    listTx.objectStore(LIST_STORE).clear()
+    const purposeTx = db.transaction(PURPOSE_STORE, "readwrite")
+    purposeTx.objectStore(PURPOSE_STORE).clear()
+
+    const matchIndexTx = db.transaction(MATCH_INDEX_STORE, "readwrite")
+    matchIndexTx.objectStore(MATCH_INDEX_STORE).clear()
 
     const contentTx = db.transaction(CONTENT_STORE, "readwrite")
     contentTx.objectStore(CONTENT_STORE).clear()
