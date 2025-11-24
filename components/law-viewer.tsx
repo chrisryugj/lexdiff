@@ -705,7 +705,7 @@ export function LawViewer({
   return (
     <>
       <div className="w-full mx-auto max-w-[1280px]">
-        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-[calc(100vh-12rem)]" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
         {/* Mobile overlay backdrop */}
         {isArticleListExpanded && (
           <div
@@ -715,7 +715,7 @@ export function LawViewer({
         )}
 
         {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-        <Card className="hidden lg:flex flex-col overflow-hidden">
+        <Card className="hidden lg:flex flex-col overflow-hidden lg:max-h-[calc(100vh-12rem)]">
           {aiAnswerMode ? (
             <AIAnswerSidebar
               relatedArticles={relatedArticles}
@@ -803,7 +803,7 @@ export function LawViewer({
         />
 
         {/* Right panel - Article content */}
-        <Card className="flex flex-col overflow-hidden">
+        <Card className="flex flex-col overflow-hidden lg:max-h-[calc(100vh-12rem)]">
           {/* Header - Hidden in AI Answer Mode */}
           {!aiAnswerMode && (
             <div className="border-b border-border px-4 pt-2 pb-5">
@@ -1046,7 +1046,7 @@ export function LawViewer({
                 />
               ) : (
                 <ScrollArea className="h-full" ref={contentRef}>
-                  <div ref={swipeRef} className="p-6 pb-20">
+                  <div ref={swipeRef} className="px-6 pt-3 pb-20">
                     <div className="mb-3 pb-2 border-b border-border">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
