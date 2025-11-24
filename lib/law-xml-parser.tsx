@@ -552,8 +552,9 @@ export function formatDelegationContent(content: string, currentLawName?: string
   // Add line break for numbered items (1., 2., 3.) - but NOT dates
   text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
 
-  // Add line break for sub-items (가., 나., 다.)
-  text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
+  // Add line break for sub-items (가., 나., 다.) - only at start of line or after line break
+  // This prevents matching sentence endings like "...을 말한다."
+  text = text.replace(/(^|<br>|<br\/>|<br \/>)\s*([가-힣]\.)\s+/g, '$1&nbsp;&nbsp;$2 ')
 
   return text
 }
