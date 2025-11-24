@@ -38,7 +38,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto max-w-[1280px] flex h-16 items-center justify-between px-4">
         <button
           onClick={handleHomeClick}
           className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
