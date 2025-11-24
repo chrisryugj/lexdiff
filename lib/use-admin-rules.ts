@@ -55,13 +55,9 @@ export function useAdminRules(
       return
     }
 
-    // 이미 데이터가 있으면 다시 fetch하지 않음 (캐시 활용)
-    if (adminRules.length > 0) {
-      setLoading(false)
-      setError(null)
-      setProgress(null)
-      return
-    }
+    // lawName이나 articleNumber가 변경되면 데이터 초기화하고 다시 fetch
+    // (이전 로직: 이미 데이터가 있으면 다시 fetch하지 않음 - 이것이 문제!)
+    setAdminRules([]) // 조문/법률 변경 시 기존 데이터 초기화
 
     let cancelled = false
 
@@ -81,11 +77,10 @@ export function useAdminRules(
           return
         }
 
-        // Step 1: 법령 체계도에서 행정규칙 목록 가져오기 (브라우저 캐시 활용)
+        // Step 1: 법령 체계도에서 행정규칙 목록 가져오기
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
         const hierarchyResponse = await fetch(hierarchyUrl, {
-          cache: 'force-cache',
-          next: { revalidate: 3600 } // 1시간 캐시
+          cache: 'no-store' // 항상 최신 데이터 가져오기
         })
 
         if (!hierarchyResponse.ok) {
@@ -108,9 +103,11 @@ export function useAdminRules(
 
         const matching: AdminRuleMatch[] = []
 
-        // Step 2: 모든 행정규칙 완전 병렬 처리 (최대 속도)
+        // Step 2: 배치 처리로 동시 요청 수 제한 (브라우저 리소스 보호)
         let completed = 0
-        const allPromises = rules.map(async (rule, idx) => {
+        const BATCH_SIZE = 5 // 동시 최대 5개씩 처리
+
+        const processRule = async (rule: any): Promise<AdminRuleMatch | null> => {
           const idParam = rule.serialNumber || rule.id
           if (!idParam) {
             completed++
@@ -121,8 +118,7 @@ export function useAdminRules(
           try {
             const contentUrl = `/api/admrul?ID=${encodeURIComponent(idParam)}`
             const contentResponse = await fetch(contentUrl, {
-              cache: 'force-cache',
-              next: { revalidate: 86400 } // 24시간 캐시 (행정규칙은 자주 변경되지 않음)
+              cache: 'no-store' // 항상 최신 데이터 가져오기
             })
 
             if (!contentResponse.ok) {
@@ -171,13 +167,19 @@ export function useAdminRules(
             if (!cancelled) setProgress({ current: completed, total: rules.length })
             return null
           }
-        })
+        }
 
-        const allResults = await Promise.all(allPromises)
+        // 배치 단위로 처리
+        for (let i = 0; i < rules.length; i += BATCH_SIZE) {
+          if (cancelled) break
 
-        allResults.forEach((result) => {
-          if (result) matching.push(result)
-        })
+          const batch = rules.slice(i, i + BATCH_SIZE)
+          const batchResults = await Promise.all(batch.map(processRule))
+
+          batchResults.forEach((result) => {
+            if (result) matching.push(result)
+          })
+        }
 
         if (!cancelled) {
           // IndexedDB에 캐싱

@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 7 // Version bump to force DB recreation (v7: fix object store not found error)
+const DB_VERSION = 9 // Force schema reset (NotFoundError fix)
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 
@@ -46,22 +46,34 @@ async function openDB(): Promise<IDBDatabase> {
 
       console.log(`📦 IndexedDB upgrade needed: v${oldVersion} → v${DB_VERSION}`)
 
-      // Version 7: 스키마 불일치 해결 - 모든 기존 스토어 완전 삭제
+      // Version 9: 모든 스토어 재생성 (admin-rule-cache와 동일)
       // 기존 스토어가 있다면 모두 삭제 (이전 버전 호환 문제 방지)
       const existingStores = Array.from(db.objectStoreNames)
       existingStores.forEach((storeName) => {
-        db.deleteObjectStore(storeName)
-        console.log(`🗑️ Deleted old store: ${storeName}`)
+        if (db.objectStoreNames.contains(storeName)) {
+          db.deleteObjectStore(storeName)
+          console.log(`🗑️ Deleted old store: ${storeName}`)
+        }
       })
 
-      // 스토어 새로 생성
+      // 법령 내용 캐시 스토어
       const contentStore = db.createObjectStore(CONTENT_STORE, { keyPath: "key" })
       contentStore.createIndex("timestamp", "timestamp", { unique: false })
       contentStore.createIndex("lawId", "lawId", { unique: false })
       contentStore.createIndex("lawTitle", "lawTitle", { unique: false })
       contentStore.createIndex("searchKey", "searchKey", { unique: false })
       contentStore.createIndex("normalizedQuery", "normalizedQuery", { unique: false })
-      console.log(`✅ Created fresh ${CONTENT_STORE} object store with all indexes`)
+      console.log(`✅ Created ${CONTENT_STORE} (v${DB_VERSION})`)
+
+      // 행정규칙 목록 캐시 스토어 (admin-rule-cache와 공유)
+      const adminListStore = db.createObjectStore("adminRulesListCache", { keyPath: "key" })
+      adminListStore.createIndex("timestamp", "timestamp", { unique: false })
+      console.log(`✅ Created adminRulesListCache (v${DB_VERSION})`)
+
+      // 행정규칙 내용 캐시 스토어 (admin-rule-cache와 공유)
+      const adminContentStore = db.createObjectStore("adminRulesContentCache", { keyPath: "key" })
+      adminContentStore.createIndex("timestamp", "timestamp", { unique: false })
+      console.log(`✅ Created adminRulesContentCache (v${DB_VERSION})`)
     }
   })
 }

@@ -171,6 +171,12 @@ export function LawViewer({
 
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
+  // ✅ useMemo로 HTML 생성 결과 캐싱 (중복 호출 방지)
+  const activeArticleHtml = useMemo(() => {
+    if (!activeArticle) return ''
+    return extractArticleText(activeArticle, false, meta.lawTitle)
+  }, [activeArticle?.jo, activeArticle?.content, meta.lawTitle])
+
   // Three-Tier hook (위임법령 데이터 및 로직)
   const {
     threeTierCitation,
@@ -193,9 +199,17 @@ export function LawViewer({
     fetchThreeTierData,
   } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance)
 
-  // Total delegation count (시행령 + 시행규칙 + 행정규칙)
-  // 행정규칙은 lazy loading이므로 loadedAdminRulesCount 사용
-  const totalDelegationCount = validDelegations.length + (showAdminRules ? adminRules.length : loadedAdminRulesCount)
+  // 위임법령 버튼 비활성화 조건 계산
+  // 1. 위임법령 데이터가 로드된 적 있음 (threeTierDelegation 존재)
+  // 2. 현재 조문에 시행령/시행규칙 없음 (validDelegations.length === 0)
+  // 3. 행정규칙이 로드된 적 있으나 현재 조문과 연관 없음 (showAdminRules && adminRules.length === 0)
+  const shouldDisableDelegationButton =
+    threeTierDelegation !== null && // 위임법령 데이터 로드됨
+    validDelegations.length === 0 && // 시행령/시행규칙 없음
+    (!showAdminRules || (showAdminRules && adminRules.length === 0)) // 행정규칙도 없거나 연관 없음
+
+  // 위임법령 버튼 카운트 (시행령 + 시행규칙 + 행정규칙)
+  const delegationButtonCount = validDelegations.length + (showAdminRules ? adminRules.length : 0)
 
   // 디버깅: 현재 조문의 delegation 데이터 확인
   useEffect(() => {
@@ -416,7 +430,7 @@ export function LawViewer({
 
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 2, 24))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 2, 10))
-  const resetFontSize = () => setFontSize(14)
+  const resetFontSize = () => setFontSize(15)
 
   const handleCopy = async () => {
     if (!contentRef.current) return
@@ -706,447 +720,449 @@ export function LawViewer({
     <>
       <div className="w-full mx-auto max-w-[1280px]">
         <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
-        {/* Mobile overlay backdrop */}
-        {isArticleListExpanded && (
-          <div
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={() => setIsArticleListExpanded(false)}
-          />
-        )}
-
-        {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-        <Card className="hidden lg:flex flex-col overflow-hidden lg:max-h-[calc(100vh-8rem)] lg:sticky lg:top-4">
-          {aiAnswerMode ? (
-            <AIAnswerSidebar
-              relatedArticles={relatedArticles}
-              onRelatedArticleClick={openExternalLawArticleModal}
+          {/* Mobile overlay backdrop */}
+          {isArticleListExpanded && (
+            <div
+              className="lg:hidden fixed inset-0 bg-black/50 z-40"
+              onClick={() => setIsArticleListExpanded(false)}
             />
-          ) : (
-            // ========== 기존 조문 목록 ==========
-            <>
-              {/* 헤더 - 본문 헤더와 동일한 디자인 */}
-              <div className="border-b border-border px-4 pt-4 pb-3 flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <ListOrdered className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {actualArticles.length}개 조문
-                </Badge>
-              </div>
-
-              <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
-                <VirtualizedArticleList
-                  articles={actualArticles}
-                  activeJo={activeJo}
-                  loadingJo={loadingJo}
-                  favorites={favorites}
-                  isOrdinance={isOrdinance}
-                  onArticleClick={handleArticleClick}
-                  onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
-                />
-              </div>
-            </>
-          )
-          }
-        </Card >
-
-        {/* Mobile Bottom Sheet for Article List */}
-        <ArticleBottomSheet
-          isOpen={isArticleListExpanded}
-          onClose={() => setIsArticleListExpanded(false)}
-          title={aiAnswerMode ? "관련 법령 목록" : "조문 목록"}
-          snapPoints={[40, 70, 90]}
-        >
-          {aiAnswerMode ? (
-            <AIAnswerSidebar
-              relatedArticles={relatedArticles}
-              onRelatedArticleClick={openExternalLawArticleModal}
-              onCloseSidebar={() => setIsArticleListExpanded(false)}
-              showHeader={false}
-            />
-          ) : (
-            // 일반 모드: 조문 목록
-            <>
-              <div className="mb-4">
-                <Badge variant="outline" className="text-xs">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {actualArticles.length}개 조문
-                </Badge>
-              </div>
-
-              <div className="h-[60vh]">
-                <VirtualizedArticleList
-                  articles={actualArticles}
-                  activeJo={activeJo}
-                  loadingJo={loadingJo}
-                  favorites={favorites}
-                  isOrdinance={isOrdinance}
-                  onArticleClick={(jo) => {
-                    handleArticleClick(jo)
-                    setIsArticleListExpanded(false)
-                  }}
-                  onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
-                />
-              </div>
-            </>
-          )}
-        </ArticleBottomSheet>
-
-        {/* Floating Action Button (Mobile only) */}
-        <FloatingActionButton
-          onClick={() => setIsArticleListExpanded(true)}
-          icon={<ListOrdered className="h-5 w-5" />}
-          count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
-          label={aiAnswerMode ? "관련 법령 목록 열기" : "조문 목록 열기"}
-        />
-
-        {/* Right panel - Article content */}
-        <Card className="flex flex-col overflow-hidden">
-          {/* Header - Hidden in AI Answer Mode */}
-          {!aiAnswerMode && (
-            <div className="border-b border-border px-4 pt-2 pb-5">
-              <div className="flex items-center gap-2 mb-1">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
-                {!isOrdinance && viewMode === "full" && (
-                  <Badge variant="outline" className="text-xs">
-                    전체 조문
-                  </Badge>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {meta.latestEffectiveDate && (
-                  <Badge variant="outline" className="text-xs">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    시행: {meta.latestEffectiveDate}
-                  </Badge>
-                )}
-                <Badge variant="outline" className="text-xs">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {articles.length}개 조문
-                </Badge>
-
-                {isOrdinance && (
-                  <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
-                    <Building2 className="h-3 w-3 mr-1" />
-                    자치법규
-                  </Badge>
-                )}
-                {meta.revisionType && (
-                  <Badge variant="secondary" className="text-xs">
-                    {meta.revisionType}
-                  </Badge>
-                )}
-                {!isOrdinance && viewMode === "full" && activeArticle && (
-                  <Badge variant="outline" className="text-xs">
-                    현재: {formatSimpleJo(activeArticle.jo)}
-                    {activeArticle.title && ` (${activeArticle.title})`}
-                  </Badge>
-                )}
-                {(() => {
-                  const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
-                  return currentLawFavorites > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      ⭐ {currentLawFavorites}개
-                    </Badge>
-                  )
-                })()}
-              </div>
-            </div>
           )}
 
-          {/* Action Buttons */}
-          {
-            !aiAnswerMode && !isOrdinance && activeArticle && (
-              <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
-                <div className="flex flex-wrap gap-1.5">
-                  <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
-                    <GitCompare className="h-3.5 w-3.5 mr-1" />
-                    신·구법 비교
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
-                    <Sparkles className="h-3.5 w-3.5 mr-1" />
-                    AI 요약
-                  </Button>
-                  <Button
-                    variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                    className="h-7 px-2"
-                  >
-                    <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
-                    즐겨찾기
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                    원문 보기
-                  </Button>
-                  {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
-                  {!isOrdinance && !aiAnswerMode && (
-                    <Button
-                      variant={tierViewMode === "2-tier" ? "default" : "outline"}
-                      size="sm"
-                      disabled={isLoadingThreeTier}
-                      onClick={async () => {
-                        if (tierViewMode === "1-tier") {
-                          // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
-                          if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
-                          setTierViewMode("2-tier")
-                          // 행정규칙 탭이 선택되어 있고 데이터가 로드된 적 있으면 자동으로 활성화
-                          if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
-                            setShowAdminRules(true)
-                          }
-                        } else {
-                          // 1단 뷰로 복귀 (showAdminRules는 유지 - 패널 재오픈 시 복원용)
-                          setTierViewMode("1-tier")
-                        }
-                      }}
-                      title="위임법령 보기 (시행령/시행규칙/행정규칙)"
-                      className="h-7 px-2"
-                    >
-                      {isLoadingThreeTier ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <FileText className="h-3.5 w-3.5 mr-1" />
-                      )}
-                      {tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${totalDelegationCount > 0 ? ` (${totalDelegationCount})` : ""}`}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )
-          }
-
-          {
-            isOrdinance && (
-              <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                    원문 보기
-                  </Button>
-
-                  <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
-                      navigator.clipboard.writeText(content)
-                      toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
-                    }}
-                    title="전체 복사"
-                    className="h-7 px-2"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )
-          }
-
-          <div className="flex-1 min-h-0">
-            {/* 전문조회 모드: 자체 스크롤 관리 */}
-            {viewMode === "full" ? (
-              tierViewMode === "2-tier" && activeArticle ? (
-                <DelegationPanel
-                  activeArticle={activeArticle}
-                  meta={meta}
-                  fontSize={fontSize}
-                  validDelegations={validDelegations}
-                  isLoadingThreeTier={isLoadingThreeTier}
-                  delegationActiveTab={delegationActiveTab}
-                  setDelegationActiveTab={setDelegationActiveTab}
-                  delegationPanelSize={delegationPanelSize}
-                  setDelegationPanelSize={setDelegationPanelSize}
-                  showAdminRules={showAdminRules}
-                  setShowAdminRules={setShowAdminRules}
-                  loadingAdminRules={loadingAdminRules}
-                  loadedAdminRulesCount={loadedAdminRulesCount}
-                  adminRules={adminRules}
-                  adminRuleViewMode={adminRuleViewMode}
-                  setAdminRuleViewMode={setAdminRuleViewMode}
-                  adminRuleHtml={adminRuleHtml}
-                  adminRuleTitle={adminRuleTitle}
-                  handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
-                  increaseFontSize={increaseFontSize}
-                  decreaseFontSize={decreaseFontSize}
-                  resetFontSize={resetFontSize}
-                  handleContentClick={handleContentClick}
-                  isOrdinance={isOrdinance}
-                />
-              ) : (
-                <ScrollArea className="h-full" ref={contentRef}>
-                  <div ref={swipeRef}>
-                    <VirtualizedFullArticleView
-                      articles={actualArticles}
-                      preambles={preambles}
-                      activeJo={activeJo}
-                      fontSize={fontSize}
-                      lawTitle={meta.lawTitle}
-                      onContentClick={handleContentClick}
-                      articleRefs={articleRefs}
-                    />
+          {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
+          <Card className="hidden lg:flex flex-col overflow-hidden lg:min-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-8rem)] lg:sticky lg:top-4">
+            {aiAnswerMode ? (
+              <AIAnswerSidebar
+                relatedArticles={relatedArticles}
+                onRelatedArticleClick={openExternalLawArticleModal}
+              />
+            ) : (
+              // ========== 기존 조문 목록 ==========
+              <>
+                {/* 헤더 - 본문 헤더와 동일한 디자인 */}
+                <div className="border-b border-border px-4 pt-0 pb-3 flex-shrink-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ListOrdered className="h-5 w-5 text-primary" />
+                    <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
                   </div>
-                </ScrollArea>
-              )
-            ) : aiAnswerMode && aiAnswerContent ? (
-              <ScrollArea className="h-full" ref={contentRef}>
-                <div className="p-6 pb-20">
-                  <AIAnswerContent
-                    aiAnswerHTML={aiAnswerHTML}
-                    userQuery={userQuery}
-                    aiConfidenceLevel={aiConfidenceLevel}
-                    fileSearchFailed={fileSearchFailed}
-                    aiCitations={aiCitations}
-                    fontSize={fontSize}
-                    setFontSize={setFontSize}
-                    handleContentClick={handleContentClick}
+                  <Badge variant="outline" className="text-xs">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {actualArticles.length}개 조문
+                  </Badge>
+                </div>
+
+                <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
+                  <VirtualizedArticleList
+                    articles={actualArticles}
+                    activeJo={activeJo}
+                    loadingJo={loadingJo}
+                    favorites={favorites}
+                    isOrdinance={isOrdinance}
+                    onArticleClick={handleArticleClick}
+                    onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
                   />
                 </div>
-              </ScrollArea>
-            ) : activeArticle ? (
-              tierViewMode === "2-tier" ? (
-                <DelegationPanel
-                  activeArticle={activeArticle}
-                  meta={meta}
-                  fontSize={fontSize}
-                  validDelegations={validDelegations}
-                  isLoadingThreeTier={isLoadingThreeTier}
-                  delegationActiveTab={delegationActiveTab}
-                  setDelegationActiveTab={setDelegationActiveTab}
-                  delegationPanelSize={delegationPanelSize}
-                  setDelegationPanelSize={setDelegationPanelSize}
-                  showAdminRules={showAdminRules}
-                  setShowAdminRules={setShowAdminRules}
-                  loadingAdminRules={loadingAdminRules}
-                  loadedAdminRulesCount={loadedAdminRulesCount}
-                  adminRules={adminRules}
-                  adminRuleViewMode={adminRuleViewMode}
-                  setAdminRuleViewMode={setAdminRuleViewMode}
-                  adminRuleHtml={adminRuleHtml}
-                  adminRuleTitle={adminRuleTitle}
-                  handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
-                  increaseFontSize={increaseFontSize}
-                  decreaseFontSize={decreaseFontSize}
-                  resetFontSize={resetFontSize}
-                  handleContentClick={handleContentClick}
-                  isOrdinance={isOrdinance}
-                />
-              ) : (
-                <ScrollArea className="h-full" ref={contentRef}>
-                  <div ref={swipeRef} className="px-6 pt-3 pb-20">
-                    <div className="mb-3 pb-2 border-b border-border">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-xl font-bold text-foreground">
-                            {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                          </h2>
-                          {activeArticle.title && (
-                            <span className="text-muted-foreground text-lg">({activeArticle.title})</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                            <ZoomOut className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                            <ZoomIn className="h-3.5 w-3.5" />
-                          </Button>
-                          <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
-                              navigator.clipboard.writeText(content)
-                              toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
-                            }}
-                            title="복사"
-                            className="h-7 px-2"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {isOrdinance ? "자치법규" : "법령"}
-                      </Badge>
-                    </div>
+              </>
+            )
+            }
+          </Card >
 
-                    <div
-                      className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                      style={{
-                        fontSize: `${fontSize}px`,
-                        lineHeight: "1.8",
-                        overflowWrap: "break-word",
-                        wordBreak: "break-word",
-                      }}
-                      onClick={handleContentClick}
-                      dangerouslySetInnerHTML={{ __html: extractArticleText(activeArticle, false, meta.lawTitle) }}
-                    />
-
-                    {!isOrdinance && revisionHistory.length > 0 && (
-                      <div className="mt-12">
-                        <RevisionHistory
-                          history={revisionHistory}
-                          articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              )
+          {/* Mobile Bottom Sheet for Article List */}
+          <ArticleBottomSheet
+            isOpen={isArticleListExpanded}
+            onClose={() => setIsArticleListExpanded(false)}
+            title={aiAnswerMode ? "관련 법령 목록" : "조문 목록"}
+            snapPoints={[40, 70, 90]}
+          >
+            {aiAnswerMode ? (
+              <AIAnswerSidebar
+                relatedArticles={relatedArticles}
+                onRelatedArticleClick={openExternalLawArticleModal}
+                onCloseSidebar={() => setIsArticleListExpanded(false)}
+                showHeader={false}
+              />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>조문을 선택하세요</p>
+              // 일반 모드: 조문 목록
+              <>
+                <div className="mb-4">
+                  <Badge variant="outline" className="text-xs">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {actualArticles.length}개 조문
+                  </Badge>
+                </div>
+
+                <div className="h-[60vh]">
+                  <VirtualizedArticleList
+                    articles={actualArticles}
+                    activeJo={activeJo}
+                    loadingJo={loadingJo}
+                    favorites={favorites}
+                    isOrdinance={isOrdinance}
+                    onArticleClick={(jo) => {
+                      handleArticleClick(jo)
+                      setIsArticleListExpanded(false)
+                    }}
+                    onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
+                  />
+                </div>
+              </>
+            )}
+          </ArticleBottomSheet>
+
+          {/* Floating Action Button (Mobile only) */}
+          <FloatingActionButton
+            onClick={() => setIsArticleListExpanded(true)}
+            icon={<ListOrdered className="h-5 w-5" />}
+            count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
+            label={aiAnswerMode ? "관련 법령 목록 열기" : "조문 목록 열기"}
+          />
+
+          {/* Right panel - Article content */}
+          <Card className="flex flex-col overflow-hidden">
+            {/* Header - Hidden in AI Answer Mode */}
+            {!aiAnswerMode && (
+              <div className="border-b border-border px-4 pt-0 pb-3.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
+                  {!isOrdinance && viewMode === "full" && (
+                    <Badge variant="outline" className="text-xs">
+                      전체 조문
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {meta.latestEffectiveDate && (
+                    <Badge variant="outline" className="text-xs">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      시행: {meta.latestEffectiveDate}
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="text-xs">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {articles.length}개 조문
+                  </Badge>
+
+                  {isOrdinance && (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                      <Building2 className="h-3 w-3 mr-1" />
+                      자치법규
+                    </Badge>
+                  )}
+                  {meta.revisionType && (
+                    <Badge variant="secondary" className="text-xs">
+                      {meta.revisionType}
+                    </Badge>
+                  )}
+                  {!isOrdinance && viewMode === "full" && activeArticle && (
+                    <Badge variant="outline" className="text-xs">
+                      현재: {formatSimpleJo(activeArticle.jo)}
+                      {activeArticle.title && ` (${activeArticle.title})`}
+                    </Badge>
+                  )}
+                  {(() => {
+                    const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
+                    return currentLawFavorites > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        ⭐ {currentLawFavorites}개
+                      </Badge>
+                    )
+                  })()}
+                </div>
               </div>
             )}
-          </div>
-        </Card >
-        <ReferenceModal
-          isOpen={refModal.open}
-          onClose={() => {
-            setRefModal({ open: false })
-            setRefModalHistory([]) // 히스토리 초기화
-          }}
-          title={refModal.title || "연결된 본문"}
-          html={refModal.html}
-          onContentClick={handleContentClick}
-          forceWhiteTheme={refModal.forceWhiteTheme}
-          lawName={refModal.lawName}
-          articleNumber={refModal.articleNumber}
-          hasHistory={refModalHistory.length > 0}
-          onBack={handleRefModalBack}
-        />
-      </div >
 
-      {/* Swipe Tutorial (첫 방문 시 표시) */}
-      <SwipeTutorial onComplete={() => { }} />
+            {/* Action Buttons */}
+            {
+              !aiAnswerMode && !isOrdinance && activeArticle && (
+                <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
+                      <GitCompare className="h-3.5 w-3.5 mr-1" />
+                      신·구법 비교
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
+                      <Sparkles className="h-3.5 w-3.5 mr-1" />
+                      AI 요약
+                    </Button>
+                    <Button
+                      variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                      className="h-7 px-2"
+                    >
+                      <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
+                      즐겨찾기
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
+                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                      원문 보기
+                    </Button>
+                    {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
+                    {!isOrdinance && !aiAnswerMode && (
+                      <Button
+                        variant={tierViewMode === "2-tier" ? "default" : "outline"}
+                        size="sm"
+                        disabled={isLoadingThreeTier || shouldDisableDelegationButton}
+                        onClick={async () => {
+                          if (tierViewMode === "1-tier") {
+                            // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
+                            if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
+                            setTierViewMode("2-tier")
+                            // 행정규칙 탭이 선택되어 있고 데이터가 로드된 적 있으면 자동으로 활성화
+                            if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
+                              setShowAdminRules(true)
+                            }
+                          } else {
+                            // 1단 뷰로 복귀 (showAdminRules는 유지 - 패널 재오픈 시 복원용)
+                            setTierViewMode("1-tier")
+                          }
+                        }}
+                        title="위임법령 보기 (시행령/시행규칙/행정규칙)"
+                        className="h-7 px-2"
+                      >
+                        {isLoadingThreeTier ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        {tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            }
 
-      {/* Swipe Hint (스와이프 시 힌트 표시) */}
-      {
-        swipeHint && (
-          <SwipeHint
-            direction={swipeHint.direction}
-            onDismiss={() => setSwipeHint(null)}
+            {
+              isOrdinance && (
+                <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
+                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                      원문 보기
+                    </Button>
+
+                    <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
+                        navigator.clipboard.writeText(content)
+                        toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
+                      }}
+                      title="전체 복사"
+                      className="h-7 px-2"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            }
+
+            <div className="flex-1 min-h-0">
+              {/* 전문조회 모드: 자체 스크롤 관리 */}
+              {viewMode === "full" ? (
+                tierViewMode === "2-tier" && activeArticle ? (
+                  <DelegationPanel
+                    activeArticle={activeArticle}
+                    meta={meta}
+                    fontSize={fontSize}
+                    validDelegations={validDelegations}
+                    isLoadingThreeTier={isLoadingThreeTier}
+                    delegationActiveTab={delegationActiveTab}
+                    setDelegationActiveTab={setDelegationActiveTab}
+                    delegationPanelSize={delegationPanelSize}
+                    setDelegationPanelSize={setDelegationPanelSize}
+                    showAdminRules={showAdminRules}
+                    setShowAdminRules={setShowAdminRules}
+                    loadingAdminRules={loadingAdminRules}
+                    loadedAdminRulesCount={loadedAdminRulesCount}
+                    adminRules={adminRules}
+                    adminRuleViewMode={adminRuleViewMode}
+                    setAdminRuleViewMode={setAdminRuleViewMode}
+                    adminRuleHtml={adminRuleHtml}
+                    adminRuleTitle={adminRuleTitle}
+                    handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
+                    increaseFontSize={increaseFontSize}
+                    decreaseFontSize={decreaseFontSize}
+                    resetFontSize={resetFontSize}
+                    handleContentClick={handleContentClick}
+                    isOrdinance={isOrdinance}
+                  />
+                ) : (
+                  <ScrollArea className="h-full" ref={contentRef}>
+                    <div ref={swipeRef}>
+                      <VirtualizedFullArticleView
+                        articles={actualArticles}
+                        preambles={preambles}
+                        activeJo={activeJo}
+                        fontSize={fontSize}
+                        lawTitle={meta.lawTitle}
+                        onContentClick={handleContentClick}
+                        articleRefs={articleRefs}
+                      />
+                    </div>
+                  </ScrollArea>
+                )
+              ) : aiAnswerMode && aiAnswerContent ? (
+                <ScrollArea className="h-full" ref={contentRef}>
+                  <div className="p-6 pb-20">
+                    <AIAnswerContent
+                      aiAnswerHTML={aiAnswerHTML}
+                      userQuery={userQuery}
+                      aiConfidenceLevel={aiConfidenceLevel}
+                      fileSearchFailed={fileSearchFailed}
+                      aiCitations={aiCitations}
+                      fontSize={fontSize}
+                      setFontSize={setFontSize}
+                      handleContentClick={handleContentClick}
+                    />
+                  </div>
+                </ScrollArea>
+              ) : activeArticle ? (
+                tierViewMode === "2-tier" ? (
+                  <DelegationPanel
+                    activeArticle={activeArticle}
+                    meta={meta}
+                    fontSize={fontSize}
+                    validDelegations={validDelegations}
+                    isLoadingThreeTier={isLoadingThreeTier}
+                    delegationActiveTab={delegationActiveTab}
+                    setDelegationActiveTab={setDelegationActiveTab}
+                    delegationPanelSize={delegationPanelSize}
+                    setDelegationPanelSize={setDelegationPanelSize}
+                    showAdminRules={showAdminRules}
+                    setShowAdminRules={setShowAdminRules}
+                    loadingAdminRules={loadingAdminRules}
+                    loadedAdminRulesCount={loadedAdminRulesCount}
+                    adminRules={adminRules}
+                    adminRuleViewMode={adminRuleViewMode}
+                    setAdminRuleViewMode={setAdminRuleViewMode}
+                    adminRuleHtml={adminRuleHtml}
+                    adminRuleTitle={adminRuleTitle}
+                    handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
+                    increaseFontSize={increaseFontSize}
+                    decreaseFontSize={decreaseFontSize}
+                    resetFontSize={resetFontSize}
+                    handleContentClick={handleContentClick}
+                    isOrdinance={isOrdinance}
+                  />
+                ) : (
+                  <ScrollArea className="h-full" ref={contentRef}>
+                    <div ref={swipeRef} className="px-6 pt-0 pb-20">
+                      <div className="mb-3 pb-2 border-b border-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-foreground">
+                              {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                            </h2>
+                            {activeArticle.title && (
+                              <span className="text-muted-foreground text-lg">({activeArticle.title})</span>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {isOrdinance ? "자치법규" : "법률"}
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                              <ZoomOut className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                              <ZoomIn className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
+                                navigator.clipboard.writeText(content)
+                                toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
+                              }}
+                              title="복사"
+                              className="h-7 px-2"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <div
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                        style={{
+                          fontSize: `${fontSize}px`,
+                          lineHeight: "1.8",
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={handleContentClick}
+                        dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
+                      />
+
+                      {!isOrdinance && revisionHistory.length > 0 && (
+                        <div className="mt-12">
+                          <RevisionHistory
+                            history={revisionHistory}
+                            articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>조문을 선택하세요</p>
+                </div>
+              )}
+            </div>
+          </Card >
+          <ReferenceModal
+            isOpen={refModal.open}
+            onClose={() => {
+              setRefModal({ open: false })
+              setRefModalHistory([]) // 히스토리 초기화
+            }}
+            title={refModal.title || "연결된 본문"}
+            html={refModal.html}
+            onContentClick={handleContentClick}
+            forceWhiteTheme={refModal.forceWhiteTheme}
+            lawName={refModal.lawName}
+            articleNumber={refModal.articleNumber}
+            hasHistory={refModalHistory.length > 0}
+            onBack={handleRefModalBack}
           />
-        )
-      }
+        </div >
+
+        {/* Swipe Tutorial (첫 방문 시 표시) */}
+        <SwipeTutorial onComplete={() => { }} />
+
+        {/* Swipe Hint (스와이프 시 힌트 표시) */}
+        {
+          swipeHint && (
+            <SwipeHint
+              direction={swipeHint.direction}
+              onDismiss={() => setSwipeHint(null)}
+            />
+          )
+        }
       </div>
     </>
   )

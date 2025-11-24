@@ -154,8 +154,9 @@ export function parseAdminRuleContent(xmlText: string): AdminRuleContent | null 
   const articles: AdminRuleArticle[] = []
 
   contentNodes.forEach((node) => {
-    const text = node.textContent?.trim()
-    if (!text) return
+    // CRITICAL: trim()하지 말고 원본 공백/줄바꿈 보존
+    const text = node.textContent
+    if (!text || !text.trim()) return
 
     contentParts.push(text)
 
@@ -201,7 +202,7 @@ function parseArticleFromSingleContent(text: string): AdminRuleArticle | null {
 
   const number = match[1] // "제1조"
   const title = match[2]  // "목적"
-  const content = match[3].trim() // 나머지 모든 내용
+  const content = match[3] // 나머지 모든 내용 (줄바꿈 보존!)
 
   return {
     number,
@@ -410,9 +411,12 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
     return ""
   }
 
+  // 앞뒤 공백만 제거, 중간 줄바꿈은 보존
+  let text = content.trim()
+
   // 1. 링크 생성 (법령 참조 정규화 후)
-  const normalized = baseLawName ? normalizeLawReferences(content, baseLawName) : content
-  let text = linkifyRefsB(normalized, baseLawName)
+  const normalized = baseLawName ? normalizeLawReferences(text, baseLawName) : text
+  text = linkifyRefsB(normalized, baseLawName)
 
   // 2. HTML escape (링크 태그만 보존)
   text = text.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, plainText) => {
@@ -426,6 +430,7 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
   text = applyRevisionStyling(text)
 
   // 4. 문단 마커 스타일링 (①②③) - 첫 번째는 건너뜀
+  // NOTE: \n은 <br>로 변환하지 않음 (whitespace-pre-wrap으로 렌더링)
   let isFirst = true
   text = text.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, (match) => {
     if (isFirst) {
@@ -435,13 +440,24 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
     return '<br><span class="para-marker">' + match + '</span>'
   })
 
-  // 5. 번호 항목 줄바꿈 (1., 2., 3.) - 날짜 제외
+  // 5. 번호 항목 (1., 2., 3.) 앞에 <br> 추가 - 날짜 제외
   text = text.replace(/(?<!\d\. )(\d+\.)\s+(?!\d+\.)/g, '<br>$1 ')
 
-  // 6. 하위 항목 줄바꿈 (가., 나., 다.)
-  text = text.replace(/([가-힣]\.)\s+/g, '<br>&nbsp;&nbsp;$1 ')
+  // 6. 하위 항목 (가., 나., 다.) 앞에 <br> + 들여쓰기 추가
+  // 공백 또는 구두점(. ! ?) 뒤에 나타나는 단일 한글 글자 + ". " 패턴만 매칭
+  // 예: "분장한다. 가. " ✅, "담당한다. 나. " ✅
+  const beforeReplace = text
+  text = text.replace(/(\s|^)([가나다라마바사아자차카타파하]\.)\s/g, '$1<br>&nbsp;&nbsp;$2 ')
 
-  // NOTE: \n → <br> 변환은 하지 않음 (whitespace-pre-wrap으로 처리)
+  // DEBUG: 한 번만 출력
+  if (beforeReplace.includes('가.') || beforeReplace.includes('나.')) {
+    console.log('[formatAdminRuleHTML] Sub-item processing:', {
+      hasMatch: beforeReplace !== text,
+      beforeSample: beforeReplace.substring(0, 200),
+      afterSample: text.substring(0, 200)
+    })
+  }
+
   return text
 }
 
