@@ -195,26 +195,26 @@ export function DelegationPanel({
                                         .map((delegation, idx) => {
                                             const originalIdx = validDelegations.findIndex(d => d === delegation)
                                             return (
-                                            <div key={idx} className="p-3 rounded-lg border border-border">
-                                                {delegation.title && (
-                                                    <p className="font-semibold text-sm text-foreground mb-2">
-                                                        {delegation.title}
-                                                    </p>
-                                                )}
-                                                {delegation.content && (
-                                                    <div
-                                                        className="text-xs text-foreground leading-relaxed break-words"
-                                                        style={{
-                                                            fontSize: `${fontSize}px`,
-                                                            lineHeight: "1.8",
-                                                            overflowWrap: "break-word",
-                                                            wordBreak: "break-word",
-                                                        }}
-                                                        onClick={handleContentClick}
-                                                        dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                    />
-                                                )}
-                                            </div>
+                                                <div key={idx} className="p-3 rounded-lg border border-border">
+                                                    {delegation.title && (
+                                                        <p className="font-semibold text-sm text-foreground mb-2">
+                                                            {delegation.title}
+                                                        </p>
+                                                    )}
+                                                    {delegation.content && (
+                                                        <div
+                                                            className="text-xs text-foreground leading-relaxed break-words"
+                                                            style={{
+                                                                fontSize: `${fontSize}px`,
+                                                                lineHeight: "1.8",
+                                                                overflowWrap: "break-word",
+                                                                wordBreak: "break-word",
+                                                            }}
+                                                            onClick={handleContentClick}
+                                                            dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
+                                                        />
+                                                    )}
+                                                </div>
                                             )
                                         })}
                                     {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
@@ -245,29 +245,29 @@ export function DelegationPanel({
                                         .map((delegation, idx) => {
                                             const originalIdx = validDelegations.findIndex(d => d === delegation)
                                             return (
-                                            <div
-                                                key={idx}
-                                                className="p-3 rounded-lg border border-border"
-                                            >
-                                                {delegation.title && (
-                                                    <p className="font-semibold text-sm text-foreground mb-2">
-                                                        {delegation.title}
-                                                    </p>
-                                                )}
-                                                {delegation.content && (
-                                                    <div
-                                                        className="text-xs text-foreground leading-relaxed break-words"
-                                                        style={{
-                                                            fontSize: `${fontSize}px`,
-                                                            lineHeight: "1.8",
-                                                            overflowWrap: "break-word",
-                                                            wordBreak: "break-word",
-                                                        }}
-                                                        onClick={handleContentClick}
-                                                        dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                    />
-                                                )}
-                                            </div>
+                                                <div
+                                                    key={idx}
+                                                    className="p-3 rounded-lg border border-border"
+                                                >
+                                                    {delegation.title && (
+                                                        <p className="font-semibold text-sm text-foreground mb-2">
+                                                            {delegation.title}
+                                                        </p>
+                                                    )}
+                                                    {delegation.content && (
+                                                        <div
+                                                            className="text-xs text-foreground leading-relaxed break-words"
+                                                            style={{
+                                                                fontSize: `${fontSize}px`,
+                                                                lineHeight: "1.8",
+                                                                overflowWrap: "break-word",
+                                                                wordBreak: "break-word",
+                                                            }}
+                                                            onClick={handleContentClick}
+                                                            dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
+                                                        />
+                                                    )}
+                                                </div>
                                             )
                                         })}
                                     {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
@@ -416,332 +416,332 @@ export function DelegationPanel({
                     <Panel className="flex flex-col">
                         <ScrollArea className="h-full">
                             <div style={{ paddingLeft: '1rem', paddingRight: '0.5rem', paddingBottom: '1rem' }}>
-                            <Tabs
-                                value={delegationActiveTab}
-                                onValueChange={(value) => {
-                                    setDelegationActiveTab(value as "decree" | "rule" | "admin")
-                                    if (value === "admin" && !showAdminRules) {
-                                        setShowAdminRules(true)
-                                    }
-                                }}
-                                className="w-full flex flex-col"
-                            >
-                                <TabsList className="w-full grid grid-cols-3 mb-2">
-                                    <TabsTrigger value="decree" className="text-sm">
-                                        시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
-                                    </TabsTrigger>
-                                    <TabsTrigger value="rule" className="text-sm">
-                                        시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
-                                    </TabsTrigger>
-                                    <TabsTrigger value="admin" className="text-sm">
-                                        {loadingAdminRules ? (
-                                            <>
-                                                행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
-                                            </>
-                                        ) : loadedAdminRulesCount > 0 ? (
-                                            `행정규칙 (${loadedAdminRulesCount})`
+                                <Tabs
+                                    value={delegationActiveTab}
+                                    onValueChange={(value) => {
+                                        setDelegationActiveTab(value as "decree" | "rule" | "admin")
+                                        if (value === "admin" && !showAdminRules) {
+                                            setShowAdminRules(true)
+                                        }
+                                    }}
+                                    className="w-full flex flex-col"
+                                >
+                                    <TabsList className="w-full grid grid-cols-3 mb-2">
+                                        <TabsTrigger value="decree" className="text-sm">
+                                            시행령 ({validDelegations.filter((d) => d.type === "시행령").length})
+                                        </TabsTrigger>
+                                        <TabsTrigger value="rule" className="text-sm">
+                                            시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
+                                        </TabsTrigger>
+                                        <TabsTrigger value="admin" className="text-sm">
+                                            {loadingAdminRules ? (
+                                                <>
+                                                    행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
+                                                </>
+                                            ) : loadedAdminRulesCount > 0 ? (
+                                                `행정규칙 (${loadedAdminRulesCount})`
+                                            ) : (
+                                                "행정규칙"
+                                            )}
+                                        </TabsTrigger>
+                                    </TabsList>
+
+                                    {/* Decree Tab */}
+                                    <TabsContent value="decree" className="mt-0">
+                                        {isLoadingThreeTier ? (
+                                            <DelegationLoadingSkeleton />
                                         ) : (
-                                            "행정규칙"
+                                            <>
+                                                <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <h3 className="text-base font-bold text-foreground">시행령</h3>
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {validDelegations.filter((d) => d.type === "시행령").length}개
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                                                                <RotateCcw className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const content = validDelegations
+                                                                        .filter((d) => d.type === "시행령")
+                                                                        .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
+                                                                        .join('\n\n---\n\n')
+                                                                    navigator.clipboard.writeText(content)
+                                                                    toast({ title: "복사 완료", description: "시행령 내용이 클립보드에 복사되었습니다." })
+                                                                }}
+                                                                title="복사"
+                                                                className="h-7 px-2"
+                                                            >
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <ScrollArea className="h-[calc(100vh-12rem)]">
+                                                    <div className="space-y-3 pr-4">
+                                                        {validDelegations
+                                                            .filter((d) => d.type === "시행령")
+                                                            .map((delegation, idx) => {
+                                                                const originalIdx = validDelegations.findIndex(d => d === delegation)
+                                                                return (
+                                                                    <div key={idx} className="py-3 border-b border-border last:border-0">
+                                                                        {delegation.title && (
+                                                                            <p className="font-semibold text-sm text-foreground mb-2">
+                                                                                {delegation.title}
+                                                                            </p>
+                                                                        )}
+                                                                        {delegation.content && (
+                                                                            <div
+                                                                                className="text-xs text-foreground leading-relaxed break-words"
+                                                                                style={{
+                                                                                    fontSize: `${fontSize}px`,
+                                                                                    lineHeight: "1.8",
+                                                                                    overflowWrap: "break-word",
+                                                                                    wordBreak: "break-word",
+                                                                                }}
+                                                                                onClick={handleContentClick}
+                                                                                dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
+                                                            <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
+                                                        )}
+                                                    </div>
+                                                </ScrollArea>
+                                            </>
                                         )}
-                                    </TabsTrigger>
-                                </TabsList>
+                                    </TabsContent>
 
-                                {/* Decree Tab */}
-                                <TabsContent value="decree" className="mt-0">
-                                    {isLoadingThreeTier ? (
-                                        <DelegationLoadingSkeleton />
-                                    ) : (
-                                        <>
-                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-foreground" />
-                                                        <h3 className="text-base font-bold text-foreground">시행령</h3>
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            {validDelegations.filter((d) => d.type === "시행령").length}개
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                            <ZoomOut className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                            <RotateCcw className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                            <ZoomIn className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                const content = validDelegations
-                                                                    .filter((d) => d.type === "시행령")
-                                                                    .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
-                                                                    .join('\n\n---\n\n')
-                                                                navigator.clipboard.writeText(content)
-                                                                toast({ title: "복사 완료", description: "시행령 내용이 클립보드에 복사되었습니다." })
-                                                            }}
-                                                            title="복사"
-                                                            className="h-7 px-2"
-                                                        >
-                                                            <Copy className="h-3.5 w-3.5" />
-                                                        </Button>
+                                    {/* Rule Tab */}
+                                    <TabsContent value="rule" className="mt-0">
+                                        {isLoadingThreeTier ? (
+                                            <DelegationLoadingSkeleton />
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <h3 className="text-base font-bold text-foreground">시행규칙</h3>
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {validDelegations.filter((d) => d.type === "시행규칙").length}개
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                                                                <RotateCcw className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const content = validDelegations
+                                                                        .filter((d) => d.type === "시행규칙")
+                                                                        .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
+                                                                        .join('\n\n---\n\n')
+                                                                    navigator.clipboard.writeText(content)
+                                                                    toast({ title: "복사 완료", description: "시행규칙 내용이 클립보드에 복사되었습니다." })
+                                                                }}
+                                                                title="복사"
+                                                                className="h-7 px-2"
+                                                            >
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <ScrollArea className="h-[calc(100vh-12rem)]">
-                                                <div className="space-y-3 pr-4">
-                                                    {validDelegations
-                                                        .filter((d) => d.type === "시행령")
-                                                        .map((delegation, idx) => {
-                                                            const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                                            return (
-                                                            <div key={idx} className="py-3 border-b border-border last:border-0">
-                                                                {delegation.title && (
-                                                                    <p className="font-semibold text-sm text-foreground mb-2">
-                                                                        {delegation.title}
-                                                                    </p>
-                                                                )}
-                                                                {delegation.content && (
-                                                                    <div
-                                                                        className="text-xs text-foreground leading-relaxed break-words"
-                                                                        style={{
-                                                                            fontSize: `${fontSize}px`,
-                                                                            lineHeight: "1.8",
-                                                                            overflowWrap: "break-word",
-                                                                            wordBreak: "break-word",
-                                                                        }}
-                                                                        onClick={handleContentClick}
-                                                                        dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            )
-                                                        })}
-                                                    {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
-                                                        <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
-                                                    )}
-                                                </div>
-                                            </ScrollArea>
-                                        </>
-                                    )}
-                                </TabsContent>
+                                                <ScrollArea className="h-[calc(100vh-12rem)]">
+                                                    <div className="space-y-3 pr-4">
+                                                        {validDelegations
+                                                            .filter((d) => d.type === "시행규칙")
+                                                            .map((delegation, idx) => {
+                                                                const originalIdx = validDelegations.findIndex(d => d === delegation)
+                                                                return (
+                                                                    <div key={idx} className="py-3 border-b border-border last:border-0">
+                                                                        {delegation.title && (
+                                                                            <p className="font-semibold text-sm text-foreground mb-2">
+                                                                                {delegation.title}
+                                                                            </p>
+                                                                        )}
+                                                                        {delegation.content && (
+                                                                            <div
+                                                                                className="text-xs text-foreground leading-relaxed break-words"
+                                                                                style={{
+                                                                                    fontSize: `${fontSize}px`,
+                                                                                    lineHeight: "1.8",
+                                                                                    overflowWrap: "break-word",
+                                                                                    wordBreak: "break-word",
+                                                                                }}
+                                                                                onClick={handleContentClick}
+                                                                                dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
+                                                            <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
+                                                        )}
+                                                    </div>
+                                                </ScrollArea>
+                                            </>
+                                        )}
+                                    </TabsContent>
 
-                                {/* Rule Tab */}
-                                <TabsContent value="rule" className="mt-0">
-                                    {isLoadingThreeTier ? (
-                                        <DelegationLoadingSkeleton />
-                                    ) : (
-                                        <>
-                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-foreground" />
-                                                        <h3 className="text-base font-bold text-foreground">시행규칙</h3>
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            {validDelegations.filter((d) => d.type === "시행규칙").length}개
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                            <ZoomOut className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                            <RotateCcw className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                            <ZoomIn className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                const content = validDelegations
-                                                                    .filter((d) => d.type === "시행규칙")
-                                                                    .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
-                                                                    .join('\n\n---\n\n')
-                                                                navigator.clipboard.writeText(content)
-                                                                toast({ title: "복사 완료", description: "시행규칙 내용이 클립보드에 복사되었습니다." })
-                                                            }}
-                                                            title="복사"
-                                                            className="h-7 px-2"
-                                                        >
-                                                            <Copy className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
+                                    {/* Admin Rules Tab */}
+                                    <TabsContent value="admin" className="mt-0">
+                                        {!showAdminRules ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                                <FileText className="h-12 w-12 mb-4 opacity-30" />
+                                                <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
+                                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                                    클릭 시 자동으로 로드됩니다
+                                                </p>
                                             </div>
-                                            <ScrollArea className="h-[calc(100vh-12rem)]">
-                                                <div className="space-y-3 pr-4">
-                                                    {validDelegations
-                                                        .filter((d) => d.type === "시행규칙")
-                                                        .map((delegation, idx) => {
-                                                            const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                                            return (
-                                                            <div key={idx} className="py-3 border-b border-border last:border-0">
-                                                                {delegation.title && (
-                                                                    <p className="font-semibold text-sm text-foreground mb-2">
-                                                                        {delegation.title}
-                                                                    </p>
-                                                                )}
-                                                                {delegation.content && (
-                                                                    <div
-                                                                        className="text-xs text-foreground leading-relaxed break-words"
-                                                                        style={{
-                                                                            fontSize: `${fontSize}px`,
-                                                                            lineHeight: "1.8",
-                                                                            overflowWrap: "break-word",
-                                                                            wordBreak: "break-word",
-                                                                        }}
-                                                                        onClick={handleContentClick}
-                                                                        dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            )
-                                                        })}
-                                                    {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
-                                                        <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
-                                                    )}
-                                                </div>
-                                            </ScrollArea>
-                                        </>
-                                    )}
-                                </TabsContent>
-
-                                {/* Admin Rules Tab */}
-                                <TabsContent value="admin" className="mt-0">
-                                    {!showAdminRules ? (
-                                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                            <FileText className="h-12 w-12 mb-4 opacity-30" />
-                                            <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
-                                            <p className="text-xs mt-2 text-muted-foreground/70">
-                                                클릭 시 자동으로 로드됩니다
-                                            </p>
-                                        </div>
-                                    ) : loadingAdminRules ? (
-                                        <DelegationLoadingSkeleton />
-                                    ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
-                                        <>
-                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-foreground" />
-                                                        <h3 className="text-base font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => setAdminRuleViewMode("list")}
-                                                            className="h-7 px-2 mr-2"
-                                                        >
-                                                            ← 목록
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                            <ZoomOut className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                            <RotateCcw className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                            <ZoomIn className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                const content = `${adminRuleTitle || '행정규칙'}\n\n${adminRuleHtml?.replace(/<[^>]*>/g, '') || ''}`
-                                                                navigator.clipboard.writeText(content)
-                                                                toast({ title: "복사 완료", description: "행정규칙 내용이 클립보드에 복사되었습니다." })
-                                                            }}
-                                                            title="복사"
-                                                            className="h-7 px-2"
-                                                        >
-                                                            <Copy className="h-3.5 w-3.5" />
-                                                        </Button>
+                                        ) : loadingAdminRules ? (
+                                            <DelegationLoadingSkeleton />
+                                        ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
+                                            <>
+                                                <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <h3 className="text-base font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => setAdminRuleViewMode("list")}
+                                                                className="h-7 px-2 mr-2"
+                                                            >
+                                                                ← 목록
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                                                                <RotateCcw className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const content = `${adminRuleTitle || '행정규칙'}\n\n${adminRuleHtml?.replace(/<[^>]*>/g, '') || ''}`
+                                                                    navigator.clipboard.writeText(content)
+                                                                    toast({ title: "복사 완료", description: "행정규칙 내용이 클립보드에 복사되었습니다." })
+                                                                }}
+                                                                title="복사"
+                                                                className="h-7 px-2"
+                                                            >
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <ScrollArea className="h-[calc(100vh-12rem)]">
-                                                <div
-                                                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
-                                                    style={{
-                                                        fontSize: `${fontSize}px`,
-                                                        lineHeight: "1.8",
-                                                        overflowWrap: "break-word",
-                                                        wordBreak: "break-word",
-                                                    }}
-                                                    onClick={handleContentClick}
-                                                    dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
-                                                />
-                                            </ScrollArea>
-                                        </>
-                                    ) : adminRules.length > 0 ? (
-                                        <>
-                                            <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-foreground" />
-                                                        <h3 className="text-base font-bold text-foreground">행정규칙</h3>
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            {adminRules.length}개
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                            <ZoomOut className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                            <RotateCcw className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                            <ZoomIn className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                                                <ScrollArea className="h-[calc(100vh-12rem)]">
+                                                    <div
+                                                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                                                        style={{
+                                                            fontSize: `${fontSize}px`,
+                                                            lineHeight: "1.8",
+                                                            overflowWrap: "break-word",
+                                                            wordBreak: "break-word",
+                                                        }}
+                                                        onClick={handleContentClick}
+                                                        dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
+                                                    />
+                                                </ScrollArea>
+                                            </>
+                                        ) : adminRules.length > 0 ? (
+                                            <>
+                                                <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <h3 className="text-base font-bold text-foreground">행정규칙</h3>
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {adminRules.length}개
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                                                                <RotateCcw className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <ScrollArea className="h-[calc(100vh-12rem)]">
-                                                <div className="space-y-3 pr-4">
-                                                    {adminRules.map((rule, idx) => (
-                                                        <button
-                                                            key={idx}
-                                                            onClick={() => {
-                                                                console.log('[Desktop] Button clicked:', rule.name, 'ID:', rule.serialNumber || rule.id)
-                                                                handleViewAdminRuleFullContent(rule)
-                                                            }}
-                                                            type="button"
-                                                            className="w-full text-left py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors rounded px-2"
-                                                        >
-                                                            <div className="flex items-start justify-between gap-2">
-                                                                <div className="flex-1">
-                                                                    <p className="font-semibold text-sm text-foreground mb-1">
-                                                                        {rule.name}
-                                                                    </p>
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        관련: {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                                                                    </p>
+                                                <ScrollArea className="h-[calc(100vh-12rem)]">
+                                                    <div className="space-y-3 pr-4">
+                                                        {adminRules.map((rule, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    console.log('[Desktop] Button clicked:', rule.name, 'ID:', rule.serialNumber || rule.id)
+                                                                    handleViewAdminRuleFullContent(rule)
+                                                                }}
+                                                                type="button"
+                                                                className="w-full text-left py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors rounded px-2"
+                                                            >
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="flex-1">
+                                                                        <p className="font-semibold text-sm text-foreground mb-1">
+                                                                            {rule.name}
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            관련: {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                                                                        </p>
+                                                                    </div>
+                                                                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
                                                                 </div>
-                                                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                            <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
-                                            <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
-                                        </div>
-                                    )}
-                                </TabsContent>
-                            </Tabs>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </ScrollArea>
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                                <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
+                                                <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
+                                            </div>
+                                        )}
+                                    </TabsContent>
+                                </Tabs>
                             </div>
                         </ScrollArea>
                     </Panel>
