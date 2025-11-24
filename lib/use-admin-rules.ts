@@ -60,15 +60,15 @@ export function useAdminRules(
       return
     }
 
-    // ✅ 조문 변경 시 즉시 로딩 상태 전환 (캐시 조회 중에도 스피너 표시)
+    // ✅ 조문 변경 시 즉시 상태 초기화 + 로딩 전환 (캐시 조회 중에도 스피너 표시)
+    setAdminRules([]) // ← useEffect에서 즉시 호출 (동기)
+    setLoading(true)  // ← useEffect에서 즉시 호출 (동기)
+    setError(null)
+    setProgress(null)
+
     let cancelled = false
 
     const fetchAdminRules = async () => {
-      setLoading(true) // 먼저 로딩 상태로 전환
-      setError(null)
-      setProgress(null)
-      setAdminRules([]) // 로딩 시작 후 초기화 (스피너가 먼저 보이도록)
-
       try {
         // Step 0: 법령 체계도에서 MST 가져오기
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
