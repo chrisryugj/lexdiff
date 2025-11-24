@@ -1,7 +1,7 @@
 /**
  * 행정규칙 조회 Hook
  * - 2단계 IndexedDB 캐싱: 법령별 제1조 캐시 + 조문별 매칭 인덱스
- * - 배치 처리로 API 호출 최적화
+ * - 캐시 HIT 시 즉시 표시 (시행령/시행규칙처럼 빠른 반응)
  */
 
 import { useState, useEffect } from "react"
@@ -60,17 +60,11 @@ export function useAdminRules(
       return
     }
 
-    // ✅ 조문 변경 시 즉시 상태 초기화 + 로딩 전환 (캐시 조회 중에도 스피너 표시)
-    setAdminRules([]) // ← useEffect에서 즉시 호출 (동기)
-    setLoading(true)  // ← useEffect에서 즉시 호출 (동기)
-    setError(null)
-    setProgress(null)
-
     let cancelled = false
 
     const fetchAdminRules = async () => {
       try {
-        // Step 0: 법령 체계도에서 MST 가져오기
+        // Step 0: 법령 체계도에서 MST 가져오기 (캐시되므로 빠름)
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
         const hierarchyResponse = await fetch(hierarchyUrl, {
           cache: 'no-store' // 항상 최신 데이터 가져오기
@@ -94,16 +88,14 @@ export function useAdminRules(
         const currentMst = hierarchy.mst || ""
         const hierarchyRules = hierarchy.adminRules
 
-        // Step 1: 조문별 매칭 인덱스 확인 (2단계 캐시)
+        // Step 1: 조문별 매칭 인덱스 확인 (2단계 캐시 - 가장 빠름)
         const matchedRuleIds = await getArticleMatchIndex(lawName, articleNumber, currentMst)
 
         if (matchedRuleIds !== null) {
-          // ✅ 매칭 인덱스 캐시 HIT
-          // 법령별 제1조 캐시에서 해당 규칙들만 조회
+          // ✅ 매칭 인덱스 캐시 HIT → 즉시 표시 (시행령/시행규칙처럼)
           const purposeCache = await getLawAdminRulesPurposeCache(lawName, currentMst)
 
           if (purposeCache && !cancelled) {
-            // 매칭된 ID에 해당하는 규칙들만 필터링
             const matching: AdminRuleMatch[] = []
 
             matchedRuleIds.forEach((ruleId) => {
@@ -120,7 +112,7 @@ export function useAdminRules(
               }
             })
 
-            console.log("[use-admin-rules] Using cached match index:", matching.length, "matches")
+            console.log("[use-admin-rules] 2단계 캐시 HIT - 즉시 표시:", matching.length, "matches")
             setAdminRules(matching)
             setLoading(false)
             setProgress(null)
@@ -128,12 +120,12 @@ export function useAdminRules(
           }
         }
 
-        // Step 2: 법령별 제1조 캐시 확인 (1단계 캐시)
+        // Step 2: 법령별 제1조 캐시 확인 (1단계 캐시 - 매칭 계산 필요)
         const purposeCache = await getLawAdminRulesPurposeCache(lawName, currentMst)
 
         if (purposeCache && !cancelled) {
-          // ✅ 제1조 캐시 HIT → 메모리에서 매칭만 수행 (API 호출 0회)
-          console.log("[use-admin-rules] Using cached purposes:", purposeCache.length, "rules")
+          // ✅ 제1조 캐시 HIT → 메모리에서 매칭만 수행 (빠름)
+          console.log("[use-admin-rules] 1단계 캐시 HIT - 매칭 계산 중:", purposeCache.length, "rules")
 
           const matching: AdminRuleMatch[] = []
 
@@ -169,9 +161,12 @@ export function useAdminRules(
           return
         }
 
-        // Step 3: 캐시 MISS → API 호출하여 제1조 수집
-        console.log("[use-admin-rules] Cache MISS, fetching purposes from API:", hierarchyRules.length, "rules")
-        setProgress({ current: 0, total: hierarchyRules.length })
+        // Step 3: 캐시 MISS → API 호출 (여기서만 로딩 표시)
+        if (!cancelled) {
+          console.log("[use-admin-rules] 캐시 MISS - API 호출 시작:", hierarchyRules.length, "rules")
+          setLoading(true) // ← 캐시 MISS일 때만 로딩 표시
+          setProgress({ current: 0, total: hierarchyRules.length })
+        }
 
         const allPurposes: Array<{
           id: string
@@ -182,7 +177,7 @@ export function useAdminRules(
 
         const matching: AdminRuleMatch[] = []
         let completed = 0
-        const BATCH_SIZE = 10 // 5 → 10으로 증가
+        const BATCH_SIZE = 10
 
         const processRule = async (rule: any): Promise<void> => {
           const idParam = rule.serialNumber || rule.id
@@ -195,13 +190,12 @@ export function useAdminRules(
           try {
             const contentUrl = `/api/admrul?ID=${encodeURIComponent(idParam)}`
             const contentResponse = await fetch(contentUrl, {
-              cache: 'no-store' // 항상 최신 데이터 가져오기
+              cache: 'no-store'
             })
 
             if (!contentResponse.ok) {
               completed++
               if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
-              // 실패해도 제1조 캐시에 null로 저장 (다음번에 스킵 가능)
               allPurposes.push({
                 id: rule.id,
                 name: rule.name,
@@ -226,7 +220,6 @@ export function useAdminRules(
               return
             }
 
-            // 제1조 캐시에 저장
             allPurposes.push({
               id: purposeData.id,
               name: purposeData.name,
@@ -234,7 +227,6 @@ export function useAdminRules(
               purpose: purposeData.purpose,
             })
 
-            // 매칭 확인
             const isMatch = checkLawArticleReference(
               purposeData.purpose.content,
               lawName,
@@ -277,14 +269,14 @@ export function useAdminRules(
         }
 
         if (!cancelled) {
-          // 법령별 제1조 캐시 저장 (1단계)
+          // 법령별 제1조 캐시 저장
           await setLawAdminRulesPurposeCache(lawName, currentMst, allPurposes)
-          console.log("[use-admin-rules] Saved purpose cache:", allPurposes.length, "rules")
+          console.log("[use-admin-rules] 1단계 캐시 저장 완료:", allPurposes.length, "rules")
 
-          // 조문별 매칭 인덱스 저장 (2단계)
+          // 조문별 매칭 인덱스 저장
           const matchedIds = matching.map(m => m.serialNumber || m.id)
           await setArticleMatchIndex(lawName, articleNumber, currentMst, matchedIds)
-          console.log("[use-admin-rules] Saved match index:", matchedIds.length, "matches")
+          console.log("[use-admin-rules] 2단계 캐시 저장 완료:", matchedIds.length, "matches")
 
           setAdminRules(matching)
           setLoading(false)
