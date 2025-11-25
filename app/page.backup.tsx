@@ -1,0 +1,188 @@
+/**
+ * app/page.tsx
+ *
+ * 메인 페이지 - IndexedDB + History API 방식
+ * - URL은 항상 '/' 유지
+ * - SearchView와 SearchResultView 조건부 렌더링
+ * - F5 새로고침 시에도 검색 결과 유지
+ */
+
+"use client"
+
+import { useState, useEffect } from "react"
+import { SearchView } from "@/components/search-view"
+import { SearchViewImproved } from "@/components/search-view-improved"
+import { SearchResultView } from "@/components/search-result-view"
+import { favoritesStore } from "@/lib/favorites-store"
+import { debugLogger } from "@/lib/debug-logger"
+import { generateSearchId } from "@/lib/search-id-generator"
+import { saveSearchResult, getSearchResult, deleteExpiredResults } from "@/lib/search-result-store"
+import {
+  initializeHistory,
+  pushSearchHistory,
+  pushHomeHistory,
+  getCurrentHistoryState,
+  onPopState,
+  type HistoryState
+} from "@/lib/history-manager"
+import type { Favorite } from "@/lib/law-types"
+
+type ViewMode = 'home' | 'search-result'
+
+export default function Home() {
+  const [viewMode, setViewMode] = useState<ViewMode>('home')
+  const [searchId, setSearchId] = useState<string | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [ragLoading, setRagLoading] = useState(false)
+  const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
+
+  // 프로그레스 상태 (SearchResultView에서 전달받음)
+  const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
+  const [searchProgress, setSearchProgress] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 초기화: History API + IndexedDB 설정
+  useEffect(() => {
+    // 만료된 검색 결과 삭제
+    deleteExpiredResults().catch(err => {
+      console.error('Failed to delete expired results:', err)
+    })
+
+    // History API 초기화
+    initializeHistory()
+
+    // 현재 상태 확인
+    const currentState = getCurrentHistoryState()
+
+    if (currentState?.viewMode === 'search-result' && currentState.searchId) {
+      // 새로고침 시 검색 결과 복원
+      debugLogger.info('🔄 새로고침 감지: 검색 결과 복원', {
+        searchId: currentState.searchId,
+        timestamp: currentState.timestamp
+      })
+
+      setViewMode('search-result')
+      setSearchId(currentState.searchId)
+    }
+
+    // popstate 이벤트 리스너 등록 (뒤로가기/앞으로가기)
+    const unsubscribe = onPopState((state: HistoryState | null) => {
+      // state가 null이거나 viewMode가 없으면 홈으로 이동
+      if (!state || !state.viewMode) {
+        debugLogger.info('⬅️ History 이동 (초기 상태 → 홈)', { state })
+        setViewMode('home')
+        setSearchId(null)
+        setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
+        setIsSearching(false) // 검색 중 상태 초기화
+        return
+      }
+
+      debugLogger.info('⬅️ History 이동', {
+        viewMode: state.viewMode,
+        searchId: state.searchId
+      })
+
+      if (state.viewMode === 'home') {
+        setViewMode('home')
+        setSearchId(null)
+        setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
+        setIsSearching(false) // 검색 중 상태 초기화
+      } else if (state.viewMode === 'search-result' && state.searchId) {
+        setViewMode('search-result')
+        setSearchId(state.searchId)
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
+  // 검색 핸들러
+  const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
+    debugLogger.info('🔍 검색 시작', query)
+
+    const newSearchId = generateSearchId()
+
+    // 검색 쿼리 저장 (UI용)
+    setSearchQuery(query.lawName)
+    setIsSearching(true)
+    setSearchStage('searching')
+    setSearchProgress(10)
+
+    // 검색 쿼리를 IndexedDB에 저장
+    try {
+      await saveSearchResult({
+        searchId: newSearchId,
+        query,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7일
+      })
+
+      debugLogger.success('✅ 검색 ID 생성', { searchId: newSearchId })
+
+      // History 추가
+      pushSearchHistory(newSearchId)
+
+      // 화면 전환 (프로그레스는 SearchResultView에서 관리)
+      setSearchId(newSearchId)
+      setViewMode('search-result')
+      // isSearching은 SearchResultView의 onProgressUpdate에서 complete 시 false로 변경됨
+
+    } catch (error) {
+      debugLogger.error('❌ 검색 실패', error)
+      setIsSearching(false)
+    }
+  }
+
+  // 즐겨찾기 선택 핸들러
+  const handleFavoriteSelect = (favorite: Favorite) => {
+    debugLogger.info('⭐ 즐겨찾기 선택', favorite)
+    handleSearch({
+      lawName: favorite.lawTitle,
+      jo: favorite.jo,
+    })
+  }
+
+  // 홈으로 돌아가기
+  const handleBack = () => {
+    debugLogger.info('🏠 홈으로 돌아가기')
+
+    // History.back() 사용 (pushHomeHistory 대신)
+    // 이렇게 하면 뒤로가기 시 검색 결과로 복원 가능
+    window.history.back()
+
+    // popstate 이벤트에서 상태 업데이트가 처리됨
+  }
+
+  return (
+    <>
+      {/* viewMode에 따라 SearchViewImproved 또는 SearchResultView 표시 */}
+      {viewMode === 'home' ? (
+        <SearchViewImproved
+          onSearch={handleSearch}
+          onFavoriteSelect={handleFavoriteSelect}
+          isSearching={isSearching}
+          ragLoading={ragLoading}
+          searchMode={searchMode}
+        />
+      ) : viewMode === 'search-result' && searchId ? (
+        <SearchResultView
+          searchId={searchId}
+          onBack={handleBack}
+          onProgressUpdate={(stage, progress) => {
+            setSearchStage(stage)
+            setSearchProgress(progress)
+            // 완료 시 즉시 프로그레스 숨김 (지연 제거)
+            if (stage === 'complete') {
+              setIsSearching(false)
+            }
+          }}
+          onModeChange={(mode) => {
+            setSearchMode(mode)
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
