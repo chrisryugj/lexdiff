@@ -4,6 +4,59 @@
 
 ---
 
+## 2025-11-25
+
+### [21:00 KST] CLAUDE.md, README.md 리프레시 및 데드 코드 정리
+- **Files**:
+  - `CLAUDE.md` (modified)
+  - `README.md` (modified)
+  - `app/api/rag-answer/route.ts` (deleted)
+  - `app/api/rag-search/route.ts` (deleted)
+  - `components/search-result-view.tsx` (modified)
+- **Changes**:
+  - **CLAUDE.md 업데이트**:
+    - Project Overview 한글화 및 핵심 기능 정리
+    - Technology Stack 테이블 형식으로 정리
+    - State Management 섹션에 IndexedDB 캐싱 추가
+    - Project Structure 섹션 추가 (주요 파일 구조)
+    - API 라우트 수 51→49개로 업데이트
+  - **README.md 업데이트**:
+    - 기술 스택 테이블 형식으로 정리
+    - Optimistic UI 패턴 추가
+    - 프로젝트 구조 현행화 (hooks/, important-docs/ 추가)
+  - **데드 코드 삭제**:
+    - `/api/rag-answer` - 미사용 API 라우트 삭제
+    - `/api/rag-search` - 미사용 API 라우트 삭제
+    - `handleRagSearch` 함수 삭제 (search-result-view.tsx)
+    - 미사용 state 변수 정리 (`ragResults`, `ragAnswer`)
+  - AI 모델 정보 수정: Gemini 2.5 Flash만 사용 (2.0 Flash Exp 삭제됨)
+- **Impact**:
+  - 문서가 현재 코드베이스 상태 반영
+  - 미사용 코드 72줄+ 삭제
+  - API 라우트 2개 삭제로 유지보수 부담 감소
+- **Reason**: 사용자 요청 (프로젝트 재분석 및 문서 업데이트)
+
+### [15:30 KST] Optimistic UI 버그 수정 및 행정규칙 로드 속도 개선
+- **Files**:
+  - `lib/use-admin-rules.ts` (modified)
+  - `hooks/use-law-viewer-admin-rules.ts` (modified)
+- **Changes**:
+  - **Strict Mode 버그 수정**: React Strict Mode에서 useEffect가 두 번 실행될 때 첫 번째 실행의 `cancelled=true`로 인해 Optimistic 캐시가 무시되는 문제 수정
+  - **dataReady 플래그 도입**: 데이터 로드 완료 여부를 명시적으로 추적하는 새로운 상태 추가
+    - 메모리 캐시 히트, IndexedDB Optimistic 캐시 히트, 폴링 완료, 전체 fetch 완료, 에러 발생 등 모든 완료 시점에서 `dataReady=true` 설정
+  - **hasEverLoaded 로직 간소화**: 복잡한 `prevLoadingRef` + `allRulesCount` 로직 제거, `dataReady` 플래그만으로 판단
+  - **로드 속도 개선**:
+    - 배치 사이즈 10 → 25 증가
+    - progress 업데이트를 각 요청마다 → 배치 완료 시에만으로 변경 (렌더링 횟수 감소)
+  - 디버그 로그 정리
+- **Impact**:
+  - 새로고침 후 동일 법령 재검색 시 "행정규칙 없음" 표시 버그 해결
+  - 캐시 없는 첫 로드 시 약 2배 속도 향상
+  - React Strict Mode에서도 안정적으로 동작
+- **Reason**: Optimistic UI 적용 후 발생한 연쇄 버그 해결 및 UX 개선
+
+---
+
 ## 2025-11-23
 
 ### [21:45 KST] Fix 2-tier view scroll issues in law-viewer
