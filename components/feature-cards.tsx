@@ -1,89 +1,162 @@
 "use client"
 
-import { Sparkles, GitCompare, Star, Scale, Zap, Shield } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { Search, Brain, GitCompare, ShieldCheck, Zap, Scale } from "lucide-react"
+import { useRef, useState, useEffect } from "react"
 
-const features = [
-  {
-    icon: Sparkles,
-    title: "AI 자연어 검색",
-    description: "일상 언어로 질문하면 AI가 관련 법령을 찾아 실시간으로 답변합니다",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
-  },
-  {
-    icon: GitCompare,
-    title: "법령 비교 분석",
-    description: "구법과 신법을 나란히 비교하고 AI가 변경 내용을 요약해드립니다",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-  },
-  {
-    icon: Star,
-    title: "스마트 즐겨찾기",
-    description: "자주 찾는 법령을 저장하고 빠르게 접근할 수 있습니다",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50 dark:bg-amber-950/30",
-  },
-  {
-    icon: Scale,
-    title: "3단 비교 시스템",
-    description: "법률-시행령-시행규칙을 한눈에 비교하고 위임관계를 파악합니다",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50 dark:bg-purple-950/30",
-  },
-  {
-    icon: Zap,
-    title: "실시간 업데이트",
-    description: "법제처 API와 연동하여 항상 최신 법령 정보를 제공합니다",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50 dark:bg-orange-950/30",
-  },
-  {
-    icon: Shield,
-    title: "행정규칙 검색",
-    description: "법령과 연관된 훈령, 예규, 고시 등을 자동으로 찾아드립니다",
-    color: "text-cyan-600",
-    bgColor: "bg-cyan-50 dark:bg-cyan-950/30",
-  },
+// 행별로 그룹화된 features
+const rows = [
+  // Row 1: AI 자연어 검색 + AI 법률 분석
+  [
+    {
+      title: "AI 자연어 검색",
+      description: "일상 언어로 질문하면 AI가 관련 법령을 찾아 실시간으로 답변합니다.",
+      icon: Search,
+      colSpan: "col-span-1 md:col-span-2",
+      gradient: "from-blue-500/15 to-purple-500/15",
+      iconColor: "text-blue-400",
+    },
+    {
+      title: "AI 법률 분석",
+      description: "법률 문맥을 이해하는 고성능 AI가 핵심 내용을 요약합니다.",
+      icon: Brain,
+      colSpan: "col-span-1",
+      gradient: "",
+      iconColor: "text-purple-400",
+    },
+  ],
+  // Row 2: 신구법 비교 + 3단 비교 시스템
+  [
+    {
+      title: "신구법 비교",
+      description: "개정 전후의 법령 변화를 시각적으로 비교하고 분석합니다.",
+      icon: GitCompare,
+      colSpan: "col-span-1",
+      gradient: "",
+      iconColor: "text-emerald-400",
+    },
+    {
+      title: "3단 비교 시스템",
+      description: "법률-시행령-시행규칙을 한눈에 비교하고 위임관계를 파악합니다.",
+      icon: Scale,
+      colSpan: "col-span-1 md:col-span-2",
+      gradient: "from-purple-500/15 to-blue-500/15",
+      iconColor: "text-amber-400",
+    },
+  ],
+  // Row 3: 실시간 업데이트 + 행정규칙 검색
+  [
+    {
+      title: "실시간 업데이트",
+      description: "법제처 API와 실시간 연동하여 항상 최신 법령 정보를 제공합니다.",
+      icon: Zap,
+      colSpan: "col-span-1",
+      gradient: "",
+      iconColor: "text-orange-400",
+    },
+    {
+      title: "위임법령 검색",
+      description: "법률과 연관된 시행령, 시행규칙, 행정규칙(고시, 훈령, 예규)을 자동으로 찾아드립니다.",
+      icon: ShieldCheck,
+      colSpan: "col-span-1 md:col-span-2",
+      gradient: "from-cyan-500/15 to-blue-500/15",
+      iconColor: "text-cyan-400",
+    },
+  ],
 ]
 
-export function FeatureCards() {
+interface FeatureCardsProps {
+  revealed?: boolean
+}
+
+export function FeatureCards({ revealed = false }: FeatureCardsProps) {
+  // 각 행별 reveal 상태
+  const [rowRevealed, setRowRevealed] = useState([false, false, false])
+  const rowRefs = [
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+  ]
+
+  // 각 행에 대해 Intersection Observer 설정 - 뷰포트 중앙 근처에서만 트리거
+  useEffect(() => {
+    const observers = rowRefs.map((ref, index) => {
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setRowRevealed(prev => {
+              const next = [...prev]
+              next[index] = true
+              return next
+            })
+            observer.disconnect()
+          }
+        },
+        { threshold: 0.5, rootMargin: "-100px 0px -100px 0px" }
+      )
+      if (ref.current) observer.observe(ref.current)
+      return observer
+    })
+
+    return () => observers.forEach(o => o.disconnect())
+  }, [])
+
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="text-center mb-8">
-        <ScrollReveal animation="fade-up">
-          <h3 className="text-7xl font-bold text-foreground mb-2" style={{ fontFamily: "Pretendard, sans-serif" }}>주요 기능</h3>
-        </ScrollReveal>
-        <ScrollReveal animation="fade-up" delay={200}>
-          <p className="text-muted-foreground mb-20" style={{ fontFamily: "Pretendard, sans-serif" }}>LexDiff가 제공하는 강력한 법령 검색 도구</p>
-        </ScrollReveal>
+    <div className="w-full" style={{ fontFamily: "Pretendard, sans-serif" }}>
+      {/* Section Header */}
+      <div className={`mb-12 transition-all duration-700 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+           style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <h3 className="text-3xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
+          압도적인 <br className="md:hidden" />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+            법률 인텔리전스
+          </span>
+        </h3>
+        <p className="text-muted-foreground/70 text-lg max-w-xl">
+          LexDiff가 제공하는 강력한 법령 검색 도구
+        </p>
       </div>
 
-      <ScrollReveal
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        stagger={100}
-        threshold={0.1}
-      >
-        {features.map((feature, index) => {
-          const Icon = feature.icon
-          return (
-            <Card
-              key={index}
-              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border/50"
-            >
-              <CardContent className="p-4 md:p-6">
-                <div className={`${feature.bgColor} w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                  <Icon className={`h-6 w-6 ${feature.color}`} />
+      {/* Bento Grid - Row by row scroll reveal */}
+      <div className="space-y-4 md:space-y-5">
+        {rows.map((row, rowIndex) => (
+          <div
+            key={rowIndex}
+            ref={rowRefs[rowIndex]}
+            className={`grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 transition-all duration-700 ${rowRevealed[rowIndex] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+            style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
+          >
+            {row.map((feature, cardIndex) => {
+              const Icon = feature.icon
+              const hasBg = feature.gradient !== ""
+              return (
+                <div
+                  key={cardIndex}
+                  className={`${feature.colSpan} group bento-card relative overflow-hidden ${hasBg ? `bg-gradient-to-br ${feature.gradient}` : ''}`}
+                >
+              {/* Background Icon */}
+              <div className="absolute top-0 right-0 p-6 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500">
+                <Icon className="w-20 h-20 md:w-24 md:h-24 text-foreground transform group-hover:scale-110 transition-transform duration-500" />
+              </div>
+
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-4 backdrop-blur-sm group-hover:bg-foreground/10 transition-colors duration-300">
+                  <Icon className={`w-5 h-5 ${feature.iconColor}`} />
                 </div>
-                <h4 className="text-lg font-semibold text-foreground mb-2" style={{ fontFamily: "Pretendard, sans-serif" }}>{feature.title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed" style={{ fontFamily: "Pretendard, sans-serif" }}>{feature.description}</p>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </ScrollReveal>
+                <h4 className="text-lg font-bold text-foreground mb-1.5">
+                  {feature.title}
+                </h4>
+                <p className="text-sm text-muted-foreground/70 leading-relaxed break-keep">
+                  {feature.description}
+                </p>
+              </div>
+            </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
