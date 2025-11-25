@@ -262,9 +262,13 @@ const handleBack = () => {
 
 ## Project Overview
 
-LexDiff is a Korean legal statute comparison system with **Google File Search RAG** for natural language AI search. The system integrates with the Korean Ministry of Government Legislation API (law.go.kr) and uses Gemini 2.0 Flash for AI-powered search and Gemini 2.5 Flash for change analysis.
+LexDiff는 한국 법령 비교 시스템으로 **Google File Search RAG**를 통한 자연어 AI 검색을 지원합니다. 법제처 API(law.go.kr)와 연동하며, AI 검색에 Gemini 2.0 Flash, 변경 분석에 Gemini 2.5 Flash를 사용합니다.
 
-**Current Main Feature**: Google File Search RAG (자연어 질문 → 실시간 AI 답변 + 법령 인용)
+**핵심 기능**:
+- 🔍 **AI 자연어 검색**: Google File Search RAG (실시간 SSE 스트리밍 + 인용 출처)
+- 📊 **3단 비교**: 법률 + 시행령 + 시행규칙 동시 표시
+- 📋 **행정규칙 조회**: Optimistic UI + IndexedDB 영구 캐싱
+- 🔗 **통합 링크 시스템**: 모든 법령 참조를 클릭 가능한 링크로 변환
 
 ---
 
@@ -343,11 +347,16 @@ Required in `.env.local`:
 
 ### State Management 🟡
 
-The app uses **React state + localStorage** (no global state library):
+**Singleton Stores (pub/sub 패턴)**:
+- `lib/favorites-store.ts` - 즐겨찾기
+- `lib/debug-logger.ts` - 디버그 로깅
+- `lib/error-report-store.ts` - 에러 리포트 (Zustand)
 
-- **Favorites**: `lib/favorites-store.ts` (singleton with pub/sub)
-- **Debug Logger**: `lib/debug-logger.ts` (singleton with pub/sub)
-- **Error Reports**: `lib/error-report-store.ts` (Zustand store)
+**IndexedDB Caching**:
+- `lib/law-content-cache.ts` - 법령 내용 (7일 TTL)
+- `lib/admin-rule-cache.ts` - 행정규칙 (영구, Optimistic UI)
+
+**History API**: URL 변경 없이 검색 결과 히스토리 관리 (`lib/history-manager.ts`)
 
 ### Date Formatting 🟡
 
@@ -371,18 +380,19 @@ headers: {
 
 ---
 
-## Technology Notes
+## Technology Stack
 
-- **Next.js 16 / React 19**: Uses App Router (not Pages Router)
-- **TypeScript**: Strict mode enabled, but build errors ignored in `next.config.mjs`
-- **Tailwind CSS v4**: Uses new `@tailwindcss/postcss` plugin
-- **UI Components**: shadcn/ui + Radix UI primitives
-- **AI**:
-  - Google Gemini 2.0 Flash: File Search RAG
-  - Google Gemini 2.5 Flash: Change summaries
-  - Uses `@google/genai` (not Vercel AI SDK despite being installed)
-- **Node.js**: Requires Node.js 20+
-- **Package Manager**: Supports npm or pnpm
+| Category | Technology |
+|----------|------------|
+| **Framework** | Next.js 16 (App Router), React 19, TypeScript 5 |
+| **Styling** | Tailwind CSS v4 (`@tailwindcss/postcss`), shadcn/ui, Radix UI |
+| **AI** | Gemini 2.5 Flash (File Search RAG, 요약), `@google/genai` |
+| **State** | React Hooks + localStorage + IndexedDB (Zustand은 에러 리포트만) |
+| **Caching** | IndexedDB (7일 쿼리, 영구 행정규칙), HTTP Cache (1h/24h) |
+| **Database** | Turso/LibSQL (학습 데이터) |
+| **Runtime** | Node.js 20+ |
+
+**API 라우트**: 49개 (법령 검색/조회, AI/RAG, Admin 관리 28개)
 
 ---
 
@@ -457,6 +467,40 @@ Task: "JSON 파싱 버그 수정"
 
 ---
 
+## 📁 Project Structure (Key Files)
+
+```
+app/
+├── page.tsx                    # 메인 페이지 (IndexedDB + History API)
+├── api/                        # 49개 API 라우트
+│   ├── file-search-rag/        # Google File Search RAG (SSE)
+│   ├── eflaw/                  # 현행 법령 (JSON)
+│   ├── law-search/             # 법령 검색 (XML)
+│   ├── three-tier/             # 3단 비교 (JSON)
+│   ├── admrul/                 # 행정규칙
+│   └── admin/                  # Admin 관리 (28개)
+components/
+├── search-result-view.tsx      # 검색 결과 (2,340줄 - 리팩토링 필요)
+├── law-viewer.tsx              # 법령 뷰어 (1,176줄)
+├── file-search-answer-display.tsx  # AI 답변 표시
+├── reference-modal.tsx         # 법령 참조 모달
+└── admin/                      # Admin 패널 컴포넌트
+lib/
+├── unified-link-generator.ts   # 통합 링크 시스템 (핵심)
+├── law-parser.ts               # JO 코드 파서
+├── file-search-client.ts       # Google File Search 클라이언트
+├── admin-rule-cache.ts         # 행정규칙 캐시 (Optimistic UI)
+└── ai-answer-processor.ts      # AI 답변 HTML 변환
+hooks/
+├── use-admin-rules.ts          # 행정규칙 상태 관리
+├── use-law-viewer-modals.ts    # 모달 상태
+└── use-law-viewer-three-tier.ts # 3단 비교 상태
+```
+
+**⚠️ 대형 컴포넌트 주의**: `search-result-view.tsx` (2,340줄) - 향후 분리 필요
+
+---
+
 **Last Updated**: 2025-11-25
-**Total Lines**: ~330
-**Important Docs**: 5 files (JSON_TO_HTML_FLOW, RAG_ARCHITECTURE, DEBUGGING_GUIDE, CHANGELOG, agent.md)
+**Total Lines**: ~380
+**Important Docs**: JSON_TO_HTML_FLOW, RAG_ARCHITECTURE, DEBUGGING_GUIDE, CHANGELOG

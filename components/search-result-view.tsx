@@ -218,13 +218,14 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   }>({ laws: [], ordinances: [] })
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
 
-  // RAG 관련 상태 (Phase 3: 기존 시스템 통합)
+  // 검색 모드 상태
   const [searchMode, setSearchMode] = useState<SearchMode>('basic')
-  const [ragResults, setRagResults] = useState<any[]>([])
-  const [ragAnswer, setRagAnswer] = useState<any>(null)
+
+  // RAG 로딩/에러/답변 상태 (File Search RAG에서 사용)
   const [ragLoading, setRagLoading] = useState(false)
   const [ragError, setRagError] = useState<string | null>(null)
   const [ragProgress, setRagProgress] = useState(0)
+  const [ragAnswer, setRagAnswer] = useState<any>(null)
 
   // AI 답변 상태 (File Search RAG)
   const [aiAnswerContent, setAiAnswerContent] = useState<string>('')
@@ -1706,80 +1707,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
   }
 
-  // RAG 검색 핸들러 (Phase 3: 기존 시스템 통합)
-  const handleRagSearch = async (query: string, options: SearchOptions) => {
-    setRagLoading(true)
-    setRagError(null)
-    setRagResults([])
-    setRagAnswer(null)
-
-    try {
-      // 1. 벡터 검색
-      debugLogger.info('RAG 검색 시작', { query, options })
-
-      const searchUrl = `/api/rag-search?query=${encodeURIComponent(query)}&limit=${options.limit}&threshold=${options.threshold}${options.lawFilter ? `&lawFilter=${encodeURIComponent(options.lawFilter)}` : ''}`
-      const searchRes = await fetch(searchUrl)
-
-      if (!searchRes.ok) {
-        throw new Error(`검색 실패: ${searchRes.status}`)
-      }
-
-      const searchData = await searchRes.json()
-
-      if (!searchData.success) {
-        throw new Error(searchData.error || '검색 실패')
-      }
-
-      debugLogger.success('RAG 검색 완료', {
-        results: searchData.results.length,
-        tokens: searchData.metadata.embeddingTokens,
-      })
-
-      setRagResults(searchData.results)
-
-      // 2. AI 답변 생성 (검색 결과가 있는 경우)
-      if (searchData.results.length > 0) {
-        debugLogger.info('AI 답변 생성 시작')
-
-        const answerRes = await fetch('/api/rag-answer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            context: searchData.results.map((r: any) => ({
-              lawName: r.lawName,
-              articleDisplay: r.articleDisplay,
-              articleContent: r.articleContent,
-              similarity: r.similarity,
-            })),
-          }),
-        })
-
-        if (!answerRes.ok) {
-          throw new Error(`답변 생성 실패: ${answerRes.status}`)
-        }
-
-        const answerData = await answerRes.json()
-
-        if (!answerData.success) {
-          throw new Error(answerData.error || '답변 생성 실패')
-        }
-
-        debugLogger.success('AI 답변 생성 완료', {
-          tokens: answerData.metadata.tokensUsed,
-        })
-
-        setRagAnswer(answerData.answer)
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : '알 수 없는 오류'
-      debugLogger.error('RAG 검색 오류', { error: errorMsg })
-      setRagError(errorMsg)
-    } finally {
-      setRagLoading(false)
-    }
-  }
-
   // AI 모드 - 관련 법령 클릭 핸들러 (모달 표시)
   // ✅ LawViewer의 openExternalLawArticleModal과 동일한 방식 사용
   const handleCitationClick = async (lawName: string, jo: string, article: string) => {
@@ -1902,7 +1829,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     setSearchResults({ laws: [], ordinances: [] })
     setMobileView("content")
     setSearchMode('basic') // 기본 검색 모드로 복귀
-    setRagResults([])
     setRagAnswer(null)
     setRagError(null)
     onBack() // 메인 화면으로 돌아가기

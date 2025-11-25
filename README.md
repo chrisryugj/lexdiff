@@ -1,14 +1,14 @@
-# LexDiff - 신·구법 법령 비교 시스템
+# LexDiff - 한국 법령 비교 및 AI 검색 시스템
 
-검색어만 입력하면 현행 조문 원문과 신·구법 대조를 한 화면에서 확인하고, **AI 자연어 검색**과 즐겨찾기 추적까지 가능한 전문가용 법령 분석 도구입니다.
+검색어만 입력하면 현행 조문 원문과 신·구법 대조를 한 화면에서 확인하고, **AI 자연어 검색**(Google File Search RAG)과 **3단 비교**(법률-시행령-시행규칙), **행정규칙 조회**까지 가능한 전문가용 법령 분석 도구입니다.
 
 ## 주요 기능
 
 ### 1. AI 자연어 검색 (Google File Search RAG)
 - **자연어 질문으로 법령 검색**: "수출통관 시 필요한 서류는?", "청년 창업 지원 내용은?"
-- **실시간 스트리밍 답변**: Google Gemini 2.5 Flash 기반 AI 답변
-- **인용 출처 표시**: 답변 근거가 된 법령 조문 자동 링크
-- **관련 법령 즉시 조회**: 인용된 법령 클릭 시 모달로 전문 표시
+- **실시간 스트리밍 답변**: Google Gemini 2.5 Flash 기반 SSE 스트리밍
+- **인용 출처 표시**: 답변 근거가 된 법령 조문 자동 링크 (클릭 시 모달)
+- **통합 링크 시스템**: 모든 법령 참조를 클릭 가능한 링크로 변환
 - **진행 상태 시각화**: 검색 → 분석 → 답변 생성 과정 실시간 표시
 
 ### 2. 법령 검색 및 조회
@@ -34,7 +34,7 @@
 
 ### 5. 행정규칙 조회
 - 조문별 관련 행정규칙 자동 검색 (훈령, 예규, 고시)
-- 제목/내용 기반 매칭
+- **Optimistic UI**: 캐시된 데이터 즉시 표시 + 백그라운드 새로고침
 - IndexedDB 영구 캐싱 (빠른 재로딩)
 - HTTP 브라우저 캐싱 (계층: 1시간, 내용: 24시간)
 - 병렬 API 호출로 성능 최적화
@@ -59,16 +59,15 @@
 
 ## 기술 스택
 
-- **Frontend**: Next.js 16, React 19, TypeScript
-- **UI**: Tailwind CSS v4, shadcn/ui, Radix UI
-- **AI**:
-  - Google Gemini 2.0 Flash (File Search RAG)
-  - Google Gemini 2.5 Flash (변경 요약)
-- **API**: 법제처 법령 API (law.go.kr)
-- **State**: React Hooks, localStorage, IndexedDB
-- **Caching**:
-  - HTTP Browser Cache (1-24시간 revalidate)
-  - IndexedDB (7일 쿼리 캐시, 영구 행정규칙 캐시)
+| Category | Technology |
+|----------|------------|
+| **Frontend** | Next.js 16, React 19, TypeScript 5 |
+| **UI** | Tailwind CSS v4, shadcn/ui, Radix UI |
+| **AI** | Gemini 2.5 Flash (File Search RAG, 요약) |
+| **API** | 법제처 법령 API (law.go.kr) - 49개 엔드포인트 |
+| **State** | React Hooks + localStorage + IndexedDB |
+| **Database** | Turso/LibSQL (학습 데이터) |
+| **Caching** | HTTP Cache (1h/24h) + IndexedDB (7일 쿼리, 영구 행정규칙) |
 
 ## 설치 및 실행
 
@@ -163,41 +162,39 @@ restart-server.cmd  # Node 프로세스 종료 + .next 캐시 삭제
 ## 프로젝트 구조
 
 ```
-├── app/
-│   ├── api/
-│   │   ├── file-search-rag/route.ts       # AI 자연어 검색 (SSE 스트리밍)
-│   │   ├── eflaw/route.ts                 # 현행 법령 조회
-│   │   ├── law-search/route.ts            # 법령 검색
-│   │   ├── oldnew/route.ts                # 신·구법 대조
-│   │   ├── three-tier/route.ts            # 3단 비교
-│   │   ├── hierarchy/route.ts             # 법령 체계도
-│   │   ├── admrul/route.ts                # 행정규칙 본문
-│   │   └── summarize/route.ts             # AI 변경 요약
-│   └── page.tsx                           # 메인 페이지
-├── components/
-│   ├── file-search-rag-view.tsx           # AI 검색 뷰 (스트리밍, 모달)
-│   ├── law-viewer.tsx                     # 법령 뷰어 (3단 비교)
-│   ├── reference-modal.tsx                # 법령 참조 모달
-│   ├── comparison-modal.tsx               # 신·구법 비교 모달
-│   ├── ai-summary-dialog.tsx              # AI 요약 다이얼로그
-│   ├── admin-rules-section.tsx            # 행정규칙 섹션
-│   ├── favorites-panel.tsx                # 즐겨찾기 패널
-│   └── debug-console.tsx                  # 디버그 콘솔
-├── lib/
-│   ├── file-search-client.ts              # Google File Search 클라이언트
-│   ├── ai-answer-processor.ts             # AI 답변 HTML 변환
-│   ├── law-parser.ts                      # JO 코드 파서
-│   ├── law-xml-parser.tsx                 # 현행 법령 XML 파서
-│   ├── three-tier-parser.ts               # 3단 비교 JSON 파서
-│   ├── hierarchy-parser.ts                # 법령 체계도 XML 파서
-│   ├── law-content-cache.ts               # IndexedDB 쿼리 캐시
-│   ├── admin-rule-cache.ts                # IndexedDB 행정규칙 캐시
-│   ├── text-similarity.ts                 # 레벤슈타인 거리 유사도
-│   ├── favorites-store.ts                 # 즐겨찾기 저장소
-│   └── debug-logger.ts                    # 디버그 로거
-└── docs/
-    ├── archived/                          # 구현 완료 문서
-    └── future/                            # 미래 참고 문서
+app/
+├── page.tsx                    # 메인 페이지 (IndexedDB + History API)
+├── api/                        # 49개 API 라우트
+│   ├── file-search-rag/        # Google File Search RAG (SSE 스트리밍)
+│   ├── eflaw/                  # 현행 법령 조회 (JSON)
+│   ├── law-search/             # 법령 검색 (XML)
+│   ├── three-tier/             # 3단 비교 (JSON)
+│   ├── admrul/                 # 행정규칙 본문
+│   ├── summarize/              # AI 변경 요약
+│   └── admin/                  # Admin 관리 (28개 라우트)
+components/
+├── search-result-view.tsx      # 검색 결과 뷰 (메인 컴포넌트)
+├── law-viewer.tsx              # 법령 뷰어 (3단 비교)
+├── file-search-answer-display.tsx  # AI 답변 표시
+├── reference-modal.tsx         # 법령 참조 모달
+├── comparison-modal.tsx        # 신·구법 비교 모달
+├── admin-rules-section.tsx     # 행정규칙 섹션 (Optimistic UI)
+├── admin/                      # Admin 패널 컴포넌트
+└── ui/                         # shadcn/ui 컴포넌트
+lib/
+├── unified-link-generator.ts   # 통합 링크 시스템 (핵심)
+├── file-search-client.ts       # Google File Search 클라이언트
+├── ai-answer-processor.ts      # AI 답변 HTML 변환
+├── law-parser.ts               # JO 코드 파서
+├── admin-rule-cache.ts         # IndexedDB 행정규칙 캐시
+├── law-content-cache.ts        # IndexedDB 쿼리 캐시
+└── favorites-store.ts          # 즐겨찾기 저장소 (pub/sub)
+hooks/
+├── use-admin-rules.ts          # 행정규칙 상태 (Optimistic UI)
+├── use-law-viewer-modals.ts    # 모달 상태
+└── use-law-viewer-three-tier.ts # 3단 비교 상태
+important-docs/                 # 핵심 구현 문서 (Claude Code용)
+docs/                           # API, 배포, 설정 가이드
 ```
 
 ## 디버그 콘솔
