@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAdminRules, type AdminRuleMatch } from '@/lib/use-admin-rules'
 import type { LawMeta } from '@/lib/law-types'
 import { parseAdminRuleContent, formatAdminRuleHTML } from '@/lib/admrul-parser'
@@ -60,16 +60,22 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     setLoadedAdminRulesCount(adminRules.length)
   }, [adminRules.length])
 
-  // 로딩이 완료되면 hasEverLoaded 설정
+  // 로딩 상태 추적 (로딩 완료 감지용)
+  const prevLoadingRef = useRef(loadingAdminRules)
+
+  // 로딩이 완료되면 hasEverLoaded 설정 (true → false 전환 시)
   useEffect(() => {
-    if (!loadingAdminRules && showAdminRules) {
+    // 로딩이 true였다가 false가 되었을 때만 hasEverLoaded를 true로
+    if (prevLoadingRef.current === true && loadingAdminRules === false && showAdminRules) {
       setHasEverLoaded(true)
     }
+    prevLoadingRef.current = loadingAdminRules
   }, [loadingAdminRules, showAdminRules])
 
   // 법령이 바뀌면 hasEverLoaded 리셋
   useEffect(() => {
     setHasEverLoaded(false)
+    prevLoadingRef.current = false
   }, [meta.lawTitle])
 
   // Handler: view admin rule full content
