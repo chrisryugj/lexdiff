@@ -17,6 +17,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   const [adminRuleTitle, setAdminRuleTitle] = useState<string | null>(null)
   const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
   const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
+  const [hasEverLoaded, setHasEverLoaded] = useState(false) // 로딩 완료 여부 추적
   const [adminRulePanelSize, setAdminRulePanelSize] = useState<number>(() => {
     if (typeof window === 'undefined') return 50
     const saved = localStorage.getItem('adminRulePanelSize')
@@ -58,6 +59,18 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   useEffect(() => {
     setLoadedAdminRulesCount(adminRules.length)
   }, [adminRules.length])
+
+  // 로딩이 완료되면 hasEverLoaded 설정
+  useEffect(() => {
+    if (!loadingAdminRules && showAdminRules) {
+      setHasEverLoaded(true)
+    }
+  }, [loadingAdminRules, showAdminRules])
+
+  // 법령이 바뀌면 hasEverLoaded 리셋
+  useEffect(() => {
+    setHasEverLoaded(false)
+  }, [meta.lawTitle])
 
   // Handler: view admin rule full content
   const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {
@@ -180,6 +193,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     setAdminRulePanelSize,
     loadedAdminRulesCount,
     setLoadedAdminRulesCount,
+    hasEverLoaded,
 
     // Data
     adminRules,

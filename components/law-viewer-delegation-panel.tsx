@@ -44,6 +44,7 @@ interface DelegationPanelProps {
     setShowAdminRules: (show: boolean) => void
     loadingAdminRules: boolean
     loadedAdminRulesCount: number
+    hasEverLoaded: boolean
     adminRules: AdminRuleMatch[]
     adminRuleViewMode: "list" | "detail"
     setAdminRuleViewMode: (mode: "list" | "detail") => void
@@ -75,6 +76,7 @@ export function DelegationPanel({
     setShowAdminRules,
     loadingAdminRules,
     loadedAdminRulesCount,
+    hasEverLoaded,
     adminRules,
     adminRuleViewMode,
     setAdminRuleViewMode,
@@ -117,10 +119,10 @@ export function DelegationPanel({
     return (
         <>
             {/* Mobile: Tab-based view */}
-            <div className="md:hidden h-full flex flex-col">
+            <div className="md:hidden flex flex-col">
                 <Tabs
                     defaultValue="law"
-                    className="flex-1 flex flex-col overflow-hidden"
+                    className="flex flex-col"
                     onValueChange={(value) => {
                         // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
                         if (value === "admin" && !showAdminRules) {
@@ -151,7 +153,7 @@ export function DelegationPanel({
                         </TabsList>
                     </div>
 
-                    <TabsContent value="law" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="law" className="mt-0">
                         <div className="prose prose-sm max-w-none w-full dark:prose-invert p-4">
                             <div className="mb-3 pb-2 border-b border-border">
                                 {/* 조문 제목 (1줄로 표시) */}
@@ -178,7 +180,7 @@ export function DelegationPanel({
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="decree" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="decree" className="mt-0">
                         {isLoadingThreeTier ? (
                             <DelegationLoadingSkeleton />
                         ) : (
@@ -228,7 +230,7 @@ export function DelegationPanel({
                         )}
                     </TabsContent>
 
-                    <TabsContent value="rule" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="rule" className="mt-0">
                         {isLoadingThreeTier ? (
                             <DelegationLoadingSkeleton />
                         ) : (
@@ -281,7 +283,7 @@ export function DelegationPanel({
                         )}
                     </TabsContent>
 
-                    <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="admin" className="mt-0">
                         {!showAdminRules ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <FileText className="h-12 w-12 mb-4 opacity-30" />
@@ -290,7 +292,7 @@ export function DelegationPanel({
                                     클릭 시 자동으로 로드됩니다
                                 </p>
                             </div>
-                        ) : loadingAdminRules ? (
+                        ) : (loadingAdminRules || !hasEverLoaded) ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
                                 <p className="text-sm font-medium">행정규칙 검색 중...</p>
@@ -631,7 +633,7 @@ export function DelegationPanel({
                                                     클릭 시 자동으로 로드됩니다
                                                 </p>
                                             </div>
-                                        ) : loadingAdminRules ? (
+                                        ) : (loadingAdminRules || !hasEverLoaded) ? (
                                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                                 <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
                                                 <p className="text-sm font-medium">행정규칙 검색 중...</p>
