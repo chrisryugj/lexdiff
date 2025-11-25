@@ -830,40 +830,40 @@ export function LawViewer({
                     </Badge>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {meta.latestEffectiveDate && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       <Calendar className="h-3 w-3 mr-1" />
-                      시행: {meta.latestEffectiveDate}
+                      {meta.latestEffectiveDate}
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                     <FileText className="h-3 w-3 mr-1" />
-                    {articles.length}개 조문
+                    {articles.length}개
                   </Badge>
 
                   {isOrdinance && (
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs px-1.5 py-0.5">
                       <Building2 className="h-3 w-3 mr-1" />
                       자치법규
                     </Badge>
                   )}
                   {meta.revisionType && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                       {meta.revisionType}
                     </Badge>
                   )}
                   {!isOrdinance && viewMode === "full" && activeArticle && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       현재: {formatSimpleJo(activeArticle.jo)}
-                      {activeArticle.title && ` (${activeArticle.title})`}
                     </Badge>
                   )}
                   {(() => {
                     const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
                     return currentLawFavorites > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        ⭐ {currentLawFavorites}개
+                      <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                        <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
+                        {currentLawFavorites}
                       </Badge>
                     )
                   })()}
@@ -1017,7 +1017,7 @@ export function LawViewer({
                 )
               ) : aiAnswerMode && aiAnswerContent ? (
                 <ScrollArea className="h-full" ref={contentRef}>
-                  <div className="p-6 pb-20">
+                  <div className="px-4 sm:px-6 py-4 pb-20">
                     <AIAnswerContent
                       aiAnswerHTML={aiAnswerHTML}
                       userQuery={userQuery}
@@ -1062,46 +1062,45 @@ export function LawViewer({
                   <ScrollArea className="h-full" ref={contentRef}>
                     <div ref={swipeRef} className="px-6 pt-0 pb-20">
                       <div className="mb-3 pb-2 border-b border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold text-foreground">
-                              {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                            </h2>
+                        {/* 조문 제목 (1줄로 표시, 넘치면 말줄임) */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <h2 className="text-xl font-bold text-foreground truncate flex-1 min-w-0">
+                            {formatSimpleJo(activeArticle.jo, isOrdinance)}
                             {activeArticle.title && (
-                              <span className="text-muted-foreground text-lg">({activeArticle.title})</span>
+                              <span className="text-muted-foreground text-lg ml-2">({activeArticle.title})</span>
                             )}
-                            <Badge variant="outline" className="text-xs">
-                              {isOrdinance ? "자치법규" : "법률"}
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                              <ZoomOut className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                              <RotateCcw className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                              <ZoomIn className="h-3.5 w-3.5" />
-                            </Button>
-                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
-                                navigator.clipboard.writeText(content)
-                                toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
-                              }}
-                              title="복사"
-                              className="h-7 px-2"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          </h2>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {isOrdinance ? "자치법규" : "법률"}
+                          </Badge>
                         </div>
 
+                        {/* 글씨크기 버튼 (별도 줄) */}
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                            <ZoomOut className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                            <ZoomIn className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
+                              navigator.clipboard.writeText(content)
+                              toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
+                            }}
+                            title="복사"
+                            className="h-7 px-2"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div

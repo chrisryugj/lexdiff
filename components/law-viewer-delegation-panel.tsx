@@ -152,14 +152,17 @@ export function DelegationPanel({
                     </div>
 
                     <TabsContent value="law" className="flex-1 overflow-y-auto mt-0">
-                        <div className="prose prose-sm max-w-none dark:prose-invert p-4">
-                            <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
-                                <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
+                        <div className="prose prose-sm max-w-none w-full dark:prose-invert p-4">
+                            <div className="mb-3 pb-2 border-b border-border">
+                                {/* 조문 제목 (1줄로 표시) */}
+                                <div className="flex items-center gap-2 mb-2">
                                     <FileText className="h-4 w-4 text-foreground shrink-0" />
-                                    <span>{formatSimpleJo(activeArticle.jo, isOrdinance)}</span>
-                                    {activeArticle.title && <span className="text-muted-foreground font-bold">({activeArticle.title})</span>}
-                                    <Badge variant="secondary" className="text-xs ml-1 shrink-0">법률 본문</Badge>
-                                </h3>
+                                    <h3 className="text-base font-bold text-foreground truncate flex-1 min-w-0">
+                                        {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                                        {activeArticle.title && <span className="text-muted-foreground font-normal ml-1">({activeArticle.title})</span>}
+                                    </h3>
+                                    <Badge variant="secondary" className="text-xs shrink-0">법률 본문</Badge>
+                                </div>
                             </div>
                             <div
                                 className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
@@ -288,7 +291,13 @@ export function DelegationPanel({
                                 </p>
                             </div>
                         ) : loadingAdminRules ? (
-                            <DelegationLoadingSkeleton />
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                <p className="text-sm font-medium">행정규칙 검색 중...</p>
+                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                    관련 행정규칙을 찾고 있습니다
+                                </p>
+                            </div>
                         ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
@@ -623,7 +632,13 @@ export function DelegationPanel({
                                                 </p>
                                             </div>
                                         ) : loadingAdminRules ? (
-                                            <DelegationLoadingSkeleton />
+                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                                <p className="text-sm font-medium">행정규칙 검색 중...</p>
+                                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                                    관련 행정규칙을 찾고 있습니다
+                                                </p>
+                                            </div>
                                         ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                                             <>
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
