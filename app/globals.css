@@ -361,14 +361,46 @@
   opacity: 0;
 }
 
-/* Hero gradient background */
-.hero-gradient {
+/* ============================================
+   Apple-Style Unified Background System
+   ============================================ */
+
+/* Base page background - unified dark */
+.page-bg {
+  background: oklch(0.08 0.008 240);
+  min-height: 100vh;
+}
+
+/* Fixed Hero Section - Header + Search stays fixed */
+.hero-section-fixed {
   background: linear-gradient(
-    135deg,
-    oklch(0.15 0.02 240) 0%,
-    oklch(0.12 0.01 240) 50%,
-    oklch(0.14 0.02 260) 100%
+    180deg,
+    oklch(0.18 0.025 250) 0%,
+    oklch(0.12 0.015 250) 30%,
+    oklch(0.08 0.008 240) 70%
   );
+  position: relative;
+}
+
+/* Logo glow effect */
+.logo-glow {
+  text-shadow:
+    0 0 15px oklch(0.55 0.18 250 / 0.2),
+    0 0 30px oklch(0.55 0.18 250 / 0.1),
+    0 0 50px oklch(0.55 0.18 250 / 0.05);
+  transition: text-shadow 0.3s ease;
+}
+
+.logo-glow:hover {
+  text-shadow:
+    0 0 20px oklch(0.55 0.18 250 / 0.3),
+    0 0 40px oklch(0.55 0.18 250 / 0.15),
+    0 0 60px oklch(0.55 0.18 250 / 0.08);
+}
+
+/* Hero gradient background - seamless transition (legacy, kept for compatibility) */
+.hero-gradient {
+  background: transparent;
   position: relative;
 }
 
@@ -380,11 +412,24 @@
   right: 0;
   bottom: 0;
   background: radial-gradient(
-    circle at 50% 0%,
-    oklch(0.55 0.18 250 / 0.15) 0%,
-    transparent 50%
+    ellipse 80% 50% at 50% -20%,
+    oklch(0.55 0.18 250 / 0.08) 0%,
+    transparent 70%
   );
   pointer-events: none;
+}
+
+/* Section backgrounds - unified with hero */
+.section-primary {
+  background: oklch(0.08 0.008 240);
+}
+
+.section-elevated {
+  background: oklch(0.09 0.008 240);
+}
+
+.section-subtle {
+  background: oklch(0.08 0.008 240);
 }
 
 /* Progress dialog animations */
@@ -560,4 +605,145 @@
 
 .animate-swipe-right {
   animation: swipe-right 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Apple-Style Scroll Reveal Animations
+   ============================================ */
+
+/* Intersection Observer based reveal */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered children animation */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-stagger.revealed > *:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger.revealed > *:nth-child(2) { transition-delay: 80ms; }
+.reveal-stagger.revealed > *:nth-child(3) { transition-delay: 160ms; }
+.reveal-stagger.revealed > *:nth-child(4) { transition-delay: 240ms; }
+.reveal-stagger.revealed > *:nth-child(5) { transition-delay: 320ms; }
+.reveal-stagger.revealed > *:nth-child(6) { transition-delay: 400ms; }
+
+.reveal-stagger.revealed > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Feature card hover effect - Apple style */
+.feature-card {
+  background: oklch(0.15 0.012 240);
+  border: 1px solid oklch(0.22 0.02 240);
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  background: oklch(0.16 0.015 240);
+  border-color: oklch(0.28 0.03 250);
+  box-shadow:
+    0 20px 40px oklch(0 0 0 / 0.3),
+    0 0 0 1px oklch(0.55 0.18 250 / 0.1);
+}
+
+/* Bento Grid Card - Futuristic style adapted */
+.bento-card {
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid oklch(0.22 0.015 240);
+  background: oklch(0.14 0.01 240 / 0.5);
+  backdrop-filter: blur(12px);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  border-color: oklch(0.3 0.025 250);
+  background: oklch(0.15 0.012 240 / 0.7);
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 32px oklch(0 0 0 / 0.25),
+    0 0 0 1px oklch(0.55 0.15 250 / 0.08);
+}
+
+/* Stats card styling */
+.stat-card {
+  background: oklch(0.14 0.01 240 / 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(0.2 0.015 240);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card:hover {
+  background: oklch(0.15 0.012 240 / 0.8);
+  border-color: oklch(0.25 0.02 240);
+}
+
+/* CTA Section gradient */
+.cta-gradient {
+  background: linear-gradient(
+    180deg,
+    oklch(0.11 0.008 240) 0%,
+    oklch(0.13 0.015 250) 50%,
+    oklch(0.11 0.008 240) 100%
+  );
+  position: relative;
+}
+
+.cta-gradient::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(
+    circle,
+    oklch(0.55 0.18 250 / 0.06) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* Divider line */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.25 0.02 240) 20%,
+    oklch(0.25 0.02 240) 80%,
+    transparent 100%
+  );
+}
+
+/* Floating scroll indicator */
+.scroll-indicator-apple {
+  animation: float-down 2.5s ease-in-out infinite;
+}
+
+@keyframes float-down {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 0.8;
+  }
 }
