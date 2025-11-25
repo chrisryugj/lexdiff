@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAdminRules, type AdminRuleMatch } from '@/lib/use-admin-rules'
 import type { LawMeta } from '@/lib/law-types'
 import { parseAdminRuleContent, formatAdminRuleHTML } from '@/lib/admrul-parser'
@@ -17,6 +17,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   const [adminRuleTitle, setAdminRuleTitle] = useState<string | null>(null)
   const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
   const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
+  const [hasEverLoaded, setHasEverLoaded] = useState(false) // 로딩 완료 여부 추적
   const [adminRulePanelSize, setAdminRulePanelSize] = useState<number>(() => {
     if (typeof window === 'undefined') return 50
     const saved = localStorage.getItem('adminRulePanelSize')
@@ -58,6 +59,24 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   useEffect(() => {
     setLoadedAdminRulesCount(adminRules.length)
   }, [adminRules.length])
+
+  // 로딩 상태 추적 (로딩 완료 감지용)
+  const prevLoadingRef = useRef(loadingAdminRules)
+
+  // 로딩이 완료되면 hasEverLoaded 설정 (true → false 전환 시)
+  useEffect(() => {
+    // 로딩이 true였다가 false가 되었을 때만 hasEverLoaded를 true로
+    if (prevLoadingRef.current === true && loadingAdminRules === false && showAdminRules) {
+      setHasEverLoaded(true)
+    }
+    prevLoadingRef.current = loadingAdminRules
+  }, [loadingAdminRules, showAdminRules])
+
+  // 법령이 바뀌면 hasEverLoaded 리셋
+  useEffect(() => {
+    setHasEverLoaded(false)
+    prevLoadingRef.current = false
+  }, [meta.lawTitle])
 
   // Handler: view admin rule full content
   const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {
@@ -180,6 +199,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     setAdminRulePanelSize,
     loadedAdminRulesCount,
     setLoadedAdminRulesCount,
+    hasEverLoaded,
 
     // Data
     adminRules,
