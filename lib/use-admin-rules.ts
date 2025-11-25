@@ -4,13 +4,23 @@
  * - 효과: 조문 이동 시 로딩 없음, 즉각적인 반응
  */
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { parseHierarchyXML } from "./hierarchy-parser"
 import { parseAdminRulePurposeOnly, checkLawArticleReference, type AdminRuleArticle } from "./admrul-parser"
 import {
   getLawAdminRulesPurposeCache,
   setLawAdminRulesPurposeCache,
 } from "./admin-rule-cache"
+
+// 전역 상태: 현재 fetch 중인 법령명 (중복 fetch 방지)
+const fetchingLawNames = new Set<string>()
+// 전역 상태: 이미 로드된 법령 데이터 캐시 (메모리)
+const loadedLawDataCache = new Map<string, Array<{
+  id: string
+  name: string
+  serialNumber?: string
+  purpose: AdminRuleArticle | null
+}>>()
 
 export interface AdminRuleMatch {
   name: string
@@ -49,9 +59,23 @@ export function useAdminRules(
 
   // 2. 현재 로드된 법령 이름 추적 (불필요한 재로딩 방지)
   const [loadedLawName, setLoadedLawName] = useState<string | null>(null)
+  const loadedLawNameRef = useRef<string | null>(null)
 
   // 3. 법령 데이터 Fetching Effect (법령명이 바뀔 때만 실행)
   useEffect(() => {
+    // 메모리 캐시 먼저 확인 (enabled 상관없이 - 재검색 시 즉시 반환용)
+    if (lawName) {
+      const memoryCached = loadedLawDataCache.get(lawName)
+      if (memoryCached) {
+        setAllRules(memoryCached)
+        loadedLawNameRef.current = lawName
+        setLoadedLawName(lawName)
+        setLoadingLaw(false)
+        return
+      }
+    }
+
+    // enabled가 false면 여기서 종료 (캐시 없으면 로딩 안 함)
     if (!enabled || !lawName) {
       setLoadingLaw(false)
       setLawError(null)
@@ -59,18 +83,56 @@ export function useAdminRules(
       return
     }
 
-    // 이미 로드된 법령이면 스킵
-    if (lawName === loadedLawName && allRules.length > 0) {
+    // 이미 로드된 법령이면 스킵 (ref 사용하여 최신 값 참조)
+    if (lawName === loadedLawNameRef.current) {
+      setLoadingLaw(false) // 이미 로드된 경우 로딩 해제
       return
     }
+
+    // 전역 메모리 캐시에서 확인 (다른 컴포넌트가 이미 로드한 경우) - 이미 위에서 체크했으므로 여기선 fetch 중 대기만
+    const memoryCached = loadedLawDataCache.get(lawName)
+    if (memoryCached) {
+      setAllRules(memoryCached)
+      loadedLawNameRef.current = lawName
+      setLoadedLawName(lawName)
+      setLoadingLaw(false)
+      return
+    }
+
+    // 다른 인스턴스가 이미 fetch 중이면 대기
+    if (fetchingLawNames.has(lawName)) {
+      setLoadingLaw(true)
+      // 폴링으로 완료 대기
+      const waitForFetch = setInterval(() => {
+        const cached = loadedLawDataCache.get(lawName)
+        if (cached) {
+          clearInterval(waitForFetch)
+          setAllRules(cached)
+          loadedLawNameRef.current = lawName
+          setLoadedLawName(lawName)
+          setLoadingLaw(false)
+        }
+        // fetch가 완료되었지만 캐시가 없는 경우 (빈 결과)
+        if (!fetchingLawNames.has(lawName) && !cached) {
+          clearInterval(waitForFetch)
+          setAllRules([])
+          loadedLawNameRef.current = lawName
+          setLoadedLawName(lawName)
+          setLoadingLaw(false)
+        }
+      }, 100)
+      return () => clearInterval(waitForFetch)
+    }
+
+    // 새 법령 요청 시작 - 즉시 로딩 상태로 전환 (비동기 함수 호출 전에)
+    fetchingLawNames.add(lawName)
+    setLoadingLaw(true)
+    setLawError(null)
+    setProgress(null)
 
     let cancelled = false
 
     const fetchAllRulesForLaw = async () => {
-      setLoadingLaw(true)
-      setLawError(null)
-      setProgress(null)
-      setAllRules([]) // 법령이 바뀌면 일단 비움
 
       try {
         // Step 0: 법령 체계도에서 MST 가져오기
@@ -89,8 +151,11 @@ export function useAdminRules(
         if (!hierarchy || !hierarchy.adminRules || hierarchy.adminRules.length === 0) {
           if (cancelled) return
           setAllRules([])
+          loadedLawDataCache.set(lawName, []) // 빈 결과도 캐시
+          loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          fetchingLawNames.delete(lawName)
           return
         }
 
@@ -101,16 +166,18 @@ export function useAdminRules(
         const cachedRules = await getLawAdminRulesPurposeCache(lawName, currentMst)
 
         if (cachedRules && !cancelled) {
-          console.log("[use-admin-rules] Cache HIT:", cachedRules.length, "rules")
           setAllRules(cachedRules)
+          loadedLawDataCache.set(lawName, cachedRules) // 메모리 캐시에도 저장
+          loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          fetchingLawNames.delete(lawName)
           return
         }
 
         // Step 2: 캐시 MISS -> API 호출하여 전체 수집
-        console.log("[use-admin-rules] Cache MISS, fetching all rules:", hierarchyRules.length)
         if (!cancelled) {
+          setAllRules([]) // 캐시 MISS 시에만 비움
           setProgress({ current: 0, total: hierarchyRules.length })
         }
 
@@ -184,15 +251,18 @@ export function useAdminRules(
         if (!cancelled) {
           // 캐시 저장
           await setLawAdminRulesPurposeCache(lawName, currentMst, fetchedRules)
-          console.log("[use-admin-rules] Saved to cache:", fetchedRules.length, "rules")
 
           setAllRules(fetchedRules)
+          loadedLawDataCache.set(lawName, fetchedRules) // 메모리 캐시에도 저장
+          loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
           setProgress(null)
         }
+        fetchingLawNames.delete(lawName)
 
       } catch (err: any) {
+        fetchingLawNames.delete(lawName)
         if (!cancelled) {
           console.error("[use-admin-rules] Error:", err)
           setLawError(err.message || "행정규칙 조회 중 오류 발생")
@@ -207,7 +277,7 @@ export function useAdminRules(
     return () => {
       cancelled = true
     }
-  }, [lawName, enabled, loadedLawName]) // articleNumber 의존성 제거됨!
+  }, [lawName, enabled]) // loadedLawName 의존성 제거 - 내부에서 체크
 
   // 4. 조문별 필터링 (메모리 연산 - 즉시 실행)
   const filteredRules = useMemo(() => {

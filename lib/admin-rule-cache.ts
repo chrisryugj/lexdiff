@@ -189,10 +189,8 @@ export async function getLawAdminRulesPurposeCache(
             return
           }
 
-          console.log("[admin-rule-cache] Purpose cache HIT:", key, entry.rules.length, "rules")
           resolve(entry.rules)
         } else {
-          console.log("[admin-rule-cache] Purpose cache MISS:", key)
           resolve(null)
         }
       }
@@ -246,7 +244,6 @@ export async function setLawAdminRulesPurposeCache(
 
       request.onsuccess = () => {
         db.close()
-        console.log("[admin-rule-cache] Purpose cache saved:", key, rules.length, "rules")
         resolve()
       }
 
@@ -293,10 +290,8 @@ export async function getArticleMatchIndex(
             return
           }
 
-          console.log("[admin-rule-cache] Match index HIT:", key, entry.matchedRuleIds.length, "matches")
           resolve(entry.matchedRuleIds)
         } else {
-          console.log("[admin-rule-cache] Match index MISS:", key)
           resolve(null)
         }
       }
@@ -352,7 +347,6 @@ export async function setArticleMatchIndex(
 
       request.onsuccess = () => {
         db.close()
-        console.log("[admin-rule-cache] Match index saved:", key, matchedRuleIds.length, "matches")
         resolve()
       }
 
@@ -362,7 +356,7 @@ export async function setArticleMatchIndex(
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error saving match index:", error)
+    // Silently fail
   }
 }
 
@@ -390,10 +384,8 @@ export async function getAdminRuleContentCache(
         db.close()
 
         if (entry) {
-          console.log("[admin-rule-cache] Content cache HIT:", key)
           resolve({ title: entry.title, html: entry.html })
         } else {
-          console.log("[admin-rule-cache] Content cache MISS:", key)
           resolve(null)
         }
       }
@@ -448,7 +440,6 @@ export async function setAdminRuleContentCache(
 
       request.onsuccess = () => {
         db.close()
-        console.log("[admin-rule-cache] Content cache saved:", key)
         resolve()
       }
 
@@ -458,7 +449,7 @@ export async function setAdminRuleContentCache(
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error saving content cache:", error)
+    // Silently fail
   }
 }
 
@@ -477,7 +468,6 @@ export async function clearAdminRuleContentCache(ruleId: string): Promise<void> 
 
       request.onsuccess = () => {
         db.close()
-        console.log("[admin-rule-cache] Content cache cleared for:", key)
         resolve()
       }
 
@@ -487,7 +477,7 @@ export async function clearAdminRuleContentCache(ruleId: string): Promise<void> 
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error clearing content cache:", error)
+    // Silently fail
   }
 }
 
@@ -508,9 +498,8 @@ export async function clearAllAdminRuleCache(): Promise<void> {
     contentTx.objectStore(CONTENT_STORE).clear()
 
     db.close()
-    console.log("[admin-rule-cache] All cache cleared")
   } catch (error) {
-    console.error("[admin-rule-cache] Error clearing cache:", error)
+    // Silently fail
   }
 }
 

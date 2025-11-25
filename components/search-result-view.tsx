@@ -459,19 +459,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       const viewMode: "single" | "full" = query.jo ? "single" : "full"
 
       if (query.jo) {
-        console.log(`🔍 [조문 검색] 요청: jo=${query.jo}, 전체 조문 수: ${articles.length}`)
-
-        // Debug: Show sample JO codes
-        const sampleJos = articles.slice(0, 10).map(a => a.jo).join(', ')
-
-        // Check if any "조의" articles exist
-        const branchArticles = articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
-        if (branchArticles.length > 0) {
-          console.log(`   조의 조문 발견: ${branchArticles.length}개`, branchArticles.slice(0, 5).map(a => `${a.jo}(${a.joNum})`).join(', '))
-        }
-
         const targetArticle = articles.find((a) => a.jo === query.jo)
-        console.log(`   조문 검색 결과: ${targetArticle ? '✅ 발견' : '❌ 없음'}`)
 
         if (targetArticle) {
           selectedJo = targetArticle.jo
@@ -1176,17 +1164,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                 // Check if requested article exists
                 let finalData = { ...parsedData }
                 if (query.jo && parsedData.selectedJo === undefined) {
-                  console.log(`🔍 [Phase 5 - 조문 검색] 요청: jo=${query.jo}, 전체 조문 수: ${parsedData.articles.length}`)
-
-                  // Debug: Show sample JO codes
-                  const sampleJos = parsedData.articles.slice(0, 10).map(a => a.jo).join(', ')
-
-                  // Check if any "조의" articles exist
-                  const branchArticles = parsedData.articles.filter(a => a.jo.endsWith('02') || a.jo.endsWith('03') || a.jo.endsWith('04'))
-                  if (branchArticles.length > 0) {
-                    console.log(`   조의 조문 발견: ${branchArticles.length}개`, branchArticles.slice(0, 5).map(a => `${a.jo}(${a.joNum})`).join(', '))
-                  }
-
                   const t5 = performance.now()
                   const { findNearestArticles } = await import('@/lib/article-finder')
 
@@ -1366,9 +1343,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
         const normalizedLawName = lawName.replace(/\s+/g, "")
 
-        console.log(`🔍 [법령 검색] 검색어: "${lawName}", 결과: ${results.length}개`)
-        console.log(`   결과 목록:`, results.slice(0, 5).map(r => r.lawName).join(', '))
-
         // 1. 정확히 일치하는 법령 찾기
         const exactMatches = results.filter((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
 
@@ -1378,8 +1352,6 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               current.lawName.length < shortest.lawName.length ? current : shortest
             )
           : undefined
-
-        console.log(`   정확 매칭: ${exactMatch ? exactMatch.lawName : '없음'}${exactMatches.length > 1 ? ` (${exactMatches.length}개 중 선택)` : ''}`)
 
         // 2. 유사도 기반 매칭 (정확한 매칭이 없을 때만)
         if (!exactMatch) {
@@ -1404,16 +1376,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
           if (bestMatch) {
             exactMatch = bestMatch.item
-            console.log(`   유사도 매칭: ${exactMatch.lawName} (유사도: ${(bestMatch.similarity * 100).toFixed(0)}%, 임계값: ${(minSimilarity * 100).toFixed(0)}%)`)
-          } else {
-            console.log(`   유사도 매칭: 없음 (최소 ${(minSimilarity * 100).toFixed(0)}% 필요)`)
           }
         }
 
         // 3. 매칭 실패 시 사용자에게 선택하도록 제안
         if (!exactMatch && results.length > 0) {
-          console.warn(`⚠️ [법령 검색] "${lawName}"의 정확한 매칭 실패, 사용자 선택 필요`)
-          console.log(`   제안 목록:`, results.map(r => r.lawName).join(', '))
 
           // 여러 결과 중 선택하도록 UI 표시
           setLawSelectionState({

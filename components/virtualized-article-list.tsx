@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef } from "react"
+import React, { useRef, useEffect } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import type { LawArticle } from "@/lib/law-types"
 import { ArticleListItem } from "@/components/article-list-item"
@@ -33,6 +33,25 @@ export const VirtualizedArticleList = React.memo(
       estimateSize: () => 60, // Estimated item height in pixels
       overscan: 5, // Render 5 extra items above/below viewport
     })
+
+    // activeJo가 변경되면 해당 위치로 스크롤
+    useEffect(() => {
+      if (!activeJo || articles.length === 0 || !parentRef.current) return
+
+      const activeIndex = articles.findIndex(a => a.jo === activeJo)
+      if (activeIndex !== -1) {
+        // 컨테이너 높이가 설정될 때까지 대기 후 스크롤
+        const timer = setTimeout(() => {
+          const container = parentRef.current
+          if (container && container.clientHeight > 0) {
+            // 직접 스크롤 위치 계산 (virtualizer.scrollToIndex 대신)
+            const scrollTop = Math.max(0, activeIndex * 60 - container.clientHeight / 2 + 30)
+            container.scrollTop = scrollTop
+          }
+        }, 150)
+        return () => clearTimeout(timer)
+      }
+    }, [activeJo, articles])
 
     return (
       <div

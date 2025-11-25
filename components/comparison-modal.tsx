@@ -46,12 +46,6 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     }
   }, [isOpen, lawId, mst])
 
-  useEffect(() => {
-    console.log('[ComparisonModal] articleHistory 상태 변경:', {
-      count: articleHistory.length,
-      revisions: articleHistory
-    })
-  }, [articleHistory])
 
   useEffect(() => {
     if (comparison && targetJo && oldScrollRef.current && newScrollRef.current) {

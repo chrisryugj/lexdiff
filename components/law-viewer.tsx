@@ -720,7 +720,7 @@ export function LawViewer({
   return (
     <>
       <div className="w-full mx-auto max-w-[1280px]">
-        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-10rem)] lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 min-h-0 lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
           {/* Mobile overlay backdrop */}
           {isArticleListExpanded && (
             <div
@@ -818,7 +818,7 @@ export function LawViewer({
           />
 
           {/* Right panel - Article content */}
-          <Card className="flex flex-col overflow-hidden h-full">
+          <Card className="flex flex-col overflow-hidden h-auto lg:h-full">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
               <div className="border-b border-border px-4 pt-0 pb-3.5">
@@ -991,6 +991,7 @@ export function LawViewer({
                     loadedAdminRulesCount={loadedAdminRulesCount}
                     hasEverLoaded={hasEverLoaded}
                     adminRules={adminRules}
+                    adminRulesProgress={adminRulesProgress}
                     adminRuleViewMode={adminRuleViewMode}
                     setAdminRuleViewMode={setAdminRuleViewMode}
                     adminRuleHtml={adminRuleHtml}
@@ -1050,6 +1051,7 @@ export function LawViewer({
                     loadedAdminRulesCount={loadedAdminRulesCount}
                     hasEverLoaded={hasEverLoaded}
                     adminRules={adminRules}
+                    adminRulesProgress={adminRulesProgress}
                     adminRuleViewMode={adminRuleViewMode}
                     setAdminRuleViewMode={setAdminRuleViewMode}
                     adminRuleHtml={adminRuleHtml}
@@ -1065,44 +1067,47 @@ export function LawViewer({
                   <ScrollArea className="h-full" ref={contentRef}>
                     <div ref={swipeRef} className="px-6 pt-0 pb-20">
                       <div className="mb-3 pb-2 border-b border-border">
-                        {/* 조문 제목 (1줄로 표시, 넘치면 말줄임) */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <h2 className="text-xl font-bold text-foreground truncate flex-1 min-w-0">
-                            {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                            {activeArticle.title && (
-                              <span className="text-muted-foreground text-lg ml-2">({activeArticle.title})</span>
-                            )}
-                          </h2>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {isOrdinance ? "자치법규" : "법률"}
-                          </Badge>
-                        </div>
+                        {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지 1줄, 버튼 2줄 */}
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                          {/* 제목 + 배지 */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h2 className="text-xl font-bold text-foreground truncate">
+                              {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                              {activeArticle.title && (
+                                <span className="text-muted-foreground text-lg ml-2">({activeArticle.title})</span>
+                              )}
+                            </h2>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {isOrdinance ? "자치법규" : "법률"}
+                            </Badge>
+                          </div>
 
-                        {/* 글씨크기 버튼 (별도 줄) */}
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                            <ZoomOut className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                            <ZoomIn className="h-3.5 w-3.5" />
-                          </Button>
-                          <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
-                              navigator.clipboard.writeText(content)
-                              toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
-                            }}
-                            title="복사"
-                            className="h-7 px-2"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
+                          {/* 글씨크기 버튼 */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                              <ZoomOut className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                              <ZoomIn className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
+                                navigator.clipboard.writeText(content)
+                                toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
+                              }}
+                              title="복사"
+                              className="h-7 px-2"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
 
