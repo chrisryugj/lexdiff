@@ -42,6 +42,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 🤖 Claude Code 작업 지침
 
+### 🚨 요구사항 명확화 우선 (CRITICAL)
+
+**모든 작업 시작 전 필수 확인**:
+
+1. **불명확한 요구사항이 있는가?**
+   - 모호하거나 정보가 부족한 부분을 찾아냄
+   - **절대 임의로 결정하지 말 것**
+   - "확인이 필요한 질문 리스트"를 우선순위별로 작성
+
+2. **질문과 함께 추천 안 제시**:
+   ```markdown
+   ## 확인이 필요한 사항
+
+   ### 1. [높은 우선순위] 레이아웃 구조
+   **질문**: 모바일과 데스크탑에서 다른 레이아웃을 사용하시나요?
+   **추천 안**: 반응형 그리드(Tailwind md: 브레이크포인트) 사용
+   **이유**: 유지보수 용이, 일관된 UX
+
+   ### 2. [중간 우선순위] 데이터 캐싱 전략
+   **질문**: API 응답을 어느 정도 기간 캐시하시겠습니까?
+   **추천 안**: 1시간 (next.revalidate: 3600)
+   **이유**: 법령 데이터는 자주 변경되지 않음
+   ```
+
+3. **사용자 답변 확인 후 작업 시작**:
+   - 모든 불명확한 사항 해결 확인
+   - agent.md 참조하여 적절한 에이전트 활용 검토
+
+**예시**:
+```
+❌ "아마도 이 방식이 맞을 것 같아 진행했습니다"
+✅ "A 방식(추천)과 B 방식이 있습니다. A 방식을 추천하는 이유는..."
+```
+
 ### 🚨 파일 크기 제한 (CRITICAL)
 
 **25,000 토큰 제한**: Claude Code는 한 번에 25,000 토큰 이상의 파일을 읽을 수 없습니다.
@@ -423,6 +457,6 @@ Task: "JSON 파싱 버그 수정"
 
 ---
 
-**Last Updated**: 2025-11-19
-**Total Lines**: ~300
-**Important Docs**: 4 files (JSON_TO_HTML_FLOW, RAG_ARCHITECTURE, DEBUGGING_GUIDE, CHANGELOG)
+**Last Updated**: 2025-11-25
+**Total Lines**: ~330
+**Important Docs**: 5 files (JSON_TO_HTML_FLOW, RAG_ARCHITECTURE, DEBUGGING_GUIDE, CHANGELOG, agent.md)
