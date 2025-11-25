@@ -44,6 +44,7 @@ interface DelegationPanelProps {
     setShowAdminRules: (show: boolean) => void
     loadingAdminRules: boolean
     loadedAdminRulesCount: number
+    hasEverLoaded: boolean
     adminRules: AdminRuleMatch[]
     adminRuleViewMode: "list" | "detail"
     setAdminRuleViewMode: (mode: "list" | "detail") => void
@@ -75,6 +76,7 @@ export function DelegationPanel({
     setShowAdminRules,
     loadingAdminRules,
     loadedAdminRulesCount,
+    hasEverLoaded,
     adminRules,
     adminRuleViewMode,
     setAdminRuleViewMode,
@@ -117,10 +119,10 @@ export function DelegationPanel({
     return (
         <>
             {/* Mobile: Tab-based view */}
-            <div className="md:hidden h-full flex flex-col">
+            <div className="md:hidden h-full flex flex-col overflow-hidden">
                 <Tabs
                     defaultValue="law"
-                    className="flex-1 flex flex-col overflow-hidden"
+                    className="flex-1 flex flex-col min-h-0"
                     onValueChange={(value) => {
                         // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
                         if (value === "admin" && !showAdminRules) {
@@ -128,7 +130,7 @@ export function DelegationPanel({
                         }
                     }}
                 >
-                    <div className="px-4 pt-2 pb-2 border-b border-border">
+                    <div className="px-4 pt-2 pb-2 border-b border-border shrink-0">
                         <TabsList className="w-full grid grid-cols-4 h-auto">
                             <TabsTrigger value="law" className="text-sm whitespace-nowrap h-9 px-2">법률</TabsTrigger>
                             <TabsTrigger value="decree" className="text-sm whitespace-nowrap h-9 px-1">
@@ -138,7 +140,7 @@ export function DelegationPanel({
                                 시행규칙 ({validDelegations.filter((d) => d.type === "시행규칙").length})
                             </TabsTrigger>
                             <TabsTrigger value="admin" className="text-sm whitespace-nowrap h-9 px-1">
-                                {loadingAdminRules ? (
+                                {(loadingAdminRules || (showAdminRules && !hasEverLoaded)) ? (
                                     <>
                                         행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
                                     </>
@@ -151,15 +153,18 @@ export function DelegationPanel({
                         </TabsList>
                     </div>
 
-                    <TabsContent value="law" className="flex-1 overflow-y-auto mt-0">
-                        <div className="prose prose-sm max-w-none dark:prose-invert p-4">
-                            <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
-                                <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
+                    <TabsContent value="law" className="flex-1 overflow-y-auto mt-0 min-h-0">
+                        <div className="prose prose-sm max-w-none w-full dark:prose-invert p-4">
+                            <div className="mb-3 pb-2 border-b border-border">
+                                {/* 조문 제목 (1줄로 표시) */}
+                                <div className="flex items-center gap-2 mb-2">
                                     <FileText className="h-4 w-4 text-foreground shrink-0" />
-                                    <span>{formatSimpleJo(activeArticle.jo, isOrdinance)}</span>
-                                    {activeArticle.title && <span className="text-muted-foreground font-bold">({activeArticle.title})</span>}
-                                    <Badge variant="secondary" className="text-xs ml-1 shrink-0">법률 본문</Badge>
-                                </h3>
+                                    <h3 className="text-base font-bold text-foreground truncate flex-1 min-w-0">
+                                        {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                                        {activeArticle.title && <span className="text-muted-foreground font-normal ml-1">({activeArticle.title})</span>}
+                                    </h3>
+                                    <Badge variant="secondary" className="text-xs shrink-0">법률 본문</Badge>
+                                </div>
                             </div>
                             <div
                                 className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
@@ -175,7 +180,7 @@ export function DelegationPanel({
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="decree" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="decree" className="flex-1 overflow-y-auto mt-0 min-h-0">
                         {isLoadingThreeTier ? (
                             <DelegationLoadingSkeleton />
                         ) : (
@@ -225,7 +230,7 @@ export function DelegationPanel({
                         )}
                     </TabsContent>
 
-                    <TabsContent value="rule" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="rule" className="flex-1 overflow-y-auto mt-0 min-h-0">
                         {isLoadingThreeTier ? (
                             <DelegationLoadingSkeleton />
                         ) : (
@@ -278,7 +283,7 @@ export function DelegationPanel({
                         )}
                     </TabsContent>
 
-                    <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0">
+                    <TabsContent value="admin" className="flex-1 overflow-y-auto mt-0 min-h-0">
                         {!showAdminRules ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <FileText className="h-12 w-12 mb-4 opacity-30" />
@@ -287,8 +292,14 @@ export function DelegationPanel({
                                     클릭 시 자동으로 로드됩니다
                                 </p>
                             </div>
-                        ) : loadingAdminRules ? (
-                            <DelegationLoadingSkeleton />
+                        ) : (loadingAdminRules || !hasEverLoaded) ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                <p className="text-sm font-medium">행정규칙 검색 중...</p>
+                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                    관련 행정규칙을 찾고 있습니다
+                                </p>
+                            </div>
                         ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
@@ -622,8 +633,14 @@ export function DelegationPanel({
                                                     클릭 시 자동으로 로드됩니다
                                                 </p>
                                             </div>
-                                        ) : loadingAdminRules ? (
-                                            <DelegationLoadingSkeleton />
+                                        ) : (loadingAdminRules || !hasEverLoaded) ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                                <p className="text-sm font-medium">행정규칙 검색 중...</p>
+                                                <p className="text-xs mt-2 text-muted-foreground/70">
+                                                    관련 행정규칙을 찾고 있습니다
+                                                </p>
+                                            </div>
                                         ) : adminRuleViewMode === "detail" && adminRuleHtml ? (
                                             <>
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
