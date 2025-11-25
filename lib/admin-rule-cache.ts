@@ -162,6 +162,46 @@ async function cleanExpiredCache(): Promise<void> {
 // ========================================
 
 /**
+ * Optimistic UI용: MST 체크 없이 캐시 엔트리 전체 반환
+ * - 페이지 새로고침 후에도 IndexedDB 캐시가 있으면 즉시 보여주기 위함
+ * - 반환값: { rules, mst } 또는 null
+ */
+export async function getLawAdminRulesPurposeCacheOptimistic(
+  lawName: string
+): Promise<{ rules: LawAdminRulesPurposeCache["rules"]; mst: string } | null> {
+  try {
+    const db = await openDB()
+    const key = lawName
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PURPOSE_STORE, "readonly")
+      const store = tx.objectStore(PURPOSE_STORE)
+      const request = store.get(key)
+
+      request.onsuccess = () => {
+        const entry = request.result as LawAdminRulesPurposeCache | undefined
+        db.close()
+
+        if (entry) {
+          // MST 체크 없이 바로 반환 (Optimistic)
+          resolve({ rules: entry.rules, mst: entry.mst })
+        } else {
+          resolve(null)
+        }
+      }
+
+      request.onerror = () => {
+        db.close()
+        reject(request.error)
+      }
+    })
+  } catch (error: any) {
+    console.error("[admin-rule-cache] Error reading optimistic cache:", error)
+    return null
+  }
+}
+
+/**
  * 법령별 전체 행정규칙의 제1조 캐시 조회
  */
 export async function getLawAdminRulesPurposeCache(

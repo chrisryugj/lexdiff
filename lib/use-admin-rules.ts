@@ -9,6 +9,7 @@ import { parseHierarchyXML } from "./hierarchy-parser"
 import { parseAdminRulePurposeOnly, checkLawArticleReference, type AdminRuleArticle } from "./admrul-parser"
 import {
   getLawAdminRulesPurposeCache,
+  getLawAdminRulesPurposeCacheOptimistic,
   setLawAdminRulesPurposeCache,
 } from "./admin-rule-cache"
 
@@ -89,16 +90,6 @@ export function useAdminRules(
       return
     }
 
-    // 전역 메모리 캐시에서 확인 (다른 컴포넌트가 이미 로드한 경우) - 이미 위에서 체크했으므로 여기선 fetch 중 대기만
-    const memoryCached = loadedLawDataCache.get(lawName)
-    if (memoryCached) {
-      setAllRules(memoryCached)
-      loadedLawNameRef.current = lawName
-      setLoadedLawName(lawName)
-      setLoadingLaw(false)
-      return
-    }
-
     // 다른 인스턴스가 이미 fetch 중이면 대기
     if (fetchingLawNames.has(lawName)) {
       setLoadingLaw(true)
@@ -124,18 +115,38 @@ export function useAdminRules(
       return () => clearInterval(waitForFetch)
     }
 
-    // 새 법령 요청 시작 - 즉시 로딩 상태로 전환 (비동기 함수 호출 전에)
+    // 새 법령 요청 시작
     fetchingLawNames.add(lawName)
-    setLoadingLaw(true)
     setLawError(null)
     setProgress(null)
 
     let cancelled = false
+    let optimisticCacheMst: string | null = null // Optimistic 캐시의 MST 저장
 
     const fetchAllRulesForLaw = async () => {
+      // ✅ Optimistic UI: IndexedDB 캐시 먼저 확인 (MST 체크 없이)
+      // 페이지 새로고침 후에도 캐시가 있으면 즉시 보여줌
+      try {
+        const optimisticCache = await getLawAdminRulesPurposeCacheOptimistic(lawName)
+        if (optimisticCache && !cancelled) {
+          // 캐시가 있으면 즉시 UI에 표시 (loading=false)
+          setAllRules(optimisticCache.rules)
+          loadedLawDataCache.set(lawName, optimisticCache.rules)
+          loadedLawNameRef.current = lawName
+          setLoadedLawName(lawName)
+          setLoadingLaw(false) // ✅ 로딩 완료 (사용자에게 즉시 보여줌)
+          optimisticCacheMst = optimisticCache.mst // 나중에 검증용
+        } else {
+          // 캐시가 없으면 로딩 표시
+          setLoadingLaw(true)
+        }
+      } catch {
+        // IndexedDB 에러 시 무시하고 진행
+        setLoadingLaw(true)
+      }
 
       try {
-        // Step 0: 법령 체계도에서 MST 가져오기
+        // Step 0: 법령 체계도에서 MST 가져오기 (백그라운드 검증용)
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
         const hierarchyResponse = await fetch(hierarchyUrl, {
           cache: 'no-store'
@@ -162,7 +173,16 @@ export function useAdminRules(
         const currentMst = hierarchy.mst || ""
         const hierarchyRules = hierarchy.adminRules
 
-        // Step 1: 캐시 확인 (법령별 전체 데이터)
+        // Step 1: Optimistic 캐시 검증 (백그라운드)
+        // MST가 일치하면 이미 보여준 데이터가 최신이므로 종료
+        if (optimisticCacheMst && optimisticCacheMst === currentMst) {
+          // ✅ MST 일치 → 캐시가 유효, 추가 작업 불필요
+          fetchingLawNames.delete(lawName)
+          return
+        }
+
+        // MST 불일치 또는 캐시 없음 → 새로 fetch 필요
+        // 기존 방식: IndexedDB에서 MST 체크하여 조회
         const cachedRules = await getLawAdminRulesPurposeCache(lawName, currentMst)
 
         if (cachedRules && !cancelled) {
@@ -175,8 +195,13 @@ export function useAdminRules(
           return
         }
 
-        // Step 2: 캐시 MISS -> API 호출하여 전체 수집
+        // Step 2: 캐시 MISS (또는 MST 불일치) -> API 호출하여 전체 수집
         if (!cancelled) {
+          // Optimistic 캐시가 stale이면 로딩 표시 + 데이터 초기화
+          if (optimisticCacheMst && optimisticCacheMst !== currentMst) {
+            console.log(`[use-admin-rules] MST mismatch: cached=${optimisticCacheMst}, current=${currentMst}. Refetching...`)
+          }
+          setLoadingLaw(true)
           setAllRules([]) // 캐시 MISS 시에만 비움
           setProgress({ current: 0, total: hierarchyRules.length })
         }
