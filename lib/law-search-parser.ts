@@ -20,7 +20,7 @@ function normalizeDateFormat(dateStr: string | undefined): string | undefined {
     return cleaned
   }
 
-  console.log(`Invalid date format, skipping: "${dateStr}"`)
+  // Invalid date format
   return undefined
 }
 
@@ -33,12 +33,10 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
     // Check for parsing errors
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
     const laws = xmlDoc.querySelectorAll("law")
-    console.log("Found laws:", laws.length)
 
     const results: LawSearchResult[] = []
 
@@ -63,20 +61,11 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
           promulgationDate,
           effectiveDate,
         })
-        console.log("Parsed law:", {
-          lawId: normalizedLawId,
-          mst,
-          lawName,
-          lawType,
-          promulgationDate,
-          effectiveDate,
-        })
       }
     })
 
     return results
   } catch (error) {
-    console.log("Law search parsing error:", error)
     debugLogger.error("법령 검색 결과 파싱 실패", error)
     return []
   }

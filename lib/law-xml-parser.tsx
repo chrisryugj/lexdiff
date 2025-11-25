@@ -91,19 +91,6 @@ function extractArticles(xmlDoc: Document): LawArticle[] {
     const joContent = joElement.querySelector("조문내용")?.textContent || ""
     const hasChanges = joElement.querySelector("조문변경여부")?.textContent === "Y"
 
-    // DEBUG: XML 원본 확인 (조문번호 55만)
-    if (joNum === "55" || joNum === "제55조") {
-      console.log("[DEBUG-XML-RAW] Article 55 XML extraction:", {
-        조문번호: joNum,
-        조문제목: joTitle,
-        조문내용_length: joContent.length,
-        조문내용_first200: joContent.substring(0, 200),
-        조문내용_starts_with: joContent.substring(0, 20),
-        has_title_in_content: joContent.includes("제55조"),
-        XML_innerHTML: joElement.innerHTML?.substring(0, 500)
-      })
-    }
-
     const revisionHistory = extractRevisionMarks(joContent, joElement)
 
     if (joContent && (!joNum.includes("조") || !joNum.includes("의"))) {
@@ -280,19 +267,6 @@ function extractRevisionMarks(
 }
 
 export function extractArticleText(article: LawArticle, isOrdinance = false, currentLawName?: string): string {
-  // DEBUG: 관세법 2조 전체 article 구조 확인
-  if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-    console.log('[DEBUG 관세법 2조 FULL ARTICLE]', {
-      jo: article.jo,
-      title: article.title,
-      contentLength: article.content?.length || 0,
-      contentPreview: article.content?.substring(0, 200),
-      hasParagraphs: !!article.paragraphs,
-      paragraphsCount: article.paragraphs?.length || 0,
-      paragraphsSample: article.paragraphs?.[0]
-    })
-  }
-
   let text = ""
 
   // CRITICAL FIX: article.content가 없어도 title이 있으면 표시
@@ -316,26 +290,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         }
       }
 
-      // DEBUG: 관세법 2조 원본 데이터 확인
-      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-        console.log('[DEBUG 관세법 2조 rawContent]', {
-          length: rawContent.length,
-          last100: rawContent.substring(rawContent.length - 100),
-          hasTrailingNewline: rawContent.endsWith('\n'),
-          hasTrailingSpace: /\s$/.test(rawContent),
-          charCodes: rawContent.substring(rawContent.length - 10).split('').map(c => c.charCodeAt(0)),
-          lastChars: rawContent.substring(rawContent.length - 10).split('').map(c => `'${c}'`).join(', ')
-        })
-      }
-
       // 1. 링크 생성 (escape 전에)
-      if (rawContent.includes('제9조') || rawContent.includes('제39조')) {
-        console.log('[extractArticleText] 제9조/제39조 발견! rawContent:', rawContent.substring(0, 500))
-        // Test regex directly
-        const testRegex = /(?<!「[^」]*)(?<!\S)(제\s*(\d+)\s*조(?:의\s*(\d+))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?!\s*[」])/g
-        const testMatches = Array.from(rawContent.matchAll(testRegex))
-        console.log('[extractArticleText] Regex test matches:', testMatches.length, testMatches.slice(0, 5).map(m => m[0]))
-      }
       content = linkifyRefsB(rawContent, currentLawName)
 
       // 2. HTML escape (링크 태그만 보존, <개정> 같은 것은 escape)
@@ -347,22 +302,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       })
 
       // 3. 개정 마커 스타일링
-      // DEBUG: 관세법 2조 개정 마커 확인
-      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-        console.log('[DEBUG applyRevisionStyling BEFORE]', {
-          contentLength: content.length,
-          개정마커샘플: content.match(/&lt;개정[^&]*&gt;/g)?.slice(0, 3),
-          contentSample: content.substring(0, 300)
-        })
-      }
       content = applyRevisionStyling(content)
-      if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-        console.log('[DEBUG applyRevisionStyling AFTER]', {
-          contentLength: content.length,
-          revMarkCount: (content.match(/class="rev-mark"/g) || []).length,
-          contentSample: content.substring(0, 300)
-        })
-      }
     } else if (article.title) {
       // article.content가 없고 title만 있는 경우
       const joDisplay = article.joNum || ('제' + article.jo + '조')
@@ -392,28 +332,8 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       return '<span class="para-marker">' + match + '</span>'
     })
 
-    // DEBUG: 관세법 2조 본문 <br> 확인
-    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-      console.log('[DEBUG 관세법 2조 content BEFORE removing trailing <br>]', {
-        contentLength: content.length,
-        contentEnd: content.substring(content.length - 100),
-        endsWithBr: content.endsWith('<br>'),
-        endsWithBrRegex: /<br>\s*$/.test(content),
-        match: content.match(/<br>\s*$/)?.[0]
-      })
-    }
-
     // CRITICAL: 본문 끝 <br> 제거 (호가 있을 경우 이중 줄바꿈 방지)
     content = content.replace(/<br>\s*$/, '')
-
-    // DEBUG: 관세법 2조 본문 <br> 확인
-    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-      console.log('[DEBUG 관세법 2조 content AFTER removing trailing <br>]', {
-        contentLength: content.length,
-        contentEnd: content.substring(content.length - 100),
-        endsWithBr: content.endsWith('<br>')
-      })
-    }
 
     text += content
   }
@@ -424,18 +344,6 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
     // 모든 호 수집
     const allItems = article.paragraphs.flatMap(para => para.items || [])
-
-    // DEBUG: 관세법 2조 확인
-    if (article.jo === "000200" && currentLawName?.includes("관세법")) {
-      console.log('[DEBUG 관세법 2조 extractArticleText]', {
-        hasParaContent,
-        paragraphsCount: article.paragraphs.length,
-        allItemsCount: allItems.length,
-        textLength: text.length,
-        textEnd: text.substring(text.length - 150),
-        textEndCharCodes: text.substring(text.length - 10).split('').map(c => `${c}(${c.charCodeAt(0)})`).join(' ')
-      })
-    }
 
     if (hasParaContent) {
       // 항내용이 있는 경우: 본문과 항 사이 줄바꿈 추가

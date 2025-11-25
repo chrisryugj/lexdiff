@@ -63,14 +63,18 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   // 로딩 상태 추적 (로딩 완료 감지용)
   const prevLoadingRef = useRef(loadingAdminRules)
 
-  // 로딩이 완료되면 hasEverLoaded 설정 (true → false 전환 시)
+  // 로딩이 완료되면 hasEverLoaded 설정
+  // 조건: showAdminRules가 true이고, 로딩이 완료되었고(false), 아직 hasEverLoaded가 false일 때
+  // 추가 조건: 실제로 로딩이 있었거나(prevLoadingRef가 true였음) 데이터가 있음(adminRules.length > 0)
   useEffect(() => {
-    // 로딩이 true였다가 false가 되었을 때만 hasEverLoaded를 true로
-    if (prevLoadingRef.current === true && loadingAdminRules === false && showAdminRules) {
-      setHasEverLoaded(true)
+    if (showAdminRules && !loadingAdminRules && !hasEverLoaded) {
+      // 로딩이 true → false로 전환됐거나, 이미 데이터가 있을 때만 완료 처리
+      if (prevLoadingRef.current === true || adminRules.length > 0) {
+        setHasEverLoaded(true)
+      }
     }
     prevLoadingRef.current = loadingAdminRules
-  }, [loadingAdminRules, showAdminRules])
+  }, [loadingAdminRules, showAdminRules, hasEverLoaded, adminRules.length])
 
   // 법령이 바뀌면 hasEverLoaded 리셋
   useEffect(() => {
