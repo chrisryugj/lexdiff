@@ -65,16 +65,25 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
 
   // 로딩이 완료되면 hasEverLoaded 설정
   // 조건: showAdminRules가 true이고, 로딩이 완료되었고(false), 아직 hasEverLoaded가 false일 때
-  // 추가 조건: 실제로 로딩이 있었거나(prevLoadingRef가 true였음) 데이터가 있음(adminRules.length > 0)
+  // ✅ Optimistic UI 대응: 데이터가 있으면 로딩 전환 없이도 완료 처리
   useEffect(() => {
     if (showAdminRules && !loadingAdminRules && !hasEverLoaded) {
       // 로딩이 true → false로 전환됐거나, 이미 데이터가 있을 때만 완료 처리
+      // ✅ Optimistic 캐시 히트: loading이 처음부터 false이고 데이터가 있는 경우도 포함
       if (prevLoadingRef.current === true || adminRules.length > 0) {
         setHasEverLoaded(true)
       }
     }
     prevLoadingRef.current = loadingAdminRules
   }, [loadingAdminRules, showAdminRules, hasEverLoaded, adminRules.length])
+
+  // ✅ Optimistic UI 대응: adminRules가 로드되면 즉시 hasEverLoaded 설정
+  // (로딩 전환 없이 데이터가 바로 들어온 경우)
+  useEffect(() => {
+    if (showAdminRules && adminRules.length > 0 && !hasEverLoaded) {
+      setHasEverLoaded(true)
+    }
+  }, [showAdminRules, adminRules.length, hasEverLoaded])
 
   // 법령이 바뀌면 hasEverLoaded 리셋
   useEffect(() => {
