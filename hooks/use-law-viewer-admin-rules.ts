@@ -46,6 +46,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   // Admin rules data
   const {
     adminRules,
+    allRulesCount,
     loading: loadingAdminRules,
     error: adminRulesError,
     progress: adminRulesProgress
@@ -65,25 +66,25 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
 
   // 로딩이 완료되면 hasEverLoaded 설정
   // 조건: showAdminRules가 true이고, 로딩이 완료되었고(false), 아직 hasEverLoaded가 false일 때
-  // ✅ Optimistic UI 대응: 데이터가 있으면 로딩 전환 없이도 완료 처리
+  // ✅ allRulesCount 사용: 필터링 전 전체 규칙 수로 판단 (특정 조문에 매칭 0개여도 로딩 완료)
   useEffect(() => {
     if (showAdminRules && !loadingAdminRules && !hasEverLoaded) {
-      // 로딩이 true → false로 전환됐거나, 이미 데이터가 있을 때만 완료 처리
-      // ✅ Optimistic 캐시 히트: loading이 처음부터 false이고 데이터가 있는 경우도 포함
-      if (prevLoadingRef.current === true || adminRules.length > 0) {
+      // 로딩이 true → false로 전환됐거나, 전체 데이터가 있을 때 완료 처리
+      // ✅ allRulesCount: 필터링 결과가 0개여도, 전체 규칙이 로드됐으면 완료
+      if (prevLoadingRef.current === true || allRulesCount > 0) {
         setHasEverLoaded(true)
       }
     }
     prevLoadingRef.current = loadingAdminRules
-  }, [loadingAdminRules, showAdminRules, hasEverLoaded, adminRules.length])
+  }, [loadingAdminRules, showAdminRules, hasEverLoaded, allRulesCount])
 
-  // ✅ Optimistic UI 대응: adminRules가 로드되면 즉시 hasEverLoaded 설정
-  // (로딩 전환 없이 데이터가 바로 들어온 경우)
+  // ✅ Optimistic UI 대응: allRules가 로드되면 즉시 hasEverLoaded 설정
+  // (로딩 전환 없이 데이터가 바로 들어온 경우 - 필터링 전 전체 규칙 기준)
   useEffect(() => {
-    if (showAdminRules && adminRules.length > 0 && !hasEverLoaded) {
+    if (showAdminRules && allRulesCount > 0 && !hasEverLoaded) {
       setHasEverLoaded(true)
     }
-  }, [showAdminRules, adminRules.length, hasEverLoaded])
+  }, [showAdminRules, allRulesCount, hasEverLoaded])
 
   // 법령이 바뀌면 hasEverLoaded 리셋
   useEffect(() => {

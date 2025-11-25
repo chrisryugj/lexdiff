@@ -33,6 +33,7 @@ export interface AdminRuleMatch {
 
 interface UseAdminRulesResult {
   adminRules: AdminRuleMatch[]
+  allRulesCount: number // 필터링 전 전체 규칙 수 (로딩 완료 판단용)
   loading: boolean // 법령 데이터 로딩 중 여부 (조문 변경 시에는 false 유지)
   error: string | null
   progress: { current: number; total: number } | null
@@ -161,8 +162,13 @@ export function useAdminRules(
 
         if (!hierarchy || !hierarchy.adminRules || hierarchy.adminRules.length === 0) {
           if (cancelled) return
-          setAllRules([])
-          loadedLawDataCache.set(lawName, []) // 빈 결과도 캐시
+          // ✅ Optimistic 캐시가 있었으면 그 데이터 유지 (체계도 빈 결과는 무시)
+          // 체계도 API가 빈 결과를 반환해도 IndexedDB 캐시가 유효할 수 있음
+          if (!optimisticCacheMst) {
+            // Optimistic 캐시가 없었던 경우에만 빈 결과 설정
+            setAllRules([])
+            loadedLawDataCache.set(lawName, [])
+          }
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
@@ -351,6 +357,7 @@ export function useAdminRules(
 
   return {
     adminRules: filteredRules,
+    allRulesCount: allRules.length, // 필터링 전 전체 규칙 수
     loading: loadingLaw, // 법령 로딩 중일 때만 true
     error: lawError,
     progress
