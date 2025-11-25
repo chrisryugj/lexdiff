@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAdminRules, type AdminRuleMatch } from '@/lib/use-admin-rules'
 import type { LawMeta } from '@/lib/law-types'
 import { parseAdminRuleContent, formatAdminRuleHTML } from '@/lib/admrul-parser'
@@ -48,6 +48,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     adminRules,
     allRulesCount,
     loading: loadingAdminRules,
+    dataReady, // ✅ 데이터 로드 완료 여부 (Optimistic 캐시 포함)
     error: adminRulesError,
     progress: adminRulesProgress
   } = useAdminRules(
@@ -61,36 +62,16 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
     setLoadedAdminRulesCount(adminRules.length)
   }, [adminRules.length])
 
-  // 로딩 상태 추적 (로딩 완료 감지용)
-  const prevLoadingRef = useRef(loadingAdminRules)
-
-  // 로딩이 완료되면 hasEverLoaded 설정
-  // 조건: showAdminRules가 true이고, 로딩이 완료되었고(false), 아직 hasEverLoaded가 false일 때
-  // ✅ allRulesCount 사용: 필터링 전 전체 규칙 수로 판단 (특정 조문에 매칭 0개여도 로딩 완료)
+  // ✅ 간소화된 hasEverLoaded 로직: dataReady 플래그 사용
+  // dataReady는 use-admin-rules.ts에서 모든 로드 완료 시점에 true로 설정됨
+  // 법령명이 바뀌면 dataReady가 잠시 false가 되므로 그 때 hasEverLoaded도 리셋
   useEffect(() => {
-    if (showAdminRules && !loadingAdminRules && !hasEverLoaded) {
-      // 로딩이 true → false로 전환됐거나, 전체 데이터가 있을 때 완료 처리
-      // ✅ allRulesCount: 필터링 결과가 0개여도, 전체 규칙이 로드됐으면 완료
-      if (prevLoadingRef.current === true || allRulesCount > 0) {
-        setHasEverLoaded(true)
-      }
-    }
-    prevLoadingRef.current = loadingAdminRules
-  }, [loadingAdminRules, showAdminRules, hasEverLoaded, allRulesCount])
-
-  // ✅ Optimistic UI 대응: allRules가 로드되면 즉시 hasEverLoaded 설정
-  // (로딩 전환 없이 데이터가 바로 들어온 경우 - 필터링 전 전체 규칙 기준)
-  useEffect(() => {
-    if (showAdminRules && allRulesCount > 0 && !hasEverLoaded) {
+    if (showAdminRules && dataReady) {
       setHasEverLoaded(true)
+    } else if (showAdminRules && !dataReady) {
+      setHasEverLoaded(false)
     }
-  }, [showAdminRules, allRulesCount, hasEverLoaded])
-
-  // 법령이 바뀌면 hasEverLoaded 리셋
-  useEffect(() => {
-    setHasEverLoaded(false)
-    prevLoadingRef.current = false
-  }, [meta.lawTitle])
+  }, [showAdminRules, dataReady])
 
   // Handler: view admin rule full content
   const handleViewAdminRuleFullContent = async (rule: AdminRuleMatch) => {

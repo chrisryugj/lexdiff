@@ -35,6 +35,7 @@ interface UseAdminRulesResult {
   adminRules: AdminRuleMatch[]
   allRulesCount: number // 필터링 전 전체 규칙 수 (로딩 완료 판단용)
   loading: boolean // 법령 데이터 로딩 중 여부 (조문 변경 시에는 false 유지)
+  dataReady: boolean // 데이터 로드 완료 여부 (Optimistic 캐시 포함)
   error: string | null
   progress: { current: number; total: number } | null
 }
@@ -56,6 +57,7 @@ export function useAdminRules(
   }>>([])
 
   const [loadingLaw, setLoadingLaw] = useState(false)
+  const [dataReady, setDataReady] = useState(false) // 데이터 로드 완료 여부
   const [lawError, setLawError] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
@@ -73,6 +75,7 @@ export function useAdminRules(
         loadedLawNameRef.current = lawName
         setLoadedLawName(lawName)
         setLoadingLaw(false)
+        setDataReady(true) // ✅ 메모리 캐시 히트 - 즉시 ready
         return
       }
     }
@@ -80,6 +83,7 @@ export function useAdminRules(
     // enabled가 false면 여기서 종료 (캐시 없으면 로딩 안 함)
     if (!enabled || !lawName) {
       setLoadingLaw(false)
+      setDataReady(false) // enabled가 아니면 ready 아님
       setLawError(null)
       setProgress(null)
       return
@@ -88,12 +92,14 @@ export function useAdminRules(
     // 이미 로드된 법령이면 스킵 (ref 사용하여 최신 값 참조)
     if (lawName === loadedLawNameRef.current) {
       setLoadingLaw(false) // 이미 로드된 경우 로딩 해제
+      setDataReady(true) // 이미 로드됨 = ready
       return
     }
 
     // 다른 인스턴스가 이미 fetch 중이면 대기
     if (fetchingLawNames.has(lawName)) {
       setLoadingLaw(true)
+      setDataReady(false) // 대기 중 = not ready
       // 폴링으로 완료 대기
       const waitForFetch = setInterval(() => {
         const cached = loadedLawDataCache.get(lawName)
@@ -103,6 +109,7 @@ export function useAdminRules(
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 폴링 완료 - ready
         }
         // fetch가 완료되었지만 캐시가 없는 경우 (빈 결과)
         if (!fetchingLawNames.has(lawName) && !cached) {
@@ -111,6 +118,7 @@ export function useAdminRules(
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 빈 결과도 ready (로드 완료)
         }
       }, 100)
       return () => clearInterval(waitForFetch)
@@ -118,6 +126,7 @@ export function useAdminRules(
 
     // 새 법령 요청 시작
     fetchingLawNames.add(lawName)
+    setDataReady(false) // 새 요청 시작 = not ready yet
     setLawError(null)
     setProgress(null)
 
@@ -127,15 +136,19 @@ export function useAdminRules(
     const fetchAllRulesForLaw = async () => {
       // ✅ Optimistic UI: IndexedDB 캐시 먼저 확인 (MST 체크 없이)
       // 페이지 새로고침 후에도 캐시가 있으면 즉시 보여줌
+      // ⚠️ 중요: Optimistic 캐시는 cancelled 체크 없이 즉시 적용 (Strict Mode 대응)
       try {
         const optimisticCache = await getLawAdminRulesPurposeCacheOptimistic(lawName)
-        if (optimisticCache && !cancelled) {
+        // ✅ Optimistic 캐시는 cancelled 체크 제거 - Strict Mode에서도 작동하도록
+        // 어차피 메모리 캐시에 저장되므로 중복 실행되어도 안전함
+        if (optimisticCache) {
           // 캐시가 있으면 즉시 UI에 표시 (loading=false)
           setAllRules(optimisticCache.rules)
           loadedLawDataCache.set(lawName, optimisticCache.rules)
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false) // ✅ 로딩 완료 (사용자에게 즉시 보여줌)
+          setDataReady(true) // ✅✅ Optimistic 캐시 로드 완료 - 핵심!
           optimisticCacheMst = optimisticCache.mst // 나중에 검증용
         } else {
           // 캐시가 없으면 로딩 표시
@@ -172,6 +185,7 @@ export function useAdminRules(
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 빈 결과도 ready (로드 완료)
           fetchingLawNames.delete(lawName)
           return
         }
@@ -183,6 +197,7 @@ export function useAdminRules(
         // MST가 일치하면 이미 보여준 데이터가 최신이므로 종료
         if (optimisticCacheMst && optimisticCacheMst === currentMst) {
           // ✅ MST 일치 → 캐시가 유효, 추가 작업 불필요
+          // dataReady는 이미 Optimistic 로드 시 true로 설정됨
           fetchingLawNames.delete(lawName)
           return
         }
@@ -197,6 +212,7 @@ export function useAdminRules(
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 유효한 MST 캐시 로드 완료
           fetchingLawNames.delete(lawName)
           return
         }
@@ -208,6 +224,7 @@ export function useAdminRules(
             console.log(`[use-admin-rules] MST mismatch: cached=${optimisticCacheMst}, current=${currentMst}. Refetching...`)
           }
           setLoadingLaw(true)
+          setDataReady(false) // MST 불일치 = 새로 fetch 필요 = not ready
           setAllRules([]) // 캐시 MISS 시에만 비움
           setProgress({ current: 0, total: hierarchyRules.length })
         }
@@ -220,13 +237,12 @@ export function useAdminRules(
         }> = []
 
         let completed = 0
-        const BATCH_SIZE = 10
+        const BATCH_SIZE = 25 // ✅ 배치 사이즈 증가 (10 → 25)
 
         const processRule = async (rule: any): Promise<void> => {
           const idParam = rule.serialNumber || rule.id
           if (!idParam) {
             completed++
-            if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
             return
           }
 
@@ -236,7 +252,6 @@ export function useAdminRules(
 
             if (!contentResponse.ok) {
               completed++
-              if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
               fetchedRules.push({
                 id: rule.id,
                 name: rule.name,
@@ -257,12 +272,10 @@ export function useAdminRules(
             })
 
             completed++
-            if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
 
           } catch (err) {
             console.error(`[use-admin-rules] Error processing ${rule.name}:`, err)
             completed++
-            if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
             fetchedRules.push({
               id: rule.id,
               name: rule.name,
@@ -272,11 +285,13 @@ export function useAdminRules(
           }
         }
 
-        // 배치 처리
+        // 배치 처리 (progress는 배치 단위로만 업데이트하여 렌더링 부하 감소)
         for (let i = 0; i < hierarchyRules.length; i += BATCH_SIZE) {
           if (cancelled) break
           const batch = hierarchyRules.slice(i, i + BATCH_SIZE)
           await Promise.all(batch.map(processRule))
+          // ✅ 배치 완료 시에만 progress 업데이트 (렌더링 최적화)
+          if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
         }
 
         if (!cancelled) {
@@ -288,6 +303,7 @@ export function useAdminRules(
           loadedLawNameRef.current = lawName
           setLoadedLawName(lawName)
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 전체 fetch 완료 - ready
           setProgress(null)
         }
         fetchingLawNames.delete(lawName)
@@ -298,6 +314,7 @@ export function useAdminRules(
           console.error("[use-admin-rules] Error:", err)
           setLawError(err.message || "행정규칙 조회 중 오류 발생")
           setLoadingLaw(false)
+          setDataReady(true) // ✅ 에러도 ready (로드 시도 완료)
           setProgress(null)
         }
       }
@@ -359,6 +376,7 @@ export function useAdminRules(
     adminRules: filteredRules,
     allRulesCount: allRules.length, // 필터링 전 전체 규칙 수
     loading: loadingLaw, // 법령 로딩 중일 때만 true
+    dataReady, // ✅ 데이터 로드 완료 여부 (hasEverLoaded 판단용)
     error: lawError,
     progress
   }
