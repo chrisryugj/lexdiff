@@ -152,6 +152,7 @@ export function LawViewer({
     adminRulePanelSize,
     setAdminRulePanelSize,
     loadedAdminRulesCount,
+    hasEverLoaded,
     adminRules,
     loadingAdminRules,
     adminRulesError,
@@ -988,6 +989,7 @@ export function LawViewer({
                     setShowAdminRules={setShowAdminRules}
                     loadingAdminRules={loadingAdminRules}
                     loadedAdminRulesCount={loadedAdminRulesCount}
+                    hasEverLoaded={hasEverLoaded}
                     adminRules={adminRules}
                     adminRuleViewMode={adminRuleViewMode}
                     setAdminRuleViewMode={setAdminRuleViewMode}
@@ -1046,6 +1048,7 @@ export function LawViewer({
                     setShowAdminRules={setShowAdminRules}
                     loadingAdminRules={loadingAdminRules}
                     loadedAdminRulesCount={loadedAdminRulesCount}
+                    hasEverLoaded={hasEverLoaded}
                     adminRules={adminRules}
                     adminRuleViewMode={adminRuleViewMode}
                     setAdminRuleViewMode={setAdminRuleViewMode}
