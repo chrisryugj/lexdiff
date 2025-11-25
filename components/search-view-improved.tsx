@@ -1,12 +1,3 @@
-/**
- * search-view-improved.tsx
- *
- * 개선된 메인 화면 컴포넌트 (Apple Style Scroll)
- * - Fixed Hero Section with 200px top margin
- * - Three distinct scroll animations for each section
- * - Premium UI/UX with advanced effects
- */
-
 "use client"
 
 import { Header } from "@/components/header"
@@ -15,9 +6,10 @@ import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeatureCards } from "@/components/feature-cards"
 import { StatsSection } from "@/components/stats-section"
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import type { Favorite } from "@/lib/law-types"
+import { motion } from "framer-motion"
 
 export interface SearchViewProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => Promise<void>
@@ -35,18 +27,12 @@ export function SearchViewImproved({
   searchMode,
 }: SearchViewProps) {
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
-  const [heroVisible, setHeroVisible] = useState(false)
 
   // Refs for scrolling to sections
   const featuresRef = useRef<HTMLElement>(null)
   const ctaRef = useRef<HTMLElement>(null)
 
   const isLoading = isSearching || ragLoading
-
-  // Initial sequential animation on page load for Hero
-  useEffect(() => {
-    setTimeout(() => setHeroVisible(true), 300)
-  }, [])
 
   const handleReset = () => {
     // Already on home
@@ -77,6 +63,31 @@ export function SearchViewImproved({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+        delayChildren: 0.1,
+      },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20, filter: "blur(10px)" },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.8,
+        ease: [0.16, 1, 0.3, 1], // Apple-style ease
+      },
+    },
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Fixed Header + Hero Section */}
@@ -84,38 +95,53 @@ export function SearchViewImproved({
         <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
 
         {/* Hero Section - Fixed */}
-        <section className={`hero-gradient hero-section ${heroVisible ? 'is-visible' : ''}`}>
+        <section className="hero-gradient">
           <div className="container mx-auto max-w-[1280px] px-6 pt-[40px] md:pt-[50px] pb-[10px] md:pb-[10px]">
-            <div className="flex flex-col items-center text-center space-y-4 md:space-y-6">
+            <motion.div
+              className="flex flex-col items-center text-center space-y-4 md:space-y-6"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {/* Title & Subtitle */}
               <div className="space-y-2 md:space-y-4">
-                <h1
+                <motion.h1
+                  variants={itemVariants}
                   className="text-5xl md:text-7xl font-bold text-foreground tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ fontFamily: "GiantsInline, sans-serif" }}
                   onClick={handleLogoClick}
                 >
                   LexDiff
-                </h1>
-                <p className="text-lg md:text-3xl text-muted-foreground font-bold" style={{ fontFamily: "ReperepointSpecialItalic, sans-serif" }}>
+                </motion.h1>
+                <motion.p
+                  variants={itemVariants}
+                  className="text-lg md:text-3xl text-muted-foreground font-bold"
+                  style={{ fontFamily: "ReperepointSpecialItalic, sans-serif" }}
+                >
                   Legal AI Platform
-                </p>
-                <p className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                </motion.p>
+                <motion.p
+                  variants={itemVariants}
+                  className="text-sm md:text-lg text-muted-foreground/80 max-w-2xl mx-auto"
+                  style={{ fontFamily: "Pretendard, sans-serif" }}
+                >
                   <span className="md:hidden">법령 검색부터 AI 분석까지,<br />대한민국 법률 정보를 가장 쉽고 빠르게</span>
                   <span className="hidden md:inline">법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게</span>
-                </p>
+                </motion.p>
               </div>
 
               {/* Search Bar */}
-              <div className="w-full max-w-3xl">
+              <motion.div variants={itemVariants} className="w-full max-w-3xl">
                 <SearchBar
                   onSearch={onSearch}
                   isLoading={isLoading}
                   searchMode={searchMode}
                 />
-              </div>
+              </motion.div>
 
               {/* Scroll Indicator */}
-              <div
+              <motion.div
+                variants={itemVariants}
                 className="scroll-indicator cursor-pointer"
                 onClick={handleScrollIndicatorClick}
                 role="button"
@@ -134,8 +160,8 @@ export function SearchViewImproved({
                     d="M19 9l-7 7-7-7"
                   />
                 </svg>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
         </section>
       </div>
@@ -219,19 +245,6 @@ export function SearchViewImproved({
       <ErrorReportDialog />
 
       <style jsx global>{`
-        /* Hero Section - Blur fade-in only */
-        .hero-section {
-          opacity: 0;
-          filter: blur(5px);
-          transition: opacity 2s cubic-bezier(0.16, 1, 0.3, 1),
-                      filter 1s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .hero-section.is-visible {
-          opacity: 1;
-          filter: blur(0px);
-        }
-
         /* Smooth scrolling */
         html {
           scroll-behavior: smooth;

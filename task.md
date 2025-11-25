@@ -6,6 +6,26 @@
 
 ## 2025-11-25
 
+### [21:30 KST] 최적화 계획 문서 업데이트
+- **Files**:
+  - `docs/integrated-optimization-plan.md` (modified)
+  - `docs/future/FUTURE_ROADMAP.md` (modified)
+- **Changes**:
+  - **integrated-optimization-plan.md 전면 개정**:
+    - 현재 코드베이스 상태 반영 (API 49개, 컴포넌트 87개)
+    - 최근 완료 작업 목록 추가 (rag-answer/rag-search 삭제, Optimistic UI)
+    - 미완료 데드 코드 목록 업데이트 (search-progress, search-view 파일들)
+    - P0~P3 우선순위 재정의
+    - search-result-view.tsx (2,266줄) 분할 계획 상세화
+    - law-viewer.tsx (1,176줄) 분할 계획 추가
+    - 실행 체크리스트 현행화
+  - **FUTURE_ROADMAP.md 업데이트**:
+    - 현재 활성화 시스템 목록 갱신 (File Search RAG, Optimistic UI 등)
+    - Phase 8~12 기능 로드맵 간소화
+    - 월간 비용 추정 업데이트
+- **Impact**: 최적화 문서가 현재 프로젝트 상태와 일치
+- **Reason**: 사용자 요청 (최적화 계획 현행화)
+
 ### [21:00 KST] CLAUDE.md, README.md 리프레시 및 데드 코드 정리
 - **Files**:
   - `CLAUDE.md` (modified)
