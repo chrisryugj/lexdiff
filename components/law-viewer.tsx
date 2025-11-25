@@ -720,7 +720,7 @@ export function LawViewer({
   return (
     <>
       <div className="w-full mx-auto max-w-[1280px]">
-        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-12rem)] lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-10rem)] lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
           {/* Mobile overlay backdrop */}
           {isArticleListExpanded && (
             <div
@@ -818,7 +818,7 @@ export function LawViewer({
           />
 
           {/* Right panel - Article content */}
-          <Card className="flex flex-col overflow-hidden">
+          <Card className="flex flex-col overflow-hidden h-full">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
               <div className="border-b border-border px-4 pt-0 pb-3.5">
