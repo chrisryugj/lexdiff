@@ -46,7 +46,7 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   // Admin rules data
   const {
     adminRules,
-    isLoading: loadingAdminRules,
+    loading: loadingAdminRules,
     error: adminRulesError,
     progress: adminRulesProgress
   } = useAdminRules(
