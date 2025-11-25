@@ -202,7 +202,7 @@ export async function getLawAdminRulesPurposeCacheOptimistic(
 }
 
 /**
- * 법령별 전체 행정규칙의 제1조 캐시 조회
+ * 법령별 전체 행정규칙의 제1조 캐시 조회 (MST 검증 포함)
  */
 export async function getLawAdminRulesPurposeCache(
   lawName: string,
@@ -253,6 +253,39 @@ export async function getLawAdminRulesPurposeCache(
       }
     }
 
+    return null
+  }
+}
+
+/**
+ * 법령별 전체 행정규칙의 제1조 캐시 조회 (MST 검증 없음 - Optimistic UI용)
+ * - 캐시된 데이터와 MST를 함께 반환하여 호출자가 백그라운드에서 검증할 수 있게 함
+ */
+export async function getLawAdminRulesPurposeCacheEntry(
+  lawName: string
+): Promise<LawAdminRulesPurposeCache | null> {
+  try {
+    const db = await openDB()
+    const key = lawName
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PURPOSE_STORE, "readonly")
+      const store = tx.objectStore(PURPOSE_STORE)
+      const request = store.get(key)
+
+      request.onsuccess = () => {
+        const entry = request.result as LawAdminRulesPurposeCache | undefined
+        db.close()
+        resolve(entry || null)
+      }
+
+      request.onerror = () => {
+        db.close()
+        reject(request.error)
+      }
+    })
+  } catch (error) {
+    console.error("[admin-rule-cache] Error reading purpose cache entry:", error)
     return null
   }
 }
