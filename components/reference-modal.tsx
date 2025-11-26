@@ -165,7 +165,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </Button>
-                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums">{fontSize}</span>
+                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums hidden sm:inline">{fontSize}</span>
                 <Button
                   variant="ghost"
                   size="sm"

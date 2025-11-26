@@ -48,7 +48,7 @@ import { VirtualizedFullArticleView } from "@/components/virtualized-full-articl
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { DelegationPanel } from "@/components/law-viewer-delegation-panel"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
-import { parseArticleHistoryXML } from "@/lib/revision-parser"
+import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
 import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
@@ -765,7 +765,7 @@ export function LawViewer({
     <>
       <div className="w-full mx-auto lg:max-w-[1280px]">
         <div
-          className={`relative grid gap-4 min-h-0 lg:h-[calc(100vh-80px)] ${
+          className={`relative grid gap-0 sm:gap-4 min-h-0 lg:h-[calc(100vh-80px)] ${
             isArticleListCollapsed
               ? 'grid-cols-1 lg:grid-cols-[64px_1fr]'
               : 'grid-cols-1 lg:grid-cols-[1fr_4fr]'
@@ -965,7 +965,7 @@ export function LawViewer({
           <Card className="flex flex-col overflow-hidden h-auto lg:h-full p-0 gap-0">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
-              <div className="border-b border-border px-4 pt-6 pb-3.5">
+              <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 sm:pb-3.5">
                 <div className="flex items-center gap-2 mb-1">
                   <BookOpen className="h-5 w-5 text-primary" />
                   <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
@@ -979,7 +979,7 @@ export function LawViewer({
                   {meta.latestEffectiveDate && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       <Calendar className="h-3 w-3 mr-1" />
-                      {meta.latestEffectiveDate}
+                      {formatDate(meta.latestEffectiveDate)}
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-xs px-1.5 py-0.5">
@@ -1022,23 +1022,26 @@ export function LawViewer({
             {/* Action Buttons */}
             {
               !aiAnswerMode && !isOrdinance && activeArticle && (
-                <div className="border-b border-border px-4 py-0.5 pt-3 pb-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
-                      <GitCompare className="h-3.5 w-3.5 mr-1" />
-                      신·구법 비교
+                <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
+                  <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
+                    <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+                      <GitCompare className="h-3.5 w-3.5 sm:mr-1" />
+                      <span className="hidden sm:inline">신·구법 비교</span>
+                      <span className="sm:hidden">비교</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-2">
-                      <Sparkles className="h-3.5 w-3.5 mr-1" />
-                      AI 요약
+                    <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+                      <Sparkles className="h-3.5 w-3.5 sm:mr-1" />
+                      <span className="hidden sm:inline">AI 요약</span>
+                      <span className="sm:hidden">요약</span>
                     </Button>
+                    {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
                     <Button
                       key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
                       variant="outline"
                       size="sm"
                       onClick={() => onToggleFavorite?.(activeArticle.jo)}
                       data-favorited={isFavorite(activeArticle.jo)}
-                      className={`h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
+                      className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
                         ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
                         : ''
                         }`}
@@ -1046,9 +1049,10 @@ export function LawViewer({
                       <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
                       즐겨찾기
                     </Button>
-                    <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                      원문 보기
+                    <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
+                      <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
+                      <span className="hidden sm:inline">원문 보기</span>
+                      <span className="sm:hidden">원문</span>
                     </Button>
                     {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
                     {!isOrdinance && !aiAnswerMode && (
@@ -1071,14 +1075,15 @@ export function LawViewer({
                           }
                         }}
                         title="위임법령 보기 (시행령/시행규칙/행정규칙)"
-                        className="h-7 px-2"
+                        className="h-7 px-1.5 sm:px-2 shrink-0"
                       >
                         {isLoadingThreeTier ? (
-                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
                         ) : (
-                          <FileText className="h-3.5 w-3.5 mr-1" />
+                          <FileText className="h-3.5 w-3.5 sm:mr-1" />
                         )}
-                        {tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}
+                        <span className="hidden sm:inline">{tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}</span>
+                        <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
                       </Button>
                     )}
                   </div>
@@ -1088,7 +1093,7 @@ export function LawViewer({
 
             {
               isOrdinance && (
-                <div className="border-b border-border px-4 py-0.5 pt-3 pb-3">
+                <div className="border-b border-border px-3 sm:px-4 py-0.5 pt-2 sm:pt-3 pb-2 sm:pb-3">
                   <div className="flex items-center gap-1">
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
                       <ExternalLink className="h-3.5 w-3.5 mr-1" />
@@ -1217,11 +1222,11 @@ export function LawViewer({
                   />
                 ) : (
                   <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-3 pb-3">
-                      <div className="mb-3 pb-2 border-b border-border">
-                        {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지 1줄, 버튼 2줄 */}
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-                          {/* 제목 + 배지 */}
+                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
+                      <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
+                        {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지+즐겨찾기 1줄, 버튼 2줄 */}
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-0.5 lg:gap-2">
+                          {/* 제목 + 배지 + 즐겨찾기(모바일) */}
                           <div className="flex items-center gap-2 min-w-0">
                             <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
                               {formatSimpleJo(activeArticle.jo, isOrdinance)}
@@ -1232,6 +1237,17 @@ export function LawViewer({
                             <Badge variant="outline" className="text-xs shrink-0">
                               {isOrdinance ? "자치법규" : "법률"}
                             </Badge>
+                            {/* 즐겨찾기 버튼 - 모바일에서 제목줄 우측 */}
+                            <Button
+                              key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                              className="lg:hidden ml-auto h-7 w-7 p-0 shrink-0"
+                              title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                            >
+                              <Star className={`h-4 w-4 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                            </Button>
                           </div>
 
                           {/* 글씨크기 버튼 */}
