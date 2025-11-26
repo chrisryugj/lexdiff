@@ -6,6 +6,90 @@
 
 ## 2025-11-26
 
+### [23:30 KST] Claude Code /doctor 오류 수정 및 가이드 문서 추가
+- **Files**:
+  - `.claude/agents/*.md` (modified) - 5개 파일
+  - `.clauderc` (deleted)
+  - `docs/CLAUDE_CODE_DOCTOR_FIXES.md` (created)
+- **Changes**:
+  - Agent 파일에 YAML frontmatter 추가 (name, description 필수)
+  - .clauderc 삭제 (deprecated - settings.json으로 대체)
+  - /doctor 수정 가이드 문서 작성
+- **Impact**: Claude Code /doctor 검사 통과, 회사 프로젝트 적용 가이드
+
+### [23:00 KST] AI 검색 결과 캐시로 뒤로가기 시 즉시 복원
+- **Files**:
+  - `components/search-result-view.tsx` (modified)
+  - `components/law-viewer.tsx` (modified)
+  - `lib/search-result-store.ts` (modified)
+- **Changes**:
+  - AI 검색(RAG) 결과를 IndexedDB에 캐시 저장
+  - 뒤로가기 시 API 재호출 없이 캐시에서 즉시 복원
+  - aiMode에 aiCitations, userQuery, fileSearchFailed 필드 추가
+  - AI 모드에서 article-history API 호출 스킵 (503 에러 방지)
+  - PC 법령뷰 즐겨찾기 버튼을 위임법령 오른쪽으로 이동
+- **Impact**: AI 검색 후 홈 → 뒤로가기 시 즉시 복원 (재로딩 없음)
+
+### [22:00 KST] 모바일 UI 개선 - 패딩 조정, 액션버튼 1줄화, 날짜 포맷 통일
+- **Files**:
+  - `components/law-viewer.tsx` (modified)
+  - `components/law-viewer-ai-answer.tsx` (modified)
+  - `components/search-result-view.tsx` (modified)
+  - `components/reference-modal.tsx` (modified)
+- **Changes**:
+  - 모바일 본문 카드 패딩 조정 (컨테이너 p-2 pt-3, 내부 px-3 pt-4)
+  - 조문 제목줄에 즐겨찾기 아이콘 버튼 추가 (모바일)
+  - 액션버튼 1줄 표시: 텍스트 축약 (비교/요약/원문/위임)
+  - 시행일 날짜 형식 YYYYMMDD → YYYY-MM-DD 통일
+  - 레퍼런스 모달 모바일에서 글자크기 숫자 숨김
+- **Impact**: 모바일 화면 활용도 향상, UI 일관성 개선
+
+### [21:00 KST] UI 테마 시스템 개선 및 레이아웃 최적화
+- **Files**:
+  - `components/command-search-modal.tsx` (modified)
+  - `components/floating-compact-header.tsx` (modified)
+  - `components/law-viewer-ai-answer.tsx` (modified)
+  - `components/law-viewer.tsx` (modified)
+  - `components/reference-modal.tsx` (modified)
+  - `components/search-result-view.tsx` (modified)
+- **Changes**:
+  - 검색 모달: 하드코딩된 색상을 CSS 변수로 전환 (다크/라이트 테마 지원)
+  - AI 답변: PC/모바일 레이아웃 분리, 신뢰도 배지 위치 최적화
+  - 법령 뷰어: 그리드 레이아웃 CSS 클래스 방식으로 변경
+  - 참조 모달: 헤더 UI 개선, 법제처 원문 버튼 추가
+  - 즐겨찾기: formatJO 함수로 조문 번호 포맷 통일
+- **Impact**: 테마 시스템 일관성, PC/모바일 레이아웃 최적화
+
+### [20:00 KST] 모바일 위임법령 탭뷰 링크 클릭 시 탭 전환 기능 완전 구현
+- **Files**: `components/law-viewer.tsx` (modified)
+- **Changes**: 위임법령 탭 내 링크 클릭 시 해당 탭으로 자동 전환
+- **Impact**: 모바일에서 위임법령 탐색 UX 개선
+
+### [19:00 KST] AI 검색 History 통합, 즐겨찾기 키 정규화, 모바일 레이아웃 개선
+- **Files**: 다수 컴포넌트 수정
+- **Changes**:
+  - AI 검색도 History API에 통합 (뒤로가기 지원)
+  - 즐겨찾기 키를 lawTitle-jo 조합으로 정규화
+  - 모바일 레이아웃 개선
+- **Impact**: AI 검색 ↔ 홈 네비게이션 자연스러움
+
+### [18:00 KST] AI 답변 헤더 및 질문 표시 UI 개선
+- **Files**: `components/law-viewer-ai-answer.tsx` (modified)
+- **Changes**: 헤더 레이아웃 개선, 질문 표시 추가
+- **Impact**: AI 답변 컨텍스트 명확화
+
+### [17:00 KST] AI 답변 및 관련 법령 사이드바 UI 개선
+- **Files**: 다수 컴포넌트 수정
+- **Changes**: 사이드바 레이아웃, 패딩, 잘림 현상 수정
+- **Impact**: AI 모드 사이드바 가독성 향상
+
+### [14:00 KST] 법령 뷰어 UI 개선 - 플로팅 헤더 및 검색 모달
+- **Files**:
+  - `components/floating-compact-header.tsx` (modified)
+  - `components/command-search-modal.tsx` (modified)
+- **Changes**: 플로팅 헤더 스타일 개선, 검색 모달 UI 개선
+- **Impact**: 법령 뷰어 헤더 UX 향상
+
 ### [11:45 KST] 유형별 프롬프트 템플릿 HTML 로직 호환성 검토 및 문서 업데이트
 - **Files**:
   - `docs/future/RAG_QUALITY_IMPROVEMENT_PLAN.md` (modified)
