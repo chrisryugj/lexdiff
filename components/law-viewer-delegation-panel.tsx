@@ -34,8 +34,8 @@ interface DelegationPanelProps {
     // Three-Tier State
     validDelegations: DelegationItem[]
     isLoadingThreeTier: boolean
-    delegationActiveTab: "decree" | "rule" | "admin"
-    setDelegationActiveTab: (tab: "decree" | "rule" | "admin") => void
+    delegationActiveTab: "law" | "decree" | "rule" | "admin"
+    setDelegationActiveTab: (tab: "law" | "decree" | "rule" | "admin") => void
     delegationPanelSize: number
     setDelegationPanelSize: (size: number) => void
 
@@ -123,9 +123,13 @@ export function DelegationPanel({
             {/* Mobile: Tab-based view */}
             <div className="md:hidden flex flex-col">
                 <Tabs
-                    defaultValue="law"
+                    value={delegationActiveTab === "decree" ? "decree" : delegationActiveTab === "rule" ? "rule" : delegationActiveTab === "admin" ? "admin" : "law"}
                     className="flex-1 flex flex-col min-h-0"
                     onValueChange={(value) => {
+                        // 탭 상태 동기화 (law 포함)
+                        if (value === "law" || value === "decree" || value === "rule" || value === "admin") {
+                            setDelegationActiveTab(value as "law" | "decree" | "rule" | "admin")
+                        }
                         // 행정규칙 탭 선택 시 로드 시작 (단계적 로딩)
                         if (value === "admin" && !showAdminRules) {
                             setShowAdminRules(true)

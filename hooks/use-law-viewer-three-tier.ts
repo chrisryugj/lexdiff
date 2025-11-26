@@ -17,8 +17,8 @@ export function useLawViewerThreeTier(
   // View mode: 1-tier (default) -> 2-tier (article + delegations with tabs) -> 3-tier (article + decree + rule)
   const [tierViewMode, setTierViewMode] = useState<"1-tier" | "2-tier" | "3-tier">("1-tier")
 
-  // Active tab for 2-tier delegation view (시행령/시행규칙/행정규칙)
-  const [delegationActiveTab, setDelegationActiveTab] = useState<"decree" | "rule" | "admin">("decree")
+  // Active tab for 2-tier delegation view (법률/시행령/시행규칙/행정규칙)
+  const [delegationActiveTab, setDelegationActiveTab] = useState<"law" | "decree" | "rule" | "admin">("decree")
 
   // Panel sizes for drag resize (2-tier views)
   const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {

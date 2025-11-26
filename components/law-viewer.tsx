@@ -666,19 +666,30 @@ export function LawViewer({
           }
 
           // 법령 타입에 따라 적절한 탭으로 전환
+          let tabSwitched = false
           if (lawType === 'decree' && validDelegations.some(d => d.type === '시행령')) {
             setDelegationActiveTab('decree')
-            // 탭 전환 후 모달 대신 탭 내용으로 스크롤하면 UX가 더 좋음
-            // 하지만 현재는 모달로 열기 (일관성 유지)
+            tabSwitched = true
+            debugLogger.info('탭 전환: 시행령', { lawName, articleLabel })
           } else if (lawType === 'rule' && validDelegations.some(d => d.type === '시행규칙')) {
             setDelegationActiveTab('rule')
+            tabSwitched = true
+            debugLogger.info('탭 전환: 시행규칙', { lawName, articleLabel })
           } else if (lawType === 'law') {
-            // 시행령/시행규칙 본문에서 법률 링크 클릭 시 → 1-tier로 전환하여 법률 본문 표시
-            // (또는 모달로 열기 - 현재는 모달로 처리됨)
+            // 시행령/시행규칙 본문에서 법률 링크 클릭 시 → 1-tier로 전환
+            setTierViewMode("1-tier")
+            tabSwitched = true
+            debugLogger.info('탭 전환: 법률 본문', { lawName, articleLabel })
+          }
+
+          // 탭 전환에 성공했으면 모달 열지 않고 리턴 (모바일 UX)
+          if (tabSwitched) {
+            setLastExternalRef({ lawName, joLabel: articleLabel })
+            return
           }
         }
 
-        // 모든 법령 링크는 모달로 열기 (사이드바 방식과 동일)
+        // 탭 전환 실패 또는 2-tier 모드가 아닐 때만 모달 열기
         await openExternalLawArticleModal(lawName, articleLabel)
         setLastExternalRef({ lawName, joLabel: articleLabel })
       } else if (refType === "same") {
@@ -736,9 +747,14 @@ export function LawViewer({
         // Set appropriate tab based on kind
         if (kind === "decree") {
           setDelegationActiveTab("decree") // 시행령 탭
+          debugLogger.info('탭 전환 (related): 시행령')
         } else if (kind === "rule") {
           setDelegationActiveTab("rule") // 시행규칙 탭
+          debugLogger.info('탭 전환 (related): 시행규칙')
         }
+
+        // 탭 전환 성공 - 모달 열지 않고 리턴
+        return
       }
     }
   }
