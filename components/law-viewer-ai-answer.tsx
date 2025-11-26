@@ -41,11 +41,11 @@ export function AIAnswerSidebar({
     return (
         <>
             {showHeader ? (
-                <div className="border-b border-border px-4 py-3 flex-shrink-0">
+                <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
                             <Link2 className="h-5 w-5 text-primary" />
-                            <h3 className="text-lg font-bold text-foreground">관련 법령</h3>
+                            <h3 className="text-xl font-bold text-foreground">관련 법령</h3>
                         </div>
                         {onCollapseClick && (
                             <Button
@@ -68,96 +68,90 @@ export function AIAnswerSidebar({
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 px-3 pt-2 pb-4 overflow-y-auto">
+            <div className="flex-1 min-h-0 px-2 pt-3 pb-4 overflow-y-auto">
                 <div className="space-y-2">
-                        {relatedArticles.length > 0 ? (
-                            (() => {
-                                // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
-                                const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
+                    {relatedArticles.length > 0 ? (
+                        (() => {
+                            // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
+                            const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
 
-                                relatedArticles.forEach(law => {
-                                    const key = `${law.lawName}|${law.jo}`
-                                    const existing = grouped.get(key)
-                                    if (existing) {
-                                        existing.sources.add(law.source)
-                                    } else {
-                                        grouped.set(key, { law, sources: new Set([law.source]) })
-                                    }
-                                })
+                            relatedArticles.forEach(law => {
+                                const key = `${law.lawName}|${law.jo}`
+                                const existing = grouped.get(key)
+                                if (existing) {
+                                    existing.sources.add(law.source)
+                                } else {
+                                    grouped.set(key, { law, sources: new Set([law.source]) })
+                                }
+                            })
 
-                                return Array.from(grouped.values()).map(({ law, sources }, idx) => {
-                                    const handleClick = () => {
-                                        debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
-                                            lawName: law.lawName,
-                                            jo: law.jo,
-                                            article: law.article,
-                                            sources: Array.from(sources)
-                                        })
+                            return Array.from(grouped.values()).map(({ law, sources }, idx) => {
+                                const handleClick = () => {
+                                    debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
+                                        lawName: law.lawName,
+                                        jo: law.jo,
+                                        article: law.article,
+                                        sources: Array.from(sources)
+                                    })
 
-                                        // 사이드바 닫기 (모바일)
-                                        onCloseSidebar?.()
+                                    // 사이드바 닫기 (모바일)
+                                    onCloseSidebar?.()
 
-                                        // ✅ 모달로 법령 조문 열기
-                                        onRelatedArticleClick(law.lawName, law.article)
-                                    }
+                                    // ✅ 모달로 법령 조문 열기
+                                    onRelatedArticleClick(law.lawName, law.article)
+                                }
 
-                                    return (
-                                        <button
-                                            key={`${law.lawName}-${law.jo}-${idx}`}
-                                            onClick={handleClick}
-                                            className="group relative w-full max-w-full text-left p-2.5 rounded-xl border border-border/40 bg-card/30 hover:bg-card/50 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden box-border"
-                                        >
-                                            {/* Hover Gradient Glow */}
-                                            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                return (
+                                    <button
+                                        key={`${law.lawName}-${law.jo}-${idx}`}
+                                        onClick={handleClick}
+                                        className="group relative w-full max-w-full text-left px-3 py-4 rounded-xl border border-border/40 bg-card/30 hover:bg-card/50 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden box-border"
+                                    >
+                                        {/* Hover Gradient Glow */}
+                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                                            <div className="relative flex items-start gap-2.5 w-full">
-                                                {/* Icon Indicator */}
-                                                <div className="shrink-0 mt-0.5">
-                                                    {sources.has('excerpt') ? (
-                                                        <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
-                                                            <Bookmark className="h-3.5 w-3.5" />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
-                                                            <Link2 className="h-3.5 w-3.5" />
-                                                        </div>
+                                        <div className="relative flex items-start gap-2.5 w-full">
+                                            <div className="flex-1 min-w-0">
+                                                {/* Law Name */}
+                                                <div className="text-sm font-semibold text-foreground/90 leading-tight mb-1.5 group-hover:text-primary transition-colors break-words pr-12">
+                                                    {law.lawName}
+                                                </div>
+                                                {/* Article Info */}
+                                                <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                                                    <span className="font-medium">{law.article}</span>
+                                                    {law.title && (
+                                                        <>
+                                                            <span className="w-0.5 h-2.5 bg-border/60 rounded-full" />
+                                                            <span className="opacity-80 truncate">{law.title}</span>
+                                                        </>
                                                     )}
                                                 </div>
+                                            </div>
 
-                                                <div className="flex-1 min-w-0">
-                                                    {/* Law Name */}
-                                                    <div className="text-sm font-semibold text-foreground/90 leading-tight mb-1 group-hover:text-primary transition-colors break-words">
-                                                        {law.lawName}
+                                            {/* Icon Indicator - 우측 상단 절대 위치 */}
+                                            <div className="absolute top-0 right-0 flex items-start gap-1">
+                                                {sources.has('excerpt') && (
+                                                    <div className="p-1 rounded-md bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
+                                                        <Bookmark className="h-3.5 w-3.5" />
                                                     </div>
-                                                    {/* Article Info */}
-                                                    <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
-                                                        <span className="font-medium">{law.article}</span>
-                                                        {law.title && (
-                                                            <>
-                                                                <span className="w-0.5 h-2.5 bg-border/60 rounded-full" />
-                                                                <span className="opacity-80 truncate">{law.title}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Multi-source indicator (if both excerpt and related) */}
-                                                {sources.size > 1 && (
-                                                    <div className="shrink-0" title="발췌 및 관련 법령">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]" />
+                                                )}
+                                                {sources.has('related') && (
+                                                    <div className="p-1 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
+                                                        <Link2 className="h-3.5 w-3.5" />
                                                     </div>
                                                 )}
                                             </div>
-                                        </button>
-                                    )
-                                })
-                            })()
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
-                                <FileText className="h-8 w-8 opacity-20" />
-                                <p className="text-sm">관련 법령이 없습니다</p>
-                            </div>
-                        )}
+                                        </div>
+                                    </button>
+                                )
+                            })
+                        })()
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
+                            <FileText className="h-8 w-8 opacity-20" />
+                            <p className="text-sm">관련 법령이 없습니다</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </>
@@ -247,41 +241,20 @@ export function AIAnswerContent({
     const { toast } = useToast()
 
     return (
-        <div className="animate-fade-in-up">
-            {/* 검색 실패 경고 메시지 - 간소화 */}
-            {fileSearchFailed && (
-                <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
-                    <div className="flex items-start gap-2">
-                        <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                            <p className="text-sm font-medium text-destructive">검색 결과 없음</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                관련 법령을 찾지 못했습니다. 검색어를 확인해주세요.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="mb-1 pb-5 border-b border-border">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 pt-2">
-                    <div className="flex flex-col gap-1 flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-                            <h3 className="text-lg sm:text-xl font-bold text-foreground mb-0">AI 답변</h3>
-                            <Badge variant="outline" className="text-xs whitespace-nowrap">
-                                File Search RAG
-                            </Badge>
-                        </div>
-                        {userQuery && (
-                            <div className="flex items-start gap-1.5 text-sm sm:text-md text-muted-foreground font-medium pl-1">
-                                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
-                                <span className="break-words">{userQuery}</span>
-                            </div>
-                        )}
+        <>
+            {/* 헤더 */}
+            <div className="border-b border-border px-2 pt-0 pb-3 flex-shrink-0">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                        <h3 className="text-xl font-bold text-foreground">AI 답변</h3>
+                        {/* File Search RAG Badge */}
+                        <Badge variant="outline" className="text-xs">
+                            File Search RAG
+                        </Badge>
                     </div>
 
-                    {/* AI 답변 컨트롤 */}
+                    {/* 컨트롤 */}
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                             <ZoomOut className="h-4 w-4" />
@@ -351,10 +324,36 @@ export function AIAnswerContent({
                         })()}
                     </div>
                 </div>
+
+                {/* 질문 표시 */}
+                {userQuery && (
+                    <div className="flex items-start gap-1.5 text-sm text-muted-foreground font-medium pl-1">
+                        <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
+                        <span className="break-words">{userQuery}</span>
+                    </div>
+                )}
             </div>
 
-            <div
-                className="prose prose-sm max-w-none w-full dark:prose-invert break-words overflow-x-hidden px-0
+            {/* 본문 영역 */}
+            <div className="flex-1 min-h-0 px-4 pt-1 pb-4 overflow-y-auto">
+                {/* 검색 실패 경고 메시지 */}
+                {fileSearchFailed && (
+                    <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-destructive">검색 결과 없음</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    관련 법령을 찾지 못했습니다. 검색어를 확인해주세요.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                <div
+                    className="prose prose-sm max-w-none w-full dark:prose-invert break-words overflow-x-hidden px-0
         [&_h2]:text-[clamp(18px,5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-nowrap
         [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-nowrap
         [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-0 sm:[&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
@@ -362,16 +361,17 @@ export function AIAnswerContent({
         [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
         [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1
         [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words"
-                style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                onClick={handleContentClick}
-                dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-            />
+                    style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                    onClick={handleContentClick}
+                    dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
+                />
 
-            {/* AI 답변 주의사항 */}
-            <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                {/* AI 답변 주의사항 */}
+                <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                    <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                </div>
             </div>
-        </div>
+        </>
     )
 }

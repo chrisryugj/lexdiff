@@ -828,7 +828,7 @@ export function LawViewer({
               // ========== 기존 조문 목록 (펼친 상태) ==========
               <>
                 {/* 헤더 - 본문 헤더와 동일한 디자인 */}
-                <div className="border-b border-border px-4 pt-3 pb-3 flex-shrink-0">
+                <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                   <div className="flex items-center gap-2 mb-1 justify-between">
                     <div className="flex items-center gap-2">
                       <ListOrdered className="h-5 w-5 text-primary" />
