@@ -14,6 +14,15 @@ export interface LinkConfig {
   currentLawName?: string       // 현재 보고 있는 법령명 (시행령에서 상위법 추론용)
 }
 
+/**
+ * 법령명에서 타입 감지
+ */
+function detectLawType(lawName: string): 'decree' | 'rule' | 'law' {
+  if (/시행령/.test(lawName)) return 'decree'
+  if (/시행규칙/.test(lawName)) return 'rule'
+  return 'law'
+}
+
 interface LinkMatch {
   start: number
   end: number
@@ -158,6 +167,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
 
   while ((match = articleRegex.exec(text)) !== null) {
     const lawName = match[1].trim()
+    const lawType = detectLawType(lawName)
     const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
     const fullLabel = joLabel + (match[6] ? `제${match[6]}항` : '') + (match[8] ? `제${match[8]}호` : '')
 
@@ -168,7 +178,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
       lawName,
       article: joLabel,
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}">「${lawName}」 ${fullLabel}</a>`
+      html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" data-law-type="${lawType}">「${lawName}」 ${fullLabel}</a>`
     })
   }
 
@@ -177,6 +187,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
 
   while ((match = nameRegex.exec(text)) !== null) {
     const lawName = match[1].trim()
+    const lawType = detectLawType(lawName)
 
     // 이미 처리된 영역인지 확인
     const isOverlap = matches.some(m =>
@@ -190,7 +201,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
         type: 'law-quoted',
         lawName,
         displayText: match[0],
-        html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law" data-law="${lawName}">${match[0]}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" style="cursor: pointer; color: rgb(59 130 246); text-decoration: underline;" data-ref="law" data-law="${lawName}" data-law-type="${lawType}">${match[0]}</a>`
       })
     }
   }

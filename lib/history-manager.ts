@@ -13,6 +13,7 @@
 export interface HistoryState {
   viewMode: 'home' | 'search-result'
   searchId?: string
+  searchMode?: 'basic' | 'rag'  // 검색 모드 (기본/AI)
   timestamp: number
 }
 
@@ -38,12 +39,13 @@ export function initializeHistory(): void {
 /**
  * 검색 결과 페이지로 이동
  * - URL은 '/' 유지
- * - History에 검색 ID 저장
+ * - History에 검색 ID와 검색 모드 저장
  */
-export function pushSearchHistory(searchId: string): void {
+export function pushSearchHistory(searchId: string, searchMode: 'basic' | 'rag' = 'basic'): void {
   const state: HistoryState = {
     viewMode: 'search-result',
     searchId,
+    searchMode,
     timestamp: Date.now()
   }
   window.history.pushState(state, '', '/')
@@ -74,10 +76,11 @@ export function getCurrentHistoryState(): HistoryState | null {
  * - pushState 대신 replaceState 사용
  * - History 스택에 추가하지 않음
  */
-export function replaceSearchHistory(searchId: string): void {
+export function replaceSearchHistory(searchId: string, searchMode: 'basic' | 'rag' = 'basic'): void {
   const state: HistoryState = {
     viewMode: 'search-result',
     searchId,
+    searchMode,
     timestamp: Date.now()
   }
   window.history.replaceState(state, '', '/')

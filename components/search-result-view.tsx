@@ -168,9 +168,10 @@ export interface SearchResultViewProps {
   onBack: () => void
   onProgressUpdate?: (stage: 'searching' | 'parsing' | 'streaming' | 'complete', progress: number) => void
   onModeChange?: (mode: 'basic' | 'rag') => void
+  initialSearchMode?: 'basic' | 'rag'  // History에서 복원된 검색 모드
 }
 
-export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeChange }: SearchResultViewProps) {
+export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeChange, initialSearchMode }: SearchResultViewProps) {
   const [isSearching, setIsSearching] = useState(false)
   const [isFocusMode, setIsFocusMode] = useState(false) // 포커스 모드 상태
   const [showSearchModal, setShowSearchModal] = useState(false) // 검색 모달 상태
@@ -221,8 +222,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   }>({ laws: [], ordinances: [] })
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
 
-  // 검색 모드 상태
-  const [searchMode, setSearchMode] = useState<SearchMode>('basic')
+  // 검색 모드 상태 (History에서 복원된 값으로 초기화)
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialSearchMode || 'basic')
 
   // RAG 로딩/에러/답변 상태 (File Search RAG에서 사용)
   const [ragLoading, setRagLoading] = useState(false)

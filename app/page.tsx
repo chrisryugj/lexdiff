@@ -58,11 +58,13 @@ export default function Home() {
       // 새로고침 시 검색 결과 복원
       debugLogger.info('🔄 새로고침 감지: 검색 결과 복원', {
         searchId: currentState.searchId,
+        searchMode: currentState.searchMode,
         timestamp: currentState.timestamp
       })
 
       setViewMode('search-result')
       setSearchId(currentState.searchId)
+      setSearchMode(currentState.searchMode || 'basic')  // 검색 모드 복원
     }
 
     // popstate 이벤트 리스너 등록 (뒤로가기/앞으로가기)
@@ -79,7 +81,8 @@ export default function Home() {
 
       debugLogger.info('⬅️ History 이동', {
         viewMode: state.viewMode,
-        searchId: state.searchId
+        searchId: state.searchId,
+        searchMode: state.searchMode
       })
 
       if (state.viewMode === 'home') {
@@ -90,6 +93,7 @@ export default function Home() {
       } else if (state.viewMode === 'search-result' && state.searchId) {
         setViewMode('search-result')
         setSearchId(state.searchId)
+        setSearchMode(state.searchMode || 'basic')  // 검색 모드 복원
       }
     })
 
@@ -121,8 +125,8 @@ export default function Home() {
 
       debugLogger.success('✅ 검색 ID 생성', { searchId: newSearchId })
 
-      // History 추가
-      pushSearchHistory(newSearchId)
+      // History 추가 (검색 모드도 함께 저장)
+      pushSearchHistory(newSearchId, searchMode)
 
       // 화면 전환 (프로그레스는 SearchResultView에서 관리)
       setSearchId(newSearchId)
@@ -170,6 +174,7 @@ export default function Home() {
         <SearchResultView
           searchId={searchId}
           onBack={handleBack}
+          initialSearchMode={searchMode}  // History에서 복원된 검색 모드 전달
           onProgressUpdate={(stage, progress) => {
             setSearchStage(stage)
             setSearchProgress(progress)

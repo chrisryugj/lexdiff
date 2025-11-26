@@ -174,6 +174,11 @@ export function LawViewer({
 
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
+  // ✅ 즐겨찾기 키 정규화 (backward compatible)
+  const favoriteKey = (jo: string) => `${meta.lawTitle}-${jo}`
+  const isFavorite = (jo: string) => favorites.has(favoriteKey(jo)) || favorites.has(jo)
+  const favoriteCount = actualArticles.reduce((acc, a) => acc + (isFavorite(a.jo) ? 1 : 0), 0)
+
   // ✅ useMemo로 HTML 생성 결과 캐싱 (중복 호출 방지)
   const activeArticleHtml = useMemo(() => {
     if (!activeArticle) return ''
@@ -651,6 +656,27 @@ export function LawViewer({
       } else if (refType === "law-article") {
         const lawName = target.getAttribute("data-law") || ""
         const articleLabel = target.getAttribute("data-article") || ""
+        const lawType = target.getAttribute("data-law-type") as 'law' | 'decree' | 'rule' | null
+
+        // 모바일 위임법령 탭뷰에서 링크 클릭 시 탭 전환 (tierViewMode === "2-tier"일 때만)
+        if (tierViewMode === "2-tier" && lawType) {
+          // 3-tier 데이터가 로드되지 않았다면 먼저 로드
+          if (!threeTierDelegation && !threeTierCitation) {
+            await fetchThreeTierData()
+          }
+
+          // 법령 타입에 따라 적절한 탭으로 전환
+          if (lawType === 'decree' && validDelegations.some(d => d.type === '시행령')) {
+            setDelegationActiveTab('decree')
+            // 탭 전환 후 모달 대신 탭 내용으로 스크롤하면 UX가 더 좋음
+            // 하지만 현재는 모달로 열기 (일관성 유지)
+          } else if (lawType === 'rule' && validDelegations.some(d => d.type === '시행규칙')) {
+            setDelegationActiveTab('rule')
+          } else if (lawType === 'law') {
+            // 시행령/시행규칙 본문에서 법률 링크 클릭 시 → 1-tier로 전환하여 법률 본문 표시
+            // (또는 모달로 열기 - 현재는 모달로 처리됨)
+          }
+        }
 
         // 모든 법령 링크는 모달로 열기 (사이드바 방식과 동일)
         await openExternalLawArticleModal(lawName, articleLabel)
@@ -721,12 +747,14 @@ export function LawViewer({
 
   return (
     <>
-      <div className="w-full mx-auto max-w-[1280px]">
+      <div className="w-full mx-auto lg:max-w-[1280px]">
         <div
           className="relative grid grid-cols-1 gap-4 min-h-0 lg:h-[calc(100vh-80px)]"
           style={{
             fontFamily: "Pretendard, sans-serif",
-            gridTemplateColumns: isArticleListCollapsed ? '64px 1fr' : '1fr 4fr'
+            gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 1024
+              ? (isArticleListCollapsed ? '64px 1fr' : '1fr 4fr')
+              : '1fr'
           }}
         >
           {/* Mobile overlay backdrop */}
@@ -802,7 +830,7 @@ export function LawViewer({
                     {actualArticles.map((article) => {
                       const joNum = formatSimpleJo(article.jo).replace('제', '').replace('조', '').replace('의', '-')
                       const isActive = article.jo === activeJo
-                      const isFavorite = favorites.has(article.jo)
+                      const isArticleFavorite = isFavorite(article.jo)
 
                       return (
                         <Button
@@ -815,7 +843,7 @@ export function LawViewer({
                           title={`${formatSimpleJo(article.jo)}${article.title ? ` ${article.title}` : ''}`}
                         >
                           <span className="font-bold">{joNum}</span>
-                          {isFavorite && (
+                          {isArticleFavorite && (
                             <Star className="h-2.5 w-2.5 absolute top-0.5 right-0.5 fill-yellow-400 text-yellow-400" />
                           )}
                         </Button>
@@ -955,20 +983,23 @@ export function LawViewer({
                       {meta.revisionType}
                     </Badge>
                   )}
+
+                  {/* 법령 전체 즐겨찾기 개수 */}
+                  {favoriteCount > 0 && (
+                    <Badge
+                      key={`header-fav-count-${favoriteCount}`}
+                      variant="outline"
+                      className="text-xs px-1.5 py-0.5"
+                    >
+                      <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-500" />
+                      {favoriteCount}
+                    </Badge>
+                  )}
                   {!isOrdinance && viewMode === "full" && activeArticle && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       현재: {formatSimpleJo(activeArticle.jo)}
                     </Badge>
                   )}
-                  {(() => {
-                    const currentLawFavorites = articles.filter(a => favorites.has(a.jo)).length
-                    return currentLawFavorites > 0 && (
-                      <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                        <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        {currentLawFavorites}
-                      </Badge>
-                    )
-                  })()}
                 </div>
               </div>
             )}
@@ -987,12 +1018,18 @@ export function LawViewer({
                       AI 요약
                     </Button>
                     <Button
-                      variant={favorites.has(activeArticle.jo) ? "default" : "outline"}
+                      key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
+                      variant="outline"
                       size="sm"
                       onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                      className="h-7 px-2"
+                      data-favorited={isFavorite(activeArticle.jo)}
+                      className={`h-7 px-2 transition-all ${
+                        isFavorite(activeArticle.jo)
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                          : ''
+                      }`}
                     >
-                      <Star className={`h-3.5 w-3.5 mr-1 ${favorites.has(activeArticle.jo) ? "fill-current" : ""}`} />
+                      <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
                       즐겨찾기
                     </Button>
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-2">
@@ -1166,7 +1203,7 @@ export function LawViewer({
                   />
                 ) : (
                   <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef} className="px-6 pt-0 pb-20">
+                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-0 pb-20">
                       <div className="mb-3 pb-2 border-b border-border">
                         {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지 1줄, 버튼 2줄 */}
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
