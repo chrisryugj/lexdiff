@@ -3,7 +3,6 @@
 import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     Sparkles,
     ShieldCheck,
@@ -69,9 +68,8 @@ export function AIAnswerSidebar({
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-hidden">
-                <ScrollArea className="h-full px-3 pt-2 pb-4">
-                    <div className="space-y-2 pr-2">
+            <div className="flex-1 min-h-0 px-3 pt-2 pb-4 overflow-y-auto">
+                <div className="space-y-2">
                         {relatedArticles.length > 0 ? (
                             (() => {
                                 // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
@@ -160,8 +158,7 @@ export function AIAnswerSidebar({
                                 <p className="text-sm">관련 법령이 없습니다</p>
                             </div>
                         )}
-                    </div>
-                </ScrollArea>
+                </div>
             </div>
         </>
     )
