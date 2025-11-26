@@ -738,7 +738,7 @@ export function LawViewer({
           )}
 
           {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-          <Card className={`hidden lg:flex flex-col overflow-hidden h-full lg:sticky lg:top-4 transition-all duration-300 ${isArticleListCollapsed ? 'lg:w-16' : ''}`}>
+          <Card className={`hidden lg:flex flex-col overflow-hidden h-full lg:sticky lg:top-4 transition-all duration-300 p-0 gap-0 ${isArticleListCollapsed ? 'lg:w-16' : ''}`}>
             {aiAnswerMode && isArticleListCollapsed ? (
               // ========== AI 슬림 모드 (접힌 상태) ==========
               <>
@@ -810,9 +810,8 @@ export function LawViewer({
                           variant={isActive ? "default" : "ghost"}
                           size="sm"
                           onClick={() => handleArticleClick(article.jo)}
-                          className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${
-                            isActive ? 'ring-2 ring-primary ring-offset-1' : ''
-                          }`}
+                          className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''
+                            }`}
                           title={`${formatSimpleJo(article.jo)}${article.title ? ` ${article.title}` : ''}`}
                         >
                           <span className="font-bold">{joNum}</span>
