@@ -39,7 +39,9 @@ export function FloatingCompactHeader({
     })
     setFavoritesCount(favoritesStore.getFavorites().length)
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   // 스크롤 감지 (모바일/PC 모두 항상 표시, 깜빡임 방지)
@@ -102,11 +104,11 @@ export function FloatingCompactHeader({
                     <Button
                       variant="outline"
                       onClick={onSearchClick}
-                      className="flex items-center gap-2 max-w-[140px] lg:max-w-md truncate hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-2 max-w-[140px] lg:max-w-md truncate bg-muted/50 hover:bg-muted border-primary/20 hover:border-primary/40 transition-all"
                       title="검색 (Cmd+K)"
                     >
-                      <Search className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate text-sm">{currentLawName}</span>
+                      <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <span className="truncate text-sm font-medium">{currentLawName}</span>
                     </Button>
                   )}
                 </div>

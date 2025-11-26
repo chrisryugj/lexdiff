@@ -2125,13 +2125,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           ) : (
             <div className="space-y-4">
               <div className="md:hidden">
-                {mobileView === "content" && (
-                  <Button variant="outline" size="sm" onClick={() => setMobileView("list")} className="mb-4 w-full">
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    다른 법령 검색
-                  </Button>
-                )}
-
+                {/* 플로팅 헤더에 검색 버튼이 있으므로 "다른 법령 검색" 버튼 제거 */}
                 {mobileView === "list" ? (
                   <div className="space-y-4">
                     <SearchBar onSearch={handleSearch} isLoading={isSearching} />
