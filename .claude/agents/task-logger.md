@@ -1,3 +1,8 @@
+---
+name: task-logger
+description: 작업 완료 시 자동으로 task.md에 기록하는 전문 에이전트
+---
+
 # Task Logger Agent
 
 **Purpose**: 작업 완료 시 자동으로 task.md에 기록하는 전문 에이전트

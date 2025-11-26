@@ -1,3 +1,8 @@
+---
+name: regex-pattern-expert
+description: 정규표현식 패턴 설계, 디버깅, 최적화 전문 에이전트
+---
+
 # Regex Pattern Expert Agent
 
 **Purpose**: 정규표현식 패턴 설계, 디버깅, 최적화 전문 에이전트

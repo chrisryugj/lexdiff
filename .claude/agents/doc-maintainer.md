@@ -1,3 +1,8 @@
+---
+name: doc-maintainer
+description: 문서 작성, 업데이트, CHANGELOG 관리 자동화 전문 에이전트
+---
+
 # Doc Maintainer Agent
 
 **Purpose**: 문서 작성, 업데이트, CHANGELOG 관리 자동화 전문 에이전트
