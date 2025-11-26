@@ -121,9 +121,9 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10" style={{ fontFamily: 'Pretendard, sans-serif' }}>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+        <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap pr-6">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {/* 뒤로가기 버튼 (히스토리가 있을 때만 표시) */}
               {hasHistory && onBack && (
@@ -137,31 +137,44 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               )}
-              <DialogTitle className="text-base font-semibold truncate">{title}</DialogTitle>
+              <DialogTitle className="text-base font-bold truncate text-primary">
+                {(() => {
+                  const match = title.match(/^(.*)(\s\(.*\))$/)
+                  if (match) {
+                    return (
+                      <>
+                        {match[1]}
+                        <span className="text-muted-foreground font-normal">{match[2]}</span>
+                      </>
+                    )
+                  }
+                  return title
+                })()}
+              </DialogTitle>
             </div>
-            <div className="flex items-center gap-2 flex-wrap" style={{ marginRight: '16px' }}>
+            <div className="flex items-center gap-2 flex-wrap">
               {/* 폰트 크기 조절 */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={decreaseFontSize}
                   disabled={fontSize <= 11}
-                  className="p-1 h-7 w-7"
+                  className="p-1 h-6 w-6"
                   title="글자 작게"
                 >
-                  <ZoomOut className="w-4 h-4" />
+                  <ZoomOut className="w-3.5 h-3.5" />
                 </Button>
-                <span className="text-xs text-muted-foreground min-w-[25px] text-center">{fontSize}</span>
+                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums">{fontSize}</span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={increaseFontSize}
                   disabled={fontSize >= 18}
-                  className="p-1 h-7 w-7"
+                  className="p-1 h-6 w-6"
                   title="글자 크게"
                 >
-                  <ZoomIn className="w-4 h-4" />
+                  <ZoomIn className="w-3.5 h-3.5" />
                 </Button>
               </div>
 
@@ -186,18 +199,18 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   variant="outline"
                   size="sm"
                   asChild
-                  className="h-7 gap-1"
+                  className="h-7 gap-1 px-2"
                 >
                   <a href={molegUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3 h-3" />
-                    <span className="text-xs">법제처 원문</span>
+                    <span className="text-xs hidden sm:inline">원문</span>
                   </a>
                 </Button>
               )}
 
               {/* 기존 원문 열기 버튼 */}
               {canShowOriginal && (
-                <Button size="sm" variant={showOriginal ? "secondary" : "default"} onClick={() => setShowOriginal((v) => !v)}>
+                <Button size="sm" variant={showOriginal ? "secondary" : "default"} onClick={() => setShowOriginal((v) => !v)} className="h-7 px-2 text-xs">
                   {showOriginal ? "미리보기" : "원문 열기"}
                 </Button>
               )}
@@ -206,7 +219,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         </DialogHeader>
         {showOriginal && canShowOriginal ? (
           <div className="w-full">
-            <iframe src={originalUrl} className="w-full h-[65vh] rounded-md border border-border" />
+            <iframe src={originalUrl} className="w-full h-[65vh] border-0" />
           </div>
         ) : (
           <ScrollArea className="max-h-[65vh]">
@@ -232,13 +245,13 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             `}</style>
             <div
               ref={contentRef}
-              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere ${forceWhiteTheme
-                  ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
-                  : "dark:prose-invert"
+              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere p-4 sm:p-6 ${forceWhiteTheme
+                ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
+                : "dark:prose-invert"
                 }`}
               style={
                 forceWhiteTheme
-                  ? { backgroundColor: '#ffffff', color: '#111827', padding: '1rem', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }
+                  ? { backgroundColor: '#ffffff', color: '#111827', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }
                   : { overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }
               }
               dangerouslySetInnerHTML={{ __html: processedHtml }}

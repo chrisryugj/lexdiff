@@ -4,7 +4,68 @@
 
 ---
 
+## 2025-11-26
+
+### [11:45 KST] 유형별 프롬프트 템플릿 HTML 로직 호환성 검토 및 문서 업데이트
+- **Files**:
+  - `docs/future/RAG_QUALITY_IMPROVEMENT_PLAN.md` (modified)
+- **Changes**:
+  - B5 섹션(질문 유형별 시스템 프롬프트) 전면 수정
+  - `ai-answer-processor.ts` HTML 변환 로직 분석 결과 반영
+  - 기존 로직이 인식하는 패턴만 사용하도록 프롬프트 재설계:
+    - 주요 섹션: `📋 핵심 요약`, `📄 상세 내용`, `💡 추가 참고`, `🔗 관련 법령`
+    - 상세 내용 하위: `⚖️ 조문 발췌`, `📖 핵심 해석`, `📝 실무 적용`, `🔴 조건·예외`
+  - 호환성 체크리스트 테이블 추가
+  - 각 유형(specific/general/comparison/procedural)별 구조 명시
+- **Impact**: HTML 로직 수정 없이 프롬프트만 변경하여 유형별 답변 구조 적용 가능
+- **Reason**: 기존 CSS 스타일링 유지하면서 유형별 최적화 구현
+
+### [10:30 KST] RAG 검색 품질 개선 계획 문서화
+- **Files**:
+  - `docs/future/RAG_QUALITY_IMPROVEMENT_PLAN.md` (created)
+- **Changes**:
+  - 현재 RAG 시스템 상태 분석 (Google File Search 기반)
+  - 3단계 개선 계획 수립:
+    - **Phase A (Quick Wins)**: maxOutputTokens 8192 증가, relevanceScore 기반 신뢰도, Citation 0 재시도
+    - **Phase B (핵심 개선)**: 쿼리 전처리 파이프라인, 동적 프롬프트, 응답 캐싱
+    - **Phase C (고급 기능)**: Metadata Filter, 관련 법령 확장, 피드백 루프
+  - 각 작업별 코드 예시 및 적용 위치 명시
+  - 예상 효과 및 비용 영향 분석
+  - 구현 로드맵 (3주 계획)
+- **Impact**: RAG 품질 개선 작업 시 참조 문서로 활용
+- **Status**: 대기 (승인 후 구현 예정)
+
+---
+
 ## 2025-11-25
+
+### [22:30 KST] 홈페이지 디자인 개선 - Apple 스타일 스크롤 애니메이션
+- **Files**:
+  - `app/globals.css` (modified)
+  - `components/search-view-improved.tsx` (modified)
+  - `components/feature-cards.tsx` (modified)
+  - `components/stats-section.tsx` (modified)
+- **Changes**:
+  - **globals.css**:
+    - 통합 배경 시스템 추가 (page-bg, section-primary, section-elevated, section-subtle)
+    - Apple 스타일 스크롤 애니메이션 (reveal-on-scroll, reveal-stagger)
+    - feature-card, stat-card 통일된 스타일링
+    - CTA 섹션 그라데이션 (cta-gradient)
+    - section-divider 추가
+    - 부드러운 scroll indicator 애니메이션 (scroll-indicator-apple)
+  - **search-view-improved.tsx**:
+    - 레이아웃 통일 (max-w-[1200px])
+    - Intersection Observer 기반 스크롤 reveal
+    - 배경 전환 통일 (히어로~컨텐츠 seamless)
+    - Fixed 헤더 backdrop-blur 적용
+  - **feature-cards.tsx**:
+    - 일관된 카드 사이즈 (feature-card 클래스)
+    - 미사용 import 제거 (Card, CardContent, ScrollReveal)
+  - **stats-section.tsx**:
+    - stat-card 클래스 적용
+    - 아이콘 배경색 통일
+- **Impact**: 깔끔하고 일관된 홈페이지 UX, 스크롤 시 부드러운 페이드인 효과
+- **Reason**: 사용자 요청 (애플 스타일 디자인 개선)
 
 ### [21:30 KST] 최적화 계획 문서 업데이트
 - **Files**:

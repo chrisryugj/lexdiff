@@ -252,38 +252,58 @@ export function AIAnswerContent({
                 uniqueCitations.set(key, c)
             }
         })
-        const verifiedCount = Array.from(uniqueCitations.values()).filter(c => c.verified).length
         const totalUnique = uniqueCitations.size
+
+        // verified 필드가 있으면 사용, 없으면 총 개수를 신뢰도로 표시
+        const hasVerifiedField = aiCitations.some(c => c.verified !== undefined)
+        const verifiedCount = hasVerifiedField
+            ? Array.from(uniqueCitations.values()).filter(c => c.verified).length
+            : totalUnique  // verified 필드 없으면 총 개수 표시
+
+        // 실제 비율 기반 신뢰도 계산 (verified 필드 없으면 총 개수 기반)
+        const confidenceRatio = hasVerifiedField
+            ? (totalUnique > 0 ? verifiedCount / totalUnique : 0)
+            : (totalUnique >= 3 ? 1 : totalUnique >= 1 ? 0.5 : 0)
+        const localConfidence = confidenceRatio >= 0.7 ? 'high' : confidenceRatio >= 0.3 ? 'medium' : 'low'
 
         return (
             <div
                 className={`
-                    relative flex items-center gap-1.5 px-2 py-1 rounded-md cursor-help
+                    relative flex items-center gap-1 px-1.5 py-0.5 rounded cursor-help
                     transition-colors duration-200
-                    ${aiConfidenceLevel === 'high'
+                    ${localConfidence === 'high'
                         ? 'bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/30'
-                        : aiConfidenceLevel === 'medium'
+                        : localConfidence === 'medium'
                             ? 'bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/30 dark:border-yellow-400/30'
                             : 'bg-red-500/10 dark:bg-red-400/10 border border-red-500/30 dark:border-red-400/30'
                     }
                 `}
-                title={`AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`}
+                title={hasVerifiedField
+                    ? `AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`
+                    : `AI 참조 조문: ${totalUnique}개`
+                }
             >
-                <ShieldCheck className={`h-4 w-4 ${aiConfidenceLevel === 'high'
+                <ShieldCheck className={`h-3.5 w-3.5 ${localConfidence === 'high'
                     ? 'text-blue-400 dark:text-blue-300'
-                    : aiConfidenceLevel === 'medium'
+                    : localConfidence === 'medium'
                         ? 'text-yellow-500 dark:text-yellow-400'
                         : 'text-red-500 dark:text-red-400'
                     }`} />
-                <div className={`flex items-baseline gap-0.5 font-bold ${aiConfidenceLevel === 'high'
+                <div className={`flex items-baseline gap-0.5 font-bold ${localConfidence === 'high'
                     ? 'text-blue-400 dark:text-blue-300'
-                    : aiConfidenceLevel === 'medium'
+                    : localConfidence === 'medium'
                         ? 'text-yellow-500 dark:text-yellow-400'
                         : 'text-red-500 dark:text-red-400'
                     }`}>
-                    <span className="text-base tabular-nums leading-none">{verifiedCount}</span>
-                    <span className="opacity-40 text-xs leading-none">/</span>
-                    <span className="text-base tabular-nums leading-none">{totalUnique}</span>
+                    {hasVerifiedField ? (
+                        <>
+                            <span className="text-sm tabular-nums leading-none">{verifiedCount}</span>
+                            <span className="opacity-40 text-[10px] leading-none">/</span>
+                            <span className="text-sm tabular-nums leading-none">{totalUnique}</span>
+                        </>
+                    ) : (
+                        <span className="text-sm tabular-nums leading-none">{totalUnique}</span>
+                    )}
                 </div>
             </div>
         )
@@ -292,30 +312,56 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-0 pb-2.5 flex-shrink-0 space-y-2">
-                {/* 1줄: 타이틀 + 배지 + 신뢰도(우측정렬) */}
+            <div className="border-b border-border px-3 sm:px-4 pt-6 pb-0.5 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
+                {/* 1줄: 타이틀+배지+신뢰도(모바일만) */}
                 <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
                         File Search RAG
                     </Badge>
-                    {/* 신뢰도 배지 - 우측 정렬 */}
-                    <div className="ml-auto">
+                    {/* 모바일만 신뢰도 표시 (PC는 2줄에 표시) */}
+                    <div className="ml-auto lg:hidden">
                         <ConfidenceBadge />
                     </div>
                 </div>
 
-                {/* 2줄: 질문 표시 */}
+                {/* 2줄: 질문 표시 + PC 버튼들 우측 */}
                 {userQuery && (
                     <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium">
                         <MessageCircleQuestion className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
-                        <span className="break-words line-clamp-2">{userQuery}</span>
+                        <span className="break-words line-clamp-2 flex-1">{userQuery}</span>
+                        {/* PC: 버튼들 우측 정렬 + 신뢰도 맨 뒤 */}
+                        <div className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
+                                <ZoomOut className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
+                                <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
+                                <ZoomIn className="h-4 w-4" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(aiAnswerHTML.replace(/<[^>]*>?/gm, ''))
+                                    toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
+                                }}
+                                title="복사"
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                            <ConfidenceBadge />
+                        </div>
                     </div>
                 )}
 
-                {/* 3줄: 컨트롤 버튼들 (우측 정렬) */}
-                <div className="flex items-center justify-end gap-1">
+                {/* 3줄: 모바일 전용 컨트롤 버튼들 (우측 정렬) */}
+                <div className="flex lg:hidden items-center justify-end gap-1">
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                         <ZoomOut className="h-4 w-4" />
                     </Button>

@@ -765,13 +765,12 @@ export function LawViewer({
     <>
       <div className="w-full mx-auto lg:max-w-[1280px]">
         <div
-          className="relative grid grid-cols-1 gap-4 min-h-0 lg:h-[calc(100vh-80px)]"
-          style={{
-            fontFamily: "Pretendard, sans-serif",
-            gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth >= 1024
-              ? (isArticleListCollapsed ? '64px 1fr' : '1fr 4fr')
-              : '1fr'
-          }}
+          className={`relative grid gap-4 min-h-0 lg:h-[calc(100vh-80px)] ${
+            isArticleListCollapsed
+              ? 'grid-cols-1 lg:grid-cols-[64px_1fr]'
+              : 'grid-cols-1 lg:grid-cols-[1fr_4fr]'
+          }`}
+          style={{ fontFamily: "Pretendard, sans-serif" }}
         >
           {/* Mobile overlay backdrop */}
           {isArticleListExpanded && (
@@ -963,10 +962,10 @@ export function LawViewer({
           />
 
           {/* Right panel - Article content */}
-          <Card className="flex flex-col overflow-hidden h-auto lg:h-full">
+          <Card className="flex flex-col overflow-hidden h-auto lg:h-full p-0 gap-0">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
-              <div className="border-b border-border px-4 pt-0 pb-3.5">
+              <div className="border-b border-border px-4 pt-6 pb-3.5">
                 <div className="flex items-center gap-2 mb-1">
                   <BookOpen className="h-5 w-5 text-primary" />
                   <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
@@ -1023,7 +1022,7 @@ export function LawViewer({
             {/* Action Buttons */}
             {
               !aiAnswerMode && !isOrdinance && activeArticle && (
-                <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                <div className="border-b border-border px-4 py-0.5 pt-3 pb-3">
                   <div className="flex flex-wrap gap-1.5">
                     <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-2">
                       <GitCompare className="h-3.5 w-3.5 mr-1" />
@@ -1039,11 +1038,10 @@ export function LawViewer({
                       size="sm"
                       onClick={() => onToggleFavorite?.(activeArticle.jo)}
                       data-favorited={isFavorite(activeArticle.jo)}
-                      className={`h-7 px-2 transition-all ${
-                        isFavorite(activeArticle.jo)
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                          : ''
-                      }`}
+                      className={`h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                        : ''
+                        }`}
                     >
                       <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
                       즐겨찾기
@@ -1090,7 +1088,7 @@ export function LawViewer({
 
             {
               isOrdinance && (
-                <div className="border-b border-border px-4 py-0.5 pt-0 pb-5">
+                <div className="border-b border-border px-4 py-0.5 pt-3 pb-3">
                   <div className="flex items-center gap-1">
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
                       <ExternalLink className="h-3.5 w-3.5 mr-1" />
@@ -1219,16 +1217,16 @@ export function LawViewer({
                   />
                 ) : (
                   <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-0 pb-20">
+                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-3 pb-3">
                       <div className="mb-3 pb-2 border-b border-border">
                         {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지 1줄, 버튼 2줄 */}
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
                           {/* 제목 + 배지 */}
                           <div className="flex items-center gap-2 min-w-0">
-                            <h2 className="text-xl font-bold text-foreground truncate">
+                            <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
                               {formatSimpleJo(activeArticle.jo, isOrdinance)}
                               {activeArticle.title && (
-                                <span className="text-muted-foreground text-lg ml-2">({activeArticle.title})</span>
+                                <span className="text-muted-foreground text-base lg:text-lg ml-2">({activeArticle.title})</span>
                               )}
                             </h2>
                             <Badge variant="outline" className="text-xs shrink-0">
@@ -1237,7 +1235,7 @@ export function LawViewer({
                           </div>
 
                           {/* 글씨크기 버튼 */}
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center justify-end gap-1 shrink-0">
                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
                               <ZoomOut className="h-3.5 w-3.5" />
                             </Button>
