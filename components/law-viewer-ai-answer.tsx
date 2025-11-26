@@ -69,9 +69,9 @@ export function AIAnswerSidebar({
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 px-3 pt-2 pb-4">
-                <ScrollArea className="h-full">
-                    <div className="space-y-2">
+            <div className="flex-1 min-h-0 overflow-hidden">
+                <ScrollArea className="h-full px-3 pt-2 pb-4">
+                    <div className="space-y-2 pr-2">
                         {relatedArticles.length > 0 ? (
                             (() => {
                                 // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
