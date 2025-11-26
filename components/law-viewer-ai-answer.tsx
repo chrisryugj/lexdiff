@@ -243,7 +243,7 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 */}
-            <div className="border-b border-border px-2 pt-0 pb-3 flex-shrink-0">
+            <div className="border-b border-border px-4 pt-0 pb-2.5 flex-shrink-0">
                 <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
@@ -327,8 +327,8 @@ export function AIAnswerContent({
 
                 {/* 질문 표시 */}
                 {userQuery && (
-                    <div className="flex items-start gap-1.5 text-sm text-muted-foreground font-medium pl-1">
-                        <MessageCircleQuestion className="h-4 w-4 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium pl-1">
+                        <MessageCircleQuestion className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
                         <span className="break-words">{userQuery}</span>
                     </div>
                 )}

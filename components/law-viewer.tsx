@@ -1121,7 +1121,7 @@ export function LawViewer({
                 )
               ) : aiAnswerMode && aiAnswerContent ? (
                 <ScrollArea className="h-full" ref={contentRef}>
-                  <div className="px-4 sm:px-6 py-4 pb-20">
+                  <div className="pb-20">
                     <AIAnswerContent
                       aiAnswerHTML={aiAnswerHTML}
                       userQuery={userQuery}
