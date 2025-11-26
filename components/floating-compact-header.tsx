@@ -30,7 +30,6 @@ export function FloatingCompactHeader({
 }: FloatingCompactHeaderProps) {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
-  const [lastScrollY, setLastScrollY] = useState(0)
   const [isVisible, setIsVisible] = useState(true)
 
   // 즐겨찾기 개수 추적
@@ -43,34 +42,18 @@ export function FloatingCompactHeader({
     return unsubscribe
   }, [])
 
-  // 스크롤 감지 (모바일: 방향 감지, PC: 항상 표시)
+  // 스크롤 감지 (모바일/PC 모두 항상 표시, 깜빡임 방지)
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
-      const isMobile = window.innerWidth < 1024
-
       setScrolled(currentScrollY > 20)
-
-      if (isMobile) {
-        // 모바일: 스크롤 방향에 따라 표시/숨김
-        if (currentScrollY > lastScrollY && currentScrollY > 100) {
-          // 스크롤 다운 → 숨김
-          setIsVisible(false)
-        } else {
-          // 스크롤 업 → 표시
-          setIsVisible(true)
-        }
-      } else {
-        // PC: 항상 표시
-        setIsVisible(true)
-      }
-
-      setLastScrollY(currentScrollY)
+      // 항상 표시 (깜빡임 방지)
+      setIsVisible(true)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [lastScrollY])
+  }, [])
 
   return (
     <AnimatePresence>
@@ -114,12 +97,12 @@ export function FloatingCompactHeader({
                     </span>
                   </button>
 
-                  {/* 법령명 Badge (클릭 시 검색 모달) */}
+                  {/* 법령명 Badge (클릭 시 검색 모달) - 모바일/PC 모두 표시 */}
                   {currentLawName && (
                     <Button
                       variant="outline"
                       onClick={onSearchClick}
-                      className="hidden lg:flex items-center gap-2 max-w-md truncate hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-2 max-w-[140px] lg:max-w-md truncate hover:bg-muted/50 transition-colors"
                       title="검색 (Cmd+K)"
                     >
                       <Search className="h-4 w-4 flex-shrink-0" />
@@ -146,16 +129,6 @@ export function FloatingCompactHeader({
                     </Button>
                   )}
 
-                  {/* 검색 (모바일) */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onSearchClick}
-                    className="lg:hidden"
-                    title="검색"
-                  >
-                    <Search className="h-5 w-5" />
-                  </Button>
 
                   {/* 포커스 모드 */}
                   <Button

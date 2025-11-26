@@ -1918,7 +1918,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         onSettingsClick={handleSettingsClick}
         onSearchClick={() => setShowSearchModal(true)}
         onFocusModeToggle={() => setIsFocusMode(!isFocusMode)}
-        currentLawName={lawData?.meta?.lawTitle}
+        currentLawName={lawData?.meta?.lawTitle || searchQuery || undefined}
         showBackButton={true}
         isFocusMode={isFocusMode}
       />

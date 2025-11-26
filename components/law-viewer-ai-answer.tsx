@@ -240,108 +240,115 @@ export function AIAnswerContent({
 }: AIAnswerContentProps) {
     const { toast } = useToast()
 
-    return (
-        <>
-            {/* 헤더 */}
-            <div className="border-b border-border px-4 pt-0 pb-2.5 flex-shrink-0">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-                        <h3 className="text-xl font-bold text-foreground">AI 답변</h3>
-                        {/* File Search RAG Badge */}
-                        <Badge variant="outline" className="text-xs">
-                            File Search RAG
-                        </Badge>
-                    </div>
+    // 신뢰도 배지 컴포넌트
+    const ConfidenceBadge = () => {
+        if (!aiCitations || aiCitations.length === 0) return null
 
-                    {/* 컨트롤 */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
-                            <ZoomOut className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setFontSize(15)} title="기본 크기">
-                            <RotateCcw className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
-                            <ZoomIn className="h-4 w-4" />
-                        </Button>
-                        <span className="text-xs text-muted-foreground mx-1">{fontSize}px</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                navigator.clipboard.writeText(aiAnswerHTML.replace(/<[^>]*>?/gm, '')) // Copy text only
-                                toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
-                            }}
-                            title="복사"
-                        >
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                        {aiCitations && aiCitations.length > 0 && (() => {
-                            // 중복 제거된 개수 계산
-                            const uniqueCitations = new Map()
-                            aiCitations.forEach(c => {
-                                const key = `${c.lawName}|${c.articleNum}`
-                                if (!uniqueCitations.has(key)) {
-                                    uniqueCitations.set(key, c)
-                                }
-                            })
-                            const verifiedCount = Array.from(uniqueCitations.values()).filter(c => c.verified).length
-                            const totalUnique = uniqueCitations.size
+        // 중복 제거된 개수 계산
+        const uniqueCitations = new Map()
+        aiCitations.forEach(c => {
+            const key = `${c.lawName}|${c.articleNum}`
+            if (!uniqueCitations.has(key)) {
+                uniqueCitations.set(key, c)
+            }
+        })
+        const verifiedCount = Array.from(uniqueCitations.values()).filter(c => c.verified).length
+        const totalUnique = uniqueCitations.size
 
-                            return (
-                                <div
-                                    className={`
-                    relative flex items-center gap-1.5 ml-2 px-2 py-1 rounded-md cursor-help
+        return (
+            <div
+                className={`
+                    relative flex items-center gap-1.5 px-2 py-1 rounded-md cursor-help
                     transition-colors duration-200
                     ${aiConfidenceLevel === 'high'
-                                            ? 'bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/30 hover:border-blue-500/50 dark:hover:border-blue-400/50'
-                                            : aiConfidenceLevel === 'medium'
-                                                ? 'bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/30 dark:border-yellow-400/30 hover:border-yellow-500/50 dark:hover:border-yellow-400/50'
-                                                : 'bg-red-500/10 dark:bg-red-400/10 border border-red-500/30 dark:border-red-400/30 hover:border-red-500/50 dark:hover:border-red-400/50'
-                                        }
-                  `}
-                                    title={`AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`}
-                                >
-                                    <ShieldCheck className={`h-4 w-4 ${aiConfidenceLevel === 'high'
-                                        ? 'text-blue-400 dark:text-blue-300'
-                                        : aiConfidenceLevel === 'medium'
-                                            ? 'text-yellow-500 dark:text-yellow-400'
-                                            : 'text-red-500 dark:text-red-400'
-                                        }`} />
-                                    <div className={`flex items-baseline gap-0.5 font-bold ${aiConfidenceLevel === 'high'
-                                        ? 'text-blue-400 dark:text-blue-300'
-                                        : aiConfidenceLevel === 'medium'
-                                            ? 'text-yellow-500 dark:text-yellow-400'
-                                            : 'text-red-500 dark:text-red-400'
-                                        }`}>
-                                        <span className="text-base tabular-nums leading-none">{verifiedCount}</span>
-                                        <span className="opacity-40 text-xs leading-none">/</span>
-                                        <span className="text-base tabular-nums leading-none">{totalUnique}</span>
-                                    </div>
-                                </div>
-                            )
-                        })()}
+                        ? 'bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/30'
+                        : aiConfidenceLevel === 'medium'
+                            ? 'bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/30 dark:border-yellow-400/30'
+                            : 'bg-red-500/10 dark:bg-red-400/10 border border-red-500/30 dark:border-red-400/30'
+                    }
+                `}
+                title={`AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`}
+            >
+                <ShieldCheck className={`h-4 w-4 ${aiConfidenceLevel === 'high'
+                    ? 'text-blue-400 dark:text-blue-300'
+                    : aiConfidenceLevel === 'medium'
+                        ? 'text-yellow-500 dark:text-yellow-400'
+                        : 'text-red-500 dark:text-red-400'
+                    }`} />
+                <div className={`flex items-baseline gap-0.5 font-bold ${aiConfidenceLevel === 'high'
+                    ? 'text-blue-400 dark:text-blue-300'
+                    : aiConfidenceLevel === 'medium'
+                        ? 'text-yellow-500 dark:text-yellow-400'
+                        : 'text-red-500 dark:text-red-400'
+                    }`}>
+                    <span className="text-base tabular-nums leading-none">{verifiedCount}</span>
+                    <span className="opacity-40 text-xs leading-none">/</span>
+                    <span className="text-base tabular-nums leading-none">{totalUnique}</span>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <>
+            {/* 헤더 - 모바일 3줄 / PC 2줄 */}
+            <div className="border-b border-border px-3 sm:px-4 pt-0 pb-2.5 flex-shrink-0 space-y-2">
+                {/* 1줄: 타이틀 + 배지 + 신뢰도(우측정렬) */}
+                <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                    <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">
+                        File Search RAG
+                    </Badge>
+                    {/* 신뢰도 배지 - 우측 정렬 */}
+                    <div className="ml-auto">
+                        <ConfidenceBadge />
                     </div>
                 </div>
 
-                {/* 질문 표시 */}
+                {/* 2줄: 질문 표시 */}
                 {userQuery && (
-                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium pl-1">
+                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium">
                         <MessageCircleQuestion className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
-                        <span className="break-words">{userQuery}</span>
+                        <span className="break-words line-clamp-2">{userQuery}</span>
                     </div>
                 )}
+
+                {/* 3줄: 컨트롤 버튼들 (우측 정렬) */}
+                <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
+                        <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
+                        <RotateCcw className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
+                        <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                            navigator.clipboard.writeText(aiAnswerHTML.replace(/<[^>]*>?/gm, ''))
+                            toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
+                        }}
+                        title="복사"
+                    >
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
 
             {/* 본문 영역 */}
-            <div className="flex-1 min-h-0 px-4 pt-1 pb-4 overflow-y-auto">
+            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-1 pb-4 overflow-y-auto overflow-x-hidden">
                 {/* 검색 실패 경고 메시지 */}
                 {fileSearchFailed && (
                     <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
                         <div className="flex items-start gap-2">
                             <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-destructive">검색 결과 없음</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     관련 법령을 찾지 못했습니다. 검색어를 확인해주세요.
@@ -353,14 +360,15 @@ export function AIAnswerContent({
 
 
                 <div
-                    className="prose prose-sm max-w-none w-full dark:prose-invert break-words overflow-x-hidden px-0
-        [&_h2]:text-[clamp(18px,5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-nowrap
-        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-nowrap
-        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-0 sm:[&_blockquote]:ml-4 [&_blockquote]:break-words [&_blockquote]:overflow-wrap-anywhere [&_blockquote]:not-italic
-        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed
+                    className="prose prose-sm max-w-none w-full dark:prose-invert overflow-x-hidden
+        [&_h2]:text-[clamp(16px,4.5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-wrap
+        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-wrap
+        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-0 sm:[&_blockquote]:ml-4 [&_blockquote]:not-italic
+        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed [&_blockquote_p]:break-words
         [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
         [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1
-        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words"
+        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words
+        [&_*]:max-w-full [&_*]:overflow-wrap-anywhere"
                     style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                     onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}

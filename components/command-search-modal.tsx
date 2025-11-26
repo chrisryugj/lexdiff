@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Search, Clock, Star, X, ArrowRight } from "lucide-react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -77,10 +78,20 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden" showCloseButton={true}>
-        {/* 검색 입력 영역 */}
-        <div className="flex items-center gap-3 px-4 py-4 border-b border-border">
-          <Search className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+      <DialogContent
+        className="max-w-2xl p-0 gap-0 overflow-hidden bg-gray-950 border-2 border-primary/40 shadow-2xl shadow-primary/30 ring-1 ring-white/10"
+        showCloseButton={true}
+      >
+        {/* 접근성을 위한 숨겨진 타이틀 */}
+        <VisuallyHidden.Root>
+          <DialogTitle>법령 검색</DialogTitle>
+        </VisuallyHidden.Root>
+
+        {/* 검색 입력 영역 - 강조된 스타일 */}
+        <div className="flex items-center gap-3 px-4 py-4 border-b-2 border-primary/20 bg-gray-800/50">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20">
+            <Search className="h-5 w-5 text-primary" />
+          </div>
           <Input
             ref={inputRef}
             type="text"
@@ -92,7 +103,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                 handleSearch(searchQuery)
               }
             }}
-            className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+            className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-base text-white placeholder:text-gray-400"
           />
         </div>
 
@@ -103,18 +114,18 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             {recentSearches.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-muted-foreground">최근 검색</h3>
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <h3 className="text-sm font-semibold text-gray-400">최근 검색</h3>
                 </div>
                 <div className="space-y-1">
                   {recentSearches.map((query, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleRecentClick(query)}
-                      className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors text-left group"
+                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/10 transition-colors text-left group border border-transparent hover:border-primary/30"
                     >
-                      <span className="text-sm">{query}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span className="text-sm text-gray-200">{query}</span>
+                      <ArrowRight className="h-4 w-4 text-gray-500 opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all" />
                     </button>
                   ))}
                 </div>
@@ -126,8 +137,8 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                  <h3 className="text-sm font-semibold text-muted-foreground">즐겨찾기</h3>
-                  <Badge variant="secondary" className="ml-auto text-xs">
+                  <h3 className="text-sm font-semibold text-gray-400">즐겨찾기</h3>
+                  <Badge variant="secondary" className="ml-auto text-xs bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
                     {favorites.length}
                   </Badge>
                 </div>
@@ -136,13 +147,13 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                     <button
                       key={`${fav.lawTitle}-${fav.jo}`}
                       onClick={() => handleFavoriteClick(fav)}
-                      className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors text-left group"
+                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/10 transition-colors text-left group border border-transparent hover:border-primary/30"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{fav.lawTitle}</div>
-                        <div className="text-xs text-muted-foreground">{fav.joLabel}</div>
+                        <div className="text-sm font-medium truncate text-gray-200">{fav.lawTitle}</div>
+                        <div className="text-xs text-gray-500">{fav.joLabel}</div>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
+                      <ArrowRight className="h-4 w-4 text-gray-500 opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0 ml-2" />
                     </button>
                   ))}
                 </div>
@@ -151,20 +162,28 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
             {/* 안내 메시지 */}
             {recentSearches.length === 0 && favorites.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Search className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="text-sm">법령명을 입력하여 검색하세요</p>
-                <p className="text-xs mt-1">예: 민법, 형법 제38조</p>
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Search className="h-8 w-8 text-primary/50" />
+                </div>
+                <p className="text-sm text-gray-300">법령명을 입력하여 검색하세요</p>
+                <p className="text-xs mt-1 text-gray-500">예: 민법, 형법 제38조</p>
               </div>
             )}
           </div>
         </ScrollArea>
 
         {/* 하단 힌트 */}
-        <div className="border-t border-border px-4 py-2 bg-muted/30">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Enter로 검색</span>
-            <span>ESC로 닫기</span>
+        <div className="border-t-2 border-primary/20 px-4 py-3 bg-gray-800/50">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400 flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-gray-700 text-gray-300 font-mono text-[10px]">Enter</kbd>
+              검색
+            </span>
+            <span className="text-gray-400 flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-gray-700 text-gray-300 font-mono text-[10px]">ESC</kbd>
+              닫기
+            </span>
           </div>
         </div>
       </DialogContent>
