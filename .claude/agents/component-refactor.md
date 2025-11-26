@@ -1,3 +1,8 @@
+---
+name: component-refactor
+description: React/Next.js 컴포넌트 리팩토링, 상태 관리, 모달 패턴 전문 에이전트
+---
+
 # Component Refactor Agent
 
 **Purpose**: React/Next.js 컴포넌트 리팩토링, 상태 관리, 모달 패턴 전문 에이전트

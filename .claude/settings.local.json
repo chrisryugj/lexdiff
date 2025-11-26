@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(git pull:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(dir \"C:\\Users\\Chris\\.claude\")",
+      "Bash(Remove-Item \"C:\\Users\\Chris\\.claude\\global-settings.json\")",
+      "Bash(cat:*)",
+      "Bash(python -m json.tool:*)"
     ],
     "deny": [],
     "ask": []

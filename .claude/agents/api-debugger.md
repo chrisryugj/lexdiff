@@ -1,3 +1,8 @@
+---
+name: api-debugger
+description: API 통합 문제 진단, XML/JSON 파싱 에러 해결 전문 에이전트
+---
+
 # API Debugger Agent
 
 **Purpose**: API 통합 문제 진단, XML/JSON 파싱 에러 해결 전문 에이전트
