@@ -323,6 +323,53 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         // 검색 쿼리 저장 (Progress Dialog 표시용)
         setSearchQuery(cached.query.lawName || '')
 
+        // AI 모드 캐시 복원 (RAG 검색 결과)
+        if (cached.aiMode) {
+          debugLogger.success('✅ AI 답변 캐시 HIT - API 호출 없음', {
+            contentLength: cached.aiMode.aiAnswerContent.length,
+            relatedLaws: cached.aiMode.aiRelatedLaws.length,
+            citations: cached.aiMode.aiCitations?.length || 0
+          })
+
+          // ⚡ 캐시 로딩 표시
+          setIsCacheHit(true)
+          setIsSearching(true)
+          updateProgress('parsing', 95)
+
+          // AI 모드 상태 복원
+          setIsAiMode(true)
+          setAiAnswerContent(cached.aiMode.aiAnswerContent)
+          setAiRelatedLaws(cached.aiMode.aiRelatedLaws)
+          setAiCitations(cached.aiMode.aiCitations || [])
+          setUserQuery(cached.aiMode.userQuery || cached.query.lawName)
+          setFileSearchFailed(cached.aiMode.fileSearchFailed || false)
+
+          // 더미 lawData 설정 (법령뷰 표시를 위해)
+          const aiLawData = {
+            meta: {
+              lawId: 'ai-answer',
+              lawTitle: 'AI 답변',
+              promulgationDate: new Date().toISOString().split('T')[0],
+              lawType: 'AI',
+              isOrdinance: false,
+              fetchedAt: new Date().toISOString()
+            },
+            articles: [],
+            selectedJo: undefined,
+            isOrdinance: false
+          }
+          setLawData(aiLawData)
+          setMobileView("content")
+
+          // ⚡ 캐시 로딩 표시 - complete 후 닫기
+          updateProgress('complete', 100)
+          setTimeout(() => {
+            setIsCacheHit(false)
+            setIsSearching(false)
+          }, 300)
+          return
+        }
+
         // lawData가 캐시되어 있으면 바로 복원 (API 호출 없음)
         if (cached.lawData) {
           debugLogger.success('✅ lawData 캐시 HIT - API 호출 없음', {
@@ -963,6 +1010,38 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
         setLawData(aiLawData)
         setMobileView("content")
+
+        // ✅ AI 검색 결과를 IndexedDB에 캐시 저장 (뒤로가기 시 복원용)
+        try {
+          const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+          const currentState = window.history.state
+          const currentSearchId = currentState?.searchId
+
+          if (currentSearchId) {
+            const existingCache = await getSearchResult(currentSearchId)
+
+            if (existingCache) {
+              await saveSearchResult({
+                ...existingCache,
+                aiMode: {
+                  aiAnswerContent: processedContent,
+                  aiRelatedLaws: relatedLaws,
+                  aiCitations: receivedCitations,
+                  userQuery: fullQuery,
+                  fileSearchFailed: searchFailed
+                }
+              })
+              debugLogger.success('💾 AI 답변을 IndexedDB에 캐시 저장 완료', {
+                searchId: currentSearchId,
+                contentLength: processedContent.length,
+                relatedLaws: relatedLaws.length,
+                citations: receivedCitations.length
+              })
+            }
+          }
+        } catch (cacheError) {
+          debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
+        }
 
         // ✅ 검색 완료 상태 업데이트 (프로그레스바 종료)
         updateProgress('complete', 100)

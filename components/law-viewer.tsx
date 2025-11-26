@@ -318,6 +318,10 @@ export function LawViewer({
     if (!meta.lawId) {
       return
     }
+    // AI 모드에서는 article-history API 호출 스킵 (lawId가 'ai-answer'인 경우)
+    if (meta.lawId === 'ai-answer') {
+      return
+    }
     if (isOrdinance) {
       return
     }
@@ -1034,21 +1038,6 @@ export function LawViewer({
                       <span className="hidden sm:inline">AI 요약</span>
                       <span className="sm:hidden">요약</span>
                     </Button>
-                    {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
-                    <Button
-                      key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                      data-favorited={isFavorite(activeArticle.jo)}
-                      className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                        : ''
-                        }`}
-                    >
-                      <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
-                      즐겨찾기
-                    </Button>
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
                       <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
                       <span className="hidden sm:inline">원문 보기</span>
@@ -1086,6 +1075,21 @@ export function LawViewer({
                         <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
                       </Button>
                     )}
+                    {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
+                    <Button
+                      key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                      data-favorited={isFavorite(activeArticle.jo)}
+                      className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                        : ''
+                        }`}
+                    >
+                      <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
+                      즐겨찾기
+                    </Button>
                   </div>
                 </div>
               )

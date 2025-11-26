@@ -67,6 +67,13 @@ export interface SearchResultCache {
       article?: string
       confidence?: number
     }>
+    aiCitations?: Array<{
+      lawName: string
+      articleNum: string
+      verified?: boolean
+    }>
+    userQuery?: string
+    fileSearchFailed?: boolean
     comparisonLaw?: {
       lawName: string
       article?: string
