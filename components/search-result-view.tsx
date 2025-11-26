@@ -24,6 +24,7 @@ import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
+import { formatDate } from "@/lib/revision-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
@@ -1923,7 +1924,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         isFocusMode={isFocusMode}
       />
       <main className="flex-1">
-        <div className="container mx-auto max-w-[1280px] p-6">
+        <div className="container mx-auto max-w-[1280px] px-2 pt-3 pb-2 sm:p-6">
           {lawSelectionState ? (
             <div className="py-4 md:py-8">
               {/* 헤더 섹션 - Glassmorphism */}
@@ -1998,13 +1999,13 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                           {law.promulgationDate && (
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              공포: {String(law.promulgationDate)}
+                              공포: {formatDate(String(law.promulgationDate))}
                             </span>
                           )}
                           {law.effectiveDate && (
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                              시행: {String(law.effectiveDate)}
+                              시행: {formatDate(String(law.effectiveDate))}
                             </span>
                           )}
                         </div>
@@ -2101,7 +2102,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                           {ordinance.effectiveDate && (
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                              시행: {String(ordinance.effectiveDate)}
+                              시행: {formatDate(String(ordinance.effectiveDate))}
                             </span>
                           )}
                         </div>
@@ -2123,18 +2124,18 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
             // 로딩 화면 제거 - ModernProgressBar만 사용
             null
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-4">
               <div className="md:hidden">
                 {/* 플로팅 헤더에 검색 버튼이 있으므로 "다른 법령 검색" 버튼 제거 */}
                 {mobileView === "list" ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2 sm:space-y-4">
                     <SearchBar onSearch={handleSearch} isLoading={isSearching} />
                     <Button variant="outline" size="sm" onClick={() => setMobileView("content")} className="w-full">
                       현재 법령으로 돌아가기
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2 sm:space-y-4">
                     {articleNotFound && (
                       <ArticleNotFoundBanner
                         requestedJo={articleNotFound.requestedJo}

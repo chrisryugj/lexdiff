@@ -312,7 +312,7 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-6 pb-0.5 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
+            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-0.5 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도(모바일만) */}
                 <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
