@@ -11,6 +11,7 @@ interface VirtualizedArticleListProps {
   loadingJo: string | null
   favorites: Set<string>
   isOrdinance: boolean
+  lawTitle?: string // ✅ 법령명 추가
   onArticleClick: (jo: string) => void
   onToggleFavorite: (jo: string) => void
 }
@@ -22,6 +23,7 @@ export const VirtualizedArticleList = React.memo(
     loadingJo,
     favorites,
     isOrdinance,
+    lawTitle = '',
     onArticleClick,
     onToggleFavorite,
   }: VirtualizedArticleListProps) {
@@ -70,7 +72,8 @@ export const VirtualizedArticleList = React.memo(
             const article = articles[virtualItem.index]
             const isActive = activeJo === article.jo
             const isLoading = loadingJo === article.jo
-            const isFavorite = favorites.has(article.jo)
+            // ✅ 법령명+조문 조합으로 확인
+            const isFavorite = favorites.has(`${lawTitle}-${article.jo}`)
 
             return (
               <div

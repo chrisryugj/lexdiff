@@ -11,13 +11,13 @@ import {
     FileText,
     Bookmark,
     GitMerge,
-    ExternalLink,
     AlertCircle,
     MessageCircleQuestion,
     ZoomOut,
     RotateCcw,
     ZoomIn,
     Copy,
+    ChevronDown,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
@@ -29,33 +29,49 @@ interface AIAnswerSidebarProps {
     onRelatedArticleClick: (lawName: string, article: string) => void
     onCloseSidebar?: () => void
     showHeader?: boolean
+    onCollapseClick?: () => void
 }
 
 export function AIAnswerSidebar({
     relatedArticles,
     onRelatedArticleClick,
     onCloseSidebar,
-    showHeader = true
+    showHeader = true,
+    onCollapseClick
 }: AIAnswerSidebarProps) {
     return (
         <>
             {showHeader ? (
-                <div className="border-b border-border p-4 flex-shrink-0">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Link2 className="h-5 w-5 text-primary" />
-                        <h3 className="text-xl font-bold text-foreground">관련 법령 목록</h3>
+                <div className="border-b border-border px-4 py-3 flex-shrink-0">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                            <Link2 className="h-5 w-5 text-primary" />
+                            <h3 className="text-lg font-bold text-foreground">관련 법령</h3>
+                        </div>
+                        {onCollapseClick && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onCollapseClick}
+                                className="h-7 w-7"
+                                title="목록 접기"
+                            >
+                                <ChevronDown className="h-4 w-4 rotate-90" />
+                            </Button>
+                        )}
                     </div>
                     <HeaderBadges relatedArticles={relatedArticles} />
                 </div>
             ) : (
-                <div className="mb-4">
+                <div className="mb-3 px-4">
+                    <h3 className="text-lg font-bold text-foreground mb-2">관련 법령</h3>
                     <HeaderBadges relatedArticles={relatedArticles} />
                 </div>
             )}
 
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 pl-3 pr-1">
                 <ScrollArea className="h-full">
-                    <div className="space-y-1 pr-4 px-4 pt-2 pb-4">
+                    <div className="space-y-1.5 pt-2 pb-4 pr-2">
                         {relatedArticles.length > 0 ? (
                             (() => {
                                 // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
@@ -91,30 +107,36 @@ export function AIAnswerSidebar({
                                         <button
                                             key={`${law.lawName}-${law.jo}-${idx}`}
                                             onClick={handleClick}
-                                            className="w-full text-left pl-4 pr-5 py-3 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group"
+                                            className="w-full text-left px-2.5 py-2.5 rounded-md border border-blue-800/20 hover:border-blue-600/40 bg-gradient-to-r from-blue-950/20 to-purple-950/20 hover:from-blue-900/40 hover:to-purple-900/40 transition-all duration-200 group overflow-hidden"
                                         >
-                                            <div className="flex items-start justify-between gap-2 mb-2">
-                                                <div className="flex items-center gap-1.5 flex-1">
-                                                    <ExternalLink className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 shrink-0 mt-0.5" />
-                                                    <span className="font-medium text-blue-300 group-hover:text-blue-200 text-base">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    {/* 법령명 - 2줄 제한 */}
+                                                    <div className="font-medium text-blue-300 group-hover:text-blue-200 text-sm line-clamp-2 mb-1">
                                                         {law.lawName}
-                                                    </span>
+                                                    </div>
+                                                    {/* 조문 - truncate */}
+                                                    <div className="text-xs text-muted-foreground truncate">
+                                                        {law.article}
+                                                        {law.title && (
+                                                            <span className="text-blue-400/70 ml-1">{law.title}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {/* 출처 아이콘 (중복 시 여러 개 표시) */}
-                                                <div className="flex items-center gap-1 shrink-0">
+
+                                                {/* 우측 아이콘 (발췌/관련) */}
+                                                <div className="flex items-center gap-1 shrink-0 mt-0.5">
                                                     {sources.has('excerpt') && (
-                                                        <Bookmark className="h-3.5 w-3.5 text-purple-400" />
+                                                        <div title="발췌법령">
+                                                            <Bookmark className="h-3.5 w-3.5 text-purple-400" />
+                                                        </div>
                                                     )}
                                                     {sources.has('related') && (
-                                                        <Link2 className="h-3.5 w-3.5 text-blue-400" />
+                                                        <div title="관련법령">
+                                                            <Link2 className="h-3.5 w-3.5 text-blue-400" />
+                                                        </div>
                                                     )}
                                                 </div>
-                                            </div>
-                                            <div className="text-sm text-muted-foreground pl-5">
-                                                {law.article}
-                                                {law.title && (
-                                                    <span className="text-blue-400/70 ml-1">{law.title}</span>
-                                                )}
                                             </div>
                                         </button>
                                     )
@@ -164,27 +186,27 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
     ).length
 
     return (
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <Badge variant="secondary" className="text-xs whitespace-nowrap">
-                <FileText className="h-3 w-3 mr-1" />
-                전체 {uniqueCount}개
+        <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="secondary" className="text-xs whitespace-nowrap px-2 py-0.5">
+                <FileText className="h-3 w-3 mr-0.5" />
+                {uniqueCount}
             </Badge>
             {excerptOnlyCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50 whitespace-nowrap">
-                    <Bookmark className="h-3 w-3 mr-1" />
-                    발췌 {excerptOnlyCount}
+                <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50 whitespace-nowrap px-2 py-0.5">
+                    <Bookmark className="h-3 w-3 mr-0.5" />
+                    {excerptOnlyCount}
                 </Badge>
             )}
             {relatedOnlyCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50 whitespace-nowrap">
-                    <Link2 className="h-3 w-3 mr-1" />
-                    관련 {relatedOnlyCount}
+                <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50 whitespace-nowrap px-2 py-0.5">
+                    <Link2 className="h-3 w-3 mr-0.5" />
+                    {relatedOnlyCount}
                 </Badge>
             )}
             {bothCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50 whitespace-nowrap">
-                    <GitMerge className="h-3 w-3 mr-1" />
-                    둘 다 {bothCount}
+                <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50 whitespace-nowrap px-2 py-0.5">
+                    <GitMerge className="h-3 w-3 mr-0.5" />
+                    {bothCount}
                 </Badge>
             )}
         </div>
@@ -299,16 +321,16 @@ export function AIAnswerContent({
                                     title={`AI 참조 조문: ${totalUnique}개\n실제 조문 존재: ${verifiedCount}개`}
                                 >
                                     <ShieldCheck className={`h-4 w-4 ${aiConfidenceLevel === 'high'
-                                            ? 'text-blue-400 dark:text-blue-300'
-                                            : aiConfidenceLevel === 'medium'
-                                                ? 'text-yellow-500 dark:text-yellow-400'
-                                                : 'text-red-500 dark:text-red-400'
+                                        ? 'text-blue-400 dark:text-blue-300'
+                                        : aiConfidenceLevel === 'medium'
+                                            ? 'text-yellow-500 dark:text-yellow-400'
+                                            : 'text-red-500 dark:text-red-400'
                                         }`} />
                                     <div className={`flex items-baseline gap-0.5 font-bold ${aiConfidenceLevel === 'high'
-                                            ? 'text-blue-400 dark:text-blue-300'
-                                            : aiConfidenceLevel === 'medium'
-                                                ? 'text-yellow-500 dark:text-yellow-400'
-                                                : 'text-red-500 dark:text-red-400'
+                                        ? 'text-blue-400 dark:text-blue-300'
+                                        : aiConfidenceLevel === 'medium'
+                                            ? 'text-yellow-500 dark:text-yellow-400'
+                                            : 'text-red-500 dark:text-red-400'
                                         }`}>
                                         <span className="text-base tabular-nums leading-none">{verifiedCount}</span>
                                         <span className="opacity-40 text-xs leading-none">/</span>

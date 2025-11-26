@@ -33,7 +33,7 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     <button
       onClick={onClick}
       disabled={isLoading}
-      className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
+      className={`w-full text-left px-2 py-2 rounded-md transition-colors ${
         isActive
           ? "bg-primary text-primary-foreground font-bold"
           : "hover:bg-secondary text-foreground font-medium"
@@ -41,12 +41,12 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-base font-bold">
+          <div className="text-sm font-bold">
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
           </div>
           {article.title && (
             <div
-              className="text-sm opacity-80 mt-0.5 truncate"
+              className="text-xs opacity-75 mt-0.5 truncate"
               title={article.title}
             >
               ({article.title})
@@ -56,32 +56,9 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {isActive ? (
-            <BookmarkCheck className="h-3.5 w-3.5 text-primary-foreground" />
-          ) : (
-            <Bookmark className="h-3.5 w-3.5 opacity-40" />
+          {isFavorite && (
+            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
           )}
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={onToggleFavorite}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault()
-                onToggleFavorite(event)
-              }
-            }}
-            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-              isFavorite
-                ? "text-[var(--color-warning)]"
-                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-            }`}
-            aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-            aria-pressed={isFavorite}
-            title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-          >
-            <Star className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`} />
-          </span>
           {article.hasChanges && (
             <AlertCircle
               className="h-3 w-3 text-[var(--color-warning)]"

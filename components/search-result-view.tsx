@@ -9,7 +9,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Header } from "@/components/header"
+import { FloatingCompactHeader } from "@/components/floating-compact-header"
+import { CommandSearchModal } from "@/components/command-search-modal"
 import { SearchBar } from "@/components/search-bar"
 import { LawViewer } from "@/components/law-viewer"
 import { ComparisonModal } from "@/components/comparison-modal"
@@ -171,6 +172,8 @@ export interface SearchResultViewProps {
 
 export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeChange }: SearchResultViewProps) {
   const [isSearching, setIsSearching] = useState(false)
+  const [isFocusMode, setIsFocusMode] = useState(false) // 포커스 모드 상태
+  const [showSearchModal, setShowSearchModal] = useState(false) // 검색 모달 상태
   const [lawData, setLawData] = useState<{
     meta: LawMeta
     articles: LawArticle[]
@@ -257,14 +260,35 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     onProgressUpdate?.(stage, progress)
   }, [onProgressUpdate])
 
+  // 단축키 등록 (Cmd/Ctrl+K: 검색, F11: 포커스 모드)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K: 검색 모달
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearchModal(true)
+      }
+      // F11: 포커스 모드
+      if (e.key === 'F11') {
+        e.preventDefault()
+        setIsFocusMode(prev => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
-      const joSet = new Set(favs.map((f) => f.jo))
+      // ✅ 법령명+조문 조합으로 구분
+      const joSet = new Set(favs.map((f) => `${f.lawTitle}-${f.jo}`))
       setFavorites(joSet)
     })
 
     const initialFavs = favoritesStore.getFavorites()
-    const joSet = new Set(initialFavs.map((f) => f.jo))
+    // ✅ 법령명+조문 조합으로 구분
+    const joSet = new Set(initialFavs.map((f) => `${f.lawTitle}-${f.jo}`))
     setFavorites(joSet)
 
     return () => {
@@ -1791,7 +1815,10 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     if (!article) return
 
     try {
-      if (favorites.has(jo)) {
+      // ✅ 법령명 + 조문으로 확인
+      const isFav = favoritesStore.isFavorite(lawData.meta.lawTitle, jo)
+
+      if (isFav) {
         const existingFavs = favoritesStore.getFavorites()
         const toRemove = existingFavs.find((f) => f.lawTitle === lawData.meta.lawTitle && f.jo === jo)
         if (toRemove) {
@@ -1811,7 +1838,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       reportError("즐겨찾기 토글", error instanceof Error ? error : new Error(String(error)), {
         lawTitle: lawData.meta.lawTitle,
         jo,
-        action: favorites.has(jo) ? "제거" : "추가",
+        action: favoritesStore.isFavorite(lawData.meta.lawTitle, jo) ? "제거" : "추가",
       })
 
       toast({
@@ -1844,6 +1871,14 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* 검색 모달 (Cmd+K) */}
+      <CommandSearchModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        onSearch={handleSearch}
+        isAiMode={isAiMode}
+      />
+
       {/* 프로그레스 오버레이 - ModernProgressBar 사용 */}
       {isSearching && (
         <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-[100] flex items-center justify-center">
@@ -1876,7 +1911,16 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         </div>
       )}
 
-      <Header onReset={handleReset} onFavoritesClick={handleFavoritesClick} onSettingsClick={handleSettingsClick} />
+      <FloatingCompactHeader
+        onBack={handleReset}
+        onFavoritesClick={handleFavoritesClick}
+        onSettingsClick={handleSettingsClick}
+        onSearchClick={() => setShowSearchModal(true)}
+        onFocusModeToggle={() => setIsFocusMode(!isFocusMode)}
+        currentLawName={lawData?.meta?.lawTitle}
+        showBackButton={true}
+        isFocusMode={isFocusMode}
+      />
       <main className="flex-1">
         <div className="container mx-auto max-w-[1280px] p-6">
           {lawSelectionState ? (
