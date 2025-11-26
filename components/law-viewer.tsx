@@ -34,6 +34,7 @@ import {
   Building2,
   GitMerge,
   MessageCircleQuestion,
+  ChevronDown,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -115,6 +116,7 @@ export function LawViewer({
   const [fontSize, setFontSize] = useState<number>(15)
   const [copied, setCopied] = useState(false)
   const [isArticleListExpanded, setIsArticleListExpanded] = useState(false)
+  const [isArticleListCollapsed, setIsArticleListCollapsed] = useState(false) // 조문목록 접기 상태
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
@@ -720,7 +722,13 @@ export function LawViewer({
   return (
     <>
       <div className="w-full mx-auto max-w-[1280px]">
-        <div className="relative grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 min-h-0 lg:h-auto" style={{ fontFamily: "Pretendard, sans-serif" }}>
+        <div
+          className="relative grid grid-cols-1 gap-4 min-h-0 lg:h-[calc(100vh-80px)]"
+          style={{
+            fontFamily: "Pretendard, sans-serif",
+            gridTemplateColumns: isArticleListCollapsed ? '64px 1fr' : '1fr 4fr'
+          }}
+        >
           {/* Mobile overlay backdrop */}
           {isArticleListExpanded && (
             <div
@@ -730,20 +738,112 @@ export function LawViewer({
           )}
 
           {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-          <Card className="hidden lg:flex flex-col overflow-hidden lg:min-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-8rem)] lg:sticky lg:top-4">
-            {aiAnswerMode ? (
+          <Card className={`hidden lg:flex flex-col overflow-hidden h-full lg:sticky lg:top-4 transition-all duration-300 ${isArticleListCollapsed ? 'lg:w-16' : ''}`}>
+            {aiAnswerMode && isArticleListCollapsed ? (
+              // ========== AI 슬림 모드 (접힌 상태) ==========
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsArticleListCollapsed(false)}
+                  className="mx-auto mt-2 mb-2"
+                  title="관련 법령 목록 펼치기"
+                >
+                  <Link2 className="h-5 w-5" />
+                </Button>
+                <Separator />
+                <ScrollArea className="flex-1">
+                  <div className="flex flex-col items-center gap-1 py-2">
+                    {relatedArticles.slice(0, 20).map((article, idx) => {
+                      const isExcerpt = article.source === 'excerpt'
+                      return (
+                        <Button
+                          key={`${article.lawName}-${article.jo}-${idx}`}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openExternalLawArticleModal(article.lawName, article.article)}
+                          className="w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative"
+                          title={`${article.lawName} ${article.article}`}
+                        >
+                          {isExcerpt ? (
+                            <Bookmark className="h-3.5 w-3.5 text-purple-400" />
+                          ) : (
+                            <Link2 className="h-3.5 w-3.5 text-blue-400" />
+                          )}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              </>
+            ) : aiAnswerMode ? (
+              // ========== AI 펼친 상태 ==========
               <AIAnswerSidebar
                 relatedArticles={relatedArticles}
                 onRelatedArticleClick={openExternalLawArticleModal}
+                showHeader={true}
+                onCollapseClick={() => setIsArticleListCollapsed(true)}
               />
+            ) : isArticleListCollapsed ? (
+              // ========== 슬림 모드 (접힌 상태) ==========
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsArticleListCollapsed(false)}
+                  className="mx-auto mt-2 mb-2"
+                  title="조문 목록 펼치기"
+                >
+                  <ListOrdered className="h-5 w-5" />
+                </Button>
+                <Separator />
+                <ScrollArea className="flex-1">
+                  <div className="flex flex-col items-center gap-1 py-2">
+                    {actualArticles.map((article) => {
+                      const joNum = formatSimpleJo(article.jo).replace('제', '').replace('조', '').replace('의', '-')
+                      const isActive = article.jo === activeJo
+                      const isFavorite = favorites.has(article.jo)
+
+                      return (
+                        <Button
+                          key={article.jo}
+                          variant={isActive ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => handleArticleClick(article.jo)}
+                          className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${
+                            isActive ? 'ring-2 ring-primary ring-offset-1' : ''
+                          }`}
+                          title={`${formatSimpleJo(article.jo)}${article.title ? ` ${article.title}` : ''}`}
+                        >
+                          <span className="font-bold">{joNum}</span>
+                          {isFavorite && (
+                            <Star className="h-2.5 w-2.5 absolute top-0.5 right-0.5 fill-yellow-400 text-yellow-400" />
+                          )}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              </>
             ) : (
-              // ========== 기존 조문 목록 ==========
+              // ========== 기존 조문 목록 (펼친 상태) ==========
               <>
                 {/* 헤더 - 본문 헤더와 동일한 디자인 */}
                 <div className="border-b border-border px-4 pt-0 pb-3 flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ListOrdered className="h-5 w-5 text-primary" />
-                    <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
+                  <div className="flex items-center gap-2 mb-1 justify-between">
+                    <div className="flex items-center gap-2">
+                      <ListOrdered className="h-5 w-5 text-primary" />
+                      <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsArticleListCollapsed(true)}
+                      className="h-7 w-7"
+                      title="조문 목록 접기"
+                    >
+                      <ChevronDown className="h-4 w-4 rotate-90" />
+                    </Button>
                   </div>
                   <Badge variant="outline" className="text-xs">
                     <FileText className="h-3 w-3 mr-1" />
@@ -751,13 +851,14 @@ export function LawViewer({
                   </Badge>
                 </div>
 
-                <div className="flex-1 min-h-0 px-4 pt-2 pb-4">
+                <div className="flex-1 min-h-0 px-2 pt-2 pb-4">
                   <VirtualizedArticleList
                     articles={actualArticles}
                     activeJo={activeJo}
                     loadingJo={loadingJo}
                     favorites={favorites}
                     isOrdinance={isOrdinance}
+                    lawTitle={meta.lawTitle}
                     onArticleClick={handleArticleClick}
                     onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
                   />
@@ -798,6 +899,7 @@ export function LawViewer({
                     loadingJo={loadingJo}
                     favorites={favorites}
                     isOrdinance={isOrdinance}
+                    lawTitle={meta.lawTitle}
                     onArticleClick={(jo) => {
                       handleArticleClick(jo)
                       setIsArticleListExpanded(false)
