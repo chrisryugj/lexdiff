@@ -434,6 +434,62 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
     debugLogger.info('관련 법령 섹션 없음')
   }
 
+  // 패턴 3: 인라인 「법령명」 제N조 패턴 (인용 괄호)
+  // 예: 「도로법」 제61조, 「도로법 시행령」 제63조
+  const quotedLawPattern = /「([^」]+)」\s*제(\d+)조(의(\d+))?/g
+  let quotedMatch
+
+  while ((quotedMatch = quotedLawPattern.exec(markdown)) !== null) {
+    const lawName = quotedMatch[1].trim()
+    const articleNum = quotedMatch[2] + (quotedMatch[4] ? `의${quotedMatch[4]}` : '')
+    const jo = buildJO(articleNum)
+
+    if (jo) {
+      laws.push({
+        lawName,
+        article: `제${articleNum}조`,
+        jo,
+        display: `${lawName} 제${articleNum}조`,
+        source: 'related'
+      })
+    }
+  }
+
+  debugLogger.info('인라인 「」 법령 추출', {
+    count: laws.filter(l => l.source === 'related').length
+  })
+
+  // 패턴 4: 인라인 법령명 제N조 패턴 (인용 괄호 없음)
+  // 예: 도로법 제61조, 도로법 시행령 제63조
+  // 주의: 이미 「」로 캡처된 것은 제외
+  const unquotedLawPattern = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법률|법|령|규칙|조례)(?:\s*시행령|\s*시행규칙)?)\s*제(\d+)조(의(\d+))?/g
+  let unquotedMatch
+
+  while ((unquotedMatch = unquotedLawPattern.exec(markdown)) !== null) {
+    const lawName = unquotedMatch[1].trim()
+    const articleNum = unquotedMatch[2] + (unquotedMatch[4] ? `의${unquotedMatch[4]}` : '')
+    const jo = buildJO(articleNum)
+
+    // 중복 체크: 같은 법령+조문이 이미 있는지 확인
+    const isDuplicate = laws.some(l =>
+      l.lawName === lawName && l.article === `제${articleNum}조`
+    )
+
+    if (jo && !isDuplicate) {
+      laws.push({
+        lawName,
+        article: `제${articleNum}조`,
+        jo,
+        display: `${lawName} 제${articleNum}조`,
+        source: 'related'
+      })
+    }
+  }
+
+  debugLogger.info('인라인 일반 법령 추출', {
+    totalRelated: laws.filter(l => l.source === 'related').length
+  })
+
   // ⚠️ 중복 제거 하지 않음 - 사이드바에서 source별로 그룹화하여 표시
   // 같은 법령이 발췌(excerpt)와 관련(related) 둘 다 있을 수 있으므로 모두 반환
   debugLogger.success('전체 법령 추출 완료 (중복 미제거)', {

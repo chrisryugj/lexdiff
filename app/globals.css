@@ -43,6 +43,13 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Ridibatang';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -298,6 +305,12 @@
   }
   .law-html-viewer br + br {
     display: none;
+  }
+
+  /* AI 답변 조문 발췌 - 리디바탕 폰트 + 작은 글씨 */
+  .prose blockquote {
+    font-family: 'Ridibatang', 'Nanum Myeongjo', serif;
+    font-size: 0.9em;
   }
 }
 

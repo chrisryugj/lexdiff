@@ -48,6 +48,7 @@ import {
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import { buildJO } from "@/lib/law-parser"
+import { getCachedResponse, cacheResponse } from "@/lib/rag-response-cache"
 import { HelpCircle, Scale, Brain, AlertCircle, X } from "lucide-react"
 
 // 법령 타입별 Badge 색상 클래스 반환
@@ -878,6 +879,51 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       // 사용자 질의 저장 (법령명 추론에 사용)
       setUserQuery(fullQuery)
 
+      // ✅ RAG 캐시 확인 (API 호출 전에 먼저 확인)
+      debugLogger.info('🔍 RAG 캐시 확인 중...', { query: fullQuery })
+      const cached = await getCachedResponse(fullQuery)
+      debugLogger.info('🔍 RAG 캐시 결과', { hit: !!cached, query: fullQuery.substring(0, 30) })
+      if (cached) {
+        debugLogger.success('✅ RAG 캐시 히트 - API 호출 스킵', {
+          query: fullQuery,
+          citationsCount: cached.citations?.length,
+          queryType: cached.queryType
+        })
+
+        setIsAiMode(true)
+        setSearchMode('rag')
+        onModeChange?.('rag')
+
+        // 캐시된 데이터로 UI 업데이트
+        const relatedLaws = extractRelatedLaws(cached.response)
+
+        setAiAnswerContent(cached.response)
+        setAiRelatedLaws(relatedLaws)
+        setAiCitations(cached.citations || [])
+        setFileSearchFailed(false)
+
+        // 더미 lawData 설정 (법령뷰 표시를 위해)
+        const aiLawData = {
+          meta: {
+            lawId: 'ai-answer',
+            lawTitle: 'AI 답변',
+            promulgationDate: new Date().toISOString().split('T')[0],
+            lawType: 'AI',
+            isOrdinance: false,
+            fetchedAt: new Date().toISOString()
+          },
+          articles: [],
+          selectedJo: undefined,
+          isOrdinance: false
+        }
+        setLawData(aiLawData)
+        setMobileView("content")
+
+        setIsSearching(false)
+        updateProgress('complete', 100)
+        return
+      }
+
       setIsSearching(true)
       setIsAiMode(true)
       setSearchMode('rag')  // RAG 검색 모드 활성화 (검색창 글로우 효과 및 버튼 스타일 적용)
@@ -924,6 +970,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         let buffer = ''
         let fullContent = ''
         let receivedCitations: any[] = []
+        let receivedConfidenceLevel: 'high' | 'medium' | 'low' = 'high'
+        let receivedQueryType: 'specific' | 'general' | 'comparison' | 'procedural' = 'general'
         let progressValue = 60
 
         // ✅ 스트리밍 중에는 UI 업데이트 하지 않음 - 모두 수집만 함
@@ -958,10 +1006,14 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                   progressValue = Math.min(progressValue + 1, 95)
                   updateProgress('streaming', progressValue)
                 } else if (parsed.type === 'citations') {
-                  // Citations 데이터 수신
+                  // Citations 데이터 수신 (confidenceLevel, queryType 포함)
                   receivedCitations = parsed.citations || []
+                  receivedConfidenceLevel = parsed.confidenceLevel || 'high'
+                  receivedQueryType = parsed.queryType || 'general'
                   debugLogger.info('📚 Citations 수신', {
                     count: receivedCitations.length,
+                    confidenceLevel: receivedConfidenceLevel,
+                    queryType: receivedQueryType,
                     citations: receivedCitations
                   })
                 }
@@ -1061,6 +1113,20 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           }
         } catch (cacheError) {
           debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
+        }
+
+        // ✅ RAG 캐시에도 저장 (같은 질문 재검색 시 API 호출 스킵용)
+        try {
+          await cacheResponse(
+            fullQuery,
+            processedContent,
+            receivedCitations,
+            receivedConfidenceLevel,
+            receivedQueryType
+          )
+          debugLogger.success('💾 RAG 캐시 저장 완료', { query: fullQuery })
+        } catch (ragCacheError) {
+          debugLogger.error('⚠️ RAG 캐시 저장 실패', ragCacheError)
         }
 
         // ✅ 검색 완료 상태 업데이트 (프로그레스바 종료)

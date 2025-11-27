@@ -11,9 +11,8 @@ import { LawViewer } from './law-viewer'
 import { extractRelatedLaws, type ParsedRelatedLaw } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
-import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
 import { ModernProgressBar } from '@/components/ui/modern-progress-bar'
-import { CONFIDENCE_CONFIGS, ALERT_CONFIGS, detectAlertType } from '@/lib/answer-section-icons'
+import { ALERT_CONFIGS, detectAlertType } from '@/lib/answer-section-icons'
 import { getCachedResponse, cacheResponse } from '@/lib/rag-response-cache'  // Phase 3 P3
 
 
@@ -63,25 +62,33 @@ export function AISearchView({
 
       setError(null)
       setWarning(null)
-      setIsAnalyzing(true)
-      setAnalysis('')
-      setRelatedLaws([])
-      setConfidenceLevel('high') // 초기값은 높음으로 가정
 
-      // ✅ Phase 3 P3: 캐시 확인
+      // ✅ Phase 3 P3: 캐시 확인 (로딩 표시 전에 먼저 확인)
+      console.log('[RAG Cache] Checking cache for query:', searchQuery)
       const cached = await getCachedResponse(searchQuery)
+      console.log('[RAG Cache] Cache result:', cached ? 'HIT' : 'MISS')
       if (cached) {
-        console.log('[RAG Cache] Using cached response')
+        console.log('[RAG Cache] Using cached response, citations:', cached.citations?.length, 'queryType:', cached.queryType)
         setAnalysis(cached.response)
         setConfidenceLevel(cached.confidenceLevel as 'high' | 'medium' | 'low')
         setCitations(cached.citations || []) // ✅ 캐시에서 citations 복원
         setQueryType((cached.queryType as any) || 'general') // ✅ 캐시에서 queryType 복원
+        // ✅ 캐시에서 relatedLaws 추출 (useEffect 대기 없이 즉시)
+        const laws = extractRelatedLaws(cached.response)
+        setRelatedLaws(laws)
+        debugLogger.success('[RAG Cache] 관련 법령 추출 완료', { count: laws.length })
         setIsAnalyzing(false)
         setSearchStage('complete')
         setSearchProgress(100)
         setProgressMessage('✅ 캐시된 답변 표시')
         return
       }
+
+      // 캐시 미스 시에만 로딩 표시
+      setIsAnalyzing(true)
+      setAnalysis('')
+      setRelatedLaws([])
+      setConfidenceLevel('high') // 초기값은 높음으로 가정
 
       // 프로그레스 초기화
       setSearchStage('searching')
@@ -321,41 +328,6 @@ export function AISearchView({
       {/* Analysis Result - LawViewer AI Mode */}
       {analysis && !error && (
         <>
-          {/* Confidence Badge & Query Type */}
-          <div className="mx-2 sm:mx-4 mt-4 flex items-center gap-2 flex-wrap">
-            {/* Confidence Badge */}
-            {(() => {
-              const config = CONFIDENCE_CONFIGS[confidenceLevel]
-              const Icon = config.icon
-
-              return (
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${config.bgColor} border ${config.borderColor} rounded-full`}>
-                  <Icon className={`h-4 w-4 ${config.iconColor}`} />
-                  <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>
-                </div>
-              )
-            })()}
-
-            {/* Query Type Badge */}
-            {(() => {
-              const typeConfigs = {
-                specific: { icon: BookOpen, label: '특정 조문', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-                general: { icon: Search, label: '일반 질문', color: 'bg-gray-50 border-gray-200 text-gray-700' },
-                comparison: { icon: Scale, label: '비교 질문', color: 'bg-purple-50 border-purple-200 text-purple-700' },
-                procedural: { icon: Sparkles, label: '절차 질문', color: 'bg-green-50 border-green-200 text-green-700' }
-              }
-              const config = typeConfigs[queryType]
-              const TypeIcon = config.icon
-
-              return (
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${config.color} border rounded-full`}>
-                  <TypeIcon className="h-4 w-4" />
-                  <span className="text-sm font-medium">{config.label}</span>
-                </div>
-              )
-            })()}
-          </div>
-
           {/* Warning Banner */}
           {warning && (() => {
             const alertType = detectAlertType(warning)
@@ -378,6 +350,8 @@ export function AISearchView({
             relatedArticles={relatedLaws}
             aiConfidenceLevel={confidenceLevel}
             aiCitations={citations}
+            userQuery={currentQuery}
+            aiQueryType={queryType}
             favorites={new Set()}
             isOrdinance={false}
             viewMode="single"

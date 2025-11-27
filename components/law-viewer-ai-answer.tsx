@@ -9,7 +9,6 @@ import {
     Link2,
     FileText,
     Bookmark,
-    GitMerge,
     AlertCircle,
     MessageCircleQuestion,
     ZoomOut,
@@ -17,6 +16,10 @@ import {
     ZoomIn,
     Copy,
     ChevronDown,
+    BookOpen,
+    Search,
+    Scale,
+    ListChecks,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
@@ -153,8 +156,9 @@ export function AIAnswerSidebar({
                         })()
                     ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
-                            <FileText className="h-8 w-8 opacity-20" />
-                            <p className="text-sm">관련 법령이 없습니다</p>
+                            <AlertCircle className="h-8 w-8 opacity-40 text-amber-500" />
+                            <p className="text-sm font-medium text-amber-600">File Search 인용 없음</p>
+                            <p className="text-xs text-center px-4">AI가 일반 지식으로 답변했습니다.<br/>법령 데이터베이스에서 관련 조문을 찾지 못했습니다.</p>
                         </div>
                     )}
                 </div>
@@ -176,57 +180,40 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
         }
     })
 
-    // 중복 제거된 고유 조문 수
+    // 중복 제거된 고유 조문 수 (총 개수)
     const uniqueCount = grouped.size
 
-    // 발췌만 있는 조문 수
-    const excerptOnlyCount = Array.from(grouped.values()).filter(
-        g => g.source.has('excerpt') && g.source.size === 1
-    ).length
-
-    // 관련법령만 있는 조문 수
-    const relatedOnlyCount = Array.from(grouped.values()).filter(
-        g => g.source.has('related') && g.source.size === 1
-    ).length
-
-    // Citations만 있는 조문 수
-    const citationOnlyCount = Array.from(grouped.values()).filter(
-        g => g.source.has('citation') && g.source.size === 1
-    ).length
-
-    // 여러 source가 있는 조문 수
-    const multiSourceCount = Array.from(grouped.values()).filter(
-        g => g.source.size > 1
-    ).length
+    // 각 source를 포함하는 조문 수 (중복 허용 - 같은 조문이 여러 source에 있어도 각각 카운트)
+    const excerptCount = Array.from(grouped.values()).filter(g => g.source.has('excerpt')).length
+    const relatedCount = Array.from(grouped.values()).filter(g => g.source.has('related')).length
+    const citationCount = Array.from(grouped.values()).filter(g => g.source.has('citation')).length
 
     return (
         <div className="flex items-center gap-1.5 flex-wrap">
+            {/* 총 개수 */}
             <Badge variant="secondary" className="text-xs whitespace-nowrap px-2 py-0.5">
                 <FileText className="h-3 w-3 mr-0.5" />
                 {uniqueCount}
             </Badge>
-            {excerptOnlyCount > 0 && (
+            {/* 발췌 조문 (해당 source를 포함하는 모든 조문) */}
+            {excerptCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50 whitespace-nowrap px-2 py-0.5">
                     <Bookmark className="h-3 w-3 mr-0.5" />
-                    {excerptOnlyCount}
+                    {excerptCount}
                 </Badge>
             )}
-            {relatedOnlyCount > 0 && (
+            {/* 관련 법령 (해당 source를 포함하는 모든 조문) */}
+            {relatedCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50 whitespace-nowrap px-2 py-0.5">
                     <Link2 className="h-3 w-3 mr-0.5" />
-                    {relatedOnlyCount}
+                    {relatedCount}
                 </Badge>
             )}
-            {citationOnlyCount > 0 && (
+            {/* AI 인용 (해당 source를 포함하는 모든 조문) */}
+            {citationCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-emerald-900/30 text-emerald-300 border-emerald-700/50 whitespace-nowrap px-2 py-0.5">
                     <Sparkles className="h-3 w-3 mr-0.5" />
-                    {citationOnlyCount}
-                </Badge>
-            )}
-            {multiSourceCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50 whitespace-nowrap px-2 py-0.5">
-                    <GitMerge className="h-3 w-3 mr-0.5" />
-                    {multiSourceCount}
+                    {citationCount}
                 </Badge>
             )}
         </div>
@@ -242,6 +229,7 @@ interface AIAnswerContentProps {
     fontSize: number
     setFontSize: (size: number | ((prev: number) => number)) => void
     handleContentClick: React.MouseEventHandler<HTMLDivElement>
+    aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
 }
 
 export function AIAnswerContent({
@@ -252,7 +240,8 @@ export function AIAnswerContent({
     aiCitations,
     fontSize,
     setFontSize,
-    handleContentClick
+    handleContentClick,
+    aiQueryType = 'general'
 }: AIAnswerContentProps) {
     const { toast } = useToast()
 
@@ -328,7 +317,7 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-0.5 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
+            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도(모바일만) */}
                 <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
@@ -342,11 +331,32 @@ export function AIAnswerContent({
                     </div>
                 </div>
 
-                {/* 2줄: 질문 표시 + PC 버튼들 우측 */}
+                {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}
                 {userQuery && (
                     <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium">
                         <MessageCircleQuestion className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
-                        <span className="break-words line-clamp-2 flex-1">{userQuery}</span>
+                        {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
+                        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                            <span className="break-words line-clamp-2">{userQuery}</span>
+                            {/* 쿼리 타입 배지 */}
+                            {(() => {
+                                const typeConfigs = {
+                                    specific: { icon: BookOpen, label: '특정 조문', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
+                                    general: { icon: Search, label: '일반 질문', bgColor: 'bg-gray-500/10', borderColor: 'border-gray-500/30', textColor: 'text-gray-500' },
+                                    comparison: { icon: Scale, label: '비교 질문', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
+                                    procedural: { icon: ListChecks, label: '절차 질문', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' }
+                                }
+                                const config = typeConfigs[aiQueryType]
+                                const TypeIcon = config.icon
+
+                                return (
+                                    <Badge variant="outline" className={`flex-shrink-0 text-xs px-2 py-0.5 ${config.bgColor} ${config.borderColor} ${config.textColor}`}>
+                                        <TypeIcon className="h-3 w-3 mr-1" />
+                                        {config.label}
+                                    </Badge>
+                                )
+                            })()}
+                        </div>
                         {/* PC: 버튼들 우측 정렬 + 신뢰도 맨 뒤 */}
                         <div className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">

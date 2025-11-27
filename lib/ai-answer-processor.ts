@@ -276,8 +276,8 @@ function styleStructuredSections(text: string): string {
   // 5. 🔗 관련 법령: 들여쓰기만 + 상단 여백
   result = indentSection(result, '🔗 관련 법령', { indent: '1rem', bullet: false })
 
-  // 6. 📄 상세 내용: 하위 섹션(📖/📝/🔴) 스타일링 + 내용 들여쓰기
-  result = styleDetailSection(result, '📄 상세 내용')
+  // 6. 📄 상세 내용: 하위 섹션(📖/📝/🔴) 스타일링 + 불릿 + 들여쓰기
+  result = styleDetailSection(result, '📄 상세 내용', { indent: '1rem', bullet: true })
 
   return result
 }
@@ -332,6 +332,8 @@ function styleLawQuotes(text: string): string {
         let quoteContent = expandedLines.join('<br>')
         // blockquote 내부에서 <strong> 태그 제거 (이탤릭은 prose 클래스에서 자동 적용)
         quoteContent = quoteContent.replace(/<strong>([^<]+)<\/strong>/g, '$1')
+        // blockquote 내부에서 📜 이모지 제거 (법령명 앞 아이콘 불필요)
+        quoteContent = quoteContent.replace(/📜\s*/g, '')
         result.push(`<blockquote>${quoteContent}</blockquote>`)
       }
       continue
@@ -442,7 +444,7 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
 /**
  * 📄 상세 내용 전용 처리 (하위 섹션 + 들여쓰기)
  */
-function styleDetailSection(text: string, sectionTitle: string): string {
+function styleDetailSection(text: string, sectionTitle: string, options: IndentOptions = { indent: '1rem', bullet: true }): string {
   const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   const sectionRegex = new RegExp(
@@ -492,9 +494,16 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         )
         const inlineContent = coreMatch[1].trim()
         if (inlineContent) {
-          contentLines.push(
-            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
-          )
+          const prefix = options.bullet ? '• ' : ''
+          if (options.bullet) {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${inlineContent}</div>`
+            )
+          } else {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+            )
+          }
           isFirstContentInSub = false
         }
         return
@@ -509,9 +518,16 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         )
         const inlineContent = practiceMatch[1].trim()
         if (inlineContent) {
-          contentLines.push(
-            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
-          )
+          const prefix = options.bullet ? '• ' : ''
+          if (options.bullet) {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${inlineContent}</div>`
+            )
+          } else {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+            )
+          }
           isFirstContentInSub = false
         }
         return
@@ -526,21 +542,36 @@ function styleDetailSection(text: string, sectionTitle: string): string {
         )
         const inlineContent = conditionMatch[1].trim()
         if (inlineContent) {
-          contentLines.push(
-            `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
-          )
+          const prefix = options.bullet ? '• ' : ''
+          if (options.bullet) {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${inlineContent}</div>`
+            )
+          } else {
+            contentLines.push(
+              `<div style="margin-top: 0.0rem; margin-left: 2.3rem;">${inlineContent}</div>`
+            )
+          }
           isFirstContentInSub = false
         }
         return
       }
 
-      // 하위 섹션 내부 텍스트 → 추가 들여쓰기 + 첫 내용에 상단 여백
+      // 하위 섹션 내부 텍스트 → (옵션) 불릿 + 추가 들여쓰기 + hanging indent
       if (currentSub !== 'none') {
         const marginTop = isFirstContentInSub ? 'margin-top: 0.0rem; ' : ''
         isFirstContentInSub = false
-        contentLines.push(
-          `<div style="${marginTop}margin-left: 2.3rem;">${trimmed}</div>`
-        )
+        const prefix = options.bullet ? '• ' : ''
+
+        if (options.bullet) {
+          contentLines.push(
+            `<div style="${marginTop}margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${trimmed}</div>`
+          )
+        } else {
+          contentLines.push(
+            `<div style="${marginTop}margin-left: 2.3rem;">${trimmed}</div>`
+          )
+        }
         return
       }
 

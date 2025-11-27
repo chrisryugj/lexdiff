@@ -80,6 +80,7 @@ interface LawViewerProps {
   aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
+  aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
 }
 
 export function LawViewer({
@@ -100,6 +101,7 @@ export function LawViewer({
   aiCitations = [],
   userQuery = '',
   aiConfidenceLevel = 'high',
+  aiQueryType = 'general',
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -154,19 +156,9 @@ export function LawViewer({
         }
       })
 
-    // relatedArticles와 병합 (중복 제거)
-    const merged = [...relatedArticles]
-    const existingKeys = new Set(
-      relatedArticles.map(r => `${r.lawName}|${r.jo}`)
-    )
-
-    citationsAsRelatedLaws.forEach(c => {
-      const key = `${c.lawName}|${c.jo}`
-      if (!existingKeys.has(key)) {
-        merged.push(c)
-        existingKeys.add(key)
-      }
-    })
+    // relatedArticles와 병합 (중복 허용 - 사이드바에서 source별로 그룹화하여 아이콘 표시)
+    // 같은 법령이 본문(excerpt/related)과 AI 인용(citation) 둘 다 있으면 둘 다 유지
+    const merged = [...relatedArticles, ...citationsAsRelatedLaws]
 
     debugLogger.info('Citations 병합 완료', {
       citations: aiCitations.length,
@@ -1239,6 +1231,7 @@ export function LawViewer({
                       fontSize={fontSize}
                       setFontSize={setFontSize}
                       handleContentClick={handleContentClick}
+                      aiQueryType={aiQueryType}
                     />
                   </div>
                 </ScrollArea>
