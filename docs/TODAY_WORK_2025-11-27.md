@@ -64,6 +64,36 @@
 
 ---
 
+### 3. Citations Source 구분 & 전용 아이콘 ✅
+
+**문제점**:
+- Citations가 항상 'related'로 표시되어 발췌/관련 구분 불가능
+- 같은 조문이 발췌+Citations에 있어도 "관련"만 표시됨
+
+**해결 방법**:
+1. **source 타입 확장**: 'excerpt' | 'related' | **'citation'**
+2. **Citations 전용 아이콘**: Sparkles (✨) 초록색
+3. **배지 시스템 개선**: citationOnlyCount 추가, multiSourceCount로 여러 조합 표시
+
+**수정 파일**:
+- `lib/law-parser.ts` (Line 336): ParsedRelatedLaw.source 타입 확장
+- `components/law-viewer.tsx` (Line 152): Citations는 'citation' source
+- `components/law-viewer-ai-answer.tsx` (Line 143-147): Citation 아이콘
+- `components/law-viewer-ai-answer.tsx` (Line 192-200): 배지 로직
+
+**커밋**:
+- `243acfd`: fix: Citations source를 'citation'으로 구분 & 전용 아이콘 추가
+- ✅ 빌드 성공
+- ✅ GitHub 푸시 완료
+
+**결과**:
+- 🟣 발췌: 보라색 Bookmark
+- 🔵 관련: 파란색 Link2
+- 🟢 Citations: 초록색 Sparkles
+- 🟩 여러 조합: GitMerge 아이콘
+
+---
+
 ## 🧪 다음 단계: 테스트 필수
 
 ### ⚠️ 중요: 캐시 삭제 먼저!
