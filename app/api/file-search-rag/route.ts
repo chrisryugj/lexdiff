@@ -32,8 +32,14 @@ export async function POST(request: NextRequest) {
               citations = chunk.citations || []
               finishReason = chunk.finishReason || null
 
-              // ✅ 신뢰도 계산 (groundingChunks 개수 기반)
-              const confidenceLevel = citations.length >= 3 ? 'high' : citations.length >= 1 ? 'medium' : 'low'
+              // ✅ 신뢰도 계산 (groundingChunks 개수 + relevanceScore 기반, Phase 1 P1 최적화)
+              const avgScore = citations.length > 0
+                ? citations.reduce((sum, c) => sum + (c.relevanceScore || 0), 0) / citations.length
+                : 0
+
+              const confidenceLevel =
+                citations.length >= 3 && avgScore > 0.7 ? 'high' :
+                citations.length >= 1 && avgScore > 0.4 ? 'medium' : 'low'
 
               // ⚠️ 신뢰도 낮음 경고
               if (citations.length === 0) {

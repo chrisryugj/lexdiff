@@ -169,14 +169,35 @@ export async function queryFileSearch(
 }
 
 /**
+ * 쿼리 재구성 (오타, 띄어쓰기, 조사 정규화) - Phase 2 P2
+ */
+function reformulateQuery(query: string): string {
+  let reformulated = query
+
+  // 1. "N조" → "제N조" 정규화
+  reformulated = reformulated.replace(/(?<!제)(\d+)조/g, '제$1조')
+
+  // 2. "법시행령" → "법 시행령" 띄어쓰기
+  reformulated = reformulated.replace(/(법)(시행령|시행규칙)/g, '$1 $2')
+  reformulated = reformulated.replace(/(령)(시행규칙)/g, '$1 $2')
+
+  // 3. 불필요한 조사 제거 (검색 최적화)
+  reformulated = reformulated.replace(/[은는이가을를의에서]/g, ' ')
+    .replace(/\s+/g, ' ').trim()
+
+  return reformulated
+}
+
+/**
  * 스트리밍 RAG 쿼리 (REST API 기반 - SDK 버그 우회)
  */
 export async function* queryFileSearchStream(
   query: string,
   options?: {
     metadataFilter?: string
+    isRetry?: boolean  // Phase 2 P2: 재시도 방지 플래그
   }
-): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string }> {
+): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string; finishReason?: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is required')
@@ -238,7 +259,7 @@ export async function* queryFileSearchStream(
       temperature: 0,  // 완전 결정적 출력
       topP: 0.8,  // 0.95 → 0.8 (토큰 효율성 개선)
       topK: 20,   // 40 → 20 (법령 검색에 최적화, 50% 감소)
-      maxOutputTokens: 4096  // 2048 → 4096 (MAX_TOKENS 오류 방지, 한글 토큰 비효율 대응)
+      maxOutputTokens: 8192  // 4096 → 8192 (답변 잘림 방지, Phase 1 P0 최적화)
     }
   }
 
@@ -530,6 +551,28 @@ export async function* queryFileSearchStream(
       textPreview: (chunk.retrievedContext?.text || '').substring(0, 100) + '...'
     }))
   })
+
+  // ✅ Phase 2 P2: Citation 0개이고 첫 시도인 경우 재시도
+  if (groundingChunks.length === 0 && !options?.isRetry) {
+    console.log('[File Search] ⚠️ No citations found, attempting query reformulation...')
+
+    // 쿼리 재구성
+    const reformulatedQuery = reformulateQuery(query)
+
+    if (reformulatedQuery !== query) {
+      console.log('[File Search] Reformulated query:', reformulatedQuery)
+      console.log('[File Search] Original query:', query)
+
+      // 재귀 호출 (1회만)
+      yield* queryFileSearchStream(reformulatedQuery, {
+        ...options,
+        isRetry: true
+      })
+      return  // 원래 결과 대신 재시도 결과 반환
+    } else {
+      console.log('[File Search] Query reformulation did not change query, skipping retry')
+    }
+  }
 
   yield {
     text: '',

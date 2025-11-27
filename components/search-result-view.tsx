@@ -23,6 +23,7 @@ import { ModernProgressBar } from "@/components/ui/modern-progress-bar"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import { normalizeLawSearchText } from "@/lib/search-normalizer"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { formatDate } from "@/lib/revision-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -47,7 +48,7 @@ import {
 import type { LawMeta, LawArticle, Favorite, LawData } from "@/lib/law-types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import { buildJO } from "@/lib/law-parser"
-import { HelpCircle, Scale, Brain } from "lucide-react"
+import { HelpCircle, Scale, Brain, AlertCircle, X } from "lucide-react"
 
 // 법령 타입별 Badge 색상 클래스 반환
 function getLawTypeBadgeClass(lawType: string): string {
@@ -243,6 +244,10 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
   // 검색 모드 선택 다이얼로그 상태
   const [showChoiceDialog, setShowChoiceDialog] = useState(false)
   const [pendingQuery, setPendingQuery] = useState<{ lawName: string; article?: string; jo?: string } | null>(null)
+
+  // 법령 검색 실패 다이얼로그 상태
+  const [showNoResultDialog, setShowNoResultDialog] = useState(false)
+  const [noResultQuery, setNoResultQuery] = useState<{ lawName: string; article?: string; jo?: string } | null>(null)
 
   // Progress 상태 (SearchResultView 내부 관리)
   const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
@@ -748,6 +753,21 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
       // 선택된 모드로 강제 실행
       handleSearchInternal(pendingQuery, undefined, mode)
       setPendingQuery(null)
+    }
+  }
+
+  const handleNoResultChoice = (choice: 'ai' | 'cancel') => {
+    setShowNoResultDialog(false)
+    if (choice === 'ai' && noResultQuery) {
+      // AI 검색으로 강제 전환
+      debugLogger.info('🤖 사용자 선택: AI 검색으로 재시도', noResultQuery)
+      handleSearchInternal(noResultQuery, undefined, 'ai')
+      setNoResultQuery(null)
+    } else {
+      // 취소 - 검색 상태만 초기화
+      debugLogger.info('❌ 사용자 선택: 검색 취소')
+      setNoResultQuery(null)
+      setIsSearching(false)
     }
   }
 
@@ -1447,9 +1467,10 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           return
         }
 
-        const normalizedLawName = lawName.replace(/\s+/g, "")
+        // ✅ Phase 오타 교정: 클라이언트 측 정규화 (오타 자동 교정)
+        const normalizedLawName = normalizeLawSearchText(lawName).replace(/\s+/g, "")
 
-        // 1. 정확히 일치하는 법령 찾기
+        // 1. 정확히 일치하는 법령 찾기 (정규화된 이름으로 매칭)
         const exactMatches = results.filter((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
 
         // 정확 매칭이 여러 개일 경우 가장 짧은 이름 우선 선택
@@ -1485,17 +1506,26 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           }
         }
 
-        // 3. 매칭 실패 시 사용자에게 선택하도록 제안
-        if (!exactMatch && results.length > 0) {
-
-          // 여러 결과 중 선택하도록 UI 표시
-          setLawSelectionState({
-            results: results,
-            query: query,
-          })
-          updateProgress('complete', 100)
-          setIsSearching(false)
-          return
+        // 3. 매칭 실패 시 처리
+        if (!exactMatch) {
+          if (results.length > 0) {
+            // 3-1. 여러 결과가 있지만 정확 매칭 실패 → 선택 UI 표시
+            setLawSelectionState({
+              results: results,
+              query: query,
+            })
+            updateProgress('complete', 100)
+            setIsSearching(false)
+            return
+          } else {
+            // 3-2. 결과가 0개 → AI 검색 제안 다이얼로그 표시
+            debugLogger.warning('⚠️ 법령 검색 결과 없음 - 다이얼로그 표시', { lawName })
+            setNoResultQuery(query)
+            setShowNoResultDialog(true)
+            updateProgress('complete', 100)
+            setIsSearching(false)
+            return
+          }
         }
 
         if (exactMatch && !jo) {
@@ -2369,6 +2399,58 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           </div>
           <div className="text-xs text-muted-foreground text-center mt-3">
             💡 Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 법령 검색 결과 없음 다이얼로그 */}
+      <Dialog open={showNoResultDialog} onOpenChange={setShowNoResultDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              법령을 찾을 수 없습니다
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              <span className="block text-sm text-muted-foreground mb-3">
+                "<span className="font-medium text-foreground">{noResultQuery?.lawName}</span>"에 대한 검색 결과가 없습니다.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                오타가 있거나 존재하지 않는 법령일 수 있습니다.<br />
+                AI 검색을 시도하시겠습니까?
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <Button
+              onClick={() => handleNoResultChoice('cancel')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-gray-500/10 hover:border-gray-500/50 transition-all"
+            >
+              <X className="h-8 w-8 text-gray-500" />
+              <div className="text-center">
+                <div className="font-semibold text-foreground">취소</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  검색 중단
+                </div>
+              </div>
+            </Button>
+            <Button
+              onClick={() => handleNoResultChoice('ai')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
+            >
+              <Brain className="h-8 w-8 text-purple-500" />
+              <div className="text-center">
+                <div className="font-semibold text-foreground">AI 검색</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  자연어로 검색
+                </div>
+              </div>
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground text-center mt-3">
+            💡 Tip: AI 검색은 오타를 자동으로 교정하여 검색합니다
           </div>
         </DialogContent>
       </Dialog>

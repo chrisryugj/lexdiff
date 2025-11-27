@@ -1,12 +1,27 @@
 "use client"
 
-import React, { useRef } from "react"
+import React, { useRef, useMemo, useEffect } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Separator } from "@/components/ui/separator"
 import { BookmarkCheck, AlertCircle } from "lucide-react"
 import type { LawArticle } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
 import { formatJO } from "@/lib/law-parser"
+
+// ✅ 성능 최적화: 컴포넌트를 외부로 이동 (매번 재생성 방지)
+const ArticleContent = React.memo(function ArticleContent({
+  article,
+  lawTitle
+}: {
+  article: LawArticle
+  lawTitle: string
+}) {
+  const html = useMemo(
+    () => extractArticleText(article, false, lawTitle),
+    [article.jo, article.content, lawTitle]
+  )
+  return <div dangerouslySetInnerHTML={{ __html: html }} />
+})
 
 interface VirtualizedFullArticleViewProps {
   articles: LawArticle[]
@@ -16,6 +31,7 @@ interface VirtualizedFullArticleViewProps {
   lawTitle: string
   onContentClick: (e: React.MouseEvent<HTMLDivElement>) => void
   articleRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
+  scrollParentRef?: React.RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -32,20 +48,31 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   lawTitle,
   onContentClick,
   articleRefs,
+  scrollParentRef,
 }: VirtualizedFullArticleViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
-  // Combine preambles and articles into a single list
-  const allItems = [
+  // ✅ 실제 스크롤 컨테이너 찾기
+  const getScrollElement = () => {
+    if (scrollParentRef?.current) {
+      // ScrollArea 내부의 실제 스크롤 엘리먼트 찾기
+      const viewport = scrollParentRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement
+      return viewport || parentRef.current
+    }
+    return parentRef.current
+  }
+
+  // ✅ 성능 최적화: allItems를 useMemo로 캐싱 (배열 재생성 방지)
+  const allItems = useMemo(() => [
     ...preambles.map((p, idx) => ({ type: 'preamble' as const, index: idx, content: p })),
     ...articles.map((a, idx) => ({ type: 'article' as const, index: idx, article: a })),
-  ]
+  ], [preambles, articles])
 
   const virtualizer = useVirtualizer({
     count: allItems.length,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: getScrollElement,
     estimateSize: () => 200, // 평균 조문 높이 (동적 조정)
-    overscan: 3, // 위아래 3개 조문 미리 렌더링
+    overscan: 1, // ✅ 성능 최적화: 3 → 1 (불필요한 조문 렌더링 감소)
     measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
       ? element => element?.getBoundingClientRect().height
       : undefined,
@@ -59,10 +86,80 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
     }
   }
 
+  // ✅ 버그 수정: activeJo 변경 시 스크롤
+  useEffect(() => {
+    if (!activeJo) return
+
+    // activeJo에 해당하는 조문의 인덱스 찾기
+    const articleIndex = articles.findIndex(a => a.jo === activeJo)
+    if (articleIndex === -1) return
+
+    // preambles 개수만큼 오프셋 추가
+    const itemIndex = preambles.length + articleIndex
+
+    console.log('[VirtualizedFullArticleView] Scroll to:', {
+      activeJo,
+      articleIndex,
+      itemIndex,
+      totalItems: allItems.length
+    })
+
+    // 스크롤 실행
+    const performScroll = () => {
+      const scrollElement = getScrollElement()
+      if (!scrollElement) {
+        console.log('[VirtualizedFullArticleView] No scroll element!')
+        return
+      }
+
+      console.log('[VirtualizedFullArticleView] scrollElement:', {
+        scrollTop: scrollElement.scrollTop,
+        scrollHeight: scrollElement.scrollHeight,
+        clientHeight: scrollElement.clientHeight
+      })
+
+      // ✅ virtualizer가 측정한 실제 위치 사용
+      const allVirtualItems = virtualizer.getVirtualItems()
+      const targetVirtualItem = allVirtualItems.find(item => item.index === itemIndex)
+
+      console.log('[VirtualizedFullArticleView] Virtual items:', {
+        totalVirtualItems: allVirtualItems.length,
+        targetFound: !!targetVirtualItem,
+        targetStart: targetVirtualItem?.start,
+        firstItem: allVirtualItems[0]?.index,
+        lastItem: allVirtualItems[allVirtualItems.length - 1]?.index
+      })
+
+      if (targetVirtualItem) {
+        // 이미 렌더링되어 있으면 정확한 위치 사용
+        console.log('[VirtualizedFullArticleView] Scrolling to targetVirtualItem.start:', targetVirtualItem.start)
+        scrollElement.scrollTop = targetVirtualItem.start
+      } else {
+        // 아직 렌더링 안 되었으면 virtualizer에게 스크롤 요청
+        console.log('[VirtualizedFullArticleView] Using virtualizer.scrollToIndex:', itemIndex)
+        virtualizer.scrollToIndex(itemIndex, { align: 'start' })
+      }
+
+      // 스크롤 후 확인
+      setTimeout(() => {
+        const currentScrollElement = getScrollElement()
+        console.log('[VirtualizedFullArticleView] After scroll:', {
+          scrollTop: currentScrollElement?.scrollTop
+        })
+      }, 100)
+    }
+
+    // requestAnimationFrame으로 리렌더링 완료 후 스크롤
+    requestAnimationFrame(() => {
+      performScroll()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJo])
+
   return (
     <div
       ref={parentRef}
-      className="overflow-y-auto h-full w-full px-5"
+      className="overflow-y-auto h-full w-full px-5 pt-3"
     >
       <div
         style={{
@@ -125,10 +222,9 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                       wordBreak: "break-word",
                     }}
                     onClick={onContentClick}
-                    dangerouslySetInnerHTML={{
-                      __html: extractArticleText(item.article, false, lawTitle),
-                    }}
-                  />
+                  >
+                    <ArticleContent article={item.article} lawTitle={lawTitle} />
+                  </div>
 
                   {item.article.hasChanges && (
                     <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
