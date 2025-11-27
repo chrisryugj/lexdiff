@@ -31,6 +31,39 @@
 
 ---
 
+### 2. Citations 사이드바 표시 & 디버깅 개선 ✅
+
+**문제점**:
+1. Citations가 API에서 수신되었지만(count: 5) 사이드바에 표시되지 않음
+2. queryType이 로그에 누락되어 디버깅 어려움
+
+**해결 방법**:
+1. **Citations를 ParsedRelatedLaw 형식으로 변환**:
+   - `buildJO()` 함수로 6-digit JO 코드 생성
+   - `mergedRelatedArticles` useMemo 추가
+   - relatedArticles와 citations 병합 (중복 제거)
+
+2. **queryType 로그 추가**:
+   - Citations 수신 로그에 queryType 필드 추가
+   - 버퍼 처리에도 동일 적용
+
+**수정 파일**:
+- `components/ai-search-view.tsx` (Line 175-180, 224-229): queryType 로그 추가
+- `components/law-viewer.tsx` (Line 134-178): Citations 병합 로직
+- `components/law-viewer.tsx` (Line 876, 973): AIAnswerSidebar에 전달
+
+**커밋**:
+- `6e5bac0`: fix: Citations를 사이드바에 표시 & queryType 로그 개선
+- ✅ 빌드 성공
+- ✅ GitHub 푸시 완료
+
+**테스트 결과**:
+- ✅ Citations가 사이드바에 정상 표시될 것으로 예상
+- ✅ Console 로그에 queryType이 표시될 것으로 예상
+- ⚠️ 캐시 삭제 필수 (IndexedDB `lexdiff-rag-cache` 삭제)
+
+---
+
 ## 🧪 다음 단계: 테스트 필수
 
 ### ⚠️ 중요: 캐시 삭제 먼저!
@@ -60,10 +93,11 @@
 - blockquote로 법령 원문 표시
 
 **확인 사항**:
-- [ ] Console에 `queryType: "specific"` 로그 표시
+- [ ] Console에 `queryType: "specific"` 로그 표시 ✅ (수정 완료)
 - [ ] 답변에 "(2줄)", "1줄" 등 메타 지시사항 **없음**
 - [ ] 4개 섹션 (📋📄💡🔗) 정상 표시
 - [ ] ⚖️ 조문 발췌 부분이 blockquote로 렌더링
+- [ ] **사이드바에 Citations 표시** ✅ (수정 완료)
 
 ---
 
@@ -75,10 +109,11 @@
 - 🔴 조건·예외 섹션 포함
 
 **확인 사항**:
-- [ ] Console에 `queryType: "procedural"` 로그 표시
+- [ ] Console에 `queryType: "procedural"` 로그 표시 ✅ (수정 완료)
 - [ ] 답변이 단계별로 구조화
 - [ ] 필요 서류, 기한 정보 포함
 - [ ] 메타 지시사항 미노출
+- [ ] **사이드바에 Citations 표시** ✅ (수정 완료)
 
 ---
 
@@ -90,10 +125,11 @@
 - 차이점 구체적 나열
 
 **확인 사항**:
-- [ ] Console에 `queryType: "comparison"` 로그 표시
+- [ ] Console에 `queryType: "comparison"` 로그 표시 ✅ (수정 완료)
 - [ ] "A는 ~이지만, B는 ~입니다" 형식의 비교
 - [ ] 차이점이 명확히 대비됨
 - [ ] 메타 지시사항 미노출
+- [ ] **사이드바에 Citations 표시** ✅ (수정 완료)
 
 ---
 
@@ -105,10 +141,12 @@
 - 핵심 항만 발췌 (전문 인용 아님)
 
 **확인 사항**:
-- [ ] Console에 `queryType: "general"` 로그 표시
+- [ ] Console에 `queryType: "general"` 로그 표시 ✅ (수정 완료)
 - [ ] 여러 관련 법령이 종합적으로 인용
 - [ ] 실무 적용 가이드 포함
 - [ ] 메타 지시사항 미노출
+- [ ] **사이드바에 Citations 표시** ✅ (수정 완료)
+- [ ] **답변 길이가 간결함** (general 프롬프트 수정 완료)
 
 ---
 
