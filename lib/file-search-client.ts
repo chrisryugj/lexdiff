@@ -7,6 +7,7 @@
 
 import { GoogleGenAI } from '@google/genai'
 import type { FileSearchStore, FileMetadata } from '@google/genai'
+import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
 
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
@@ -212,47 +213,138 @@ export async function* queryFileSearchStream(
     throw new Error(`Invalid STORE_ID format: ${STORE_ID}. Must start with 'fileSearchStores/'`)
   }
 
-  // 법령 전문 AI 시스템 프롬프트 (이모지 유지 - 프론트엔드에서 lucide로 렌더링)
-  const systemInstruction = `법령 RAG AI. File Search Store 결과만 사용. 조문 없으면: "File Search Store에서 '${query}' 관련 조문을 찾을 수 없습니다"
+  // ✅ Phase 4 B4: 쿼리 전처리
+  const processed = await preprocessQuery(query)
+  const effectiveQuery = processed.processedQuery
 
-# 출력 구조 (각 항목 1줄, 간결, 괄호안 메시지 지시사항 출력금지 법령명은 「」로 감쌈)
+  console.log('[File Search] Query preprocessing:', {
+    original: query,
+    processed: effectiveQuery,
+    type: processed.queryType,
+    laws: processed.extractedLaws,
+    articles: processed.extractedArticles,
+    confidence: processed.confidence
+  })
 
-## 📋 핵심 요약 (3줄, ✅📌🔔이모지 필수)
-- ✅ 결론 1줄
+  // ✅ Phase 5 B5: 질문 유형별 시스템 프롬프트
+  const PROMPT_TEMPLATES: Record<string, string> = {
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // specific: 특정 조문 질문 (조문 원문 강조)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    specific: `법령 RAG AI. File Search Store 결과만 사용.
+**특정 조문에 대한 질문입니다. 해당 조문을 정확하게 인용하고 해석해주세요.**
+
+조문 없으면: "File Search Store에서 관련 조문을 찾을 수 없습니다"
+
+# 출력 구조 (필수 준수)
+## 📋 핵심 요약 (2줄)
+- ✅ 해당 조문의 핵심 내용 1줄
 - 📌 적용 조건/예외 1줄
-- 🔔 사용자가 지금 해야 할 행동 1줄
 
-## 📄 상세 내용 (각 항목은 1줄만)
+## 📄 상세 내용
 - ⚖️ 조문 발췌
-  **📜 「법령명」 제N조 ([제목])**
-     (항,호 번호 포함 및 줄바꿈(①,1.), 핵심 1줄 조문 그대로 인용 )
-- 📖 핵심 해석 1줄
-- 📝 실무 적용 1줄
-- 🔴 조건·예외 1줄
-
-## 💡 추가 참고 (최대 2줄)
-- 서류·절차·주의사항
+  📜 「법령명」 제N조 (제목)
+  (항, 호 번호 포함 전문 인용, 줄바꿈 ①②③ 사용)
+- 📖 핵심 해석: 조문의 법적 의미 1줄
+- 📝 실무 적용: 실무에서의 적용 방법 1줄
 
 ## 🔗 관련 법령
-- 📜 「법령명」 제N조 ([제목]) 목록만
-- 질의와 직접 관련된 법령만 (시행령, 시행규칙 등)
-- 단순히 조문 번호만 같은 다른 법령 제외
+- 📜 「모법/시행령/시행규칙」 제N조 (직접 관련된 조문만)`,
 
-# 작성 규칙
-- 규칙: 각 1줄. 불확실시 명시. 간결.`
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // general: 일반 법령 질문 (폭넓은 검색)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    general: `법령 RAG AI. File Search Store 결과만 사용.
+**일반적인 법령 질문입니다. 관련 법령을 폭넓게 검색하여 종합적으로 답변해주세요.**
+
+# 출력 구조 (필수 준수)
+## 📋 핵심 요약 (3줄)
+- ✅ 결론 1줄
+- 📌 주요 관련 법령 1줄
+- 🔔 실무 포인트 1줄
+
+## 📄 상세 내용
+- ⚖️ 조문 발췌
+  📜 「법령명」 제N조 (핵심 조문)
+- 📖 핵심 해석: 종합 해석 1줄
+- 📝 실무 적용: 절차, 서류, 주의사항 요약
+
+## 💡 추가 참고
+- 관련 정보, 유의사항
+
+## 🔗 관련 법령
+- 📜 「법령명」 제N조 목록`,
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // comparison: 비교 질문 (차이점 강조)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    comparison: `법령 RAG AI. File Search Store 결과만 사용.
+**비교 질문입니다. 두 항목의 차이점을 명확하게 대비해주세요.**
+
+# 출력 구조 (필수 준수)
+## 📋 핵심 요약 (3줄)
+- ✅ 가장 중요한 차이 1줄
+- 📌 적용 범위 차이 1줄
+- 🔔 실무상 주의점 1줄
+
+## 📄 상세 내용
+- ⚖️ 조문 발췌
+  📜 「A 관련 법령」 제N조
+  📜 「B 관련 법령」 제N조
+- 📖 핵심 해석: 차이점 분석 (A는 ~, B는 ~)
+- 🔴 조건·예외: 각 경우별 적용 조건
+
+## 🔗 관련 법령
+- 📜 근거 조문 목록`,
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // procedural: 절차/방법 질문 (단계별 안내)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    procedural: `법령 RAG AI. File Search Store 결과만 사용.
+**절차/방법 질문입니다. 단계별로 명확하게 안내해주세요.**
+
+# 출력 구조 (필수 준수)
+## 📋 핵심 요약 (3줄)
+- ✅ 전체 절차 요약 1줄
+- 📌 필수 요건 1줄
+- 🔔 주의사항 1줄
+
+## 📄 상세 내용
+- ⚖️ 조문 발췌
+  📜 「관련 법령」 제N조 (절차 규정)
+- 📖 핵심 해석: 단계별 설명 (1단계: ~, 2단계: ~, 3단계: ~)
+- 📝 실무 적용: 필요 서류, 기한, 신청 방법
+- 🔴 조건·예외: 특수 상황, 예외 케이스
+
+## 💡 추가 참고
+- 추가 유의사항, 팁
+
+## 🔗 관련 법령
+- 📜 「법령명」 제N조 목록`
+  }
+
+  const systemInstruction = PROMPT_TEMPLATES[processed.queryType] || PROMPT_TEMPLATES.general
+
+  // ✅ Phase 6 C7: Metadata Filter 적용 (options 또는 전처리 결과 사용)
+  const effectiveMetadataFilter = options?.metadataFilter || processed.metadataFilter
+
+  if (effectiveMetadataFilter) {
+    console.log('[File Search] Metadata Filter applied:', effectiveMetadataFilter)
+  }
 
   // REST API 요청 본문 (Gemini REST API는 camelCase 필수!)
   const requestBody = {
     contents: [{
       role: 'user',
-      parts: [{ text: query }]
+      parts: [{ text: effectiveQuery }]  // ✅ effectiveQuery 사용
     }],
     systemInstruction: {
       parts: [{ text: systemInstruction }]
     },
     tools: [{
       fileSearch: {
-        fileSearchStoreNames: [STORE_ID]
+        fileSearchStoreNames: [STORE_ID],
+        ...(effectiveMetadataFilter && { metadataFilter: effectiveMetadataFilter })  // Phase 6 C7
       }
     }],
     generationConfig: {
