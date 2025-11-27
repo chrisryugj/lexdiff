@@ -41,12 +41,12 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold">
+          <div className="text-base font-bold">
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
           </div>
           {article.title && (
             <div
-              className="text-xs opacity-75 mt-0.5 truncate"
+              className="text-sm opacity-75 mt-0.5 truncate"
               title={article.title}
             >
               ({article.title})

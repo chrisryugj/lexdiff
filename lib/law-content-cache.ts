@@ -89,6 +89,14 @@ async function openDB(): Promise<IDBDatabase> {
 async function cleanExpiredCache(): Promise<void> {
   try {
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache cleanup.`)
+      db.close()
+      return
+    }
+
     const expiryTime = Date.now() - CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
 
     const tx = db.transaction(CONTENT_STORE, "readwrite")
@@ -309,6 +317,14 @@ export async function getLawContentCache(
 ): Promise<LawContentCacheEntry | null> {
   try {
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
+      db.close()
+      return null
+    }
+
     const tx = db.transaction(CONTENT_STORE, "readonly")
     const store = tx.objectStore(CONTENT_STORE)
 
@@ -385,6 +401,14 @@ export async function clearLawContentCache(
 ): Promise<void> {
   try {
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache delete.`)
+      db.close()
+      return
+    }
+
     const key = `${lawId}_${effectiveDate}`
 
     const tx = db.transaction(CONTENT_STORE, "readwrite")
@@ -406,6 +430,13 @@ export async function clearLawContentCache(
 export async function clearAllLawContentCache(): Promise<void> {
   try {
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache clear.`)
+      db.close()
+      return
+    }
 
     const tx = db.transaction(CONTENT_STORE, "readwrite")
     const store = tx.objectStore(CONTENT_STORE)
@@ -433,6 +464,13 @@ export async function getLawContentCacheStats(): Promise<{
 }> {
   try {
     const db = await openDB()
+
+    // ✅ Object store 존재 여부 확인
+    if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Returning empty stats.`)
+      db.close()
+      return { totalEntries: 0, totalSize: 0, oldestEntry: null, newestEntry: null }
+    }
 
     const tx = db.transaction(CONTENT_STORE, "readonly")
     const store = tx.objectStore(CONTENT_STORE)
