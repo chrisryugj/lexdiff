@@ -435,7 +435,7 @@ export function AIAnswerContent({
                     className="prose prose-sm max-w-none w-full dark:prose-invert overflow-x-hidden
         [&_h2]:text-[clamp(16px,4.5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-wrap
         [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-wrap
-        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/40 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-0 sm:[&_blockquote]:ml-4 [&_blockquote]:not-italic
+        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/25 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-1.5 sm:[&_blockquote]:pl-3 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 sm:[&_blockquote]:ml-8 [&_blockquote]:not-italic
         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed [&_blockquote_p]:break-words
         [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
         [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1

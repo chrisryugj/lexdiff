@@ -334,6 +334,12 @@ function styleLawQuotes(text: string): string {
         quoteContent = quoteContent.replace(/<strong>([^<]+)<\/strong>/g, '$1')
         // blockquote 내부에서 📜 이모지 제거 (법령명 앞 아이콘 불필요)
         quoteContent = quoteContent.replace(/📜\s*/g, '')
+        // 법령명 + 조문번호(조문제목) 하이라이트: "「법령명」 제N조(제목)" 패턴
+        // 법령명+조문번호는 볼드, 조문제목은 일반
+        quoteContent = quoteContent.replace(
+          /(「[^」]+」)\s*(제\d+조(?:의\d+)?)\s*(\([^)]+\))/g,
+          '<span class="quote-article-title"><strong>$1 $2</strong> <span class="quote-article-subtitle">$3</span></span>'
+        )
         result.push(`<blockquote>${quoteContent}</blockquote>`)
       }
       continue

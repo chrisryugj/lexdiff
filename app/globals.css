@@ -44,8 +44,29 @@
 }
 
 @font-face {
-  font-family: 'Ridibatang';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff');
+  font-family: 'NotoSerifKR';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NotoSerifKR.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ChosunIlboMyungjo';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Chosunilbo_myungjo.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GounBatang';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunBatang-Regular.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SchoolSafeDictation';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-5@1.0/HakgyoansimBadasseugiTTF-L.woff2') format('woff2');
   font-weight: normal;
   font-display: swap;
 }
@@ -307,10 +328,31 @@
     display: none;
   }
 
-  /* AI 답변 조문 발췌 - 리디바탕 폰트 + 작은 글씨 */
+  /* AI 답변 조문 발췌 - Noto Serif KR 폰트 + 작은 글씨 */
   .prose blockquote {
-    font-family: 'Ridibatang', 'Nanum Myeongjo', serif;
+    font-family: 'SchoolSafeDictation', 'Nanum Myeongjo', serif;
     font-size: 0.9em;
+  }
+
+  /* 조문 발췌 내 법령명+조문번호(조문제목) 하이라이트 */
+  .prose blockquote .quote-article-title {
+    display: inline-block;
+    background: oklch(0.7 0.12 250 / 0.15);
+    color: oklch(0.88 0.08 250);
+    padding: 0.15em 0.5em 0.15em 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.92em;
+    margin-bottom: 0.3em;
+    font-weight: normal;
+  }
+
+  .prose blockquote .quote-article-title strong {
+    font-weight: 700;
+  }
+
+  .prose blockquote .quote-article-subtitle {
+    font-weight: 400;
+    opacity: 0.9;
   }
 }
 
