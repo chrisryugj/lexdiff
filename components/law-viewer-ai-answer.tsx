@@ -116,11 +116,11 @@ export function AIAnswerSidebar({
                                         <div className="relative flex items-start gap-2.5 w-full">
                                             <div className="flex-1 min-w-0">
                                                 {/* Law Name */}
-                                                <div className="text-sm font-semibold text-foreground/90 leading-tight mb-1.5 group-hover:text-primary transition-colors break-words pr-12">
+                                                <div className="text-base font-semibold text-foreground/90 leading-tight mb-1.5 group-hover:text-primary transition-colors break-words pr-12">
                                                     {law.lawName}
                                                 </div>
                                                 {/* Article Info */}
-                                                <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                                                <div className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
                                                     <span className="font-medium">{law.article}</span>
                                                     {law.title && (
                                                         <>
