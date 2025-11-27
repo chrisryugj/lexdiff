@@ -131,6 +131,52 @@ export function LawViewer({
     return convertAIAnswerToHTML(aiAnswerContent)
   }, [aiAnswerContent])
 
+  // ✅ Citations를 ParsedRelatedLaw 형식으로 변환 및 병합
+  const mergedRelatedArticles = useMemo(() => {
+    if (!aiCitations || aiCitations.length === 0) {
+      return relatedArticles
+    }
+
+    // Citations를 ParsedRelatedLaw로 변환
+    const citationsAsRelatedLaws: ParsedRelatedLaw[] = aiCitations
+      .filter(c => c.lawName && c.articleNum)
+      .map(citation => {
+        const articleNum = citation.articleNum.replace(/^제/, '').replace(/조$/, '')
+        const jo = buildJO(articleNum)
+
+        return {
+          lawName: citation.lawName,
+          article: citation.articleNum,
+          jo,
+          display: `${citation.lawName} ${citation.articleNum}`,
+          source: 'related' as const,
+          fullText: citation.text
+        }
+      })
+
+    // relatedArticles와 병합 (중복 제거)
+    const merged = [...relatedArticles]
+    const existingKeys = new Set(
+      relatedArticles.map(r => `${r.lawName}|${r.jo}`)
+    )
+
+    citationsAsRelatedLaws.forEach(c => {
+      const key = `${c.lawName}|${c.jo}`
+      if (!existingKeys.has(key)) {
+        merged.push(c)
+        existingKeys.add(key)
+      }
+    })
+
+    debugLogger.info('Citations 병합 완료', {
+      citations: aiCitations.length,
+      relatedArticles: relatedArticles.length,
+      merged: merged.length
+    })
+
+    return merged
+  }, [aiCitations, relatedArticles])
+
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
     if (!activeJo) return null
@@ -827,7 +873,7 @@ export function LawViewer({
             ) : aiAnswerMode ? (
               // ========== AI 펼친 상태 ==========
               <AIAnswerSidebar
-                relatedArticles={relatedArticles}
+                relatedArticles={mergedRelatedArticles}
                 onRelatedArticleClick={openExternalLawArticleModal}
                 showHeader={true}
                 onCollapseClick={() => setIsArticleListCollapsed(true)}
@@ -924,7 +970,7 @@ export function LawViewer({
           >
             {aiAnswerMode ? (
               <AIAnswerSidebar
-                relatedArticles={relatedArticles}
+                relatedArticles={mergedRelatedArticles}
                 onRelatedArticleClick={openExternalLawArticleModal}
                 onCloseSidebar={() => setIsArticleListExpanded(false)}
                 showHeader={false}

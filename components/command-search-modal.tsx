@@ -30,10 +30,14 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     if (isOpen) {
       setFavorites(favoritesStore.getFavorites())
 
-      // 최근 검색어 로드 (localStorage)
-      const recent = localStorage.getItem('recent-searches')
+      // 최근 검색어 로드 (localStorage) - search-bar.tsx와 동일한 키 사용
+      const recent = localStorage.getItem('recentSearches')
       if (recent) {
-        setRecentSearches(JSON.parse(recent).slice(0, 5))
+        try {
+          setRecentSearches(JSON.parse(recent).slice(0, 5))
+        } catch (error) {
+          console.error('Failed to parse recent searches:', error)
+        }
       }
 
       // 입력창 포커스
@@ -58,10 +62,10 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   const handleSearch = (query: string) => {
     if (!query.trim()) return
 
-    // 최근 검색어 저장
+    // 최근 검색어 저장 - search-bar.tsx와 동일한 키 사용
     const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5)
     setRecentSearches(updated)
-    localStorage.setItem('recent-searches', JSON.stringify(updated))
+    localStorage.setItem('recentSearches', JSON.stringify(updated))
 
     onSearch({ lawName: query })
     onClose()

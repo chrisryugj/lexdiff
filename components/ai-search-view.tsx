@@ -175,7 +175,8 @@ export function AISearchView({
                 debugLogger.info('Citations 수신', {
                   count: parsed.citations?.length || 0,
                   finishReason: parsed.finishReason,
-                  confidenceLevel: parsed.confidenceLevel
+                  confidenceLevel: parsed.confidenceLevel,
+                  queryType: parsed.queryType  // ✅ queryType 추가
                 })
               }
             } catch (e) {
@@ -223,7 +224,8 @@ export function AISearchView({
                 debugLogger.info('Citations 수신 (버퍼)', {
                   count: parsed.citations?.length || 0,
                   finishReason: parsed.finishReason,
-                  confidenceLevel: parsed.confidenceLevel
+                  confidenceLevel: parsed.confidenceLevel,
+                  queryType: parsed.queryType  // ✅ queryType 추가
                 })
               }
             } catch (e) {
