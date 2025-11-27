@@ -337,23 +337,26 @@ export function LawViewer({
     // Close article list on mobile after selection
     setIsArticleListExpanded(false)
 
-    // Scroll content area to top - do this first before any state updates
-    const scrollToTop = () => {
-      if (contentRef.current) {
-        const scrollContainer = contentRef.current.querySelector('[data-radix-scroll-area-viewport]')
-        if (scrollContainer) {
-          scrollContainer.scrollTop = 0
-          // Also use scrollTo for better browser compatibility
-          scrollContainer.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    // ✅ 단문 조회 모드에서만 스크롤을 top으로 (전문 조회는 VirtualizedFullArticleView가 처리)
+    if (!isFullView) {
+      // Scroll content area to top - do this first before any state updates
+      const scrollToTop = () => {
+        if (contentRef.current) {
+          const scrollContainer = contentRef.current.querySelector('[data-radix-scroll-area-viewport]')
+          if (scrollContainer) {
+            scrollContainer.scrollTop = 0
+            // Also use scrollTo for better browser compatibility
+            scrollContainer.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+          }
         }
       }
+
+      // Scroll immediately
+      scrollToTop()
+
+      // Scroll again after a short delay to ensure it works after state updates
+      setTimeout(scrollToTop, 50)
     }
-
-    // Scroll immediately
-    scrollToTop()
-
-    // Scroll again after a short delay to ensure it works after state updates
-    setTimeout(scrollToTop, 50)
 
     // Check if article is already loaded
     const existingArticle = loadedArticles.find((a) => a.jo === jo)
@@ -401,12 +404,10 @@ export function LawViewer({
     // Always set active JO after loading attempt
     setActiveJo(jo)
 
-    if (isFullView) {
-      const element = articleRefs.current[jo]
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "start" })
-      }
-    } else {
+    // ✅ 전문 조회 모드는 VirtualizedFullArticleView의 useEffect에서 자동 스크롤
+    // 단문 조회 모드만 여기서 처리
+    if (!isFullView) {
+      // 단문 조회 모드 로직 (필요시 추가)
     }
   }
 
@@ -1175,6 +1176,7 @@ export function LawViewer({
                         lawTitle={meta.lawTitle}
                         onContentClick={handleContentClick}
                         articleRefs={articleRefs}
+                        scrollParentRef={contentRef}
                       />
                     </div>
                   </ScrollArea>

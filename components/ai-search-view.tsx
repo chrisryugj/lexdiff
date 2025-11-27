@@ -14,6 +14,7 @@ import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { Search, FileSearch, Sparkles, CheckCircle } from 'lucide-react'
 import { ModernProgressBar } from '@/components/ui/modern-progress-bar'
 import { CONFIDENCE_CONFIGS, ALERT_CONFIGS, detectAlertType } from '@/lib/answer-section-icons'
+import { getCachedResponse, cacheResponse } from '@/lib/rag-response-cache'  // Phase 3 P3
 
 
 export function AISearchView({
@@ -65,6 +66,20 @@ export function AISearchView({
       setRelatedLaws([])
       setConfidenceLevel('high') // 초기값은 높음으로 가정
 
+      // ✅ Phase 3 P3: 캐시 확인
+      const cached = await getCachedResponse(searchQuery)
+      if (cached) {
+        console.log('[RAG Cache] Using cached response')
+        setAnalysis(cached.response)
+        setConfidenceLevel(cached.confidenceLevel as 'high' | 'medium' | 'low')
+        setIsAnalyzing(false)
+        setSearchStage('complete')
+        setSearchProgress(100)
+        setProgressMessage('✅ 캐시된 답변 표시')
+        // Note: citations는 LawViewer가 analysis에서 자동 추출
+        return
+      }
+
       // 프로그레스 초기화
       setSearchStage('searching')
       setSearchProgress(10)
@@ -100,6 +115,9 @@ export function AISearchView({
 
       let buffer = ''
       let streamChunkCount = 0
+      let fullResponse = ''  // Phase 3 P3: 전체 응답 수집
+      let finalCitations: any[] = []  // Phase 3 P3: Citation 수집
+      let finalConfidenceLevel = 'high'  // Phase 3 P3: 신뢰도 수집
 
       while (true) {
         const { done, value } = await reader.read()
@@ -125,6 +143,7 @@ export function AISearchView({
 
               if (parsed.type === 'text') {
                 setAnalysis(prev => prev + parsed.text)
+                fullResponse += parsed.text  // Phase 3 P3: 전체 응답 수집
                 streamChunkCount++
                 // 프로그레스: 50% → 95% (청크 수에 따라)
                 const progress = Math.min(50 + streamChunkCount * 5, 95)
@@ -136,7 +155,11 @@ export function AISearchView({
                 // ✅ 신뢰도 레벨 업데이트
                 if (parsed.confidenceLevel) {
                   setConfidenceLevel(parsed.confidenceLevel)
+                  finalConfidenceLevel = parsed.confidenceLevel  // Phase 3 P3: 수집
                   debugLogger.info('신뢰도 레벨 수신', { level: parsed.confidenceLevel })
+                }
+                if (parsed.citations) {
+                  finalCitations = parsed.citations  // Phase 3 P3: 수집
                 }
                 debugLogger.info('Citations 수신', {
                   count: parsed.citations?.length || 0,
@@ -164,6 +187,7 @@ export function AISearchView({
 
               if (parsed.type === 'text') {
                 setAnalysis(prev => prev + parsed.text)
+                fullResponse += parsed.text  // Phase 3 P3: 전체 응답 수집
                 debugLogger.success('남은 버퍼에서 텍스트 추가', { length: parsed.text.length })
               } else if (parsed.type === 'warning') {
                 setWarning(parsed.message)
@@ -172,7 +196,11 @@ export function AISearchView({
                 // ✅ 신뢰도 레벨 업데이트 (버퍼)
                 if (parsed.confidenceLevel) {
                   setConfidenceLevel(parsed.confidenceLevel)
+                  finalConfidenceLevel = parsed.confidenceLevel  // Phase 3 P3: 수집
                   debugLogger.info('신뢰도 레벨 수신 (버퍼)', { level: parsed.confidenceLevel })
+                }
+                if (parsed.citations) {
+                  finalCitations = parsed.citations  // Phase 3 P3: 수집
                 }
                 debugLogger.info('Citations 수신 (버퍼)', {
                   count: parsed.citations?.length || 0,
@@ -185,6 +213,16 @@ export function AISearchView({
             }
           }
         }
+      }
+
+      // ✅ Phase 3 P3: 캐시에 응답 저장
+      if (fullResponse && finalCitations) {
+        await cacheResponse(searchQuery, fullResponse, finalCitations, finalConfidenceLevel)
+        debugLogger.success('[RAG Cache] Response cached', {
+          queryLength: searchQuery.length,
+          responseLength: fullResponse.length,
+          citationsCount: finalCitations.length
+        })
       }
 
       // 완료 - 프로그레스 완료 표시 후 딜레이
