@@ -34,6 +34,8 @@ export function AISearchView({
   const [searchProgress, setSearchProgress] = useState(0)
   const [currentQuery, setCurrentQuery] = useState(initialQuery) // 현재 검색 중인 질의
   const [progressMessage, setProgressMessage] = useState('') // 프로그래스바 메시지
+  const [citations, setCitations] = useState<any[]>([]) // ✅ 인용 출처 목록
+  const [queryType, setQueryType] = useState<'specific' | 'general' | 'comparison' | 'procedural'>('general') // ✅ 쿼리 타입
 
   // 프로그레스에 표시할 질의 (ref로 즉시 업데이트)
   const searchingQueryRef = useRef(initialQuery)
@@ -72,11 +74,11 @@ export function AISearchView({
         console.log('[RAG Cache] Using cached response')
         setAnalysis(cached.response)
         setConfidenceLevel(cached.confidenceLevel as 'high' | 'medium' | 'low')
+        setCitations(cached.citations || []) // ✅ 캐시에서 citations 복원
         setIsAnalyzing(false)
         setSearchStage('complete')
         setSearchProgress(100)
         setProgressMessage('✅ 캐시된 답변 표시')
-        // Note: citations는 LawViewer가 analysis에서 자동 추출
         return
       }
 
@@ -160,6 +162,12 @@ export function AISearchView({
                 }
                 if (parsed.citations) {
                   finalCitations = parsed.citations  // Phase 3 P3: 수집
+                  setCitations(parsed.citations) // ✅ 사이드바에 표시할 citations 설정
+                }
+                // ✅ 쿼리 타입 수집
+                if (parsed.queryType) {
+                  setQueryType(parsed.queryType)
+                  debugLogger.info('쿼리 타입 수신', { type: parsed.queryType })
                 }
                 debugLogger.info('Citations 수신', {
                   count: parsed.citations?.length || 0,
@@ -201,6 +209,12 @@ export function AISearchView({
                 }
                 if (parsed.citations) {
                   finalCitations = parsed.citations  // Phase 3 P3: 수집
+                  setCitations(parsed.citations) // ✅ 사이드바에 표시할 citations 설정
+                }
+                // ✅ 쿼리 타입 수집 (버퍼)
+                if (parsed.queryType) {
+                  setQueryType(parsed.queryType)
+                  debugLogger.info('쿼리 타입 수신 (버퍼)', { type: parsed.queryType })
                 }
                 debugLogger.info('Citations 수신 (버퍼)', {
                   count: parsed.citations?.length || 0,
@@ -300,8 +314,9 @@ export function AISearchView({
       {/* Analysis Result - LawViewer AI Mode */}
       {analysis && !error && (
         <>
-          {/* Confidence Badge */}
-          <div className="mx-2 sm:mx-4 mt-4 flex items-center gap-2">
+          {/* Confidence Badge & Query Type */}
+          <div className="mx-2 sm:mx-4 mt-4 flex items-center gap-2 flex-wrap">
+            {/* Confidence Badge */}
             {(() => {
               const config = CONFIDENCE_CONFIGS[confidenceLevel]
               const Icon = config.icon
@@ -310,6 +325,25 @@ export function AISearchView({
                 <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${config.bgColor} border ${config.borderColor} rounded-full`}>
                   <Icon className={`h-4 w-4 ${config.iconColor}`} />
                   <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>
+                </div>
+              )
+            })()}
+
+            {/* Query Type Badge */}
+            {(() => {
+              const typeConfigs = {
+                specific: { icon: BookOpen, label: '특정 조문', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+                general: { icon: Search, label: '일반 질문', color: 'bg-gray-50 border-gray-200 text-gray-700' },
+                comparison: { icon: Scale, label: '비교 질문', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+                procedural: { icon: Sparkles, label: '절차 질문', color: 'bg-green-50 border-green-200 text-green-700' }
+              }
+              const config = typeConfigs[queryType]
+              const TypeIcon = config.icon
+
+              return (
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${config.color} border rounded-full`}>
+                  <TypeIcon className="h-4 w-4" />
+                  <span className="text-sm font-medium">{config.label}</span>
                 </div>
               )
             })()}
@@ -336,6 +370,7 @@ export function AISearchView({
             aiAnswerContent={analysis}
             relatedArticles={relatedLaws}
             aiConfidenceLevel={confidenceLevel}
+            aiCitations={citations}
             favorites={new Set()}
             isOrdinance={false}
             viewMode="single"

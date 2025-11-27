@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     let fullResponse = ''
     let citations: any[] = []
     let finishReason: string | null = null
+    let queryType: string = 'general'  // ✅ 쿼리 타입 기본값
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -28,9 +29,10 @@ export async function POST(request: NextRequest) {
           // File Search 스트리밍 쿼리
           for await (const chunk of queryFileSearchStream(query, { metadataFilter })) {
             if (chunk.done) {
-              // 마지막 청크 - citation + finishReason 포함
+              // 마지막 청크 - citation + finishReason + queryType 포함
               citations = chunk.citations || []
               finishReason = chunk.finishReason || null
+              queryType = chunk.queryType || 'general'  // ✅ 쿼리 타입 수집
 
               // ✅ 신뢰도 계산 (groundingChunks 개수 + relevanceScore 기반, Phase 1 P1 최적화)
               const avgScore = citations.length > 0
@@ -61,13 +63,14 @@ export async function POST(request: NextRequest) {
                 )
               }
 
-              // Citation + Confidence 전송
+              // Citation + Confidence + Query Type 전송
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({
                   type: 'citations',
                   citations,
                   finishReason,
-                  confidenceLevel
+                  confidenceLevel,
+                  queryType  // ✅ 쿼리 타입 포함
                 })}\n\n`)
               )
             } else {
