@@ -149,7 +149,7 @@ export function LawViewer({
           article: citation.articleNum,
           jo,
           display: `${citation.lawName} ${citation.articleNum}`,
-          source: 'related' as const,
+          source: 'citation' as any,  // ✅ Citations 전용 source (기존 'excerpt' | 'related'과 별개)
           fullText: citation.text
         }
       })

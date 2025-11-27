@@ -333,7 +333,7 @@ export interface ParsedRelatedLaw {
   jo: string            // "003800" (6-digit JO code)
   title?: string        // "(신고납부)"
   display: string       // "관세법 제38조 (신고납부)" (전체 표시명)
-  source: 'excerpt' | 'related'  // 발췌조문 vs 관련법령
+  source: 'excerpt' | 'related' | 'citation'  // 발췌조문 vs 관련법령 vs Citations (File Search)
   fullText?: string     // 조문 전문 (나중에 로드)
 }
 

@@ -131,13 +131,18 @@ export function AIAnswerSidebar({
                                             {/* Icon Indicator - 우측 상단 절대 위치 */}
                                             <div className="absolute top-0 right-0 flex items-start gap-1">
                                                 {sources.has('excerpt') && (
-                                                    <div className="p-1 rounded-md bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
+                                                    <div className="p-1 rounded-md bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors" title="발췌 조문">
                                                         <Bookmark className="h-3.5 w-3.5" />
                                                     </div>
                                                 )}
                                                 {sources.has('related') && (
-                                                    <div className="p-1 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
+                                                    <div className="p-1 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors" title="관련 법령">
                                                         <Link2 className="h-3.5 w-3.5" />
+                                                    </div>
+                                                )}
+                                                {sources.has('citation') && (
+                                                    <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors" title="AI 인용 출처">
+                                                        <Sparkles className="h-3.5 w-3.5" />
                                                     </div>
                                                 )}
                                             </div>
@@ -174,19 +179,24 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
     // 중복 제거된 고유 조문 수
     const uniqueCount = grouped.size
 
-    // 발췌만 있는 조문 수 (관련법령에도 있으면 제외)
+    // 발췌만 있는 조문 수
     const excerptOnlyCount = Array.from(grouped.values()).filter(
         g => g.source.has('excerpt') && g.source.size === 1
     ).length
 
-    // 관련법령만 있는 조문 수 (발췌에도 있으면 제외)
+    // 관련법령만 있는 조문 수
     const relatedOnlyCount = Array.from(grouped.values()).filter(
         g => g.source.has('related') && g.source.size === 1
     ).length
 
-    // 둘 다 있는 조문 수
-    const bothCount = Array.from(grouped.values()).filter(
-        g => g.source.size === 2
+    // Citations만 있는 조문 수
+    const citationOnlyCount = Array.from(grouped.values()).filter(
+        g => g.source.has('citation') && g.source.size === 1
+    ).length
+
+    // 여러 source가 있는 조문 수
+    const multiSourceCount = Array.from(grouped.values()).filter(
+        g => g.source.size > 1
     ).length
 
     return (
@@ -207,10 +217,16 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
                     {relatedOnlyCount}
                 </Badge>
             )}
-            {bothCount > 0 && (
+            {citationOnlyCount > 0 && (
+                <Badge variant="outline" className="text-xs bg-emerald-900/30 text-emerald-300 border-emerald-700/50 whitespace-nowrap px-2 py-0.5">
+                    <Sparkles className="h-3 w-3 mr-0.5" />
+                    {citationOnlyCount}
+                </Badge>
+            )}
+            {multiSourceCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-green-900/30 text-green-300 border-green-700/50 whitespace-nowrap px-2 py-0.5">
                     <GitMerge className="h-3 w-3 mr-0.5" />
-                    {bothCount}
+                    {multiSourceCount}
                 </Badge>
             )}
         </div>
