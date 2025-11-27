@@ -25,6 +25,7 @@ export interface RAGCacheEntry {
   response: string  // AI 응답
   citations: any[]  // Citation 목록
   confidenceLevel: string  // 신뢰도
+  queryType?: string  // 쿼리 타입 (specific/general/comparison/procedural)
   timestamp: number  // 생성 시간
   hitCount: number  // 캐시 히트 횟수
 }
@@ -166,6 +167,7 @@ export async function getCachedResponse(query: string): Promise<{
   response: string
   citations: any[]
   confidenceLevel: string
+  queryType?: string
 } | null> {
   try {
     const db = await openDB()
@@ -210,7 +212,8 @@ export async function getCachedResponse(query: string): Promise<{
         resolve({
           response: cached.response,
           citations: cached.citations,
-          confidenceLevel: cached.confidenceLevel
+          confidenceLevel: cached.confidenceLevel,
+          queryType: cached.queryType
         })
       }
 
@@ -229,7 +232,8 @@ export async function cacheResponse(
   query: string,
   response: string,
   citations: any[],
-  confidenceLevel: string
+  confidenceLevel: string,
+  queryType?: string
 ): Promise<void> {
   try {
     const db = await openDB()
@@ -242,6 +246,7 @@ export async function cacheResponse(
       response,
       citations,
       confidenceLevel,
+      queryType,
       timestamp: Date.now(),
       hitCount: 0
     }
