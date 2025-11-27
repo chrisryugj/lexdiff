@@ -75,6 +75,7 @@ export function AISearchView({
         setAnalysis(cached.response)
         setConfidenceLevel(cached.confidenceLevel as 'high' | 'medium' | 'low')
         setCitations(cached.citations || []) // ✅ 캐시에서 citations 복원
+        setQueryType((cached.queryType as any) || 'general') // ✅ 캐시에서 queryType 복원
         setIsAnalyzing(false)
         setSearchStage('complete')
         setSearchProgress(100)
@@ -120,6 +121,7 @@ export function AISearchView({
       let fullResponse = ''  // Phase 3 P3: 전체 응답 수집
       let finalCitations: any[] = []  // Phase 3 P3: Citation 수집
       let finalConfidenceLevel = 'high'  // Phase 3 P3: 신뢰도 수집
+      let finalQueryType = 'general'  // Phase 3 P3: 쿼리 타입 수집
 
       while (true) {
         const { done, value } = await reader.read()
@@ -167,6 +169,7 @@ export function AISearchView({
                 // ✅ 쿼리 타입 수집
                 if (parsed.queryType) {
                   setQueryType(parsed.queryType)
+                  finalQueryType = parsed.queryType  // Phase 3 P3: 수집
                   debugLogger.info('쿼리 타입 수신', { type: parsed.queryType })
                 }
                 debugLogger.info('Citations 수신', {
@@ -214,6 +217,7 @@ export function AISearchView({
                 // ✅ 쿼리 타입 수집 (버퍼)
                 if (parsed.queryType) {
                   setQueryType(parsed.queryType)
+                  finalQueryType = parsed.queryType  // Phase 3 P3: 수집
                   debugLogger.info('쿼리 타입 수신 (버퍼)', { type: parsed.queryType })
                 }
                 debugLogger.info('Citations 수신 (버퍼)', {
@@ -231,11 +235,12 @@ export function AISearchView({
 
       // ✅ Phase 3 P3: 캐시에 응답 저장
       if (fullResponse && finalCitations) {
-        await cacheResponse(searchQuery, fullResponse, finalCitations, finalConfidenceLevel)
+        await cacheResponse(searchQuery, fullResponse, finalCitations, finalConfidenceLevel, finalQueryType)
         debugLogger.success('[RAG Cache] Response cached', {
           queryLength: searchQuery.length,
           responseLength: fullResponse.length,
-          citationsCount: finalCitations.length
+          citationsCount: finalCitations.length,
+          queryType: finalQueryType
         })
       }
 
