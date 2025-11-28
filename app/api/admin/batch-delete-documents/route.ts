@@ -3,6 +3,7 @@
  * DELETE /api/admin/batch-delete-documents
  *
  * Deletes multiple documents from the File Search Store
+ * Uses force=true to delete documents with chunks
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -50,7 +51,8 @@ export async function DELETE(request: NextRequest) {
       await Promise.all(
         batch.map(async (documentId) => {
           try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/${documentId}`
+            // Use force=true to delete document with all its chunks
+            const url = `https://generativelanguage.googleapis.com/v1beta/${documentId}?force=true`
 
             const response = await fetch(url, {
               method: 'DELETE',

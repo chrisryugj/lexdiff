@@ -11,10 +11,15 @@
 export interface ParsedLawMetadata {
   lawId: string
   lawName: string
+  lawType: string // 법률, 시행령, 시행규칙, 조례, 헌법
+  ministry: string // 소관부처
   effectiveDate: string
   promulgationDate: string
   promulgationNumber: string
+  lastAmendmentDate: string // 최종개정일
   revisionType: string
+  mst: string // 법령일련번호 (URL 생성용)
+  url: string // 법제처 URL
   articleCount: number
   totalCharacters: number
   fetchedAt: string
@@ -160,6 +165,17 @@ function extractContentFromHangArray(hangArray: any[]): string {
 }
 
 /**
+ * Detect law type from name
+ */
+function detectLawType(lawName: string): string {
+  if (/시행규칙$/.test(lawName)) return '시행규칙'
+  if (/시행령$/.test(lawName)) return '시행령'
+  if (/조례|규칙/.test(lawName)) return '조례'
+  if (lawName === '대한민국헌법') return '헌법'
+  return '법률'
+}
+
+/**
  * Parse law JSON data from law.go.kr API
  */
 export function parseLawFromAPI(jsonData: any): ParsedLaw {
@@ -171,13 +187,52 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
 
   // Extract metadata
   const basicInfo = lawData.기본정보 || lawData
+
+  // Debug: log available metadata fields
+  console.log('[parseLawFromAPI] Available basicInfo keys:', Object.keys(basicInfo))
+  console.log('[parseLawFromAPI] 소관부처명:', basicInfo.소관부처명)
+  console.log('[parseLawFromAPI] 소관부처:', basicInfo.소관부처)
+  console.log('[parseLawFromAPI] 최종개정일자:', basicInfo.최종개정일자)
+  console.log('[parseLawFromAPI] 법령일련번호:', basicInfo.법령일련번호)
+
+  const lawName = basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음"
+  const mst = basicInfo.법령일련번호 || basicInfo.법령MST || ""
+
+  // Handle ministry field - can be string or object with content/소관부처명 property
+  let ministry = ""
+  const rawMinistry = basicInfo.소관부처명 || basicInfo.소관부처
+  if (typeof rawMinistry === "string") {
+    ministry = rawMinistry
+  } else if (rawMinistry && typeof rawMinistry === "object") {
+    // API returns: { content: '법제처', 소관부처코드: '1170000' }
+    ministry = rawMinistry.content || rawMinistry.소관부처명 || rawMinistry["#text"] || ""
+  }
+
+  console.log('[parseLawFromAPI] Extracted ministry:', ministry)
+  console.log('[parseLawFromAPI] Extracted mst:', mst)
+
+  const lawId = basicInfo.법령ID || basicInfo.법령키 || "unknown"
+
+  // URL 생성: MST가 없으면 법령ID로 대체
+  let url = ""
+  if (mst) {
+    url = `https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=${mst}`
+  } else if (lawId && lawId !== "unknown") {
+    url = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+  }
+
   const metadata: ParsedLawMetadata = {
-    lawId: basicInfo.법령ID || basicInfo.법령키 || "unknown",
-    lawName: basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || "제목 없음",
+    lawId,
+    lawName,
+    lawType: detectLawType(lawName),
+    ministry,
     effectiveDate: basicInfo.최종시행일자 || basicInfo.시행일자 || "",
     promulgationDate: basicInfo.공포일자 || "",
     promulgationNumber: basicInfo.공포번호 || "",
+    lastAmendmentDate: basicInfo.최종개정일자 || "",
     revisionType: basicInfo.제개정구분명 || basicInfo.제개정구분 || "",
+    mst,
+    url,
     articleCount: 0,
     totalCharacters: 0,
     fetchedAt: new Date().toISOString()
@@ -309,7 +364,12 @@ function generateMarkdown(metadata: ParsedLawMetadata, articles: ParsedLawArticl
 
   // Header
   md += `# ${metadata.lawName}\n\n`
+  md += `**법령종류**: ${metadata.lawType}\n`
   md += `**법령 ID**: ${metadata.lawId}\n`
+
+  if (metadata.ministry) {
+    md += `**소관부처**: ${metadata.ministry}\n`
+  }
 
   if (metadata.effectiveDate) {
     const formatted = formatDate(metadata.effectiveDate)
@@ -325,11 +385,20 @@ function generateMarkdown(metadata: ParsedLawMetadata, articles: ParsedLawArticl
     md += `\n`
   }
 
+  if (metadata.lastAmendmentDate) {
+    md += `**최종개정일**: ${formatDate(metadata.lastAmendmentDate)}\n`
+  }
+
   if (metadata.revisionType) {
     md += `**제개정구분**: ${metadata.revisionType}\n`
   }
 
   md += `**조문 수**: ${metadata.articleCount}개\n`
+
+  if (metadata.url) {
+    md += `**URL**: ${metadata.url}\n`
+  }
+
   md += `\n---\n\n`
 
   // Articles

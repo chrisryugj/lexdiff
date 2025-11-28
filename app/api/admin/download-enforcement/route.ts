@@ -209,12 +209,32 @@ function parseLawJSON(jsonData: any) {
   }
 
   const basicInfo = lawData.기본정보 || lawData
+
+  // Debug: log available metadata fields
+  console.log('[parseLawJSON] Available basicInfo keys:', Object.keys(basicInfo))
+  console.log('[parseLawJSON] 소관부처명:', basicInfo.소관부처명)
+  console.log('[parseLawJSON] 소관부처:', basicInfo.소관부처)
+  console.log('[parseLawJSON] 최종개정일자:', basicInfo.최종개정일자)
+  console.log('[parseLawJSON] 법령일련번호:', basicInfo.법령일련번호)
   const lawId = basicInfo.법령ID || basicInfo.법령키 || 'unknown'
   const lawName = basicInfo.법령명_한글 || basicInfo.법령명한글 || basicInfo.법령명 || '제목 없음'
   const effectiveDate = basicInfo.최종시행일자 || basicInfo.시행일자 || ''
   const promulgationDate = basicInfo.공포일자 || ''
   const promulgationNumber = basicInfo.공포번호 || ''
   const revisionType = basicInfo.제개정구분명 || basicInfo.제개정구분 || ''
+
+  // 소관부처 - 객체 또는 문자열 처리
+  // API returns: { content: '법제처', 소관부처코드: '1170000' }
+  let ministry = ''
+  const rawMinistry = basicInfo.소관부처명 || basicInfo.소관부처
+  if (typeof rawMinistry === 'string') {
+    ministry = rawMinistry
+  } else if (rawMinistry && typeof rawMinistry === 'object') {
+    ministry = rawMinistry.content || rawMinistry.소관부처명 || rawMinistry['#text'] || ''
+  }
+
+  const lastAmendmentDate = basicInfo.최종개정일자 || ''
+  const mst = basicInfo.법령일련번호 || basicInfo.법령MST || ''
 
   const articles: any[] = []
   const articleUnits = lawData.조문?.조문단위 || []
@@ -340,6 +360,10 @@ function parseLawJSON(jsonData: any) {
     promulgationDate,
     promulgationNumber,
     revisionType,
+    // 추가 메타데이터
+    ministry,
+    lastAmendmentDate,
+    mst,
     articleCount: articles.length,
     totalCharacters: articles.reduce((sum, a) => sum + a.content.length, 0),
     articles
@@ -360,11 +384,44 @@ function formatDate(dateStr: string) {
 }
 
 /**
+ * Detect law type from name
+ */
+function detectLawType(lawName: string): string {
+  if (/시행규칙$/.test(lawName)) return '시행규칙'
+  if (/시행령$/.test(lawName)) return '시행령'
+  if (/조례|규칙/.test(lawName)) return '조례'
+  if (lawName === '대한민국헌법') return '헌법'
+  return '법률'
+}
+
+/**
+ * Generate law.go.kr URL from MST or law name
+ */
+function generateLawUrl(mst: string, lawName?: string): string {
+  if (mst) {
+    return `https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=${mst}`
+  }
+  if (lawName) {
+    return `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+  }
+  return ''
+}
+
+/**
  * Generate markdown
  */
 function generateMarkdown(parsed: any): string {
   let md = `# ${parsed.lawName}\n\n`
+
+  // 법령 종류
+  const lawType = detectLawType(parsed.lawName)
+  md += `**법령종류**: ${lawType}\n`
   md += `**법령 ID**: ${parsed.lawId}\n`
+
+  // 소관부처
+  if (parsed.ministry) {
+    md += `**소관부처**: ${parsed.ministry}\n`
+  }
 
   if (parsed.effectiveDate) {
     md += `**시행일**: ${formatDate(parsed.effectiveDate)}\n`
@@ -378,11 +435,23 @@ function generateMarkdown(parsed: any): string {
     md += `\n`
   }
 
+  // 최종개정일
+  if (parsed.lastAmendmentDate) {
+    md += `**최종개정일**: ${formatDate(parsed.lastAmendmentDate)}\n`
+  }
+
   if (parsed.revisionType) {
     md += `**제개정구분**: ${parsed.revisionType}\n`
   }
 
   md += `**조문 수**: ${parsed.articleCount}개\n`
+
+  // 법제처 URL - MST가 없으면 법령명으로 URL 생성
+  const lawUrl = generateLawUrl(parsed.mst, parsed.lawName)
+  if (lawUrl) {
+    md += `**URL**: ${lawUrl}\n`
+  }
+
   md += `\n---\n\n`
 
   for (const article of parsed.articles) {
@@ -464,12 +533,16 @@ export async function POST(request: NextRequest) {
     await saveParsedLaw(parsed.lawId, markdown, {
       lawId: parsed.lawId,
       lawName: parsed.lawName,
+      lawType: detectLawType(parsed.lawName),
+      ministry: parsed.ministry,
       effectiveDate: parsed.effectiveDate,
       promulgationDate: parsed.promulgationDate,
       promulgationNumber: parsed.promulgationNumber,
+      lastAmendmentDate: parsed.lastAmendmentDate,
       revisionType: parsed.revisionType,
       articleCount: parsed.articleCount,
       totalCharacters: parsed.totalCharacters,
+      url: generateLawUrl(parsed.mst, parsed.lawName),
       fetchedAt: new Date().toISOString()
     })
 

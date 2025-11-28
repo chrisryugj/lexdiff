@@ -124,14 +124,20 @@ async function fetchOrdinanceContent(ordinId: string) {
 function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: string) {
   try {
     const ordinIdMatch = xml.match(/<자치법규ID>(\d+)<\/자치법규ID>/)
+    const mstMatch = xml.match(/<자치법규일련번호>(\d+)<\/자치법규일련번호>/)
     const effectiveDateMatch = xml.match(/<시행일자>(\d+)<\/시행일자>/)
     const promulgationDateMatch = xml.match(/<공포일자>(\d+)<\/공포일자>/)
     const promulgationNumberMatch = xml.match(/<공포번호>([^<]+)<\/공포번호>/)
+    const lastAmendmentDateMatch = xml.match(/<최종개정일자>(\d+)<\/최종개정일자>/)
+    const lawKindMatch = xml.match(/<자치법규종류>([^<]+)<\/자치법규종류>/)
 
     const ordinId = ordinIdMatch ? ordinIdMatch[1] : 'unknown'
+    const mst = mstMatch ? mstMatch[1] : ''
     const effectiveDate = effectiveDateMatch ? effectiveDateMatch[1] : ''
     const promulgationDate = promulgationDateMatch ? promulgationDateMatch[1] : ''
     const promulgationNumber = promulgationNumberMatch ? promulgationNumberMatch[1] : ''
+    const lastAmendmentDate = lastAmendmentDateMatch ? lastAmendmentDateMatch[1] : ''
+    const lawKind = lawKindMatch ? lawKindMatch[1] : '조례' // 조례 or 규칙
 
     const articles: any[] = []
     const articleMatches = xml.matchAll(/<조[^>]*>([\s\S]*?)<\/조>/g)
@@ -182,11 +188,15 @@ function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: str
 
     return {
       ordinId,
+      mst,
       ordinanceName,
       districtName,
+      lawKind,
       effectiveDate,
       promulgationDate,
       promulgationNumber,
+      lastAmendmentDate,
+      url: mst ? `https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=${mst}` : '',
       articleCount: articles.length,
       articles
     }
@@ -213,6 +223,7 @@ function formatDate(dateStr: string) {
  */
 function generateMarkdown(parsed: any): string {
   let md = `# ${parsed.ordinanceName}\n\n`
+  md += `**법령종류**: ${parsed.lawKind}\n`
   md += `**자치구**: ${parsed.districtName}\n`
   md += `**자치법규 ID**: ${parsed.ordinId}\n`
 
@@ -228,7 +239,16 @@ function generateMarkdown(parsed: any): string {
     md += `\n`
   }
 
+  if (parsed.lastAmendmentDate) {
+    md += `**최종개정일**: ${formatDate(parsed.lastAmendmentDate)}\n`
+  }
+
   md += `**조문 수**: ${parsed.articleCount}개\n`
+
+  if (parsed.url) {
+    md += `**URL**: ${parsed.url}\n`
+  }
+
   md += `\n---\n\n`
 
   // Each article with metadata (for chunking resilience)

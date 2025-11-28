@@ -33,6 +33,10 @@ const BASIC_CHAR_MAP = new Map<string, string>([
 
 const LAW_ALIAS_ENTRIES: LawAliasEntry[] = [
   {
+    canonical: "대한민국헌법",
+    aliases: ["헌법", "헌 법"],
+  },
+  {
     canonical: "관세법",
     aliases: ["관세벚", "관세요", "관세 볍", "관세 볍률"],
   },

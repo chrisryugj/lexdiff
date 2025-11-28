@@ -35,6 +35,7 @@ import {
   GitMerge,
   MessageCircleQuestion,
   ChevronDown,
+  Landmark,
 } from "lucide-react"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
@@ -1279,9 +1280,16 @@ export function LawViewer({
                                 <span className="text-muted-foreground text-base lg:text-lg ml-2">({activeArticle.title})</span>
                               )}
                             </h2>
-                            <Badge variant="outline" className="text-xs shrink-0">
-                              {isOrdinance ? "자치법규" : "법률"}
-                            </Badge>
+                            {meta.lawTitle === "대한민국헌법" ? (
+                              <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50">
+                                <Landmark className="h-3 w-3 mr-1" />
+                                헌법
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {isOrdinance ? "자치법규" : "법률"}
+                              </Badge>
+                            )}
                             {/* 즐겨찾기 버튼 - 모바일에서 제목줄 우측 */}
                             <Button
                               key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}

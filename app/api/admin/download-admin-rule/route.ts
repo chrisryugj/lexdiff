@@ -76,11 +76,14 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
   }
 
   const ruleId = getNodeText('행정규칙ID') || 'unknown'
+  const mst = getNodeText('행정규칙일련번호') || ''
   const name = getNodeText('행정규칙명') || ruleName
   const org = getNodeText('소관부처명')
+  const ruleKind = getNodeText('행정규칙종류') || '행정규칙'
   const effectiveDate = getNodeText('시행일자')
   const publishDate = getNodeText('발령일자')
   const publishNumber = getNodeText('발령번호')
+  const lastAmendmentDate = getNodeText('최종개정일자')
 
   // Extract articles from <조문> elements
   const joElements = serviceNode.getElementsByTagName('조문')
@@ -186,12 +189,16 @@ function parseAdminRuleXML(xml: string, ruleName: string, lawName: string) {
 
   return {
     ruleId,
+    mst,
     ruleName: name,
     lawName,
     organization: org,
+    ruleKind,
     effectiveDate,
     publishDate,
     publishNumber,
+    lastAmendmentDate,
+    url: mst ? `https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=${mst}` : '',
     articleCount: articles.length,
     totalCharacters: articles.reduce((sum: number, a: any) => sum + a.content.length, 0),
     articles
@@ -320,6 +327,7 @@ function parseItems(content: string): Array<{ num: string; content: string }> {
  */
 function generateMarkdown(parsed: any): string {
   let md = `# ${parsed.ruleName}\n\n`
+  md += `**법령종류**: ${parsed.ruleKind}\n`
   md += `**상위 법령**: ${parsed.lawName}\n`
   md += `**행정규칙 ID**: ${parsed.ruleId}\n`
 
@@ -339,7 +347,16 @@ function generateMarkdown(parsed: any): string {
     md += `\n`
   }
 
+  if (parsed.lastAmendmentDate) {
+    md += `**최종개정일**: ${formatDate(parsed.lastAmendmentDate)}\n`
+  }
+
   md += `**조문 수**: ${parsed.articleCount}개\n`
+
+  if (parsed.url) {
+    md += `**URL**: ${parsed.url}\n`
+  }
+
   md += `\n---\n\n`
 
   // Each article with metadata (for chunking resilience)
