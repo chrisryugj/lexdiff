@@ -93,7 +93,7 @@ function CollapsibleBlockquote({
           {title}
         </h3>
         {isExpanded && (
-          <div className="relative">
+          <div className="relative ml-4">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
             <div
               className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-0"
@@ -109,7 +109,7 @@ function CollapsibleBlockquote({
 
   // 일반 blockquote (관련법령 아닌 경우)
   return (
-    <div className="my-1">
+    <div className="my-1 ml-4">
       <div className="relative">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
         <div
@@ -644,7 +644,7 @@ export function FileSearchAnswerDisplay({
             </div>
           </div>
 
-          <div className="max-w-none overflow-x-hidden">
+          <div className="prose max-w-none overflow-x-hidden">
             <ReactMarkdown components={markdownComponents}>{processedAnswer}</ReactMarkdown>
           </div>
         </Card>

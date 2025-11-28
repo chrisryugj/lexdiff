@@ -591,8 +591,8 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
 
         {/* Uploaded Laws */}
         {uploadedLaws.length > 0 && (
-          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-            {uploadedLaws.slice(0, 50).map((law) => (
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {uploadedLaws.map((law) => (
               <div key={law.fileName} className="flex items-center p-3 rounded-xl bg-accent/10 border border-accent/20 opacity-75">
                 <CheckCircle2 className="w-4 h-4 text-accent mr-3" />
                 <div className="flex-1 min-w-0">
@@ -603,11 +603,6 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
                 </div>
               </div>
             ))}
-            {uploadedLaws.length > 50 && (
-              <div className="p-2 text-center text-xs text-muted-foreground">
-                ... 외 {uploadedLaws.length - 50}개 더 있음
-              </div>
-            )}
           </div>
         )}
       </div>

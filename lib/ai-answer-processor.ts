@@ -6,6 +6,34 @@ import { debugLogger } from './debug-logger'
 import { linkifyRefsAI } from './unified-link-generator'
 
 /**
+ * 텍스트 앞의 마크다운 불릿/대시 제거
+ * 모든 섹션에서 범용적으로 사용
+ */
+function stripLeadingBullet(text: string): string {
+  return text.replace(/^[-*•]\s*/, '').trim()
+}
+
+/**
+ * 📋 핵심요약 전의 서론 텍스트를 첫 번째 항목으로 통합
+ * AI가 서론을 먼저 작성한 경우 핵심요약 내부로 이동
+ */
+function mergeIntroIntoSummary(text: string): string {
+  const summaryIndex = text.search(/📋\s*핵심\s*요약/)
+  if (summaryIndex > 0) {
+    const intro = text.substring(0, summaryIndex).trim()
+    if (intro && intro.length > 10) {  // 의미 있는 서론인 경우만
+      // 서론을 핵심요약 첫 번째 ✅ 항목으로 변환
+      const restText = text.substring(summaryIndex)
+      return restText.replace(
+        /(📋\s*핵심\s*요약\s*\n)/,
+        `$1✅ ${intro}\n`
+      )
+    }
+  }
+  return text
+}
+
+/**
  * 이모지를 lucide 아이콘 SVG로 교체
  */
 function replaceEmojisWithIcons(text: string): string {
@@ -61,8 +89,11 @@ export function convertAIAnswerToHTML(markdown: string): string {
 
   debugLogger.info('AI 답변 HTML 변환 시작', { length: markdown.length })
 
+  // 0단계: 서론을 핵심요약으로 통합 (AI가 서론 먼저 작성한 경우)
+  let text = mergeIntroIntoSummary(markdown)
+
   // 1단계: 마크다운 문법 제거 (내용만 남김)
-  let text = removeMarkdownSyntax(markdown)
+  text = removeMarkdownSyntax(text)
 
   // 2단계: ⚖️ 조문 발췌 마커 추가 (이스케이프 전에)
   text = markLawQuotes(text)
@@ -409,20 +440,26 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
         return
       }
 
-      // 이미 불릿 있으면 그대로
-      if (/^[\s]*[•\-]/.test(trimmed)) {
-        contentLines.push(line)
-        return
-      }
-
       // 상단 여백 스타일 (첫 번째 내용에만 적용)
       const marginTop = isFirstContent && options.topMargin ? `margin-top: ${options.topMargin}; ` : ''
       isFirstContent = false
 
+      // 마크다운 불릿/대시 제거 (범용 처리)
+      const cleanText = stripLeadingBullet(trimmed)
+      if (!cleanText) return  // 불릿만 있던 줄은 건너뛰기
+
       // ✅ 📌 🔔 이모지가 있는 경우 → hanging indent (핵심 요약 섹션 전용)
-      if (sectionTitle === '📋 핵심 요약' && /^[✅📌🔔]/.test(trimmed)) {
+      if (sectionTitle === '📋 핵심 요약' && /^[✅📌🔔]/.test(cleanText)) {
         contentLines.push(
-          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${cleanText}</div>`
+        )
+        return
+      }
+
+      // 핵심 요약 섹션: 이모지 없는 하위 항목 → 추가 들여쓰기
+      if (sectionTitle === '📋 핵심 요약' && !options.bullet) {
+        contentLines.push(
+          `<div style="${marginTop}margin-left: calc(${options.indent} + 1.5em);">${cleanText}</div>`
         )
         return
       }
@@ -430,14 +467,14 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
       // 일반 텍스트 → 들여쓰기 + (옵션) 불릿
       const prefix = options.bullet ? '• ' : ''
 
-      // 💡 추가 참고 섹션의 불릿 → hanging indent
+      // 불릿 있는 섹션 → hanging indent
       if (options.bullet) {
         contentLines.push(
-          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -0.7em; padding-left: 1em;">${prefix}${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -0.7em; padding-left: 1em;">${prefix}${cleanText}</div>`
         )
       } else {
         contentLines.push(
-          `<div style="${marginTop}margin-left: ${options.indent};">${prefix}${trimmed}</div>`
+          `<div style="${marginTop}margin-left: ${options.indent};">${prefix}${cleanText}</div>`
         )
       }
     })
@@ -567,15 +604,20 @@ function styleDetailSection(text: string, sectionTitle: string, options: IndentO
       if (currentSub !== 'none') {
         const marginTop = isFirstContentInSub ? 'margin-top: 0.0rem; ' : ''
         isFirstContentInSub = false
+
+        // 마크다운 불릿/대시 제거 (범용 처리) - 불릿 겹침 방지
+        const cleanText = stripLeadingBullet(trimmed)
+        if (!cleanText) return  // 불릿만 있던 줄은 건너뛰기
+
         const prefix = options.bullet ? '• ' : ''
 
         if (options.bullet) {
           contentLines.push(
-            `<div style="${marginTop}margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${trimmed}</div>`
+            `<div style="${marginTop}margin-left: 2.3rem; text-indent: -0.7em; padding-left: 0.7em;">${prefix}${cleanText}</div>`
           )
         } else {
           contentLines.push(
-            `<div style="${marginTop}margin-left: 2.3rem;">${trimmed}</div>`
+            `<div style="${marginTop}margin-left: 2.3rem;">${cleanText}</div>`
           )
         }
         return

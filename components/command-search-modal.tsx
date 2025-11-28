@@ -10,7 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
-import { formatJO } from "@/lib/law-parser"
+import { formatJO, parseSearchQuery } from "@/lib/law-parser"
+import { debugLogger } from "@/lib/debug-logger"
 
 interface CommandSearchModalProps {
   isOpen: boolean
@@ -67,7 +68,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     setRecentSearches(updated)
     localStorage.setItem('recentSearches', JSON.stringify(updated))
 
-    onSearch({ lawName: query })
+    // parseSearchQuery로 파싱하여 조문 번호 추출
+    try {
+      const parsed = parseSearchQuery(query)
+      debugLogger.info('CommandSearchModal 검색 파싱', { query, parsed })
+      onSearch(parsed)
+    } catch (error) {
+      debugLogger.error('검색 파싱 실패', error)
+      onSearch({ lawName: query })
+    }
     onClose()
     setSearchQuery("")
   }
@@ -78,7 +87,16 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   }
 
   const handleRecentClick = (query: string) => {
-    handleSearch(query)
+    // 최근 검색은 parseSearchQuery로 파싱하여 조문 번호 추출
+    try {
+      const parsed = parseSearchQuery(query)
+      debugLogger.info('CommandSearchModal 최근 검색 파싱', { query, parsed })
+      onSearch(parsed)
+      onClose()
+    } catch (error) {
+      debugLogger.error('최근 검색 파싱 실패', error)
+      handleSearch(query)
+    }
   }
 
   return (
