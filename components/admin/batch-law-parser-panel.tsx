@@ -25,6 +25,31 @@ interface ParseResult {
   selectedCandidate?: string
 }
 
+/**
+ * Find base law candidate when candidates are law/시행령/시행규칙 trio
+ * Returns the base law (not 시행령 or 시행규칙) if applicable
+ */
+function findBaseLawCandidate(
+  candidates: Array<{ lawId: string; lawName: string; effectiveDate: string; revisionType?: string }>,
+  searchQuery: string
+): { lawId: string; lawName: string } | null {
+  // Only auto-select if candidates <= 3 and query doesn't include 시행령/시행규칙
+  if (candidates.length > 3) return null
+  if (/시행령|시행규칙/.test(searchQuery)) return null
+
+  // Check if all candidates match the pattern: 법률, 법률 시행령, 법률 시행규칙
+  const baseLaw = candidates.find((c) => !c.lawName.endsWith('시행령') && !c.lawName.endsWith('시행규칙'))
+  const hasEnforcement = candidates.some((c) => c.lawName.endsWith('시행령'))
+  const hasRule = candidates.some((c) => c.lawName.endsWith('시행규칙'))
+
+  // If we have a base law and at least one enforcement/rule variant, auto-select base law
+  if (baseLaw && (hasEnforcement || hasRule)) {
+    return { lawId: baseLaw.lawId, lawName: baseLaw.lawName }
+  }
+
+  return null
+}
+
 export function BatchLawParserPanel() {
   const [inputText, setInputText] = useState('')
   const [results, setResults] = useState<ParseResult[]>([])
@@ -93,11 +118,21 @@ export function BatchLawParserPanel() {
           updateResult(index, { status: 'error', error: '저장 실패' })
         }
       } else if (data.candidates && data.candidates.length > 0) {
-        // Multiple candidates - needs selection
-        updateResult(index, {
-          status: 'selecting',
-          candidates: data.candidates
-        })
+        // Check if candidates are exactly "법률/시행령/시행규칙" trio
+        // In that case, auto-select the base law (not 시행령/시행규칙)
+        const baseLawCandidate = findBaseLawCandidate(data.candidates, lawName)
+
+        if (baseLawCandidate) {
+          // Auto-select the base law
+          console.log(`[BatchLawParser] Auto-selecting base law: ${baseLawCandidate.lawName}`)
+          await handleSelectCandidate(index, baseLawCandidate.lawId)
+        } else {
+          // Multiple candidates - needs manual selection
+          updateResult(index, {
+            status: 'selecting',
+            candidates: data.candidates
+          })
+        }
       } else {
         updateResult(index, { status: 'error', error: data.error || '검색 결과 없음' })
       }
