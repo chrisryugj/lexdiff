@@ -157,7 +157,7 @@ export function AIAnswerSidebar({
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
                             <AlertCircle className="h-8 w-8 opacity-40 text-amber-500" />
                             <p className="text-sm font-medium text-amber-600">File Search 인용 없음</p>
-                            <p className="text-xs text-center px-4">AI가 일반 지식으로 답변했습니다.<br/>법령 데이터베이스에서 관련 조문을 찾지 못했습니다.</p>
+                            <p className="text-xs text-center px-4">AI가 일반 지식으로 답변했습니다.<br />법령 데이터베이스에서 관련 조문을 찾지 못했습니다.</p>
                         </div>
                     )}
                 </div>
@@ -318,18 +318,16 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
-                {/* 1줄: 타이틀+배지+신뢰도(모바일만) */}
+            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
+                {/* 1줄: 타이틀+배지+신뢰도 */}
                 <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
                         File Search RAG
                     </Badge>
-                    {/* 모바일만 신뢰도 표시 (PC는 2줄에 표시) */}
-                    <div className="ml-auto lg:hidden">
-                        <ConfidenceBadge />
-                    </div>
+                    {/* 신뢰도 배지 - RAG 배지 바로 옆 */}
+                    <ConfidenceBadge />
                 </div>
 
                 {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}
@@ -358,7 +356,7 @@ export function AIAnswerContent({
                                 )
                             })()}
                         </div>
-                        {/* PC: 버튼들 우측 정렬 + 신뢰도 맨 뒤 */}
+                        {/* PC: 버튼들 우측 정렬 */}
                         <div className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                                 <ZoomOut className="h-4 w-4" />
@@ -382,7 +380,6 @@ export function AIAnswerContent({
                             >
                                 <Copy className="h-4 w-4" />
                             </Button>
-                            <ConfidenceBadge />
                         </div>
                     </div>
                 )}
@@ -415,7 +412,7 @@ export function AIAnswerContent({
             </div>
 
             {/* 본문 영역 */}
-            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-1 pb-4 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-0 pb-4 overflow-y-auto overflow-x-hidden">
                 {/* ✅ Phase 7: 신뢰도 경고 배너 (low일 때) */}
                 {aiConfidenceLevel === 'low' && !fileSearchFailed && (
                     <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
