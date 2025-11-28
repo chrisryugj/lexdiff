@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
       const filePath = path.join(parsedLawsDir, fileName)
       const stats = fs.statSync(filePath)
 
-      const lawName = fileName.replace('.md', '')
+      // Convert underscores back to spaces for lawName matching
+      const lawName = fileName.replace('.md', '').replace(/_/g, ' ')
 
       enforcementFiles.push({
         fileName,
