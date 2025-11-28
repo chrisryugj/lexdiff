@@ -1,13 +1,14 @@
 /**
  * Admin Rules Download Panel - LexDiff Professional Edition
  * Refined interface for downloading administrative rules (고시, 예규, 훈령)
+ * With download log tracking and filter functionality
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw, Filter, MinusCircle } from 'lucide-react'
 
 interface SavedLaw {
   lawId: string
@@ -21,9 +22,18 @@ interface SavedLaw {
 interface DownloadStatus {
   lawName: string
   ruleName: string
-  status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error'
+  status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error' | 'confirmed_none'
   error?: string
   downloadedAt?: string
+}
+
+interface DownloadLogEntry {
+  lawName: string
+  ruleName: string
+  result: 'success' | 'not_found' | 'error'
+  timestamp: string
+  articleCount?: number
+  error?: string
 }
 
 interface AdminRulesDownloadPanelProps {
@@ -37,20 +47,28 @@ interface AdminRule {
   type: string
 }
 
+type FilterType = 'all' | 'incomplete' | 'completed'
+
 export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPanelProps = {}) {
   const [laws, setLaws] = useState<SavedLaw[]>([])
   const [loading, setLoading] = useState(true)
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DownloadStatus[]>>(new Map())
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set())
+  const [downloadLog, setDownloadLog] = useState<Record<string, Record<string, DownloadLogEntry>>>({})
+  const [notFoundRules, setNotFoundRules] = useState<Set<string>>(new Set())
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
   const [currentLawName, setCurrentLawName] = useState<string>('')
+  const [filter, setFilter] = useState<FilterType>('all')
 
   // Selection UI states
   const [selectedLaw, setSelectedLaw] = useState<string | null>(null)
   const [availableRules, setAvailableRules] = useState<AdminRule[]>([])
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set())
   const [loadingRules, setLoadingRules] = useState(false)
+
+  // Law-level status tracking
+  const [lawStatus, setLawStatus] = useState<Map<string, 'pending' | 'checked' | 'has_rules' | 'no_rules'>>(new Map())
 
   useEffect(() => {
     loadLaws()
@@ -63,14 +81,17 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
   }, [refreshTrigger])
 
   async function loadLaws(): Promise<Set<string> | null> {
+    setLoading(true)
     try {
-      const [lawsResponse, filesResponse] = await Promise.all([
+      const [lawsResponse, filesResponse, logResponse] = await Promise.all([
         fetch('/api/admin/list-parsed'),
-        fetch('/api/admin/list-admin-rule-files')
+        fetch('/api/admin/list-admin-rule-files'),
+        fetch('/api/admin/admin-rule-download-log')
       ])
 
       const lawsData = await lawsResponse.json()
       const filesData = await filesResponse.json()
+      const logData = await logResponse.json()
 
       if (lawsData.success) {
         const allLaws = lawsData.laws || []
@@ -90,29 +111,44 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
         // Use file metadata for downloaded files
         if (filesData.success) {
-          console.log('[loadLaws] 파일 목록 수신:', {
-            파일갯수: filesData.files.length,
-            파일목록: filesData.files.map((f: any) => f.ruleName)
-          })
-
           filesData.files.forEach((file: any) => {
             downloaded.add(file.ruleName)
             downloadDates.set(file.ruleName, file.downloadedAt)
           })
         }
 
-        console.log('[loadLaws] downloadedFiles 업데이트:', {
-          이전크기: downloadedFiles.size,
-          새크기: downloaded.size,
-          목록: Array.from(downloaded)
-        })
-
+        // Load download log
+        const log = logData.success ? logData.log : {}
+        const notFound = new Set<string>(logData.notFoundRules || [])
+        setDownloadLog(log)
+        setNotFoundRules(notFound)
         setDownloadedFiles(downloaded)
 
         // Store download dates for later use
         ;(window as any).__adminRuleDownloadDates = downloadDates
 
-        // Return the downloaded set for immediate use
+        // Determine law-level status based on log
+        const newLawStatus = new Map<string, 'pending' | 'checked' | 'has_rules' | 'no_rules'>()
+        baseLaws.forEach((law: SavedLaw) => {
+          const lawLog = log[law.lawName]
+          if (lawLog) {
+            const ruleNames = Object.keys(lawLog)
+            const hasSuccess = ruleNames.some(name => lawLog[name]?.result === 'success')
+            const allNotFound = ruleNames.length > 0 && ruleNames.every(name => lawLog[name]?.result === 'not_found')
+
+            if (hasSuccess) {
+              newLawStatus.set(law.lawName, 'has_rules')
+            } else if (allNotFound) {
+              newLawStatus.set(law.lawName, 'no_rules')
+            } else {
+              newLawStatus.set(law.lawName, 'checked')
+            }
+          } else {
+            newLawStatus.set(law.lawName, 'pending')
+          }
+        })
+        setLawStatus(newLawStatus)
+
         return downloaded
       }
       return null
@@ -124,20 +160,25 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
   }
 
+  async function saveDownloadLog(lawName: string, ruleName: string, result: 'success' | 'not_found' | 'error', articleCount?: number, error?: string) {
+    try {
+      await fetch('/api/admin/admin-rule-download-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lawName, ruleName, result, articleCount, error })
+      })
+    } catch (e) {
+      console.error('Failed to save download log:', e)
+    }
+  }
+
   async function showRulesForLaw(lawName: string, freshDownloadedFiles?: Set<string>) {
     setSelectedLaw(lawName)
     setLoadingRules(true)
     setAvailableRules([])
     setSelectedRules(new Set())
 
-    // Use provided fresh data or current state
     const currentDownloaded = freshDownloadedFiles || downloadedFiles
-
-    console.log('[showRulesForLaw] 행정규칙 목록 조회 시작:', {
-      법령: lawName,
-      freshData제공됨: !!freshDownloadedFiles,
-      사용할downloaded크기: currentDownloaded.size
-    })
 
     try {
       const hierarchyRes = await fetch(`/api/hierarchy?lawName=${encodeURIComponent(lawName)}`)
@@ -155,8 +196,6 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       const adminRules: AdminRule[] = []
       const seenKeys = new Map<string, AdminRule>()
 
-      // Extract all admin rule types (3단뷰와 동일: 고시, 예규, 훈령, 공고, 지침, 기타)
-      // 중복 제거: serialNumber 또는 id를 키로 사용
       ;['고시', '예규', '훈령', '공고', '지침', '기타'].forEach((ruleType) => {
         hierarchyDoc.querySelectorAll(`${ruleType} 기본정보`).forEach((node) => {
           const name = node.querySelector('행정규칙명')?.textContent
@@ -164,10 +203,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
           const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
 
           if (name && id) {
-            // Use serialNumber as unique key (fallback to id)
             const uniqueKey = serialNumber || id
 
-            // Skip duplicates (same serialNumber/id)
             if (!seenKeys.has(uniqueKey)) {
               seenKeys.set(uniqueKey, {
                 name,
@@ -180,34 +217,17 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         })
       })
 
-      // Convert map to array
       adminRules.push(...Array.from(seenKeys.values()))
 
-      console.log('[showRulesForLaw] 행정규칙 목록 파싱:', {
-        법령: lawName,
-        행정규칙수: adminRules.length,
-        목록샘플: adminRules.slice(0, 5).map(r => r.name),
-        현재downloaded크기: currentDownloaded.size,
-        현재downloaded목록샘플: Array.from(currentDownloaded).slice(0, 5)
-      })
-
       if (adminRules.length === 0) {
+        // Log that this law has no admin rules
+        await saveDownloadLog(lawName, '(행정규칙 없음)', 'not_found')
+        setLawStatus(prev => new Map(prev.set(lawName, 'no_rules')))
         alert(`${lawName}에 대한 행정규칙이 없습니다`)
         setSelectedLaw(null)
       } else {
         setAvailableRules(adminRules)
-
-        // 각 규칙의 다운로드 상태 확인
-        const downloadStatus = adminRules.map(r => ({
-          name: r.name,
-          isDownloaded: currentDownloaded.has(r.name)
-        }))
-        const downloadedCount = downloadStatus.filter(s => s.isDownloaded).length
-        console.log('[showRulesForLaw] 체크박스 상태:', {
-          전체: adminRules.length,
-          다운로드됨: downloadedCount,
-          샘플: downloadStatus.slice(0, 10)
-        })
+        setLawStatus(prev => new Map(prev.set(lawName, 'has_rules')))
       }
     } catch (error: any) {
       alert(`행정규칙 목록 조회 실패: ${error.message}`)
@@ -224,14 +244,6 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
     const rulesToDownload = availableRules.filter((r) => selectedRules.has(r.name))
 
-    console.log('[Download Selected] 다운로드 시작:', {
-      법령: selectedLaw,
-      선택갯수: selectedRules.size,
-      필터링후갯수: rulesToDownload.length,
-      선택목록: Array.from(selectedRules),
-      필터링후목록: rulesToDownload.map(r => r.name)
-    })
-
     const statuses: DownloadStatus[] = []
     let actualSuccessCount = 0
 
@@ -247,9 +259,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       try {
         const downloadRes = await fetch('/api/admin/download-admin-rule', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: rule.id,
             serialNumber: rule.serialNumber,
@@ -260,22 +270,23 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 
         const result = await downloadRes.json()
 
-        console.log(`[Download Selected] "${rule.name}" 결과:`, result)
-
         if (result.success) {
           status.status = 'success'
           actualSuccessCount++
-          // Only add to downloadedFiles if actually successful
           setDownloadedFiles((prev) => new Set([...prev, rule.name]))
+          await saveDownloadLog(selectedLaw, rule.name, 'success', result.articleCount)
         } else if (result.notFound) {
-          status.status = 'not_found'
+          status.status = 'confirmed_none'
+          await saveDownloadLog(selectedLaw, rule.name, 'not_found')
         } else {
           status.status = 'error'
           status.error = result.error || '다운로드 실패'
+          await saveDownloadLog(selectedLaw, rule.name, 'error', undefined, result.error)
         }
       } catch (error: any) {
         status.status = 'error'
         status.error = error.message
+        await saveDownloadLog(selectedLaw, rule.name, 'error', undefined, error.message)
       }
 
       setDownloadProgress(new Map(downloadProgress.set(selectedLaw, [...statuses])))
@@ -283,167 +294,145 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
     }
 
     setIsDownloading(false)
-
-    console.log('[Download Selected] 파일 목록 새로고침 중...')
-    // Reload file list to update stats (but don't reload modal)
     await loadLaws()
 
-    console.log('[Download Selected] 완료:', {
-      실제성공: actualSuccessCount,
-      선택총갯수: rulesToDownload.length
-    })
-
     const failedCount = rulesToDownload.length - actualSuccessCount
-    alert(`✅ 다운로드 완료\n\n선택: ${rulesToDownload.length}개\n성공: ${actualSuccessCount}개\n실패: ${failedCount}개\n\n※ 모달을 닫았다 다시 열면 다운로드된 항목이 체크 표시됩니다.`)
-  }
-
-  async function downloadAdminRulesForLaw(lawName: string) {
-    const key = lawName
-    setIsDownloading(true)
-
-    try {
-      const hierarchyRes = await fetch(`/api/hierarchy?lawName=${encodeURIComponent(lawName)}`)
-      if (!hierarchyRes.ok) {
-        setDownloadProgress(
-          new Map(
-            downloadProgress.set(key, [
-              {
-                lawName,
-                ruleName: '행정규칙',
-                status: 'error',
-                error: '체계도 조회 실패'
-              }
-            ])
-          )
-        )
-        setIsDownloading(false)
-        return
-      }
-
-      const hierarchyXml = await hierarchyRes.text()
-      const parser = new DOMParser()
-      const hierarchyDoc = parser.parseFromString(hierarchyXml, 'text/xml')
-
-      const adminRules: Array<{ name: string; id: string; serialNumber?: string }> = []
-      const seenKeys = new Map<string, { name: string; id: string; serialNumber?: string }>()
-
-      // Extract all admin rule types (3단뷰와 동일)
-      ;['고시', '예규', '훈령', '공고', '지침', '기타'].forEach((ruleType) => {
-        hierarchyDoc.querySelectorAll(`${ruleType} 기본정보`).forEach((node) => {
-          const name = node.querySelector('행정규칙명')?.textContent
-          const id = node.querySelector('행정규칙ID')?.textContent
-          const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
-
-          if (name && id) {
-            const uniqueKey = serialNumber || id
-            if (!seenKeys.has(uniqueKey)) {
-              seenKeys.set(uniqueKey, { name, id, serialNumber: serialNumber || undefined })
-            }
-          }
-        })
-      })
-
-      adminRules.push(...Array.from(seenKeys.values()))
-
-      if (adminRules.length === 0) {
-        setDownloadProgress(
-          new Map(
-            downloadProgress.set(key, [
-              {
-                lawName,
-                ruleName: '행정규칙',
-                status: 'not_found',
-                error: '행정규칙 없음'
-              }
-            ])
-          )
-        )
-        setIsDownloading(false)
-        return
-      }
-
-      // Download all admin rules
-      const statuses: DownloadStatus[] = []
-
-      for (const rule of adminRules) {
-        const status: DownloadStatus = {
-          lawName,
-          ruleName: rule.name,
-          status: 'downloading'
-        }
-        statuses.push(status)
-        setDownloadProgress(new Map(downloadProgress.set(key, [...statuses])))
-
-        try {
-          const downloadRes = await fetch('/api/admin/download-admin-rule', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              id: rule.id,
-              serialNumber: rule.serialNumber,
-              name: rule.name,
-              lawName: lawName
-            })
-          })
-
-          const result = await downloadRes.json()
-
-          if (result.success) {
-            status.status = 'success'
-            setDownloadedFiles((prev) => new Set([...prev, rule.name]))
-          } else if (result.notFound) {
-            status.status = 'not_found'
-          } else {
-            status.status = 'error'
-            status.error = result.error || '다운로드 실패'
-          }
-        } catch (error: any) {
-          status.status = 'error'
-          status.error = error.message
-        }
-
-        setDownloadProgress(new Map(downloadProgress.set(key, [...statuses])))
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-
-      setDownloadProgress(new Map(downloadProgress.set(key, [...statuses])))
-    } finally {
-      setIsDownloading(false)
-    }
+    alert(`✅ 다운로드 완료\n\n선택: ${rulesToDownload.length}개\n성공: ${actualSuccessCount}개\n실패: ${failedCount}개`)
   }
 
   async function downloadAllAdminRules() {
-    if (!confirm(`전체 ${laws.length}개 법령의 행정규칙을 다운로드하시겠습니까?\n\n시간이 오래 걸릴 수 있습니다.`)) {
+    // Get filtered laws that need checking
+    const lawsToProcess = filteredLaws.filter(law => {
+      const status = lawStatus.get(law.lawName)
+      return status === 'pending' || status === undefined
+    })
+
+    if (lawsToProcess.length === 0) {
+      alert('처리할 항목이 없습니다.')
+      return
+    }
+
+    if (!confirm(`${lawsToProcess.length}개 법령의 행정규칙을 확인하시겠습니까?\n\n시간이 오래 걸릴 수 있습니다.`)) {
       return
     }
 
     setIsDownloading(true)
-    setBatchProgress({ current: 0, total: laws.length })
+    setBatchProgress({ current: 0, total: lawsToProcess.length })
 
     let successCount = 0
+    let noRulesCount = 0
     let errorCount = 0
 
-    for (let i = 0; i < laws.length; i++) {
-      const law = laws[i]
+    for (let i = 0; i < lawsToProcess.length; i++) {
+      const law = lawsToProcess[i]
       setCurrentLawName(law.lawName)
-      setBatchProgress({ current: i + 1, total: laws.length })
+      setBatchProgress({ current: i + 1, total: lawsToProcess.length })
 
       try {
-        await downloadAdminRulesForLaw(law.lawName)
-        successCount++
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Check hierarchy for admin rules
+        const hierarchyRes = await fetch(`/api/hierarchy?lawName=${encodeURIComponent(law.lawName)}`)
+        if (!hierarchyRes.ok) {
+          errorCount++
+          continue
+        }
+
+        const hierarchyXml = await hierarchyRes.text()
+        const parser = new DOMParser()
+        const hierarchyDoc = parser.parseFromString(hierarchyXml, 'text/xml')
+
+        const adminRules: Array<{ name: string; id: string; serialNumber?: string }> = []
+        const seenKeys = new Map<string, { name: string; id: string; serialNumber?: string }>()
+
+        ;['고시', '예규', '훈령', '공고', '지침', '기타'].forEach((ruleType) => {
+          hierarchyDoc.querySelectorAll(`${ruleType} 기본정보`).forEach((node) => {
+            const name = node.querySelector('행정규칙명')?.textContent
+            const id = node.querySelector('행정규칙ID')?.textContent
+            const serialNumber = node.querySelector('행정규칙일련번호')?.textContent
+
+            if (name && id) {
+              const uniqueKey = serialNumber || id
+              if (!seenKeys.has(uniqueKey)) {
+                seenKeys.set(uniqueKey, { name, id, serialNumber: serialNumber || undefined })
+              }
+            }
+          })
+        })
+
+        adminRules.push(...Array.from(seenKeys.values()))
+
+        if (adminRules.length === 0) {
+          // No admin rules for this law
+          await saveDownloadLog(law.lawName, '(행정규칙 없음)', 'not_found')
+          setLawStatus(prev => new Map(prev.set(law.lawName, 'no_rules')))
+          noRulesCount++
+        } else {
+          // Download all admin rules for this law
+          const statuses: DownloadStatus[] = []
+
+          for (const rule of adminRules) {
+            // Skip if already downloaded
+            if (downloadedFiles.has(rule.name)) continue
+
+            const status: DownloadStatus = {
+              lawName: law.lawName,
+              ruleName: rule.name,
+              status: 'downloading'
+            }
+            statuses.push(status)
+            setDownloadProgress(new Map(downloadProgress.set(law.lawName, [...statuses])))
+
+            try {
+              const downloadRes = await fetch('/api/admin/download-admin-rule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: rule.id,
+                  serialNumber: rule.serialNumber,
+                  name: rule.name,
+                  lawName: law.lawName
+                })
+              })
+
+              const result = await downloadRes.json()
+
+              if (result.success) {
+                status.status = 'success'
+                setDownloadedFiles((prev) => new Set([...prev, rule.name]))
+                await saveDownloadLog(law.lawName, rule.name, 'success', result.articleCount)
+              } else if (result.notFound) {
+                status.status = 'confirmed_none'
+                await saveDownloadLog(law.lawName, rule.name, 'not_found')
+              } else {
+                status.status = 'error'
+                status.error = result.error
+                await saveDownloadLog(law.lawName, rule.name, 'error', undefined, result.error)
+              }
+            } catch (error: any) {
+              status.status = 'error'
+              status.error = error.message
+              await saveDownloadLog(law.lawName, rule.name, 'error', undefined, error.message)
+            }
+
+            setDownloadProgress(new Map(downloadProgress.set(law.lawName, [...statuses])))
+            await new Promise((resolve) => setTimeout(resolve, 300))
+          }
+
+          setLawStatus(prev => new Map(prev.set(law.lawName, 'has_rules')))
+          successCount++
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 500))
       } catch (error) {
         errorCount++
-        console.error(`Failed to download admin rules for ${law.lawName}:`, error)
+        console.error(`Failed to process ${law.lawName}:`, error)
       }
     }
 
     setIsDownloading(false)
     setCurrentLawName('')
     setBatchProgress({ current: 0, total: 0 })
-    alert(`✅ 행정규칙 다운로드 완료\n\n성공: ${successCount}개 법령\n실패: ${errorCount}개 법령`)
+    await loadLaws()
+    alert(`✅ 행정규칙 다운로드 완료\n\n처리: ${lawsToProcess.length}개 법령\n행정규칙 있음: ${successCount}개\n행정규칙 없음: ${noRulesCount}개\n오류: ${errorCount}개`)
   }
 
   function getStatusIcon(status: DownloadStatus['status']) {
@@ -456,6 +445,8 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         return <CheckCircle2 className="w-4 h-4 text-accent" />
       case 'not_found':
         return <XCircle className="w-4 h-4 text-warning" />
+      case 'confirmed_none':
+        return <MinusCircle className="w-4 h-4 text-muted-foreground" />
       case 'error':
         return <XCircle className="w-4 h-4 text-destructive" />
     }
@@ -471,10 +462,71 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         return '완료'
       case 'not_found':
         return '없음'
+      case 'confirmed_none':
+        return '없음 (확인됨)'
       case 'error':
         return '오류'
     }
   }
+
+  function getLawStatusIcon(status: string | undefined) {
+    switch (status) {
+      case 'has_rules':
+        return <CheckCircle2 className="w-4 h-4 text-accent" />
+      case 'no_rules':
+        return <MinusCircle className="w-4 h-4 text-muted-foreground" />
+      case 'checked':
+        return <AlertCircle className="w-4 h-4 text-warning" />
+      default:
+        return <AlertCircle className="w-4 h-4 text-muted-foreground" />
+    }
+  }
+
+  function getLawStatusText(status: string | undefined) {
+    switch (status) {
+      case 'has_rules':
+        return '행정규칙 있음'
+      case 'no_rules':
+        return '행정규칙 없음 (확인됨)'
+      case 'checked':
+        return '확인됨'
+      default:
+        return '미확인'
+    }
+  }
+
+  // Filter laws based on current filter
+  const filteredLaws = useMemo(() => {
+    return laws.filter(law => {
+      const status = lawStatus.get(law.lawName)
+      const isPending = status === 'pending' || status === undefined
+      const isComplete = status === 'has_rules' || status === 'no_rules'
+
+      switch (filter) {
+        case 'incomplete':
+          return isPending
+        case 'completed':
+          return isComplete
+        default:
+          return true
+      }
+    })
+  }, [laws, lawStatus, filter])
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const hasRulesCount = Array.from(lawStatus.values()).filter(s => s === 'has_rules').length
+    const noRulesCount = Array.from(lawStatus.values()).filter(s => s === 'no_rules').length
+    const pendingCount = laws.length - hasRulesCount - noRulesCount
+
+    return {
+      total: laws.length,
+      downloadedFiles: downloadedFiles.size,
+      hasRules: hasRulesCount,
+      noRules: noRulesCount,
+      pending: pendingCount
+    }
+  }, [laws, lawStatus, downloadedFiles])
 
   if (loading) {
     return (
@@ -487,19 +539,26 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-muted-foreground mb-1">총 법령</div>
-          <div className="text-3xl font-bold text-foreground">{laws.length}</div>
+      <div className="grid grid-cols-5 gap-3">
+        <div className="p-3 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+          <div className="text-xs text-muted-foreground mb-1">총 법령</div>
+          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
         </div>
-        <div className="p-4 bg-primary/10 backdrop-blur-sm rounded-xl border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-primary mb-1">다운로드됨</div>
-          <div className="text-3xl font-bold text-primary">{downloadedFiles.size}</div>
-          <div className="text-xs text-muted-foreground mt-1">행정규칙 파일</div>
+        <div className="p-3 bg-primary/10 backdrop-blur-sm rounded-xl border border-primary/20 shadow-sm">
+          <div className="text-xs text-primary mb-1">다운로드 파일</div>
+          <div className="text-2xl font-bold text-primary">{stats.downloadedFiles}</div>
         </div>
-        <div className="p-4 bg-accent/10 backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-accent mb-1">처리 상태</div>
-          <div className="text-2xl font-bold text-accent">{isDownloading ? '진행 중' : '대기'}</div>
+        <div className="p-3 bg-accent/10 backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm">
+          <div className="text-xs text-accent mb-1">행정규칙 있음</div>
+          <div className="text-2xl font-bold text-accent">{stats.hasRules}</div>
+        </div>
+        <div className="p-3 bg-muted/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+          <div className="text-xs text-muted-foreground mb-1">행정규칙 없음</div>
+          <div className="text-2xl font-bold text-muted-foreground">{stats.noRules}</div>
+        </div>
+        <div className="p-3 bg-warning/10 backdrop-blur-sm rounded-xl border border-warning/20 shadow-sm">
+          <div className="text-xs text-warning mb-1">미확인</div>
+          <div className="text-2xl font-bold text-warning">{stats.pending}</div>
         </div>
       </div>
 
@@ -533,17 +592,48 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
         </div>
       )}
 
-      {/* Action Bar */}
+      {/* Action Bar with Filter */}
       <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
-        <div className="text-sm text-muted-foreground">
-          {laws.length}개 법령 · 각 법령의 모든 행정규칙 다운로드
+        <div className="flex items-center gap-3">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <div className="flex gap-1">
+            <Button
+              variant={filter === 'all' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('all')}
+              className="h-8"
+            >
+              전체 ({laws.length})
+            </Button>
+            <Button
+              variant={filter === 'incomplete' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('incomplete')}
+              className="h-8"
+            >
+              미확인 ({stats.pending})
+            </Button>
+            <Button
+              variant={filter === 'completed' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('completed')}
+              className="h-8"
+            >
+              확인됨 ({stats.hasRules + stats.noRules})
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={loadLaws} disabled={loading || isDownloading} variant="outline" size="default" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </Button>
-          <Button onClick={downloadAllAdminRules} disabled={isDownloading || laws.length === 0} className="gap-2 shadow-lg shadow-primary/20" size="default">
+          <Button
+            onClick={downloadAllAdminRules}
+            disabled={isDownloading || stats.pending === 0}
+            className="gap-2 shadow-lg shadow-primary/20"
+            size="default"
+          >
             {isDownloading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -552,7 +642,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                전체 다운로드
+                {filter === 'incomplete' ? '미확인 다운로드' : '전체 다운로드'}
               </>
             )}
           </Button>
@@ -560,9 +650,11 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       </div>
 
       {/* Laws List */}
-      <div className="space-y-3 max-h-[800px] overflow-y-auto">
-        {laws.map((law) => {
+      <div className="space-y-3 max-h-[600px] overflow-y-auto">
+        {filteredLaws.map((law) => {
           const progress = downloadProgress.get(law.lawName) || []
+          const status = lawStatus.get(law.lawName)
+          const isComplete = status === 'has_rules' || status === 'no_rules'
 
           return (
             <div
@@ -571,7 +663,13 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <h3 className="font-medium text-foreground">{law.lawName}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-foreground">{law.lawName}</h3>
+                    <div className="flex items-center gap-1 text-xs">
+                      {getLawStatusIcon(status)}
+                      <span className="text-muted-foreground">{getLawStatusText(status)}</span>
+                    </div>
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     {law.articleCount}개 조문 · 시행일: {law.effectiveDate}
                   </p>
@@ -591,30 +689,48 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   )}
                 </div>
 
-                <Button
-                  onClick={() => showRulesForLaw(law.lawName)}
-                  disabled={isDownloading || loadingRules}
-                  size="default"
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {progress.some((p) => p.status === 'downloading') ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                  목록 보기
-                </Button>
+                {isComplete ? (
+                  <div className="flex items-center gap-1.5 text-sm text-accent">
+                    {status === 'has_rules' ? (
+                      <><CheckCircle2 className="w-4 h-4" />완료</>
+                    ) : (
+                      <><MinusCircle className="w-4 h-4 text-muted-foreground" /><span className="text-muted-foreground">없음</span></>
+                    )}
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => showRulesForLaw(law.lawName)}
+                    disabled={isDownloading || loadingRules}
+                    size="default"
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {progress.some((p) => p.status === 'downloading') ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    목록 보기
+                  </Button>
+                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {laws.length === 0 && (
+      {filteredLaws.length === 0 && (
         <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-          <p className="text-muted-foreground">저장된 법령이 없습니다</p>
-          <p className="text-sm text-muted-foreground mt-1">먼저 법령을 다운로드하세요</p>
+          <p className="text-muted-foreground">
+            {filter === 'incomplete' ? '미확인 항목이 없습니다' :
+             filter === 'completed' ? '확인된 항목이 없습니다' :
+             '저장된 법령이 없습니다'}
+          </p>
+          {filter !== 'all' && (
+            <Button variant="link" onClick={() => setFilter('all')} className="mt-2">
+              전체 보기
+            </Button>
+          )}
         </div>
       )}
 
@@ -659,20 +775,20 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   <label className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/10 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={availableRules.length > 0 && selectedRules.size === availableRules.length}
+                      checked={availableRules.length > 0 && selectedRules.size === availableRules.filter(r => !downloadedFiles.has(r.name) && !notFoundRules.has(r.name)).length}
                       onChange={() => {
-                        // Toggle: if all selected, deselect all; otherwise select all
-                        if (selectedRules.size === availableRules.length) {
+                        const selectableRules = availableRules.filter(r => !downloadedFiles.has(r.name) && !notFoundRules.has(r.name))
+                        if (selectedRules.size === selectableRules.length) {
                           setSelectedRules(new Set())
                         } else {
-                          setSelectedRules(new Set(availableRules.map((r) => r.name)))
+                          setSelectedRules(new Set(selectableRules.map((r) => r.name)))
                         }
                       }}
                       disabled={isDownloading}
                       className="h-4 w-4"
                     />
                     <span className="font-medium text-primary">
-                      전체 선택 {selectedRules.size > 0 && `(${selectedRules.size}/${availableRules.length})`}
+                      전체 선택 {selectedRules.size > 0 && `(${selectedRules.size}/${availableRules.filter(r => !downloadedFiles.has(r.name) && !notFoundRules.has(r.name)).length})`}
                     </span>
                   </label>
 
@@ -680,6 +796,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                   {availableRules.map((rule, index) => {
                     const isSelected = selectedRules.has(rule.name)
                     const isDownloaded = downloadedFiles.has(rule.name)
+                    const isConfirmedNone = notFoundRules.has(rule.name)
                     const downloadDates = (window as any).__adminRuleDownloadDates as Map<string, string> | undefined
                     const downloadedAt = downloadDates?.get(rule.name)
 
@@ -691,7 +808,9 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                             ? 'bg-primary/10 border-primary/30 shadow-sm'
                             : isDownloaded
                               ? 'bg-accent/10 border-accent/30 opacity-60'
-                              : 'bg-card/30 border-border/50 hover:bg-card/50 hover:border-primary/20'
+                              : isConfirmedNone
+                                ? 'bg-muted/30 border-border/30 opacity-50'
+                                : 'bg-card/30 border-border/50 hover:bg-card/50 hover:border-primary/20'
                         }`}
                       >
                         <input
@@ -706,7 +825,7 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                             }
                             setSelectedRules(newSet)
                           }}
-                          disabled={isDownloading || isDownloaded}
+                          disabled={isDownloading || isDownloaded || isConfirmedNone}
                           className="h-4 w-4"
                         />
                         <div className="flex-1">
@@ -716,11 +835,13 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
                             {isDownloaded && downloadedAt && (
                               <span className="ml-2">· 다운로드: {formatDate(downloadedAt)}</span>
                             )}
+                            {isConfirmedNone && (
+                              <span className="ml-2">· 없음 (확인됨)</span>
+                            )}
                           </div>
                         </div>
-                        {isDownloaded && (
-                          <CheckCircle2 className="h-4 w-4 text-accent" />
-                        )}
+                        {isDownloaded && <CheckCircle2 className="h-4 w-4 text-accent" />}
+                        {isConfirmedNone && <MinusCircle className="h-4 w-4 text-muted-foreground" />}
                       </label>
                     )
                   })}
@@ -759,10 +880,9 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
       <div className="p-4 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
         <div className="text-sm text-muted-foreground space-y-1">
           <div>• 고시, 예규, 훈령 등 법령 체계도의 행정규칙을 다운로드합니다</div>
-          <div>• 각 법령의 모든 행정규칙을 다운로드합니다 (제한 없음)</div>
-          <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-admin-rules/(법령명)/</code></div>
-          <div>• 전체 다운로드는 저장된 모든 법령을 처리합니다</div>
-          <div>• 다운로드 시점: 파일 생성일 기준 표시</div>
+          <div>• <strong>행정규칙 없음 (확인됨)</strong>: 해당 법령에 행정규칙이 없는 경우</div>
+          <div>• 필터: 미확인건만 선택하여 효율적으로 다운로드 가능</div>
+          <div>• 다운로드 이력은 <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/admin-rule-download-log.json</code>에 저장</div>
         </div>
       </div>
     </div>
@@ -772,7 +892,6 @@ export function AdminRulesDownloadPanel({ refreshTrigger }: AdminRulesDownloadPa
 function formatDate(isoDate: string): string {
   try {
     const date = new Date(isoDate)
-    // Convert to KST (UTC+9)
     const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000))
     const year = kstDate.getUTCFullYear()
     const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0')

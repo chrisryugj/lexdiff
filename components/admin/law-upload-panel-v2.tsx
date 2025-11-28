@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Loader2, Upload, Pause, Play, XCircle, CheckCircle2, AlertCircle } from 'lucide-react'
@@ -129,7 +129,7 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
           const lawType = metadata.find((m: any) => m.key === 'law_type')?.stringValue
 
           // Only include law files (not ordinances)
-          if (lawType === 'law' && fileName) {
+          if ((lawType === 'law' || lawType === '법령') && fileName) {
             serverFiles.add(fileName)
           }
         }
@@ -220,6 +220,10 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
         }
       }
 
+      // Extract law name from markdown content
+      const firstLine = data.markdown.split('\n')[0]
+      const lawName = firstLine.replace(/^#\s*/, '').trim()
+
       // Create FormData
       const formData = new FormData()
       const blob = new Blob([data.markdown], { type: 'text/markdown' })
@@ -229,8 +233,11 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
 
       // Add metadata
       const metadata = {
-        law_type: 'law',
+        law_type: '법령',
+        law_name: lawName,
         file_name: fileName,
+        source: 'parsed-laws',
+        uploaded_at: new Date().toISOString(),
         upload_source: 'law-upload-panel-v2'
       }
       formData.append('metadata', JSON.stringify(metadata))
@@ -268,6 +275,10 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
     }
   }
 
+  // Abort controller for stopping uploads
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isAbortedRef = useRef(false)
+
   async function startUpload() {
     if (selectedFiles.size === 0) return
 
@@ -280,70 +291,122 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
     const fileNames = Array.from(selectedFiles)
     setTotalFiles(fileNames.length)
 
-    const uploadResults: UploadResult[] = []
+    // Reset abort state
+    isAbortedRef.current = false
+    abortControllerRef.current = new AbortController()
 
-    for (let i = 0; i < fileNames.length; i++) {
-      // Check if should stop
-      if (shouldStop) {
-        console.log('❌ Upload cancelled by user')
-        break
+    try {
+      const response = await fetch('/api/admin/stream-upload-laws', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({
+          fileNames,
+          delay: 100 // Fast delay
+        }),
+        signal: abortControllerRef.current.signal
+      })
+
+      if (!response.ok) {
+        throw new Error('Upload request failed')
       }
 
-      // Check if paused
-      while (paused && !shouldStop) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Failed to get reader')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const newResults: UploadResult[] = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.type === 'progress') {
+                setCurrentIndex(data.current)
+
+                // Add result
+                const result: UploadResult = {
+                  fileName: data.fileName,
+                  lawName: data.fileName.replace('.md', ''),
+                  status: data.status,
+                  error: data.error
+                }
+
+                newResults.push(result)
+                setResults([...newResults])
+              } else if (data.type === 'complete') {
+                // Final completion handled below
+              }
+            } catch (e) {
+              console.error('Parse error:', e)
+            }
+          }
+        }
       }
 
-      if (shouldStop) break
+      // Update uploaded files list
+      const successfulFiles = newResults.filter((r) => r.status === 'success').map((r) => r.fileName)
+      const newUploadedFiles = new Set([...uploadedFiles, ...successfulFiles])
+      saveUploadedFiles(newUploadedFiles)
 
-      const fileName = fileNames[i]
-      setCurrentIndex(i + 1)
+      // Clear selection for successful uploads
+      const failedFiles = newResults.filter((r) => r.status === 'error').map((r) => r.fileName)
+      setSelectedFiles(new Set(failedFiles))
 
-      const result = await uploadSingleFile(fileName)
-      uploadResults.push(result)
-      setResults([...uploadResults])
+      onUploadComplete?.()
 
-      // Small delay between uploads
-      if (i < fileNames.length - 1 && !shouldStop) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
+      if (!isAbortedRef.current) {
+        const successCount = newResults.filter((r) => r.status === 'success').length
+        alert(`✅ 업로드 완료!\n\n성공: ${successCount}개\n실패: ${newResults.length - successCount}개`)
       }
-    }
 
-    setUploading(false)
-    setPaused(false)
-
-    // Update uploaded files list
-    const successfulFiles = uploadResults.filter((r) => r.status === 'success').map((r) => r.fileName)
-    const newUploadedFiles = new Set([...uploadedFiles, ...successfulFiles])
-    saveUploadedFiles(newUploadedFiles)
-
-    // Clear selection for successful uploads
-    const failedFiles = uploadResults.filter((r) => r.status === 'error').map((r) => r.fileName)
-    setSelectedFiles(new Set(failedFiles))
-
-    onUploadComplete?.()
-
-    if (!shouldStop) {
-      const successCount = uploadResults.filter((r) => r.status === 'success').length
-      alert(`✅ 업로드 완료!\n\n성공: ${successCount}개\n실패: ${uploadResults.length - successCount}개`)
+    } catch (error: any) {
+      if (error.name === 'AbortError' || isAbortedRef.current) {
+        console.log('Upload aborted')
+        alert('⛔ 업로드가 중지되었습니다.')
+      } else {
+        console.error('Upload error:', error)
+        alert('❌ 업로드 중 오류가 발생했습니다: ' + error.message)
+      }
+    } finally {
+      setUploading(false)
+      setPaused(false)
+      abortControllerRef.current = null
     }
   }
 
   function pauseUpload() {
-    setPaused(true)
+    // SSE doesn't support pause easily without server support, 
+    // but we can implement it if needed. For now, we'll disable pause/resume 
+    // to focus on robust cancellation as requested.
+    alert('SSE 모드에서는 일시중지가 지원되지 않습니다. 중지 후 다시 시도해주세요.')
   }
 
   function resumeUpload() {
-    setPaused(false)
+    // Not supported in SSE mode currently
   }
 
   function cancelUpload() {
-    if (!confirm('업로드를 완전히 취소하시겠습니까?\n\n진행 중인 작업이 중단되고, 이미 업로드된 파일은 유지됩니다.')) {
+    if (!confirm('업로드를 중지하시겠습니까?\n\n현재 진행 중인 작업이 즉시 중단됩니다.')) {
       return
     }
 
-    setShouldStop(true)
-    setPaused(false)
+    isAbortedRef.current = true
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
   }
 
   const selectedCount = selectedFiles.size

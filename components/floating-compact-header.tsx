@@ -6,6 +6,7 @@ import { Scale, Star, Settings, ChevronLeft, Search, Maximize2 } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
+import { UsageGuidePopover } from "@/components/usage-guide-popover"
 
 interface FloatingCompactHeaderProps {
   onBack?: () => void
@@ -16,6 +17,7 @@ interface FloatingCompactHeaderProps {
   currentLawName?: string // 현재 법령명
   showBackButton?: boolean
   isFocusMode?: boolean
+  guideType?: 'law-search' | 'ai-search' // 사용법 안내 타입
 }
 
 export function FloatingCompactHeader({
@@ -27,6 +29,7 @@ export function FloatingCompactHeader({
   currentLawName,
   showBackButton = true,
   isFocusMode = false,
+  guideType = 'law-search',
 }: FloatingCompactHeaderProps) {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
@@ -115,6 +118,9 @@ export function FloatingCompactHeader({
 
                 {/* 오른쪽: 버튼들 */}
                 <div className="flex items-center gap-1 lg:gap-2">
+                  {/* 사용법 안내 */}
+                  <UsageGuidePopover type={guideType} />
+
                   {/* 즐겨찾기 */}
                   {favoritesCount > 0 && (
                     <Button

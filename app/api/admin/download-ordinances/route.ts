@@ -42,47 +42,95 @@ function extractDistrictFromOrgName(orgName: string): string {
  */
 async function searchOrdinances(districtCode: string, districtName: string) {
   try {
-    const params = new URLSearchParams({
-      target: 'ordin',
-      OC: LAW_OC!,
-      type: 'XML',
-      display: '100',
-      orgnCd: districtCode
-    })
-
-    const url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
-    const response = await fetch(url)
-    const xml = await response.text()
-
-    if (!response.ok) {
-      return []
-    }
+    // Use district name as search query since orgnCd doesn't filter properly
+    // For Seoul districts, search with full name like "서울특별시 광진구"
+    const searchQuery = districtName === '서울특별시' ? '서울특별시' : `서울특별시 ${districtName}`
 
     const allOrdinances: Array<{ id: string; name: string; kind: string }> = []
-    const lawMatches = xml.matchAll(/<자치법규>([\s\S]*?)<\/자치법규>/g)
+    const seenIds = new Set<string>()
+    let page = 1
+    let totalCnt = 0
+    const pageSize = 100
 
-    for (const match of lawMatches) {
-      const lawXml = match[1]
+    // Paginate through all results
+    while (true) {
+      const params = new URLSearchParams({
+        target: 'ordin',
+        OC: LAW_OC!,
+        type: 'XML',
+        display: String(pageSize),
+        page: String(page),
+        query: searchQuery,
+        section: 'orgNm' // Search in organization name field
+      })
 
-      const ordinSeqMatch = lawXml.match(/<자치법규일련번호>(\d+)<\/자치법규일련번호>/)
-      const ordinIdMatch = lawXml.match(/<자치법규ID>(\d+)<\/자치법규ID>/)
-      const nameMatch = lawXml.match(/<자치법규명>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/자치법규명>/)
-      const kindMatch = lawXml.match(/<자치법규종류>([^<]+)<\/자치법규종류>/)
-      const orgNameMatch = lawXml.match(/<지자체기관명>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/지자체기관명>/)
+      const url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
+      const response = await fetch(url)
+      const xml = await response.text()
 
-      const ordinSeq = ordinSeqMatch ? ordinSeqMatch[1] : null
-      const ordinId = ordinIdMatch ? ordinIdMatch[1] : null
-      const name = nameMatch ? nameMatch[1].trim() : 'Unknown'
-      const kind = kindMatch ? kindMatch[1] : ''
-      const orgName = orgNameMatch ? orgNameMatch[1].trim() : ''
-      const id = ordinSeq || ordinId
+      if (page === 1) {
+        // Extract totalCnt from first page
+        const totalCntMatch = xml.match(/<totalCnt>(\d+)<\/totalCnt>/)
+        totalCnt = totalCntMatch ? parseInt(totalCntMatch[1]) : 0
+      }
 
-      if (id && name && kind && (kind === '조례' || kind === '규칙')) {
-        const extractedDistrict = extractDistrictFromOrgName(orgName)
-        if (extractedDistrict === districtName) {
-          allOrdinances.push({ id, name, kind })
+      if (!response.ok) {
+        break
+      }
+
+      const lawMatches = xml.matchAll(/<law[^>]*>([\s\S]*?)<\/law>/g)
+      let pageMatches = 0
+
+      for (const match of lawMatches) {
+        pageMatches++
+        const lawXml = match[1]
+
+        const ordinSeqMatch = lawXml.match(/<자치법규일련번호>(\d+)<\/자치법규일련번호>/)
+        const ordinIdMatch = lawXml.match(/<자치법규ID>(\d+)<\/자치법규ID>/)
+        const nameMatch = lawXml.match(/<자치법규명>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/자치법규명>/)
+        const kindMatch = lawXml.match(/<자치법규종류>([^<]+)<\/자치법규종류>/)
+        const orgNameMatch = lawXml.match(/<지자체기관명>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/지자체기관명>/)
+
+        const ordinSeq = ordinSeqMatch ? ordinSeqMatch[1] : null
+        const ordinId = ordinIdMatch ? ordinIdMatch[1] : null
+        const name = nameMatch ? nameMatch[1].trim() : 'Unknown'
+        const kind = kindMatch ? kindMatch[1] : ''
+        const orgName = orgNameMatch ? orgNameMatch[1].trim() : ''
+        const id = ordinSeq || ordinId
+
+        if (id && !seenIds.has(id) && name && kind && (kind === '조례' || kind === '규칙')) {
+          const extractedDistrict = extractDistrictFromOrgName(orgName)
+
+          // For 서울특별시 (city-level), only match exact "서울특별시" without district names
+          // This excludes "서울특별시 광진구", "서울특별시교육청" etc.
+          let isMatch = false
+          if (districtName === '서울특별시') {
+            // Must be exactly "서울특별시" or "서울특별시 본청" etc.
+            // Exclude: 자치구(OO구), 교육청
+            isMatch = orgName === '서울특별시' ||
+                      (orgName.startsWith('서울특별시') &&
+                       !/(구|군)$/.test(orgName.trim()) &&
+                       !orgName.includes('교육청'))
+          } else {
+            // For districts, match exact district or if orgName contains the district name
+            isMatch = extractedDistrict === districtName || orgName.includes(districtName)
+          }
+
+          if (isMatch) {
+            seenIds.add(id)
+            allOrdinances.push({ id, name, kind })
+          }
         }
       }
+
+      // Check if we've fetched all pages
+      if (pageMatches < pageSize || page * pageSize >= totalCnt) {
+        break
+      }
+
+      page++
+      // Small delay between pages to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 200))
     }
 
     return allOrdinances
@@ -120,8 +168,9 @@ async function fetchOrdinanceContent(ordinId: string) {
 
 /**
  * Parse ordinance XML
+ * @param lawKindFromSearch - 검색 결과에서 가져온 법령종류 (조례/규칙)
  */
-function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: string) {
+function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: string, lawKindFromSearch: string) {
   try {
     const ordinIdMatch = xml.match(/<자치법규ID>(\d+)<\/자치법규ID>/)
     const mstMatch = xml.match(/<자치법규일련번호>(\d+)<\/자치법규일련번호>/)
@@ -129,7 +178,6 @@ function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: str
     const promulgationDateMatch = xml.match(/<공포일자>(\d+)<\/공포일자>/)
     const promulgationNumberMatch = xml.match(/<공포번호>([^<]+)<\/공포번호>/)
     const lastAmendmentDateMatch = xml.match(/<최종개정일자>(\d+)<\/최종개정일자>/)
-    const lawKindMatch = xml.match(/<자치법규종류>([^<]+)<\/자치법규종류>/)
 
     const ordinId = ordinIdMatch ? ordinIdMatch[1] : 'unknown'
     const mst = mstMatch ? mstMatch[1] : ''
@@ -137,7 +185,8 @@ function parseOrdinanceXML(xml: string, ordinanceName: string, districtName: str
     const promulgationDate = promulgationDateMatch ? promulgationDateMatch[1] : ''
     const promulgationNumber = promulgationNumberMatch ? promulgationNumberMatch[1] : ''
     const lastAmendmentDate = lastAmendmentDateMatch ? lastAmendmentDateMatch[1] : ''
-    const lawKind = lawKindMatch ? lawKindMatch[1] : '조례' // 조례 or 규칙
+    // Use the kind from search results (already parsed as 조례/규칙)
+    const lawKind = lawKindFromSearch || '조례'
 
     const articles: any[] = []
     const articleMatches = xml.matchAll(/<조[^>]*>([\s\S]*?)<\/조>/g)
@@ -281,6 +330,9 @@ function generateMarkdown(parsed: any): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Check if client wants SSE stream
+  const isStreaming = request.headers.get('accept')?.includes('text/event-stream')
+
   try {
     const body: DownloadRequest = await request.json()
     const { districtCode, districtName, delay = 1000 } = body
@@ -302,6 +354,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         ordinanceCount: 0,
+        skippedCount: 0,
+        errorCount: 0,
+        totalFound: 0,
         message: `${districtName}에서 조례를 찾을 수 없습니다`
       })
     }
@@ -314,54 +369,138 @@ export async function POST(request: NextRequest) {
       fs.mkdirSync(districtDir, { recursive: true })
     }
 
-    // 2. Download each ordinance
+    // SSE streaming mode - allows abort
+    if (isStreaming) {
+      const encoder = new TextEncoder()
+      let aborted = false
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          let successCount = 0
+          let skipCount = 0
+          let errorCount = 0
+          const total = ordinances.length
+
+          const sendEvent = (data: any) => {
+            if (!aborted) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+            }
+          }
+
+          // Send initial info
+          sendEvent({ type: 'start', total, districtName })
+
+          for (let i = 0; i < ordinances.length && !aborted; i++) {
+            const ordinance = ordinances[i]
+            try {
+              const sanitized = ordinance.name.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').substring(0, 200)
+              const filename = `${sanitized}.md`
+              const filepath = path.join(districtDir, filename)
+
+              if (fs.existsSync(filepath)) {
+                skipCount++
+              } else {
+                const xml = await fetchOrdinanceContent(ordinance.id)
+                if (xml) {
+                  const parsed = parseOrdinanceXML(xml, ordinance.name, districtName, ordinance.kind)
+                  const markdown = generateMarkdown(parsed)
+                  fs.writeFileSync(filepath, markdown, 'utf-8')
+                  successCount++
+                  await new Promise((resolve) => setTimeout(resolve, delay))
+                } else {
+                  errorCount++
+                }
+              }
+
+              // Send progress every 10 items
+              if ((i + 1) % 10 === 0 || i === ordinances.length - 1) {
+                sendEvent({
+                  type: 'progress',
+                  processed: i + 1,
+                  total,
+                  successCount,
+                  skipCount,
+                  errorCount
+                })
+              }
+            } catch (error) {
+              errorCount++
+            }
+          }
+
+          // Send final result
+          sendEvent({
+            type: 'complete',
+            success: true,
+            ordinanceCount: successCount,
+            skippedCount: skipCount,
+            errorCount,
+            totalFound: total
+          })
+
+          console.log(`[${districtName}] ✅ 완료: 신규 ${successCount}, 스킵 ${skipCount}, 에러 ${errorCount} (총 ${total}개)`)
+          controller.close()
+        },
+        cancel() {
+          aborted = true
+          console.log(`[${districtName}] ⛔ 클라이언트가 연결을 끊음 - 다운로드 중지`)
+        }
+      })
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        }
+      })
+    }
+
+    // Non-streaming mode (legacy)
     let successCount = 0
     let skipCount = 0
     let errorCount = 0
+    const total = ordinances.length
+    let processed = 0
 
     for (const ordinance of ordinances) {
+      processed++
       try {
-        // Sanitize filename
         const sanitized = ordinance.name.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').substring(0, 200)
         const filename = `${sanitized}.md`
         const filepath = path.join(districtDir, filename)
 
-        // Skip if exists
         if (fs.existsSync(filepath)) {
           skipCount++
+          if (processed % 50 === 0 || processed === total) {
+            console.log(`[${districtName}] ${processed}/${total} (신규: ${successCount}, 스킵: ${skipCount}, 에러: ${errorCount})`)
+          }
           continue
         }
 
-        // Fetch content
         const xml = await fetchOrdinanceContent(ordinance.id)
-
         if (!xml) {
           errorCount++
           continue
         }
 
-        // Parse
-        const parsed = parseOrdinanceXML(xml, ordinance.name, districtName)
-
-        // Generate markdown
+        const parsed = parseOrdinanceXML(xml, ordinance.name, districtName, ordinance.kind)
         const markdown = generateMarkdown(parsed)
-
-        // Save file
         fs.writeFileSync(filepath, markdown, 'utf-8')
-
         successCount++
 
-        // Delay between requests
+        if (successCount % 10 === 0 || processed === total) {
+          console.log(`[${districtName}] ${processed}/${total} (신규: ${successCount}, 스킵: ${skipCount}, 에러: ${errorCount})`)
+        }
+
         await new Promise((resolve) => setTimeout(resolve, delay))
       } catch (error: any) {
-        console.error(`[Download Ordinances] Error downloading ${ordinance.name}:`, error)
+        console.error(`[${districtName}] Error: ${ordinance.name}`)
         errorCount++
       }
     }
 
-    console.log(
-      `[Download Ordinances] ✅ Completed: ${districtName} - ${successCount} downloaded, ${skipCount} skipped, ${errorCount} errors`
-    )
+    console.log(`[${districtName}] ✅ 완료: 신규 ${successCount}, 스킵 ${skipCount}, 에러 ${errorCount} (총 ${total}개)`)
 
     return NextResponse.json({
       success: true,

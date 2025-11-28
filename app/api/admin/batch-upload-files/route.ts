@@ -79,28 +79,53 @@ async function uploadSingleFile(
   metadata: Record<string, string> = {}
 ): Promise<{ success: boolean; fileName: string; documentId?: string; error?: string }> {
   try {
-    // Add file info to metadata
-    const fileMetadata = {
-      ...metadata,
-      original_filename: file.name,
-      file_type: file.type,
-      file_size: file.size.toString(),
-      upload_time: new Date().toISOString()
-    }
-
+    // Step 1: Upload file to Gemini File API (no metadata in header to avoid Korean encoding issues)
     const uploadFormData = new FormData()
     uploadFormData.append('file', file)
 
-    const metadataHeader = JSON.stringify(fileMetadata)
-    const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents:upload`
+    const uploadResponse = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': apiKey },
+      body: uploadFormData
+    })
 
-    const response = await fetch(url, {
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
+      throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`)
+    }
+
+    const uploadedFile = await uploadResponse.json()
+    const fileNameGemini = uploadedFile.file?.name || uploadedFile.name
+
+    if (!fileNameGemini) {
+      throw new Error('File upload did not return a file name')
+    }
+
+    // Step 2: Import to File Search Store with metadata (JSON body, not header)
+    const customMetadata = [
+      { key: 'original_filename', stringValue: file.name },
+      { key: 'file_type', stringValue: file.type },
+      { key: 'file_size', stringValue: file.size.toString() },
+      { key: 'upload_time', stringValue: new Date().toISOString() }
+    ]
+
+    // Add custom metadata
+    for (const [key, value] of Object.entries(metadata)) {
+      customMetadata.push({ key, stringValue: value })
+    }
+
+    const importUrl = `https://generativelanguage.googleapis.com/v1beta/${storeId}:importFile`
+
+    const response = await fetch(importUrl, {
       method: 'POST',
       headers: {
-        'x-goog-api-key': apiKey,
-        'x-goog-file-metadata': metadataHeader
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
       },
-      body: uploadFormData
+      body: JSON.stringify({
+        fileName: fileNameGemini,
+        customMetadata
+      })
     })
 
     if (!response.ok) {
@@ -108,16 +133,17 @@ async function uploadSingleFile(
       return {
         success: false,
         fileName: file.name,
-        error: `Upload failed: ${response.status}`
+        error: `Import failed: ${response.status} - ${errorText}`
       }
     }
 
-    const result = await response.json()
+    const importResult = await response.json()
+    const documentId = importResult.document?.name || importResult.name
 
     return {
       success: true,
       fileName: file.name,
-      documentId: result.name
+      documentId
     }
   } catch (error: any) {
     return {

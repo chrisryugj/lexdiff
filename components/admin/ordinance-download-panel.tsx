@@ -1,14 +1,18 @@
 /**
  * Ordinance Download Panel - LexDiff Professional Edition
  * Refined interface for Seoul ordinance batch downloads
+ * With parallel processing and abort control
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Download, CheckCircle2, XCircle, Play } from 'lucide-react'
+import { Loader2, Download, CheckCircle2, XCircle, StopCircle } from 'lucide-react'
+
+// Parallel processing configuration
+const PARALLEL_LIMIT = 8 // Number of concurrent downloads
 
 const SEOUL_DISTRICTS = [
   { code: '11', name: '서울특별시' },
@@ -44,6 +48,8 @@ interface DistrictStatus {
   name: string
   status: 'pending' | 'downloading' | 'success' | 'error'
   ordinanceCount?: number
+  skippedCount?: number
+  totalFound?: number
   error?: string
   startTime?: number
   lastDownloaded?: string
@@ -53,9 +59,13 @@ export function OrdinanceDownloadPanel() {
   const [selectedDistricts, setSelectedDistricts] = useState<Set<string>>(new Set())
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DistrictStatus>>(new Map())
-  const [currentDistrict, setCurrentDistrict] = useState<string | null>(null)
+  const [activeDownloads, setActiveDownloads] = useState<Set<string>>(new Set())
   const [elapsedTime, setElapsedTime] = useState(0)
   const [districtDownloadDates, setDistrictDownloadDates] = useState<Map<string, string>>(new Map())
+
+  // Abort controller for stopping downloads
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isAbortedRef = useRef(false)
 
   // Load existing ordinance files on mount
   useEffect(() => {
@@ -107,73 +117,124 @@ export function OrdinanceDownloadPanel() {
     }
   }
 
-  async function downloadDistrict(districtCode: string, districtName: string) {
+  async function downloadDistrict(
+    districtCode: string,
+    districtName: string,
+    signal: AbortSignal
+  ): Promise<DistrictStatus> {
     const startTime = Date.now()
-    setCurrentDistrict(districtName)
 
-    setDownloadProgress(
-      new Map(
-        downloadProgress.set(districtCode, {
-          code: districtCode,
-          name: districtName,
-          status: 'downloading',
-          startTime
-        })
-      )
-    )
+    // Mark as downloading
+    setActiveDownloads(prev => new Set(prev).add(districtCode))
+    setDownloadProgress(prev => {
+      const newMap = new Map(prev)
+      newMap.set(districtCode, {
+        code: districtCode,
+        name: districtName,
+        status: 'downloading',
+        startTime
+      })
+      return newMap
+    })
 
     try {
+      // Use SSE streaming for abort support
       const response = await fetch('/api/admin/download-ordinances', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
         },
         body: JSON.stringify({
           districtCode,
           districtName,
-          delay: 1000
-        })
+          delay: 50 // Very fast delay
+        }),
+        signal
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        setDownloadProgress(
-          new Map(
-            downloadProgress.set(districtCode, {
-              code: districtCode,
-              name: districtName,
-              status: 'success',
-              ordinanceCount: result.ordinanceCount || 0,
-              startTime
-            })
-          )
-        )
-      } else {
-        setDownloadProgress(
-          new Map(
-            downloadProgress.set(districtCode, {
-              code: districtCode,
-              name: districtName,
-              status: 'error',
-              error: result.error || '다운로드 실패',
-              startTime
-            })
-          )
-        )
+      if (!response.ok) {
+        throw new Error('API 요청 실패')
       }
-    } catch (error: any) {
-      setDownloadProgress(
-        new Map(
-          downloadProgress.set(districtCode, {
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('스트림 읽기 실패')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalResult: any = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.type === 'complete') {
+                finalResult = data
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      const status: DistrictStatus = finalResult?.success
+        ? {
+            code: districtCode,
+            name: districtName,
+            status: 'success',
+            ordinanceCount: finalResult.ordinanceCount || 0,
+            skippedCount: finalResult.skippedCount || 0,
+            totalFound: finalResult.totalFound || 0,
+            startTime
+          }
+        : {
             code: districtCode,
             name: districtName,
             status: 'error',
-            error: error.message,
+            error: finalResult?.error || '다운로드 실패',
             startTime
-          })
-        )
-      )
+          }
+
+      setDownloadProgress(prev => {
+        const newMap = new Map(prev)
+        newMap.set(districtCode, status)
+        return newMap
+      })
+
+      return status
+    } catch (error: any) {
+      const status: DistrictStatus = {
+        code: districtCode,
+        name: districtName,
+        status: 'error',
+        error: signal.aborted ? '중지됨' : error.message,
+        startTime
+      }
+
+      setDownloadProgress(prev => {
+        const newMap = new Map(prev)
+        newMap.set(districtCode, status)
+        return newMap
+      })
+
+      return status
+    } finally {
+      setActiveDownloads(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(districtCode)
+        return newSet
+      })
     }
   }
 
@@ -183,13 +244,20 @@ export function OrdinanceDownloadPanel() {
       return
     }
 
+    const estimatedMinutes = Math.ceil(selectedDistricts.size / PARALLEL_LIMIT * 0.5)
     if (
       !confirm(
-        `선택한 ${selectedDistricts.size}개 자치구의 조례를 다운로드하시겠습니까?\n\n예상 소요 시간: ${Math.ceil(selectedDistricts.size * 2)}분`
+        `선택한 ${selectedDistricts.size}개 자치구의 조례를 다운로드하시겠습니까?\n\n` +
+        `병렬 처리: ${PARALLEL_LIMIT}개 동시 다운로드\n` +
+        `예상 소요 시간: ${estimatedMinutes}~${estimatedMinutes * 2}분`
       )
     ) {
       return
     }
+
+    // Reset abort state
+    isAbortedRef.current = false
+    abortControllerRef.current = new AbortController()
 
     setIsDownloading(true)
     setDownloadProgress(new Map())
@@ -200,21 +268,76 @@ export function OrdinanceDownloadPanel() {
       setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
     }, 1000)
 
-    for (const code of selectedDistricts) {
-      const district = SEOUL_DISTRICTS.find((d) => d.code === code)
-      if (!district) continue
+    // Convert selected districts to array
+    const districtsToDownload = Array.from(selectedDistricts)
+      .map(code => SEOUL_DISTRICTS.find(d => d.code === code))
+      .filter((d): d is typeof SEOUL_DISTRICTS[0] => d !== undefined)
 
-      await downloadDistrict(district.code, district.name)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+    // Parallel processing with semaphore pattern
+    const results: DistrictStatus[] = []
+    let index = 0
+
+    async function processNext(): Promise<void> {
+      while (index < districtsToDownload.length && !isAbortedRef.current) {
+        const currentIndex = index++
+        const district = districtsToDownload[currentIndex]
+
+        // Check abort before starting
+        if (isAbortedRef.current) {
+          results.push({
+            code: district.code,
+            name: district.name,
+            status: 'error',
+            error: '중지됨'
+          })
+          continue
+        }
+
+        const result = await downloadDistrict(
+          district.code,
+          district.name,
+          abortControllerRef.current!.signal
+        )
+        results.push(result)
+      }
     }
+
+    // Start parallel workers
+    const workers = Array(Math.min(PARALLEL_LIMIT, districtsToDownload.length))
+      .fill(null)
+      .map(() => processNext())
+
+    await Promise.all(workers)
 
     clearInterval(timer)
     setIsDownloading(false)
-    setCurrentDistrict(null)
+    setActiveDownloads(new Set())
 
-    const successCount = Array.from(downloadProgress.values()).filter((d) => d.status === 'success').length
-    const errorCount = Array.from(downloadProgress.values()).filter((d) => d.status === 'error').length
-    alert(`✅ 조례 다운로드 완료\n\n성공: ${successCount}개 자치구\n실패: ${errorCount}개 자치구`)
+    const successCount = results.filter(d => d.status === 'success').length
+    const errorCount = results.filter(d => d.status === 'error').length
+    const abortedCount = results.filter(d => d.error === '중지됨').length
+    const totalFound = results.reduce((sum, d) => sum + (d.totalFound || 0), 0)
+    const totalDownloaded = results.reduce((sum, d) => sum + (d.ordinanceCount || 0), 0)
+    const totalSkipped = results.reduce((sum, d) => sum + (d.skippedCount || 0), 0)
+
+    if (isAbortedRef.current) {
+      alert(`⛔ 다운로드가 중지되었습니다\n\n완료: ${successCount}개 자치구\n실패: ${errorCount - abortedCount}개\n중지: ${abortedCount}개\n\n조례: ${totalFound.toLocaleString()}개 (신규 ${totalDownloaded}, 기존 ${totalSkipped})`)
+    } else {
+      alert(`✅ 조례 다운로드 완료\n\n자치구: ${successCount}개 성공, ${errorCount}개 실패\n조례: ${totalFound.toLocaleString()}개 (신규 ${totalDownloaded}, 기존 ${totalSkipped})`)
+    }
+
+    // Reload file dates
+    loadExistingFiles()
+  }
+
+  function stopDownload() {
+    if (!confirm('다운로드를 중지하시겠습니까?\n\n현재 진행 중인 다운로드가 즉시 중지됩니다.')) {
+      return
+    }
+
+    isAbortedRef.current = true
+    // Abort all current SSE connections
+    abortControllerRef.current?.abort()
   }
 
   function getDistrictStatus(code: string): DistrictStatus | undefined {
@@ -232,6 +355,17 @@ export function OrdinanceDownloadPanel() {
   const completedCount = successCount + errorCount
   const progressPercent = selectedDistricts.size > 0 ? (completedCount / selectedDistricts.size) * 100 : 0
 
+  // Calculate total ordinances from completed downloads
+  const totalOrdinancesDownloaded = Array.from(downloadProgress.values())
+    .filter(d => d.status === 'success')
+    .reduce((sum, d) => sum + (d.ordinanceCount || 0), 0)
+  const totalOrdinancesSkipped = Array.from(downloadProgress.values())
+    .filter(d => d.status === 'success')
+    .reduce((sum, d) => sum + (d.skippedCount || 0), 0)
+  const totalOrdinancesFound = Array.from(downloadProgress.values())
+    .filter(d => d.status === 'success')
+    .reduce((sum, d) => sum + (d.totalFound || 0), 0)
+
   return (
     <div className="space-y-6">
       {/* Progress Monitor */}
@@ -243,13 +377,33 @@ export function OrdinanceDownloadPanel() {
                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
               </div>
               <div>
-                <div className="font-medium text-foreground">처리 중: {currentDistrict || '대기 중'}</div>
-                <div className="text-sm text-muted-foreground">{formatTime(elapsedTime)} 경과</div>
+                <div className="font-medium text-foreground">
+                  병렬 다운로드 중 ({activeDownloads.size}/{PARALLEL_LIMIT} 활성)
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {formatTime(elapsedTime)} 경과 · {Array.from(activeDownloads).map(code => {
+                    const district = SEOUL_DISTRICTS.find(d => d.code === code)
+                    return district?.name
+                  }).filter(Boolean).join(', ') || '대기 중'}
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-foreground">{Math.round(progressPercent)}%</div>
-              <div className="text-sm text-muted-foreground">{completedCount} / {selectedDistricts.size}</div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-2xl font-bold text-foreground">{Math.round(progressPercent)}%</div>
+                <div className="text-sm text-muted-foreground">
+                  {completedCount}/{selectedDistricts.size} 자치구 · {totalOrdinancesFound.toLocaleString()}개 조례
+                </div>
+              </div>
+              <Button
+                onClick={stopDownload}
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+              >
+                <StopCircle className="h-4 w-4" />
+                중지
+              </Button>
             </div>
           </div>
           <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
@@ -297,7 +451,11 @@ export function OrdinanceDownloadPanel() {
             {selectedDistricts.size === SEOUL_DISTRICTS.length ? '전체 해제' : '전체 선택'}
           </Button>
           <div className="text-sm text-muted-foreground">
-            약 {selectedDistricts.size * 80}개 조례 · 약 {Math.ceil(selectedDistricts.size * 2)}분 소요
+            {selectedDistricts.size > 0
+              ? totalOrdinancesFound > 0
+                ? `${totalOrdinancesFound.toLocaleString()}개 조례 완료 · ${Math.max(1, Math.ceil(selectedDistricts.size / PARALLEL_LIMIT))}~${Math.max(2, Math.ceil(selectedDistricts.size / PARALLEL_LIMIT * 2))}분 예상`
+                : `${selectedDistricts.size}개 자치구 선택 · 약 ${Math.max(1, Math.ceil(selectedDistricts.size / PARALLEL_LIMIT))}~${Math.max(2, Math.ceil(selectedDistricts.size / PARALLEL_LIMIT * 2))}분 예상`
+              : '자치구를 선택하세요'}
           </div>
         </div>
         <Button
@@ -327,10 +485,17 @@ export function OrdinanceDownloadPanel() {
           const status = getDistrictStatus(district.code)
 
           return (
-            <button
+            <div
               key={district.code}
               onClick={() => !isDownloading && toggleDistrict(district.code)}
-              disabled={isDownloading}
+              role="button"
+              tabIndex={isDownloading ? -1 : 0}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !isDownloading) {
+                  e.preventDefault()
+                  toggleDistrict(district.code)
+                }
+              }}
               className={`
                 p-4 rounded-xl border transition-all duration-200 text-left
                 ${isSelected
@@ -348,7 +513,7 @@ export function OrdinanceDownloadPanel() {
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <Checkbox checked={isSelected} disabled={isDownloading} />
+                <Checkbox checked={isSelected} disabled={isDownloading} onCheckedChange={() => {}} />
                 {status && (
                   <div>
                     {status.status === 'downloading' && (
@@ -369,7 +534,8 @@ export function OrdinanceDownloadPanel() {
 
               {status && status.status === 'success' && (
                 <div className="mt-2 text-xs text-accent">
-                  ✓ {status.ordinanceCount}개 조례
+                  ✓ {status.totalFound?.toLocaleString()}개 조례
+                  {status.ordinanceCount! > 0 && ` (신규 ${status.ordinanceCount})`}
                 </div>
               )}
 
@@ -384,7 +550,7 @@ export function OrdinanceDownloadPanel() {
                   최근: {formatDate(districtDownloadDates.get(district.name)!)}
                 </div>
               )}
-            </button>
+            </div>
           )
         })}
       </div>
@@ -392,11 +558,11 @@ export function OrdinanceDownloadPanel() {
       {/* Info Card */}
       <div className="p-4 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
         <div className="text-sm text-muted-foreground space-y-1">
-          <div>• law.go.kr API에서 조례 다운로드</div>
+          <div>• law.go.kr API에서 조례 다운로드 (<strong>{PARALLEL_LIMIT}개 병렬 처리</strong>)</div>
           <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-ordinances/(자치구명)/</code></div>
-          <div>• 자치구당 약 2분 소요 (API 속도 제한)</div>
+          <div>• 전체 다운로드 약 {Math.ceil(SEOUL_DISTRICTS.length / PARALLEL_LIMIT)}~{Math.ceil(SEOUL_DISTRICTS.length / PARALLEL_LIMIT * 2)}분 소요 (약 12,000개 조례)</div>
           <div>• RAG 청킹을 위한 메타데이터 포함</div>
-          <div>• 최근 다운로드: 파일 생성일 기준 표시</div>
+          <div>• 중지 버튼으로 다운로드 강제 종료 가능</div>
         </div>
       </div>
 

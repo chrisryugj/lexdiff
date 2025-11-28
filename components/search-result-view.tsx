@@ -2097,6 +2097,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         currentLawName={lawData?.meta?.lawTitle || searchQuery || undefined}
         showBackButton={true}
         isFocusMode={isFocusMode}
+        guideType={aiAnswerContent ? 'ai-search' : 'law-search'}
       />
       <main className="flex-1">
         <div className="container mx-auto max-w-[1280px] px-2 pt-3 pb-2 sm:p-6">

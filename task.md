@@ -4,6 +4,27 @@
 
 ---
 
+## 2025-11-28
+
+### [14:30 KST] 사용법 안내 툴팁 및 상세 도움말 페이지 구현
+- **Files**:
+  - `components/ui/popover.tsx` (created) - shadcn/ui Popover 컴포넌트
+  - `components/usage-guide-popover.tsx` (created) - 사용법 안내 팝오버
+  - `app/help/page.tsx` (created) - 상세 도움말 페이지
+  - `components/floating-compact-header.tsx` (modified) - 도움말 버튼 추가
+  - `components/search-result-view.tsx` (modified) - AI/법령 모드별 guideType 설정
+- **Changes**:
+  - **2단계 도움말 시스템 구현**:
+    - 간편 툴팁 (Popover): 핵심 기능 빠른 안내 + 첫 방문 자동 표시
+    - 상세 도움말 페이지 (/help): 모든 기능 자세한 설명 + 예시
+  - **법령 검색 가이드**: 검색 방법, 조문 탐색, 즐겨찾기, 비교 기능, 3단 비교, 단축키
+  - **AI 검색 가이드**: 질문 방법, 답변 구조, 인용 출처, 검색 팁, 질문 예시
+  - 첫 방문 시 localStorage 기반 자동 표시
+  - 탭 네비게이션으로 법령/AI 검색 가이드 전환
+- **Impact**: 처음 사용하는 사용자를 위한 친절한 사용법 안내 제공
+
+---
+
 ## 2025-11-26
 
 ### [23:30 KST] Claude Code /doctor 오류 수정 및 가이드 문서 추가

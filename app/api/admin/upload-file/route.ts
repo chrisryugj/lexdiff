@@ -163,58 +163,96 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Add file info to metadata
-    metadata.original_filename = file.name
-    metadata.file_type = file.type
-    metadata.file_size = file.size.toString()
-    metadata.upload_time = new Date().toISOString()
-
-    // Upload to File Search Store
+    // Step 1: Upload file to Gemini File API (no metadata in header to avoid Korean encoding issues)
     const uploadFormData = new FormData()
     uploadFormData.append('file', file)
 
-    // Add metadata as JSON string in x-goog-file-metadata header
-    const metadataHeader = JSON.stringify(metadata)
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents:upload`
-
-    const response = await fetch(url, {
+    const uploadResponse = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files`, {
       method: 'POST',
-      headers: {
-        'x-goog-api-key': apiKey,
-        'x-goog-file-metadata': metadataHeader
-      },
+      headers: { 'x-goog-api-key': apiKey },
       body: uploadFormData
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
       console.error('[Upload File API] ❌ Upload failed:', errorText)
       return NextResponse.json(
         {
           success: false,
-          error: `파일 업로드 실패: ${response.status}`,
+          error: `파일 업로드 실패: ${uploadResponse.status}`,
+          details: errorText
+        },
+        { status: uploadResponse.status }
+      )
+    }
+
+    const uploadedFile = await uploadResponse.json()
+    const fileNameGemini = uploadedFile.file?.name || uploadedFile.name
+
+    if (!fileNameGemini) {
+      return NextResponse.json(
+        { success: false, error: 'File upload did not return a file name' },
+        { status: 500 }
+      )
+    }
+
+    // Step 2: Import to File Search Store with metadata (JSON body, not header)
+    const customMetadata = [
+      { key: 'original_filename', stringValue: file.name },
+      { key: 'display_name', stringValue: displayName },
+      { key: 'file_type', stringValue: file.type },
+      { key: 'file_size', stringValue: file.size.toString() },
+      { key: 'upload_time', stringValue: new Date().toISOString() }
+    ]
+
+    // Add custom metadata
+    for (const [key, value] of Object.entries(metadata)) {
+      customMetadata.push({ key, stringValue: value })
+    }
+
+    const importUrl = `https://generativelanguage.googleapis.com/v1beta/${storeId}:importFile`
+
+    const response = await fetch(importUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        fileName: fileNameGemini,
+        customMetadata
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Upload File API] ❌ Import failed:', errorText)
+      return NextResponse.json(
+        {
+          success: false,
+          error: `파일 import 실패: ${response.status}`,
           details: errorText
         },
         { status: response.status }
       )
     }
 
-    const result = await response.json()
+    const importResult = await response.json()
+    const documentId = importResult.document?.name || importResult.name
 
-    console.log('[Upload File API] ✅ File uploaded:', result)
+    console.log('[Upload File API] ✅ File uploaded:', documentId)
 
     return NextResponse.json({
       success: true,
       document: {
-        id: result.name,
+        id: documentId,
         displayName: displayName,
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
-        state: result.state,
-        createTime: result.createTime,
-        updateTime: result.updateTime
+        state: importResult.document?.state || 'ACTIVE',
+        createTime: importResult.document?.createTime,
+        updateTime: importResult.document?.updateTime
       },
       message: `✅ "${file.name}" 업로드 완료!`
     })

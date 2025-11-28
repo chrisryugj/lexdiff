@@ -1,19 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git pull:*)",
-      "Bash(git push:*)",
-      "Bash(dir \"C:\\Users\\Chris\\.claude\")",
-      "Bash(Remove-Item \"C:\\Users\\Chris\\.claude\\global-settings.json\")",
-      "Bash(cat:*)",
-      "Bash(python -m json.tool:*)",
-      "Bash(claude doctor:*)",
-      "WebSearch",
-      "Bash(claude mcp add context7 --scope user -- npx -y @upstash/context7-mcp@latest)",
-      "Bash(claude mcp add:*)",
-      "Bash(claude mcp list:*)",
-      "Bash(npm install:*)",
-      "Bash(pnpm add:*)"
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

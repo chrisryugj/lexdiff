@@ -15,7 +15,7 @@ const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
 export interface LawMetadata {
   law_id: string
   law_name: string
-  law_type: '법률' | '조례' | '시행령' | '시행규칙'
+  law_type: '법률' | '법령' | '조례' | '시행령' | '시행규칙'
   category?: string
   region?: string
   total_articles: string

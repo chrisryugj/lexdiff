@@ -191,13 +191,9 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
     // - Storage: Free for first 20GB
     // - Retrieval: $0.05 per 1M tokens
     //
-    // Actual retrieval cost calculation:
-    // Each query retrieves ~5-10 document chunks
-    // Each chunk is ~1000 tokens
-    const avgTokensPerQuery = 1000 * 7 // 7 chunks * ~1000 tokens each
-    const avgQueries = 100 // Monthly estimated queries
-    const retrievalTokens = avgQueries * avgTokensPerQuery
-    const retrievalCost = (retrievalTokens * 0.05) / 1000000
+    // Retrieval cost based on 1 full retrieval of total tokens (capacity planning)
+    // Retrieval: $0.05 per 1M tokens
+    const retrievalCost = (totalTokens * 0.05) / 1000000
 
     setCostEstimate({
       totalDocuments: docs.length,
@@ -643,7 +639,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
 
           <div className="mt-3 pt-3 border-t border-border/50">
             <p className="text-xs text-muted-foreground">
-              💡 100개 쿼리 기준 (실제 비용은 사용량에 따라 다름)
+              💡 전체 토큰 1회 검색 기준 (실제 비용은 사용량에 따라 다름)
               <br />
               • Storage: 20GB까지 무료
               <br />• Retrieval: $0.05 per 1M tokens
@@ -877,11 +873,10 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
             {filteredDocuments.map((doc, index) => (
               <div
                 key={doc.id}
-                className={`p-4 border rounded-xl transition-all ${
-                  selectedDocIds.has(doc.id)
-                    ? 'bg-primary/10 border-primary/30 shadow-md'
-                    : 'bg-card/30 border-border/50 hover:bg-card/50 hover:shadow-sm'
-                }`}
+                className={`p-4 border rounded-xl transition-all ${selectedDocIds.has(doc.id)
+                  ? 'bg-primary/10 border-primary/30 shadow-md'
+                  : 'bg-card/30 border-border/50 hover:bg-card/50 hover:shadow-sm'
+                  }`}
                 style={{
                   animation: `fadeInUp 0.3s ease-out ${index * 10}ms both`
                 }}
@@ -921,11 +916,10 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                   {/* Actions */}
                   <div className="flex flex-col gap-2 ml-4">
                     <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        doc.state === 'STATE_ACTIVE'
-                          ? 'bg-accent/10 border border-accent/30 text-accent'
-                          : 'bg-muted/30 border border-border/50 text-muted-foreground'
-                      }`}
+                      className={`px-2 py-1 rounded text-xs ${doc.state === 'STATE_ACTIVE'
+                        ? 'bg-accent/10 border border-accent/30 text-accent'
+                        : 'bg-muted/30 border border-border/50 text-muted-foreground'
+                        }`}
                     >
                       {doc.state === 'STATE_ACTIVE' ? (
                         <span className="flex items-center gap-1">
