@@ -10,6 +10,7 @@ import {
     FileText,
     Bookmark,
     AlertCircle,
+    AlertTriangle,
     MessageCircleQuestion,
     ZoomOut,
     RotateCcw,
@@ -230,6 +231,7 @@ interface AIAnswerContentProps {
     setFontSize: (size: number | ((prev: number) => number)) => void
     handleContentClick: React.MouseEventHandler<HTMLDivElement>
     aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
+    isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
 }
 
 export function AIAnswerContent({
@@ -241,7 +243,8 @@ export function AIAnswerContent({
     fontSize,
     setFontSize,
     handleContentClick,
-    aiQueryType = 'general'
+    aiQueryType = 'general',
+    isTruncated = false
 }: AIAnswerContentProps) {
     const { toast } = useToast()
 
@@ -415,6 +418,26 @@ export function AIAnswerContent({
 
             {/* 본문 영역 */}
             <div className="flex-1 min-h-0 px-3 sm:px-4 pt-1 pb-4 overflow-y-auto overflow-x-hidden">
+                {/* ✅ Phase 7: 신뢰도 경고 배너 (low일 때) */}
+                {aiConfidenceLevel === 'low' && !fileSearchFailed && (
+                    <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
+                        <div className="flex items-center gap-2 text-red-500 text-sm">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <span>참조 조문 부족. 일반 지식 기반 답변</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* ✅ Phase 7: 답변 잘림 경고 (MAX_TOKENS) */}
+                {isTruncated && (
+                    <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-md">
+                        <div className="flex items-center gap-2 text-amber-500 text-sm">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <span>답변이 길어 일부 생략됨</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* 검색 실패 경고 메시지 */}
                 {fileSearchFailed && (
                     <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
@@ -430,12 +453,38 @@ export function AIAnswerContent({
                     </div>
                 )}
 
+                {/* ✅ Phase 7: 답변 내용이 없을 때 (grounding metadata 없음) */}
+                {!aiAnswerHTML && (
+                    <>
+                        {/* 신뢰도 낮음 배너 */}
+                        <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
+                            <div className="flex items-center gap-2 text-red-500 text-sm">
+                                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                <span>File Search 인용 없음 - 법령 데이터베이스에서 결과를 찾지 못함</span>
+                            </div>
+                        </div>
 
-                <div
+                        {/* 오류 메시지 */}
+                        <div className="flex flex-col items-center gap-4 max-w-md mx-auto text-center py-6">
+                            <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
+                                <AlertTriangle className="h-7 w-7 text-amber-500" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-base font-medium text-foreground">검색 결과를 찾지 못했습니다</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    법령 데이터베이스에서 관련 조문을 찾을 수 없었습니다.
+                                    다른 검색어로 다시 시도해 주세요.
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {aiAnswerHTML && <div
                     className="prose prose-sm max-w-none w-full dark:prose-invert overflow-x-hidden
         [&_h2]:text-[clamp(16px,4.5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-wrap
         [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-wrap
-        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/25 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-1.5 sm:[&_blockquote]:pl-3 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-6 sm:[&_blockquote]:ml-10 [&_blockquote]:not-italic
+        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/25 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-3 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:not-italic
         [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed [&_blockquote_p]:break-words
         [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
         [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1
@@ -444,13 +493,15 @@ export function AIAnswerContent({
                     style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                     onClick={handleContentClick}
                     dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-                />
+                />}
 
                 {/* AI 답변 주의사항 */}
-                <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                    <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                    <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
-                </div>
+                {aiAnswerHTML && (
+                    <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
+                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                    </div>
+                )}
             </div>
         </>
     )

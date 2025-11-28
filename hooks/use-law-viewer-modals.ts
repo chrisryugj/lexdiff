@@ -3,6 +3,7 @@ import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { buildJO, formatJO } from '@/lib/law-parser'
 import { extractArticleText } from '@/lib/law-xml-parser'
 import { debugLogger } from '@/lib/debug-logger'
+import { parseOrdinanceJSON, findOrdinanceArticle } from '@/lib/ordinance-parser'
 
 interface ModalState {
   open: boolean
@@ -39,17 +40,137 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(cleanedLawName) && !/시행규칙|시행령/.test(cleanedLawName))) &&
         !/시행규칙|시행령/.test(cleanedLawName)
 
-      // 자치법규는 법제처 자치법규 페이지로 리다이렉트
+      // 자치법규 본문 조회 및 파싱
       if (isOrdinance) {
-        const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
-        setRefModal({
-          open: true,
-          title: `${cleanedLawName} ${articleLabel}`,
-          html: `<div class="space-y-3"><p>자치법규는 법제처 자치법규 페이지에서 확인하실 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} ${articleLabel} 보기 →</a></div></div>`,
-          lawName: cleanedLawName,
-          articleNumber: articleLabel,
-        })
-        return
+        debugLogger.info('[citation] 자치법규 본문 조회 시작', { lawName: cleanedLawName, articleLabel })
+
+        try {
+          // 1. 자치법규 검색 API로 ID 조회
+          const ordinSearchRes = await fetch(`/api/ordin-search?query=${encodeURIComponent(cleanedLawName)}`)
+          if (!ordinSearchRes.ok) {
+            throw new Error('자치법규 검색 실패')
+          }
+
+          const ordinSearchXml = await ordinSearchRes.text()
+          const ordinParser = new DOMParser()
+          const ordinSearchDoc = ordinParser.parseFromString(ordinSearchXml, "text/xml")
+
+          // 검색 결과에서 자치법규 정보 추출
+          const ordinNodes = Array.from(ordinSearchDoc.querySelectorAll("law, 자치법규"))
+          const normalizedSearchName = cleanedLawName.replace(/\s+/g, "")
+
+          // 정확한 이름 매칭 우선
+          const exactMatch = ordinNodes.find(node => {
+            const nodeName = (node.querySelector("자치법규명, ordinName")?.textContent || "").replace(/\s+/g, "")
+            return nodeName === normalizedSearchName
+          })
+
+          const ordinNode = exactMatch || ordinNodes[0]
+
+          const ordinId = ordinNode?.querySelector("자치법규ID, ordinId, ID")?.textContent
+          const ordinSeq = ordinNode?.querySelector("자치법규일련번호, ordinSeq, MST")?.textContent
+
+          debugLogger.info('[citation] 자치법규 검색 결과', { ordinId, ordinSeq, foundCount: ordinNodes.length })
+
+          if (!ordinId && !ordinSeq) {
+            // 검색 결과 없으면 법제처 링크로 폴백
+            const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
+            setRefModal({
+              open: true,
+              title: `${cleanedLawName} ${articleLabel}`,
+              html: `<div class="space-y-3"><p>자치법규를 찾지 못했습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} ${articleLabel} 보기 →</a></div></div>`,
+              lawName: cleanedLawName,
+              articleNumber: articleLabel,
+            })
+            return
+          }
+
+          // 2. 자치법규 본문 조회
+          const ordinParams = new URLSearchParams()
+          if (ordinId) ordinParams.append("ordinId", ordinId)
+          else if (ordinSeq) ordinParams.append("ordinSeq", ordinSeq)
+
+          const ordinRes = await fetch(`/api/ordin?${ordinParams.toString()}`)
+          if (!ordinRes.ok) {
+            throw new Error('자치법규 본문 조회 실패')
+          }
+
+          const ordinJson = await ordinRes.json()
+
+          // 3. JSON 파싱
+          const { meta: ordinMeta, articles: ordinArticles } = parseOrdinanceJSON(ordinJson)
+
+          debugLogger.info('[citation] 자치법규 파싱 완료', {
+            lawTitle: ordinMeta.lawTitle,
+            articleCount: ordinArticles.length
+          })
+
+          // 4. 특정 조문 찾기
+          const targetArticle = findOrdinanceArticle(ordinArticles, articleLabel)
+
+          if (!targetArticle) {
+            const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
+            setRefModal({
+              open: true,
+              title: `${cleanedLawName} ${articleLabel}`,
+              html: `<div class="space-y-3"><p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground">조문이 삭제되었거나 번호가 변경되었을 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} 전문 보기 →</a></div></div>`,
+              lawName: cleanedLawName,
+              articleNumber: articleLabel,
+            })
+            return
+          }
+
+          // 5. HTML 생성 (extractArticleText 사용, isOrdinance=true)
+          const articleTitle = `${cleanedLawName} ${formatJO(targetArticle.jo)}${targetArticle.title ? ` (${targetArticle.title})` : ""}`
+          const htmlContent = extractArticleText(targetArticle, true, cleanedLawName)
+
+          if (!htmlContent || htmlContent.trim().length === 0) {
+            const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
+            setRefModal({
+              open: true,
+              title: articleTitle,
+              html: `<div class="space-y-3"><p>⚠️ 조문 내용을 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground">이 조문은 최근 개정으로 인해 내용이 변경되었거나 삭제되었을 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${cleanedLawName} ${articleLabel} 보기</a></div></div>`,
+              lawName: cleanedLawName,
+              articleNumber: articleLabel,
+            })
+            return
+          }
+
+          // 현재 모달이 열려있으면 히스토리에 저장
+          if (refModal.open && refModal.title) {
+            setRefModalHistory(prev => [...prev, {
+              title: refModal.title!,
+              html: refModal.html,
+              forceWhiteTheme: refModal.forceWhiteTheme,
+              lawName: refModal.lawName,
+              articleNumber: refModal.articleNumber,
+            }])
+          }
+
+          setRefModal({
+            open: true,
+            title: articleTitle,
+            html: htmlContent,
+            lawName: cleanedLawName,
+            articleNumber: articleLabel,
+          })
+
+          debugLogger.success('[citation] 자치법규 모달 열기 완료', { articleTitle })
+          return
+        } catch (ordinError) {
+          debugLogger.error('[citation] 자치법규 조회 실패, 법제처 링크로 폴백', ordinError)
+
+          // 오류 발생 시 법제처 링크로 폴백
+          const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
+          setRefModal({
+            open: true,
+            title: `${cleanedLawName} ${articleLabel}`,
+            html: `<div class="space-y-3"><p>자치법규 조회 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} ${articleLabel} 보기 →</a></div></div>`,
+            lawName: cleanedLawName,
+            articleNumber: articleLabel,
+          })
+          return
+        }
       }
 
       const qs = new URLSearchParams({ query: cleanedLawName })

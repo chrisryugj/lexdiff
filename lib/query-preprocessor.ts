@@ -90,7 +90,9 @@ function extractArticleNumbers(query: string): string[] {
 // 조문 형식 정규화
 function normalizeArticleFormat(query: string): string {
   // "38조" → "제38조" (단, "제38조"는 유지)
-  return query.replace(/(?<!제)(\d+)조/g, '제$1조')
+  // ✅ Phase 7 Fix: 숫자 앞에 "제"나 다른 숫자가 있으면 변환하지 않음
+  // 예: "제38조" → 유지, "38조" → "제38조"
+  return query.replace(/(?<!제)(?<!\d)(\d+)조/g, '제$1조')
 }
 
 // 법령명 띄어쓰기 정규화
@@ -102,19 +104,30 @@ function normalizeLawSpacing(query: string): string {
     .replace(/(령)(시행규칙)/g, '$1 $2')
 }
 
+// ✅ Phase 7: 쿼리 분류 키워드 확장
+const PROCEDURAL_KEYWORDS = [
+  '절차', '방법', '어떻게', '신청', '과정', '단계',
+  '등록', '허가', '신고', '제출', '접수', '발급',
+  '취득', '갱신', '연장', '변경신고', '폐업'
+]
+
+const COMPARISON_KEYWORDS = [
+  '차이', '비교', '다른', '구분', '구별', '다르게', '차별', '대비'
+]
+
 // 질문 유형 분류
 function classifyQueryType(
   query: string,
   laws: string[],
   articles: string[]
 ): 'specific' | 'general' | 'comparison' | 'procedural' {
-  // 비교 질문
-  if (query.includes('차이') || query.includes('비교') || query.includes('다른')) {
+  // 비교 질문 (확장된 키워드)
+  if (COMPARISON_KEYWORDS.some(kw => query.includes(kw))) {
     return 'comparison'
   }
 
-  // 절차 질문
-  if (query.includes('절차') || query.includes('방법') || query.includes('어떻게')) {
+  // 절차 질문 (확장된 키워드)
+  if (PROCEDURAL_KEYWORDS.some(kw => query.includes(kw))) {
     return 'procedural'
   }
 
@@ -146,31 +159,30 @@ function calculateConfidence(laws: string[], articles: string[]): number {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 6 C7: Metadata Filter 구성
+// ⚠️ 비활성화 유지 권장: 전체 검색이 더 나은 결과 제공
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function buildMetadataFilter(query: string, extractedLaws: string[]): string | undefined {
-  // 1. 시행령 명시적 언급
-  if (query.includes('시행령') && !query.includes('시행규칙')) {
-    return 'law_type="시행령"'
-  }
-
-  // 2. 시행규칙 명시적 언급
-  if (query.includes('시행규칙')) {
-    return 'law_type="시행규칙"'
-  }
-
-  // 3. 조례 언급
-  if (query.includes('조례')) {
-    return 'law_type="조례"'
-  }
-
-  // 4. 특정 법령명이 1개만 있으면 해당 법령군 필터
-  if (extractedLaws.length === 1) {
-    const lawName = extractedLaws[0]
-    // "관세법" → law_name CONTAINS "관세법" (시행령, 시행규칙 제외)
-    const baseLawName = lawName.replace(/\s*(시행령|시행규칙)$/, '')
-    return `law_name CONTAINS "${baseLawName}"`
-  }
-
-  // 5. 필터 없음 (전체 검색)
+//
+// 📌 Google File Search API Metadata Filter 문법 (AIP-160):
+// - 정확히 일치: key="value" (예: law_name="관세법")
+// - ❌ CONTAINS 미지원 - 부분 매칭 불가
+// - ❌ LIKE 미지원
+// - 참고: https://google.aip.dev/160
+//
+// 📌 customMetadata 키 (upload-parsed-law/route.ts에서 설정):
+// - law_name: 법령명 (예: "관세법")
+// - law_type: "법률" (고정값)
+// - file_name, source, uploaded_at
+//
+// 📌 비활성화 이유:
+// 1. 정확히 일치만 지원 → "관세법"으로 필터하면 "관세법 시행령" 제외됨
+// 2. 사용자가 "관세법"이라고 해도 시행령/시행규칙이 더 적절할 수 있음
+// 3. 전체 검색이 더 넓은 범위에서 관련 조문 검색
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function buildMetadataFilter(_query: string, _extractedLaws: string[]): string | undefined {
+  // 비활성화 유지
   return undefined
+
+  // 재활성화 시 올바른 문법 예시:
+  // if (query.includes('시행령')) return 'law_type="시행령"'
+  // if (extractedLaws.length === 1) return `law_name="${extractedLaws[0]}"`
 }

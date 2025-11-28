@@ -35,6 +35,7 @@ export function AISearchView({
   const [progressMessage, setProgressMessage] = useState('') // 프로그래스바 메시지
   const [citations, setCitations] = useState<any[]>([]) // ✅ 인용 출처 목록
   const [queryType, setQueryType] = useState<'specific' | 'general' | 'comparison' | 'procedural'>('general') // ✅ 쿼리 타입
+  const [isTruncated, setIsTruncated] = useState(false) // ✅ Phase 7: 답변 잘림 여부
 
   // 프로그레스에 표시할 질의 (ref로 즉시 업데이트)
   const searchingQueryRef = useRef(initialQuery)
@@ -62,6 +63,7 @@ export function AISearchView({
 
       setError(null)
       setWarning(null)
+      setIsTruncated(false) // ✅ Phase 7: 새 검색 시 초기화
 
       // ✅ Phase 3 P3: 캐시 확인 (로딩 표시 전에 먼저 확인)
       console.log('[RAG Cache] Checking cache for query:', searchQuery)
@@ -161,6 +163,10 @@ export function AISearchView({
                 setSearchProgress(progress)
               } else if (parsed.type === 'warning') {
                 setWarning(parsed.message)
+                // ✅ Phase 7: 답변 잘림 감지
+                if (parsed.message?.includes('잘렸') || parsed.message?.includes('생략')) {
+                  setIsTruncated(true)
+                }
                 debugLogger.warning('AI 답변 경고', { message: parsed.message })
               } else if (parsed.type === 'citations') {
                 // ✅ 신뢰도 레벨 업데이트
@@ -325,8 +331,8 @@ export function AISearchView({
         </div>
       )}
 
-      {/* Analysis Result - LawViewer AI Mode */}
-      {analysis && !error && (
+      {/* Analysis Result - LawViewer AI Mode (답변 유무와 관계없이 로딩/에러가 아니면 표시) */}
+      {!error && !isAnalyzing && (
         <>
           {/* Warning Banner */}
           {warning && (() => {
@@ -352,6 +358,7 @@ export function AISearchView({
             aiCitations={citations}
             userQuery={currentQuery}
             aiQueryType={queryType}
+            aiIsTruncated={isTruncated}
             favorites={new Set()}
             isOrdinance={false}
             viewMode="single"
