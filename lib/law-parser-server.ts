@@ -67,10 +67,17 @@ function extractContentFromHangArray(hangArray: any[]): string {
 
     // 배열인 경우
     if (Array.isArray(hangContent)) {
-      return hangContent.some(c => c && c.trim())
+      return hangContent.some(c => c && typeof c === 'string' && c.trim())
     }
     // 문자열인 경우
-    return hangContent.trim().length > 0
+    if (typeof hangContent === 'string') {
+      return hangContent.trim().length > 0
+    }
+    // 객체인 경우 (예: { content: '...' })
+    if (typeof hangContent === 'object' && hangContent.content) {
+      return hangContent.content.trim().length > 0
+    }
+    return false
   })
 
   // 모든 호 수집
@@ -88,12 +95,20 @@ function extractContentFromHangArray(hangArray: any[]): string {
       if (hang.항내용) {
         let hangContent = hang.항내용
 
-        // Handle array format (some 항내용 are arrays of strings)
+        // Handle array format (some 항내용 are arrays of strings or objects)
         if (Array.isArray(hangContent)) {
-          hangContent = hangContent.join("\n")
+          hangContent = hangContent
+            .map(c => typeof c === 'string' ? c : (c?.content || ''))
+            .join("\n")
+        }
+        // Handle object format (e.g., { content: '...' })
+        else if (typeof hangContent === 'object' && hangContent.content) {
+          hangContent = hangContent.content
         }
 
-        content += "\n" + hangContent
+        if (typeof hangContent === 'string') {
+          content += "\n" + hangContent
+        }
       }
 
       // Extract 호 (items) if present
@@ -104,10 +119,14 @@ function extractContentFromHangArray(hangArray: any[]): string {
 
             // Handle array format
             if (Array.isArray(hoContent)) {
-              hoContent = hoContent.join("\n")
+              hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
+            } else if (typeof hoContent === 'object' && hoContent.content) {
+              hoContent = hoContent.content
             }
 
-            content += "\n" + hoContent
+            if (typeof hoContent === 'string') {
+              content += "\n" + hoContent
+            }
           }
 
           // Extract 목 (sub-items) if present
@@ -118,10 +137,14 @@ function extractContentFromHangArray(hangArray: any[]): string {
 
                 // Handle array format
                 if (Array.isArray(mokContent)) {
-                  mokContent = mokContent.join("\n")
+                  mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
+                } else if (typeof mokContent === 'object' && mokContent.content) {
+                  mokContent = mokContent.content
                 }
 
-                content += "\n  " + mokContent
+                if (typeof mokContent === 'string') {
+                  content += "\n  " + mokContent
+                }
               }
             }
           }
@@ -137,10 +160,14 @@ function extractContentFromHangArray(hangArray: any[]): string {
 
         // Handle array format
         if (Array.isArray(hoContent)) {
-          hoContent = hoContent.join("\n")
+          hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
+        } else if (typeof hoContent === 'object' && hoContent.content) {
+          hoContent = hoContent.content
         }
 
-        content += "\n" + hoContent
+        if (typeof hoContent === 'string') {
+          content += "\n" + hoContent
+        }
       }
 
       // Extract 목 (sub-items) if present
@@ -151,10 +178,14 @@ function extractContentFromHangArray(hangArray: any[]): string {
 
             // Handle array format
             if (Array.isArray(mokContent)) {
-              mokContent = mokContent.join("\n")
+              mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
+            } else if (typeof mokContent === 'object' && mokContent.content) {
+              mokContent = mokContent.content
             }
 
-            content += "\n  " + mokContent
+            if (typeof mokContent === 'string') {
+              content += "\n  " + mokContent
+            }
           }
         }
       }
@@ -346,8 +377,12 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
 
   metadata.articleCount = articles.length
 
+  console.log(`[parseLawFromAPI] Parsed ${articles.length} articles for ${metadata.lawName}`)
+
   // Generate markdown
   const markdown = generateMarkdown(metadata, articles)
+
+  console.log(`[parseLawFromAPI] Generated markdown (${markdown.length} chars)`)
 
   return {
     metadata,
@@ -489,11 +524,15 @@ export async function parseLawByNameOrId(
     // Try as law ID first (if it's all digits)
     if (/^\d+$/.test(searchQuery)) {
       try {
+        console.log(`[parseLawByNameOrId] Trying to fetch by ID: ${searchQuery}`)
         const lawData = await fetchLawFromAPI(searchQuery, apiKey)
+        console.log(`[parseLawByNameOrId] Fetched law data, parsing...`)
         const parsed = parseLawFromAPI(lawData)
+        console.log(`[parseLawByNameOrId] Successfully parsed: ${parsed.metadata.lawName}`)
         return { success: true, law: parsed }
-      } catch (e) {
+      } catch (e: any) {
         // Not a valid ID, continue to search
+        console.log(`[parseLawByNameOrId] ID fetch/parse failed: ${e.message}`)
       }
     }
 
