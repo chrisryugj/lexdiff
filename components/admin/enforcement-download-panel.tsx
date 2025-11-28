@@ -1,13 +1,14 @@
 /**
  * Enforcement Download Panel - LexDiff Professional Edition
  * Refined interface for downloading enforcement decrees and rules
+ * With download log tracking and filter functionality
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw, Filter, MinusCircle } from 'lucide-react'
 
 interface SavedLaw {
   lawId: string
@@ -21,15 +22,26 @@ interface SavedLaw {
 interface DownloadStatus {
   lawName: string
   type: '시행령' | '시행규칙'
-  status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error'
+  status: 'pending' | 'downloading' | 'success' | 'not_found' | 'error' | 'confirmed_none'
   articleCount?: number
   error?: string
   downloadedAt?: string
 }
 
+interface DownloadLogEntry {
+  lawName: string
+  type: '시행령' | '시행규칙'
+  result: 'success' | 'not_found' | 'error'
+  timestamp: string
+  articleCount?: number
+  error?: string
+}
+
 interface EnforcementDownloadPanelProps {
   refreshTrigger?: number
 }
+
+type FilterType = 'all' | 'incomplete' | 'completed'
 
 export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownloadPanelProps = {}) {
   const [laws, setLaws] = useState<SavedLaw[]>([])
@@ -37,8 +49,10 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   const [downloadProgress, setDownloadProgress] = useState<Map<string, DownloadStatus[]>>(new Map())
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadedFiles, setDownloadedFiles] = useState<Set<string>>(new Set())
+  const [downloadLog, setDownloadLog] = useState<Record<string, { 시행령?: DownloadLogEntry; 시행규칙?: DownloadLogEntry }>>({})
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
   const [currentLawName, setCurrentLawName] = useState<string>('')
+  const [filter, setFilter] = useState<FilterType>('all')
 
   useEffect(() => {
     loadLaws()
@@ -51,14 +65,17 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   }, [refreshTrigger])
 
   async function loadLaws() {
+    setLoading(true)
     try {
-      const [lawsResponse, filesResponse] = await Promise.all([
+      const [lawsResponse, filesResponse, logResponse] = await Promise.all([
         fetch('/api/admin/list-parsed'),
-        fetch('/api/admin/list-enforcement-files')
+        fetch('/api/admin/list-enforcement-files'),
+        fetch('/api/admin/enforcement-download-log')
       ])
 
       const lawsData = await lawsResponse.json()
       const filesData = await filesResponse.json()
+      const logData = await logResponse.json()
 
       if (lawsData.success) {
         const allLaws = lawsData.laws || []
@@ -76,6 +93,10 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
             downloadDates.set(file.lawName, file.downloadedAt)
           })
         }
+
+        // Load download log
+        const log = logData.success ? logData.log : {}
+        setDownloadLog(log)
 
         setLaws(baseLaws)
         setDownloadedFiles(downloaded)
@@ -96,17 +117,22 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
           const decreePattern = patterns.find((pattern) => downloaded.has(pattern))
           const rulePattern = rulePatterns.find((pattern) => downloaded.has(pattern))
 
+          // Check log for confirmed "not found" status
+          const lawLog = log[law.lawName]
+          const decreeLoggedNotFound = lawLog?.시행령?.result === 'not_found'
+          const ruleLoggedNotFound = lawLog?.시행규칙?.result === 'not_found'
+
           initialProgress.set(law.lawName, [
             {
               lawName: law.lawName,
               type: '시행령',
-              status: decreePattern ? 'success' : 'pending',
+              status: decreePattern ? 'success' : decreeLoggedNotFound ? 'confirmed_none' : 'pending',
               downloadedAt: decreePattern ? downloadDates.get(decreePattern) : undefined
             },
             {
               lawName: law.lawName,
               type: '시행규칙',
-              status: rulePattern ? 'success' : 'pending',
+              status: rulePattern ? 'success' : ruleLoggedNotFound ? 'confirmed_none' : 'pending',
               downloadedAt: rulePattern ? downloadDates.get(rulePattern) : undefined
             }
           ])
@@ -118,6 +144,18 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
       console.error('Failed to load laws:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function saveDownloadLog(lawName: string, type: '시행령' | '시행규칙', result: 'success' | 'not_found' | 'error', articleCount?: number, error?: string) {
+    try {
+      await fetch('/api/admin/enforcement-download-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lawName, type, result, articleCount, error })
+      })
+    } catch (e) {
+      console.error('Failed to save download log:', e)
     }
   }
 
@@ -144,13 +182,20 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
           const enforcementName = `${lawName} ${type}`
           setDownloadedFiles((prev) => new Set([...prev, enforcementName]))
 
+          // Log success
+          saveDownloadLog(lawName, type, 'success', result.articleCount)
+
           if (result.skipped) {
             return { ...p, status: 'success' as const }
           }
           return { ...p, status: 'success' as const, articleCount: result.articleCount }
         } else if (result.notFound) {
-          return { ...p, status: 'not_found' as const }
+          // Log not found - this is a confirmed "none" state
+          saveDownloadLog(lawName, type, 'not_found')
+          return { ...p, status: 'confirmed_none' as const }
         } else {
+          // Log error
+          saveDownloadLog(lawName, type, 'error', undefined, result.error)
           return { ...p, status: 'error' as const, error: result.error }
         }
       })
@@ -161,41 +206,62 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         p.type === type ? { ...p, status: 'error' as const, error: error.message } : p
       )
       setDownloadProgress(new Map(downloadProgress.set(key, finalProgress)))
+      saveDownloadLog(lawName, type, 'error', undefined, error.message)
     }
   }
 
   async function downloadAll(lawName: string) {
     const key = lawName
-    setDownloadProgress(
-      new Map(
-        downloadProgress.set(key, [
-          { lawName, type: '시행령', status: 'pending' },
-          { lawName, type: '시행규칙', status: 'pending' }
-        ])
-      )
-    )
+    const currentProgress = downloadProgress.get(key) || []
+
+    // Only download items that are still pending (not confirmed_none or success)
+    const decreeStatus = currentProgress.find(p => p.type === '시행령')
+    const ruleStatus = currentProgress.find(p => p.type === '시행규칙')
+
+    const needsDecree = !decreeStatus || decreeStatus.status === 'pending' || decreeStatus.status === 'error'
+    const needsRule = !ruleStatus || ruleStatus.status === 'pending' || ruleStatus.status === 'error'
+
+    if (!needsDecree && !needsRule) {
+      return // Nothing to download
+    }
 
     setIsDownloading(true)
 
-    await downloadEnforcement(lawName, '시행령')
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    await downloadEnforcement(lawName, '시행규칙')
+    if (needsDecree) {
+      await downloadEnforcement(lawName, '시행령')
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+
+    if (needsRule) {
+      await downloadEnforcement(lawName, '시행규칙')
+    }
 
     setIsDownloading(false)
   }
 
   async function downloadAllLaws() {
-    if (!confirm(`전체 ${laws.length}개 법령의 시행령/시행규칙을 다운로드하시겠습니까?`)) {
+    // Get filtered laws that need download
+    const lawsToDownload = filteredLaws.filter(law => {
+      const progress = downloadProgress.get(law.lawName) || []
+      return progress.some(p => p.status === 'pending' || p.status === 'error')
+    })
+
+    if (lawsToDownload.length === 0) {
+      alert('다운로드할 항목이 없습니다.')
+      return
+    }
+
+    if (!confirm(`${lawsToDownload.length}개 법령의 시행령/시행규칙을 다운로드하시겠습니까?`)) {
       return
     }
 
     setIsDownloading(true)
-    setBatchProgress({ current: 0, total: laws.length })
+    setBatchProgress({ current: 0, total: lawsToDownload.length })
 
-    for (let i = 0; i < laws.length; i++) {
-      const law = laws[i]
+    for (let i = 0; i < lawsToDownload.length; i++) {
+      const law = lawsToDownload[i]
       setCurrentLawName(law.lawName)
-      setBatchProgress({ current: i + 1, total: laws.length })
+      setBatchProgress({ current: i + 1, total: lawsToDownload.length })
 
       await downloadAll(law.lawName)
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -204,7 +270,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
     setIsDownloading(false)
     setCurrentLawName('')
     setBatchProgress({ current: 0, total: 0 })
-    alert('✅ 전체 다운로드 완료!')
+    alert('✅ 다운로드 완료!')
   }
 
   function getStatusIcon(status: DownloadStatus['status']) {
@@ -217,6 +283,8 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         return <CheckCircle2 className="w-4 h-4 text-accent" />
       case 'not_found':
         return <XCircle className="w-4 h-4 text-warning" />
+      case 'confirmed_none':
+        return <MinusCircle className="w-4 h-4 text-muted-foreground" />
       case 'error':
         return <XCircle className="w-4 h-4 text-destructive" />
     }
@@ -232,10 +300,50 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         return '완료'
       case 'not_found':
         return '없음'
+      case 'confirmed_none':
+        return '없음 (확인됨)'
       case 'error':
         return '오류'
     }
   }
+
+  // Filter laws based on current filter
+  const filteredLaws = useMemo(() => {
+    return laws.filter(law => {
+      const progress = downloadProgress.get(law.lawName) || []
+      const allDone = progress.length === 2 && progress.every(p =>
+        p.status === 'success' || p.status === 'confirmed_none' || p.status === 'not_found'
+      )
+      const hasPending = progress.some(p => p.status === 'pending' || p.status === 'error')
+
+      switch (filter) {
+        case 'incomplete':
+          return hasPending
+        case 'completed':
+          return allDone
+        default:
+          return true
+      }
+    })
+  }, [laws, downloadProgress, filter])
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const allProgress = Array.from(downloadProgress.values()).flat()
+    const successCount = allProgress.filter(s => s.status === 'success').length
+    const confirmedNoneCount = allProgress.filter(s => s.status === 'confirmed_none' || s.status === 'not_found').length
+    const pendingCount = allProgress.filter(s => s.status === 'pending').length
+    const errorCount = allProgress.filter(s => s.status === 'error').length
+
+    return {
+      total: laws.length,
+      targetFiles: laws.length * 2,
+      success: successCount,
+      confirmedNone: confirmedNoneCount,
+      pending: pendingCount,
+      error: errorCount
+    }
+  }, [laws, downloadProgress])
 
   if (loading) {
     return (
@@ -245,30 +353,29 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
     )
   }
 
-  const completedCount = Array.from(downloadProgress.values())
-    .flat()
-    .filter((s) => s.status === 'success').length
-
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-muted-foreground mb-1">총 법령</div>
-          <div className="text-3xl font-bold text-foreground">{laws.length}</div>
+      <div className="grid grid-cols-5 gap-3">
+        <div className="p-3 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+          <div className="text-xs text-muted-foreground mb-1">총 법령</div>
+          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
         </div>
-        <div className="p-4 bg-primary/10 backdrop-blur-sm rounded-xl border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-primary mb-1">다운로드 대상</div>
-          <div className="text-3xl font-bold text-primary">{laws.length * 2}</div>
-          <div className="text-xs text-muted-foreground mt-1">시행령 + 시행규칙</div>
+        <div className="p-3 bg-accent/10 backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm">
+          <div className="text-xs text-accent mb-1">다운로드 완료</div>
+          <div className="text-2xl font-bold text-accent">{stats.success}</div>
         </div>
-        <div className="p-4 bg-accent/10 backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-accent mb-1">다운로드됨</div>
-          <div className="text-3xl font-bold text-accent">{completedCount}</div>
+        <div className="p-3 bg-muted/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
+          <div className="text-xs text-muted-foreground mb-1">없음 (확인)</div>
+          <div className="text-2xl font-bold text-muted-foreground">{stats.confirmedNone}</div>
         </div>
-        <div className="p-4 bg-warning/10 backdrop-blur-sm rounded-xl border border-warning/20 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-sm text-warning mb-1">남은 파일</div>
-          <div className="text-3xl font-bold text-warning">{laws.length * 2 - completedCount}</div>
+        <div className="p-3 bg-warning/10 backdrop-blur-sm rounded-xl border border-warning/20 shadow-sm">
+          <div className="text-xs text-warning mb-1">미확인</div>
+          <div className="text-2xl font-bold text-warning">{stats.pending}</div>
+        </div>
+        <div className="p-3 bg-destructive/10 backdrop-blur-sm rounded-xl border border-destructive/20 shadow-sm">
+          <div className="text-xs text-destructive mb-1">오류</div>
+          <div className="text-2xl font-bold text-destructive">{stats.error}</div>
         </div>
       </div>
 
@@ -302,17 +409,59 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         </div>
       )}
 
-      {/* Action Bar */}
+      {/* Action Bar with Filter */}
       <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
-        <div className="text-sm text-muted-foreground">
-          {laws.length}개 법령 · 각 법령당 2개 파일 (시행령, 시행규칙)
+        <div className="flex items-center gap-3">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <div className="flex gap-1">
+            <Button
+              variant={filter === 'all' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('all')}
+              className="h-8"
+            >
+              전체 ({laws.length})
+            </Button>
+            <Button
+              variant={filter === 'incomplete' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('incomplete')}
+              className="h-8"
+            >
+              미완료 ({laws.filter(law => {
+                const progress = downloadProgress.get(law.lawName) || []
+                return progress.some(p => p.status === 'pending' || p.status === 'error')
+              }).length})
+            </Button>
+            <Button
+              variant={filter === 'completed' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilter('completed')}
+              className="h-8"
+            >
+              완료 ({laws.filter(law => {
+                const progress = downloadProgress.get(law.lawName) || []
+                return progress.length === 2 && progress.every(p =>
+                  p.status === 'success' || p.status === 'confirmed_none' || p.status === 'not_found'
+                )
+              }).length})
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={loadLaws} disabled={loading || isDownloading} variant="outline" size="default" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </Button>
-          <Button onClick={downloadAllLaws} disabled={isDownloading || laws.length === 0} className="gap-2 shadow-lg shadow-primary/20 h-10" size="default">
+          <Button
+            onClick={downloadAllLaws}
+            disabled={isDownloading || filteredLaws.filter(law => {
+              const progress = downloadProgress.get(law.lawName) || []
+              return progress.some(p => p.status === 'pending' || p.status === 'error')
+            }).length === 0}
+            className="gap-2 shadow-lg shadow-primary/20 h-10"
+            size="default"
+          >
             {isDownloading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -321,7 +470,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
             ) : (
               <>
                 <Download className="h-4 w-4" />
-                전체 다운로드
+                {filter === 'incomplete' ? '미완료 다운로드' : '전체 다운로드'}
               </>
             )}
           </Button>
@@ -330,7 +479,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
 
       {/* Laws List */}
       <div className="space-y-3">
-        {laws.map((law) => {
+        {filteredLaws.map((law) => {
           const progress = downloadProgress.get(law.lawName) || []
           const decreeStatus = progress.find((p) => p.type === '시행령')
           const ruleStatus = progress.find((p) => p.type === '시행규칙')
@@ -389,30 +538,66 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                   )}
                 </div>
 
-                <Button
-                  onClick={() => downloadAll(law.lawName)}
-                  disabled={isDownloading}
-                  size="sm"
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {progress.some((p) => p.status === 'downloading') ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                  다운로드
-                </Button>
+                {/* Show download button only if at least one is pending or error */}
+                {(() => {
+                  const allDone = progress.length === 2 &&
+                    progress.every((p) => p.status === 'success' || p.status === 'confirmed_none' || p.status === 'not_found')
+                  const isCurrentlyDownloading = progress.some((p) => p.status === 'downloading')
+                  const hasPendingOrError = progress.some((p) => p.status === 'pending' || p.status === 'error')
+
+                  if (allDone && !isCurrentlyDownloading) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-sm text-accent">
+                        <CheckCircle2 className="w-4 h-4" />
+                        완료
+                      </div>
+                    )
+                  }
+
+                  if (!hasPendingOrError && !isCurrentlyDownloading) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MinusCircle className="w-4 h-4" />
+                        확인됨
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Button
+                      onClick={() => downloadAll(law.lawName)}
+                      disabled={isDownloading}
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {isCurrentlyDownloading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      다운로드
+                    </Button>
+                  )
+                })()}
               </div>
             </div>
           )
         })}
       </div>
 
-      {laws.length === 0 && (
+      {filteredLaws.length === 0 && (
         <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-          <p className="text-muted-foreground">저장된 법령이 없습니다</p>
-          <p className="text-sm text-muted-foreground mt-1">먼저 법령을 다운로드하세요</p>
+          <p className="text-muted-foreground">
+            {filter === 'incomplete' ? '미완료 항목이 없습니다' :
+             filter === 'completed' ? '완료된 항목이 없습니다' :
+             '저장된 법령이 없습니다'}
+          </p>
+          {filter !== 'all' && (
+            <Button variant="link" onClick={() => setFilter('all')} className="mt-2">
+              전체 보기
+            </Button>
+          )}
         </div>
       )}
 
@@ -420,10 +605,9 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
       <div className="p-4 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
         <div className="text-sm text-muted-foreground space-y-1">
           <div>• law.go.kr API에서 시행령/시행규칙 검색 및 다운로드</div>
-          <div>• 저장 경로: <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/parsed-laws/</code></div>
-          <div>• 자동으로 법령명 기반 매칭</div>
-          <div>• RAG 청킹을 위한 메타데이터 포함</div>
-          <div>• 다운로드 시점: 파일 생성일 기준 표시</div>
+          <div>• <strong>없음 (확인됨)</strong>: 시행령/시행규칙이 존재하지 않는 법령</div>
+          <div>• 필터: 미완료건만 선택하여 효율적으로 다운로드 가능</div>
+          <div>• 다운로드 이력은 <code className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">data/enforcement-download-log.json</code>에 저장</div>
         </div>
       </div>
     </div>

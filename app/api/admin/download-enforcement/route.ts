@@ -113,10 +113,17 @@ function extractContentFromHangArray(hangArray: any[], articleNum?: string): str
 
     // 배열인 경우
     if (Array.isArray(hangContent)) {
-      return hangContent.some(c => c && c.trim())
+      return hangContent.some(c => c && typeof c === 'string' && c.trim())
     }
     // 문자열인 경우
-    return hangContent.trim().length > 0
+    if (typeof hangContent === 'string') {
+      return hangContent.trim().length > 0
+    }
+    // 객체인 경우 (예: { content: '...' })
+    if (typeof hangContent === 'object' && hangContent.content) {
+      return hangContent.content.trim().length > 0
+    }
+    return false
   })
 
   // 모든 호 수집
@@ -140,30 +147,55 @@ function extractContentFromHangArray(hangArray: any[], articleNum?: string): str
     for (const hang of hangArray) {
       if (hang.항내용) {
         let hangContent = hang.항내용
+
+        // Handle array format (some 항내용 are arrays of strings or objects)
         if (Array.isArray(hangContent)) {
-          hangContent = hangContent.join('\n')
+          hangContent = hangContent
+            .map(c => typeof c === 'string' ? c : (c?.content || ''))
+            .join('\n')
         }
-        content += '\n' + hangContent
+        // Handle object format (e.g., { content: '...' })
+        else if (typeof hangContent === 'object' && hangContent.content) {
+          hangContent = hangContent.content
+        }
+
+        if (typeof hangContent === 'string') {
+          content += '\n' + hangContent
+        }
       }
 
       if (hang.호 && Array.isArray(hang.호)) {
         for (const ho of hang.호) {
           if (ho.호내용) {
             let hoContent = ho.호내용
+
+            // Handle array format
             if (Array.isArray(hoContent)) {
-              hoContent = hoContent.join('\n')
+              hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join('\n')
+            } else if (typeof hoContent === 'object' && hoContent.content) {
+              hoContent = hoContent.content
             }
-            content += '\n' + hoContent
+
+            if (typeof hoContent === 'string') {
+              content += '\n' + hoContent
+            }
           }
 
           if (ho.목 && Array.isArray(ho.목)) {
             for (const mok of ho.목) {
               if (mok.목내용) {
                 let mokContent = mok.목내용
+
+                // Handle array format
                 if (Array.isArray(mokContent)) {
-                  mokContent = mokContent.join('\n')
+                  mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join('\n')
+                } else if (typeof mokContent === 'object' && mokContent.content) {
+                  mokContent = mokContent.content
                 }
-                content += '\n  ' + mokContent
+
+                if (typeof mokContent === 'string') {
+                  content += '\n  ' + mokContent
+                }
               }
             }
           }
@@ -175,20 +207,34 @@ function extractContentFromHangArray(hangArray: any[], articleNum?: string): str
     for (const ho of allItems) {
       if (ho.호내용) {
         let hoContent = ho.호내용
+
+        // Handle array format
         if (Array.isArray(hoContent)) {
-          hoContent = hoContent.join('\n')
+          hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join('\n')
+        } else if (typeof hoContent === 'object' && hoContent.content) {
+          hoContent = hoContent.content
         }
-        content += '\n' + hoContent
+
+        if (typeof hoContent === 'string') {
+          content += '\n' + hoContent
+        }
       }
 
       if (ho.목 && Array.isArray(ho.목)) {
         for (const mok of ho.목) {
           if (mok.목내용) {
             let mokContent = mok.목내용
+
+            // Handle array format
             if (Array.isArray(mokContent)) {
-              mokContent = mokContent.join('\n')
+              mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join('\n')
+            } else if (typeof mokContent === 'object' && mokContent.content) {
+              mokContent = mokContent.content
             }
-            content += '\n  ' + mokContent
+
+            if (typeof mokContent === 'string') {
+              content += '\n  ' + mokContent
+            }
           }
         }
       }
