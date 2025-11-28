@@ -16,6 +16,7 @@ const API_KEY = process.env.GEMINI_API_KEY
 interface UploadRequest {
   fileNames: string[]
   delay?: number
+  concurrency?: number
 }
 
 async function uploadSingleLaw(fileName: string): Promise<{
@@ -115,7 +116,7 @@ async function uploadSingleLaw(fileName: string): Promise<{
 export async function POST(request: NextRequest) {
   try {
     const body: UploadRequest = await request.json()
-    const { fileNames, delay = 100 } = body
+    const { fileNames, delay = 100, concurrency = 1 } = body
 
     if (!fileNames || fileNames.length === 0) {
       return new Response(JSON.stringify({ success: false, error: '파일이 선택되지 않았습니다' }), {
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log(`[Stream Upload Laws] Starting upload of ${fileNames.length} files`)
+    console.log(`[Stream Upload Laws] Starting upload of ${fileNames.length} files (Concurrency: ${concurrency})`)
 
     const encoder = new TextEncoder()
     let aborted = false
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest) {
         let errorCount = 0
         const total = fileNames.length
         const results: Array<{ fileName: string; status: string; error?: string }> = []
+        let processedCount = 0
 
         const sendEvent = (data: any) => {
           if (!aborted) {
@@ -152,42 +154,57 @@ export async function POST(request: NextRequest) {
         // Send initial info
         sendEvent({ type: 'start', total })
 
-        for (let i = 0; i < fileNames.length && !aborted; i++) {
-          const fileName = fileNames[i]
+        // Process in chunks
+        for (let i = 0; i < fileNames.length && !aborted; i += concurrency) {
+          const chunk = fileNames.slice(i, i + concurrency)
 
-          // Send progress before starting each file
-          sendEvent({
-            type: 'uploading',
-            current: i + 1,
-            total,
-            fileName,
-            successCount,
-            errorCount
+          // Upload chunk in parallel
+          const chunkPromises = chunk.map(async (fileName, idx) => {
+            if (aborted) return null
+
+            // Send uploading event (approximate)
+            sendEvent({
+              type: 'uploading',
+              current: processedCount + idx + 1,
+              total,
+              fileName,
+              successCount,
+              errorCount
+            })
+
+            const result = await uploadSingleLaw(fileName)
+            return result
           })
 
-          const result = await uploadSingleLaw(fileName)
-          results.push(result)
+          const chunkResults = await Promise.all(chunkPromises)
 
-          if (result.status === 'success') {
-            successCount++
-          } else {
-            errorCount++
+          for (const result of chunkResults) {
+            if (!result || aborted) continue
+
+            results.push(result)
+            processedCount++
+
+            if (result.status === 'success') {
+              successCount++
+            } else {
+              errorCount++
+            }
+
+            // Send result for this file
+            sendEvent({
+              type: 'progress',
+              current: processedCount,
+              total,
+              fileName: result.fileName,
+              status: result.status,
+              error: result.error,
+              successCount,
+              errorCount
+            })
           }
 
-          // Send result for this file
-          sendEvent({
-            type: 'progress',
-            current: i + 1,
-            total,
-            fileName: result.fileName,
-            status: result.status,
-            error: result.error,
-            successCount,
-            errorCount
-          })
-
-          // Small delay between uploads
-          if (i < fileNames.length - 1 && !aborted) {
+          // Small delay between chunks
+          if (i + concurrency < fileNames.length && !aborted) {
             await new Promise((resolve) => setTimeout(resolve, delay))
           }
         }
@@ -202,7 +219,47 @@ export async function POST(request: NextRequest) {
           results
         })
 
-        console.log(`[Stream Upload Laws] ✅ 완료: 성공 ${successCount}, 실패 ${errorCount} (총 ${total}개)`)
+        // ✅ Log successful uploads to server-side file
+        try {
+          const successResults = results.filter(r => r.status === 'success')
+          if (successResults.length > 0) {
+            const logPath = path.join(process.cwd(), 'data', 'uploaded-laws-log.json')
+            let currentLog: any[] = []
+
+            try {
+              const content = await fs.readFile(logPath, 'utf-8')
+              currentLog = JSON.parse(content)
+            } catch {
+              // File doesn't exist or is invalid, start fresh
+            }
+
+            const newEntries = successResults.map(r => ({
+              fileName: r.fileName,
+              lawName: r.fileName.replace('.md', ''),
+              uploadedAt: new Date().toISOString(),
+              status: 'success'
+            }))
+
+            // Merge and deduplicate (by fileName)
+            const mergedLog = [...currentLog]
+            for (const entry of newEntries) {
+              const existingIndex = mergedLog.findIndex(e => e.fileName === entry.fileName)
+              if (existingIndex >= 0) {
+                mergedLog[existingIndex] = entry // Update existing
+              } else {
+                mergedLog.push(entry)
+              }
+            }
+
+            // Ensure data directory exists
+            await fs.mkdir(path.join(process.cwd(), 'data'), { recursive: true })
+            await fs.writeFile(logPath, JSON.stringify(mergedLog, null, 2))
+            console.log(`📝 Logged ${newEntries.length} uploads to ${logPath}`)
+          }
+        } catch (error) {
+          console.error('Failed to write upload log:', error)
+        }
+
         controller.close()
       },
       cancel() {
