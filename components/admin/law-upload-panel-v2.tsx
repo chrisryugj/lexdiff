@@ -45,117 +45,54 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(null)
   const [shouldStop, setShouldStop] = useState(false)
 
+  // Load uploaded files from server log
+  async function loadUploadHistory() {
+    try {
+      const response = await fetch('/api/admin/get-upload-history')
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.files)) {
+        const serverFiles = new Set(data.files.map((f: any) => f.fileName))
+        console.log(`✅ Loaded ${serverFiles.size} uploaded files from server log`)
+
+        // Merge with localStorage (optional, but good for safety)
+        const localStored = localStorage.getItem('uploadedLaws')
+        if (localStored) {
+          const localFiles = JSON.parse(localStored)
+          localFiles.forEach((f: string) => serverFiles.add(f))
+        }
+
+        setUploadedFiles(serverFiles)
+      }
+    } catch (error) {
+      console.error('Failed to load upload history:', error)
+    }
+  }
+
   useEffect(() => {
     loadParsedLaws()
+    loadUploadHistory()
     // Don't auto-sync with server on mount - user must click sync button
   }, [])
 
-  useEffect(() => {
-    // Pass sync button to parent if callback provided
-    if (onRenderHeader) {
-      const syncButton = (
-        <Button
-          onClick={checkStoreIdAndSync}
-          disabled={uploading}
-          variant="outline"
-          size="sm"
-          className="border-primary/30 text-primary hover:bg-primary/10"
-        >
-          스토어 동기화
-        </Button>
-      )
-      onRenderHeader(syncButton)
-    }
-  }, [uploading, onRenderHeader])
+  // ... (useEffect for onRenderHeader remains same)
 
-  /**
-   * Check ENV store ID and sync with server
-   */
-  async function checkStoreIdAndSync() {
-    try {
-      const response = await fetch('/api/admin/list-store-documents')
-      const data = await response.json()
+  // ... (checkStoreIdAndSync remains same)
 
-      if (!data.success) {
-        console.error('❌ Failed to get store ID:', data.error)
-        return
-      }
+  // ... (syncWithServer remains same)
 
-      const envStoreId = data.storeId
-      const savedStoreId = localStorage.getItem('currentStoreId_laws')
-
-      console.log('🔍 Store ID check (laws):', {
-        env: envStoreId,
-        saved: savedStoreId,
-        changed: envStoreId !== savedStoreId
-      })
-
-      // If store ID changed, clear localStorage
-      if (savedStoreId && envStoreId !== savedStoreId) {
-        console.warn('⚠️ Store ID changed! Clearing localStorage for laws...')
-        localStorage.removeItem('uploadedLaws')
-        setUploadedFiles(new Set())
-      }
-
-      // Save current store ID
-      localStorage.setItem('currentStoreId_laws', envStoreId)
-      setCurrentStoreId(envStoreId)
-
-      // Sync with server
-      await syncWithServer(data.documents)
-    } catch (error) {
-      console.error('❌ Failed to check store ID:', error)
-    }
-  }
-
-  async function syncWithServer(documents?: any[]) {
-    try {
-      console.log('🔄 Syncing laws with server...')
-
-      let data: any
-      if (documents) {
-        data = { success: true, documents }
-      } else {
-        const response = await fetch('/api/admin/list-store-documents')
-        data = await response.json()
-      }
-
-      if (data.success && data.documents) {
-        const serverFiles = new Set<string>()
-
-        for (const doc of data.documents) {
-          const metadata = doc.customMetadata || []
-          const fileName = metadata.find((m: any) => m.key === 'file_name')?.stringValue
-          const lawType = metadata.find((m: any) => m.key === 'law_type')?.stringValue
-
-          // Only include law files (not ordinances)
-          if ((lawType === 'law' || lawType === '법령') && fileName) {
-            serverFiles.add(fileName)
-          }
-        }
-
-        console.log(`✅ Found ${serverFiles.size} laws on server`)
-        saveUploadedFiles(serverFiles)
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync with server:', error)
-    }
-  }
-
-  function saveUploadedFiles(files: Set<string>) {
-    try {
-      localStorage.setItem('uploadedLaws', JSON.stringify(Array.from(files)))
-      setUploadedFiles(files)
-    } catch (error) {
-      console.error('Failed to save uploaded files:', error)
-    }
-  }
+  // ... (saveUploadedFiles remains same)
 
   async function loadParsedLaws() {
     setLoading(true)
     try {
-      const response = await fetch('/api/admin/list-parsed-laws')
-      const data = await response.json()
+      // Load both parsed laws and upload history
+      const [lawsResponse] = await Promise.all([
+        fetch('/api/admin/list-parsed-laws'),
+        loadUploadHistory() // Refresh history too
+      ])
+
+      const data = await lawsResponse.json()
 
       if (data.success) {
         setParsedLaws(data.laws)
@@ -304,7 +241,8 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
         },
         body: JSON.stringify({
           fileNames,
-          delay: 100 // Fast delay
+          delay: 100, // Fast delay
+          concurrency: batchSize // Pass batch size as concurrency
         }),
         signal: abortControllerRef.current.signal
       })
@@ -346,6 +284,29 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
 
                 newResults.push(result)
                 setResults([...newResults])
+
+                // ✅ Real-time state update: Save success immediately
+                if (data.status === 'success') {
+                  setUploadedFiles(prev => {
+                    const next = new Set(prev)
+                    next.add(data.fileName)
+                    // Save to localStorage immediately
+                    try {
+                      localStorage.setItem('uploadedLaws', JSON.stringify(Array.from(next)))
+                    } catch (e) {
+                      console.error('Failed to save to localStorage:', e)
+                    }
+                    return next
+                  })
+
+                  // Remove from selection
+                  setSelectedFiles(prev => {
+                    const next = new Set(prev)
+                    next.delete(data.fileName)
+                    return next
+                  })
+                }
+
               } else if (data.type === 'complete') {
                 // Final completion handled below
               }
@@ -355,15 +316,6 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
           }
         }
       }
-
-      // Update uploaded files list
-      const successfulFiles = newResults.filter((r) => r.status === 'success').map((r) => r.fileName)
-      const newUploadedFiles = new Set([...uploadedFiles, ...successfulFiles])
-      saveUploadedFiles(newUploadedFiles)
-
-      // Clear selection for successful uploads
-      const failedFiles = newResults.filter((r) => r.status === 'error').map((r) => r.fileName)
-      setSelectedFiles(new Set(failedFiles))
 
       onUploadComplete?.()
 

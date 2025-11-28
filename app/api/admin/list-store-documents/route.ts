@@ -33,9 +33,8 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       pageCount++
       // Note: Gemini File Search API max pageSize is 20
-      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${
-        pageToken ? `&pageToken=${pageToken}` : ''
-      }`
+      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${pageToken ? `&pageToken=${pageToken}` : ''
+        }`
 
       console.log(`[List Store Documents API] Fetching page ${pageCount}...`)
       console.log(`[List Store Documents API] URL: ${url}`)
@@ -99,6 +98,60 @@ export async function GET(request: NextRequest) {
         customMetadata: doc.customMetadata // Include metadata for sync
       }
     })
+
+    // ✅ Sync with server-side log
+    try {
+      const fs = require('fs').promises
+      const path = require('path')
+      const logPath = path.join(process.cwd(), 'data', 'uploaded-laws-log.json')
+
+      let currentLog: any[] = []
+      try {
+        const content = await fs.readFile(logPath, 'utf-8')
+        currentLog = JSON.parse(content)
+      } catch {
+        // File doesn't exist or is invalid
+      }
+
+      // Filter for laws only
+      const lawDocuments = formattedDocuments.filter(doc => {
+        const metadata = doc.customMetadata || []
+        const lawType = metadata.find((m: any) => m.key === 'law_type')?.stringValue
+        return lawType === 'law' || lawType === '법령'
+      })
+
+      if (lawDocuments.length > 0) {
+        const newEntries = lawDocuments.map(doc => {
+          const metadata = doc.customMetadata || []
+          const fileName = metadata.find((m: any) => m.key === 'file_name')?.stringValue || doc.displayName
+          return {
+            fileName,
+            lawName: doc.lawName,
+            uploadedAt: doc.createTime,
+            status: 'success',
+            documentId: doc.id
+          }
+        }).filter(entry => entry.fileName) // Ensure fileName exists
+
+        // Merge: Prefer existing log entries (to keep original upload time if needed), but add missing ones
+        // Actually, store sync is "source of truth", so maybe we should trust store?
+        // Let's just add missing ones to avoid overwriting custom local data if any.
+
+        const mergedLog = [...currentLog]
+        for (const entry of newEntries) {
+          const existingIndex = mergedLog.findIndex(e => e.fileName === entry.fileName)
+          if (existingIndex === -1) {
+            mergedLog.push(entry)
+          }
+        }
+
+        await fs.mkdir(path.join(process.cwd(), 'data'), { recursive: true })
+        await fs.writeFile(logPath, JSON.stringify(mergedLog, null, 2))
+        console.log(`📝 Synced ${lawDocuments.length} laws from store to log file`)
+      }
+    } catch (error) {
+      console.error('Failed to sync log with store documents:', error)
+    }
 
     return NextResponse.json({
       success: true,
