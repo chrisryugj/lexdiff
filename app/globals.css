@@ -6,6 +6,7 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(200%);
   }
@@ -47,6 +48,13 @@
   font-family: 'NotoSerifKR';
   src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NotoSerifKR.woff') format('woff');
   font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NanumSquareNeo';
+  src: url('https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareNeo/NanumSquareNeoTTF-aLt.woff2') format('woff2');
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -215,6 +223,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -306,6 +315,7 @@
     text-decoration: underline;
     cursor: pointer;
   }
+
   a.law-drf-link,
   .prose a.law-drf-link {
     color: oklch(0.7 0.18 240);
@@ -316,22 +326,29 @@
   .law-html-viewer p {
     margin: 0.5rem 0;
   }
+
   .law-html-viewer li {
     margin: 0.25rem 0;
   }
+
   .law-html-viewer h1,
   .law-html-viewer h2,
   .law-html-viewer h3 {
     margin: 0.75rem 0;
   }
-  .law-html-viewer br + br {
+
+  .law-html-viewer br+br {
     display: none;
   }
 
-  /* AI 답변 조문 발췌 - Noto Serif KR 폰트 + 작은 글씨 */
+  /* AI 답변 조문 발췌 - Pretendard 폰트 */
   .prose blockquote {
-    font-family: 'SchoolSafeDictation', 'Nanum Myeongjo', serif;
-    font-size: 0.9em;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 1.0em;
+    margin-left: 2.5rem;
+    margin-right: 1.5rem;
+    padding-right: 0.5rem;
+    color: #d1d5db;
   }
 
   /* 조문 발췌 내 법령명+조문번호(조문제목) 하이라이트 */
@@ -341,7 +358,7 @@
     color: oklch(0.88 0.08 250);
     padding: 0.15em 0.5em 0.15em 0;
     border-radius: 0 4px 4px 0;
-    font-size: 0.92em;
+    font-size: 1.0em;
     margin-bottom: 0.3em;
     font-weight: normal;
   }
@@ -376,9 +393,12 @@
 
 /* AI 모드 글로우 효과 */
 @keyframes glow-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(168, 85, 247, 0.7);
   }
@@ -390,9 +410,26 @@
 
 /* 에러 흔들림 효과 */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-  20%, 40%, 60%, 80% { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 .animate-shake {
@@ -405,6 +442,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -428,12 +466,10 @@
 
 /* Fixed Hero Section - Header + Search stays fixed */
 .hero-section-fixed {
-  background: linear-gradient(
-    180deg,
-    oklch(0.18 0.025 250) 0%,
-    oklch(0.12 0.015 250) 30%,
-    oklch(0.08 0.008 240) 70%
-  );
+  background: linear-gradient(180deg,
+      oklch(0.18 0.025 250) 0%,
+      oklch(0.12 0.015 250) 30%,
+      oklch(0.08 0.008 240) 70%);
   position: relative;
 }
 
@@ -466,11 +502,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(
-    ellipse 80% 50% at 50% -20%,
-    oklch(0.55 0.18 250 / 0.08) 0%,
-    transparent 70%
-  );
+  background: radial-gradient(ellipse 80% 50% at 50% -20%,
+      oklch(0.55 0.18 250 / 0.08) 0%,
+      transparent 70%);
   pointer-events: none;
 }
 
@@ -492,6 +526,7 @@
   0% {
     background-position: -200% center;
   }
+
   100% {
     background-position: 200% center;
   }
@@ -501,15 +536,19 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
 }
 
 @keyframes bounce-subtle {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-4px);
   }
@@ -538,33 +577,44 @@
 
 /* Liquid Glass Morphism Animations */
 @keyframes liquid-1 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   33% {
     transform: translate(30%, -30%) scale(1.1);
   }
+
   66% {
     transform: translate(-20%, 20%) scale(0.9);
   }
 }
 
 @keyframes liquid-2 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   33% {
     transform: translate(-30%, 30%) scale(0.9);
   }
+
   66% {
     transform: translate(20%, -20%) scale(1.1);
   }
 }
 
 @keyframes liquid-3 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(-50%, -50%) scale(1) rotate(0deg);
   }
+
   50% {
     transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
   }
@@ -575,9 +625,11 @@
     transform: scale(0);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.2);
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -606,6 +658,7 @@
     opacity: 0;
     transform: translateY(30px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -617,6 +670,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -633,10 +687,13 @@
 
 /* Swipe Tutorial Animations */
 @keyframes swipe-left {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0);
     opacity: 0.3;
   }
+
   50% {
     transform: translateX(-30px);
     opacity: 1;
@@ -644,10 +701,13 @@
 }
 
 @keyframes swipe-right {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0);
     opacity: 0.3;
   }
+
   50% {
     transform: translateX(30px);
     opacity: 1;
@@ -679,20 +739,37 @@
 }
 
 /* Staggered children animation */
-.reveal-stagger > * {
+.reveal-stagger>* {
   opacity: 0;
   transform: translateY(30px);
   transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.reveal-stagger.revealed > *:nth-child(1) { transition-delay: 0ms; }
-.reveal-stagger.revealed > *:nth-child(2) { transition-delay: 80ms; }
-.reveal-stagger.revealed > *:nth-child(3) { transition-delay: 160ms; }
-.reveal-stagger.revealed > *:nth-child(4) { transition-delay: 240ms; }
-.reveal-stagger.revealed > *:nth-child(5) { transition-delay: 320ms; }
-.reveal-stagger.revealed > *:nth-child(6) { transition-delay: 400ms; }
+.reveal-stagger.revealed>*:nth-child(1) {
+  transition-delay: 0ms;
+}
 
-.reveal-stagger.revealed > * {
+.reveal-stagger.revealed>*:nth-child(2) {
+  transition-delay: 80ms;
+}
+
+.reveal-stagger.revealed>*:nth-child(3) {
+  transition-delay: 160ms;
+}
+
+.reveal-stagger.revealed>*:nth-child(4) {
+  transition-delay: 240ms;
+}
+
+.reveal-stagger.revealed>*:nth-child(5) {
+  transition-delay: 320ms;
+}
+
+.reveal-stagger.revealed>*:nth-child(6) {
+  transition-delay: 400ms;
+}
+
+.reveal-stagger.revealed>* {
   opacity: 1;
   transform: translateY(0);
 }
@@ -750,12 +827,10 @@
 
 /* CTA Section gradient */
 .cta-gradient {
-  background: linear-gradient(
-    180deg,
-    oklch(0.11 0.008 240) 0%,
-    oklch(0.13 0.015 250) 50%,
-    oklch(0.11 0.008 240) 100%
-  );
+  background: linear-gradient(180deg,
+      oklch(0.11 0.008 240) 0%,
+      oklch(0.13 0.015 250) 50%,
+      oklch(0.11 0.008 240) 100%);
   position: relative;
 }
 
@@ -767,24 +842,20 @@
   transform: translate(-50%, -50%);
   width: 60%;
   height: 60%;
-  background: radial-gradient(
-    circle,
-    oklch(0.55 0.18 250 / 0.06) 0%,
-    transparent 70%
-  );
+  background: radial-gradient(circle,
+      oklch(0.55 0.18 250 / 0.06) 0%,
+      transparent 70%);
   pointer-events: none;
 }
 
 /* Divider line */
 .section-divider {
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(0.25 0.02 240) 20%,
-    oklch(0.25 0.02 240) 80%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(0.25 0.02 240) 20%,
+      oklch(0.25 0.02 240) 80%,
+      transparent 100%);
 }
 
 /* Floating scroll indicator */
@@ -793,10 +864,13 @@
 }
 
 @keyframes float-down {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
     opacity: 0.4;
   }
+
   50% {
     transform: translateY(8px);
     opacity: 0.8;
