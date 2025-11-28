@@ -617,6 +617,28 @@ export async function* queryFileSearchStream(
       }
     }
 
+    // 조문 제목 추출
+    let articleTitle = ''
+
+    // ✅ 방법 1: Structured Markdown 메타데이터 블록
+    const articleTitleMatch = chunkText.match(/\*\*제목\*\*:\s*(.+?)(?:\n|$)/m)
+    if (articleTitleMatch) {
+      articleTitle = articleTitleMatch[1].trim()
+    }
+
+    // ✅ 방법 2 (Fallback): "## 제N조 조문제목" 또는 "## 제N조의M 조문제목" 패턴
+    // 예: "## 제38조 신고납부" → "신고납부"
+    if (!articleTitle && articleNum) {
+      const headingMatch = chunkText.match(/## 제\d+(?:의\d+)?조\s+(.+?)(?:\n|$)/m)
+      if (headingMatch) {
+        const potentialTitle = headingMatch[1].trim()
+        // 본문 시작이 아닌 실제 제목인지 확인 (짧고 괄호가 없는 경우)
+        if (potentialTitle.length <= 30 && !potentialTitle.includes('(') && !potentialTitle.includes('①')) {
+          articleTitle = potentialTitle
+        }
+      }
+    }
+
     // 시행일 추출 (Structured Markdown)
     let effectiveDate = ''
     const effectiveDateMatch = chunkText.match(/\*\*시행일\*\*:\s*(.+?)(?:\n|$)/m)
@@ -627,6 +649,7 @@ export async function* queryFileSearchStream(
     const citation = {
       lawName: lawName || '알 수 없음',
       articleNum,
+      articleTitle: articleTitle || undefined,  // ✅ 조문 제목 추가
       text: chunkText.substring(0, 200) + '...',
       source: `${lawName || '알 수 없음'} ${articleNum}`.trim(),
       relevanceScore: chunk.relevanceScore,
@@ -634,10 +657,11 @@ export async function* queryFileSearchStream(
     }
 
     // DEBUG: 추출 결과 로깅
-    if (idx === 0 || !lawName) {
+    if (idx === 0 || !lawName || articleTitle) {
       console.log('[File Search] Extracted citation:', {
         lawName: citation.lawName,
         articleNum: citation.articleNum,
+        articleTitle: citation.articleTitle || '(미추출)',
         hasUri: !!uri,
         hasMetadata: !!chunk.retrievedContext?.metadata,
         extractionMethod: lawName ? 'success' : 'fallback'

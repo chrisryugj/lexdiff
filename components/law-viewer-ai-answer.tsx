@@ -116,20 +116,18 @@ export function AIAnswerSidebar({
 
                                         <div className="relative flex items-start gap-2.5 w-full">
                                             <div className="flex-1 min-w-0">
-                                                {/* Law Name */}
-                                                <div className="text-base font-semibold text-foreground/90 leading-tight mb-1.5 group-hover:text-primary transition-colors break-words pr-12">
-                                                    {law.lawName}
+                                                {/* 법령명 + 조문번호 (한 줄, 조문번호 색상 다르게) */}
+                                                <div className="text-base font-semibold leading-tight mb-1 break-words pr-12">
+                                                    <span className="text-foreground/90 group-hover:text-primary transition-colors">{law.lawName}</span>
+                                                    {' '}
+                                                    <span className="text-muted-foreground/70">{law.article}</span>
                                                 </div>
-                                                {/* Article Info */}
-                                                <div className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
-                                                    <span className="font-medium">{law.article}</span>
-                                                    {law.title && (
-                                                        <>
-                                                            <span className="w-0.5 h-2.5 bg-border/60 rounded-full" />
-                                                            <span className="opacity-80 truncate">{law.title}</span>
-                                                        </>
-                                                    )}
-                                                </div>
+                                                {/* 조문제목 - 괄호 제거 */}
+                                                {law.title && (
+                                                    <div className="text-sm text-muted-foreground truncate">
+                                                        {law.title.replace(/^\(|\)$/g, '')}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Icon Indicator - 우측 상단 절대 위치 */}

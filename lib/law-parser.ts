@@ -408,8 +408,9 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
   debugLogger.info('발췌조문 헤더 추출', { count: laws.length })
 
   // 패턴 2: 관련 법령 섹션의 리스트
-  // "## 🔗 관련 법령" 섹션 찾기 (📖 → 🔗 변경됨)
-  const relatedSectionPattern = /## 🔗 관련\s*법령([\s\S]*?)(?=##|$)/
+  // "🔗 관련 법령" 또는 "## 🔗 관련 법령" 섹션 찾기
+  // Phase 7: AI 프롬프트가 ## 없이 출력하므로 선택적으로 매칭
+  const relatedSectionPattern = /(?:##\s*)?🔗\s*관련\s*법령([\s\S]*?)(?=📋|📄|💡|⚖️|##|$)/
   const sectionMatch = markdown.match(relatedSectionPattern)
 
   if (sectionMatch) {
@@ -434,22 +435,25 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
     debugLogger.info('관련 법령 섹션 없음')
   }
 
-  // 패턴 3: 인라인 「법령명」 제N조 패턴 (인용 괄호)
-  // 예: 「도로법」 제61조, 「도로법 시행령」 제63조
-  const quotedLawPattern = /「([^」]+)」\s*제(\d+)조(의(\d+))?/g
+  // 패턴 3: 인라인 「법령명」 제N조 (제목) 패턴 (인용 괄호)
+  // 예: 「도로법」 제61조, 「도로법 시행령」 제63조 (신고납부)
+  // Phase 7: (제목) 패턴도 캡처
+  const quotedLawPattern = /「([^」]+)」\s*제(\d+)조(의(\d+))?\s*(\([^)]+\))?/g
   let quotedMatch
 
   while ((quotedMatch = quotedLawPattern.exec(markdown)) !== null) {
     const lawName = quotedMatch[1].trim()
     const articleNum = quotedMatch[2] + (quotedMatch[4] ? `의${quotedMatch[4]}` : '')
     const jo = buildJO(articleNum)
+    const titlePart = quotedMatch[5]?.trim()  // (제목) 부분
 
     if (jo) {
       laws.push({
         lawName,
         article: `제${articleNum}조`,
         jo,
-        display: `${lawName} 제${articleNum}조`,
+        title: titlePart,  // ✅ 조문 제목 추가
+        display: `${lawName} 제${articleNum}조${titlePart ? ' ' + titlePart : ''}`,
         source: 'related'
       })
     }

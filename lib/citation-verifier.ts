@@ -22,6 +22,7 @@ export interface Citation {
   lawName: string
   lawId?: string // 법령 ID (메타데이터에서 추출)
   articleNum: string // "제38조", "제38조의2" 등
+  articleTitle?: string // 조문 제목 (예: "신고납부")
   text: string
   source: string
   relevanceScore?: number

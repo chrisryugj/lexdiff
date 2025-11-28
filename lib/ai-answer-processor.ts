@@ -322,8 +322,8 @@ function styleStructuredSections(text: string): string {
   // 4. 💡 추가 참고: 불릿 + 들여쓰기 + 상단 여백
   result = indentSection(result, '💡 추가 참고', { indent: '1rem', bullet: true })
 
-  // 5. 🔗 관련 법령: 들여쓰기만 + 상단 여백
-  result = indentSection(result, '🔗 관련 법령', { indent: '1rem', bullet: false })
+  // 5. 🔗 관련 법령: 들여쓰기 + 📜 링크 아이콘 추가
+  result = styleRelatedLawsSection(result, '🔗 관련 법령')
 
   // 6. 📄 상세 내용: 하위 섹션(📖/📝/🔴) 스타일링 + 불릿 + 들여쓰기
   result = styleDetailSection(result, '📄 상세 내용', { indent: '1rem', bullet: true })
@@ -499,6 +499,60 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
     })
 
     // 제목 + 내용 (빈 줄 없이 붙임)
+    return titleLine + contentLines.join('')
+  })
+}
+
+/**
+ * 🔗 관련 법령 섹션 전용 처리
+ * 각 법령 앞에 📜 링크 아이콘 추가
+ */
+function styleRelatedLawsSection(text: string, sectionTitle: string): string {
+  const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  const sectionRegex = new RegExp(
+    `(${escapedTitle}[\\s\\S]*?)(?=📋 핵심 요약|📄 상세 내용|💡 추가 참고|⚖️ 조문 발췌|$)`,
+    'g'
+  )
+
+  // Link2 아이콘 SVG (사이드바와 동일한 lucide Link2 아이콘)
+  const linkIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5" style="color: hsl(var(--primary)); vertical-align: -2px;"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>'
+
+  return text.replace(sectionRegex, (match) => {
+    const lines = match.split('\n')
+    const [titleLine, ...rest] = lines
+    const contentLines: string[] = []
+
+    rest.forEach((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return
+
+      // 이미 HTML 태그로 시작하는 줄은 그대로
+      if (trimmed.startsWith('<div') || trimmed.startsWith('<span')) {
+        contentLines.push(line)
+        return
+      }
+
+      // 마크다운 불릿/대시 제거
+      let cleanText = stripLeadingBullet(trimmed)
+      if (!cleanText) return
+
+      // 이미 📜가 있으면 제거 (중복 방지)
+      cleanText = cleanText.replace(/^📜\s*/, '')
+
+      // 「법령명」 패턴이 있는 줄에만 아이콘 추가
+      if (cleanText.includes('「') && cleanText.includes('」')) {
+        contentLines.push(
+          `<div style="margin-left: 1rem;">${linkIcon}${cleanText}</div>`
+        )
+      } else {
+        // 법령 패턴이 없는 일반 텍스트
+        contentLines.push(
+          `<div style="margin-left: 1rem;">${cleanText}</div>`
+        )
+      }
+    })
+
     return titleLine + contentLines.join('')
   })
 }

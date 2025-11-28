@@ -149,10 +149,22 @@ export function LawViewer({
         const articleNum = citation.articleNum.replace(/^제/, '').replace(/조$/, '')
         const jo = buildJO(articleNum)
 
+        // ✅ 조문 제목 보완: citation에 제목이 없으면 relatedArticles에서 찾기
+        let title = citation.articleTitle
+        if (!title && relatedArticles.length > 0) {
+          const matching = relatedArticles.find(
+            r => r.lawName === citation.lawName && r.article === citation.articleNum && r.title
+          )
+          if (matching) {
+            title = matching.title
+          }
+        }
+
         return {
           lawName: citation.lawName,
           article: citation.articleNum,
           jo,
+          title,  // ✅ 조문 제목 (보완 포함)
           display: `${citation.lawName} ${citation.articleNum}`,
           source: 'citation' as any,  // ✅ Citations 전용 source (기존 'excerpt' | 'related'과 별개)
           fullText: citation.text
