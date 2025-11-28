@@ -30,13 +30,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 📄 Additional Documentation
 
-- `docs/02-API_INTEGRATION.md` - API 통합 가이드
-- `docs/04-DATABASE_SCHEMA.md` - Turso DB 스키마
-- `docs/05-DEPLOYMENT_GUIDE.md` - 배포 가이드
-- `docs/06-GEMINI_FILE_SEARCH_GUIDE.md` - File Search 설정
-- `docs/03-CODE_EXAMPLES.md` - 코드 예시 모음
+- `docs/06-GEMINI_FILE_SEARCH_GUIDE.md` - File Search 설정 (핵심)
+- `docs/11-REFACTORING_PLAN_V3.md` - 현재 진행중 리팩토링 계획
+- `docs/13-bmad-architect-full-project-analysis.md` - 전체 아키텍처 분석
+- `.claude/agent.md` - 에이전트 활용 가이드
+- `task.md` - 작업 로그
 - `docs/future/` - 미래 기능 계획 (Phase 8+)
-- `docs/archived/` - 완료된 구현 문서
+- `docs/archived/` - 완료된 구현 문서 (29개)
 
 ---
 
@@ -68,7 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 3. **사용자 답변 확인 후 작업 시작**:
    - 모든 불명확한 사항 해결 확인
-   - 03-agent.md 참조하여 적절한 에이전트 활용 검토
+   - .claude/agent.md 참조하여 적절한 에이전트 활용 검토
 
 **예시**:
 ```
