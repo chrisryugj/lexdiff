@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Search, Keyboard, Star, GitCompare, Link2, Smartphone, MessageSquare, FileText, Quote, Zap, Lightbulb, CheckCircle, XCircle, BookOpen, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,18 @@ type TabType = 'law-search' | 'ai-search'
 
 export default function HelpPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('law-search')
+
+  // 뒤로가기 핸들러 - 브라우저 히스토리 사용
+  const handleBack = () => {
+    // 히스토리가 있으면 뒤로가기, 없으면 홈으로
+    if (window.history.length > 1) {
+      window.history.back()
+    } else {
+      router.push('/')
+    }
+  }
 
   useEffect(() => {
     // URL 해시에서 탭 타입 읽기
@@ -32,11 +43,9 @@ export default function HelpPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="shrink-0">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={handleBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div className="flex items-center gap-2">
               <HelpCircle className="h-6 w-6 text-blue-500" />
               <h1 className="text-xl font-bold">LexDiff 사용 가이드</h1>
