@@ -107,6 +107,10 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = styleStructuredSections(text)
   debugLogger.info('스타일링 후', { hasBlockquote: text.includes('<blockquote') })
 
+  // 4.5단계: [1] [2] [3] 단계 형식을 CSS 스타일링으로 변환 (Phase 7)
+  text = styleStepNumbers(text)
+  debugLogger.info('단계 스타일링 후', { hasStepContainer: text.includes('step-container') })
+
   // 5단계: 법령 링크 생성 (이스케이프된 텍스트 처리)
   // linkifyRefsAI가 디코드 → 링크 생성 → 재이스케이프 처리
   text = linkifyRefsAI(text)
@@ -185,8 +189,22 @@ function markLawQuotes(text: string): string {
       continue
     }
 
-    // "📖 핵심 해석" 종료 - 블록 종료
-    if (inQuoteSection && (trimmed.includes('📖 핵심 해석') || trimmed.includes('핵심 해석'))) {
+    // 블록 종료 조건: 다음 섹션 시작 시
+    // - 📖 핵심 해석
+    // - 🔗 관련 법령 (Phase 7: 조문 발췌 다음에 바로 관련 법령이 오는 경우)
+    // - 📄 상세 내용, 💡 추가 참고 등 다른 주요 섹션
+    const isEndOfQuote = inQuoteSection && (
+      trimmed.includes('📖 핵심 해석') ||
+      trimmed.includes('핵심 해석') ||
+      trimmed.includes('🔗 관련 법령') ||
+      trimmed.includes('관련 법령') ||
+      trimmed.includes('📄 상세 내용') ||
+      trimmed.includes('💡 추가 참고') ||
+      trimmed.includes('⚠️ 조건') ||
+      trimmed.includes('📝 실무')
+    )
+
+    if (isEndOfQuote) {
       // 수집된 조문 내용을 블록으로 감싸기
       if (currentQuoteLines.length > 0) {
         result.push('<<<QUOTE_START>>>')
@@ -388,7 +406,8 @@ function styleLawQuotes(text: string): string {
  * 모바일 최적화: 이모지와 텍스트가 함께 줄바꿈되지 않도록 white-space: nowrap 추가
  */
 function styleMainSectionHeadings(text: string): string {
-  const mainSections = ['📋 핵심 요약', '📄 상세 내용', '💡 추가 참고', '🔗 관련 법령']
+  // Phase 7: ⚖️ 조문 발췌를 주요 섹션으로 승격 (📋 핵심 요약과 같은 레벨)
+  const mainSections = ['📋 핵심 요약', '⚖️ 조문 발췌', '📄 상세 내용', '💡 추가 참고', '🔗 관련 법령']
 
   let result = text
 
@@ -518,13 +537,13 @@ function styleDetailSection(text: string, sectionTitle: string, options: IndentO
         return
       }
 
-      // 하위 섹션 제목 감지 (모바일 최적화: white-space: nowrap 추가)
+      // Phase 7: ⚖️ 조문 발췌는 이제 styleMainSectionHeadings에서 주요 섹션으로 처리됨
+      // 여기서는 하위 섹션 상태만 리셋
       if (trimmed.includes('⚖️ 조문 발췌')) {
         currentSub = 'none'
         isFirstContentInSub = false
-        contentLines.push(
-          `<div style="font-weight: bold; margin-left: 1rem; margin-top: 0.0rem; white-space: nowrap;">⚖️ 조문 발췌</div>`
-        )
+        // 주요 섹션으로 이미 스타일링되었으므로 그대로 통과
+        contentLines.push(line)
         return
       }
 
@@ -634,3 +653,23 @@ function styleDetailSection(text: string, sectionTitle: string, options: IndentO
 
 // 기존 linkifyRefsB와 restoreLinkMarkers 함수는 통합 시스템(unified-link-generator)으로 대체됨
 // linkifyRefsAI 사용으로 마커 시스템 불필요
+
+/**
+ * ✅ Phase 7: [1] [2] [3] 단계 형식을 CSS 스타일링으로 변환
+ * 절차 질문(procedural) 답변에서 단계별 표시를 시각적으로 강조
+ */
+function styleStepNumbers(text: string): string {
+  // [1], [2], [3] 등의 패턴을 찾아서 스타일링된 HTML로 변환
+  // 패턴: 줄 시작(또는 태그 뒤) + [숫자] + 내용
+  const stepRegex = /(?:^|>|\n)\s*\[(\d+)\]\s*([^\n<]+)/g
+
+  return text.replace(stepRegex, (match, num, content) => {
+    // 매치 앞의 문자 보존 (>, \n 등)
+    const prefix = match.match(/^[>\n]/) ? match[0] : ''
+
+    return `${prefix}<div class="step-container" style="display: flex; align-items: flex-start; gap: 0.75rem; margin: 0.4rem 0; margin-left: 1rem;">
+      <div class="step-number" style="background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.8) 100%); color: white; border-radius: 50%; min-width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">${num}</div>
+      <div class="step-content" style="flex: 1; padding-top: 0.1rem;">${content.trim()}</div>
+    </div>`
+  })
+}

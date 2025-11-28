@@ -82,6 +82,7 @@ interface LawViewerProps {
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
   aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
+  aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
 }
 
 export function LawViewer({
@@ -103,6 +104,7 @@ export function LawViewer({
   userQuery = '',
   aiConfidenceLevel = 'high',
   aiQueryType = 'general',
+  aiIsTruncated = false,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -1220,7 +1222,8 @@ export function LawViewer({
                     </div>
                   </ScrollArea>
                 )
-              ) : aiAnswerMode && aiAnswerContent ? (
+              ) : aiAnswerMode ? (
+                // ✅ Phase 7: AI 모드 - 헤더 유지하면서 AIAnswerContent 표시 (답변 없을 때도)
                 <ScrollArea className="h-full" ref={contentRef}>
                   <div className="pb-20">
                     <AIAnswerContent
@@ -1233,6 +1236,7 @@ export function LawViewer({
                       setFontSize={setFontSize}
                       handleContentClick={handleContentClick}
                       aiQueryType={aiQueryType}
+                      isTruncated={aiIsTruncated}
                     />
                   </div>
                 </ScrollArea>
