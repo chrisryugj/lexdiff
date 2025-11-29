@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useState, useRef, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { Copy, Check } from "lucide-react"
 import { Button, buttonVariants } from "./button"
 import { cn } from "@/lib/utils"
@@ -40,7 +41,7 @@ export function CopyButton({
   ...props
 }: CopyButtonProps) {
   const [showFeedback, setShowFeedback] = useState(false)
-  const [feedbackPosition, setFeedbackPosition] = useState({ x: 0, y: 0 })
+  const [feedbackPosition, setFeedbackPosition] = useState({ x: 0, y: 0, showBelow: false })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -48,12 +49,15 @@ export function CopyButton({
     async (e: React.MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation()
 
-      // 버튼 위치 계산
+      // 버튼 위치 계산 - 버튼 위 또는 아래에 표시
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect()
+        // 버튼이 화면 상단에 가까우면 아래에 표시, 아니면 위에 표시
+        const showBelow = rect.top < 50
         setFeedbackPosition({
           x: rect.left + rect.width / 2,
-          y: rect.top - 8,
+          y: showBelow ? rect.bottom + 8 : rect.top - 8,
+          showBelow,
         })
       }
 
@@ -121,35 +125,34 @@ export function CopyButton({
   )
 }
 
-/** 알림 포탈 컴포넌트 */
+/** 알림 포탈 컴포넌트 - 실제 React Portal로 body에 렌더링 */
 function CopyFeedbackPortal({
   position,
   message,
 }: {
-  position: { x: number; y: number }
+  position: { x: number; y: number; showBelow: boolean }
   message: string
 }) {
-  const [mounted, setMounted] = useState(false)
+  // 클라이언트 사이드에서만 렌더링
+  if (typeof window === "undefined") return null
 
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return null
-
-  return (
+  return createPortal(
     <div
-      className="fixed z-[9999] pointer-events-none animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2"
+      className={cn(
+        "fixed z-[9999] pointer-events-none animate-in fade-in-0 zoom-in-95",
+        position.showBelow ? "slide-in-from-top-2" : "slide-in-from-bottom-2"
+      )}
       style={{
         left: position.x,
         top: position.y,
-        transform: "translate(-50%, -100%)",
+        transform: position.showBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
       }}
     >
-      <div className="bg-foreground text-background px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
+      <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
         {message}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
