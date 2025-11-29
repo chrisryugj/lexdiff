@@ -8,35 +8,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CRITICAL**: 상세한 내용은 아래 문서를 참조하세요. Claude는 필요시 자동으로 이 문서들을 읽습니다.
 
-- 🔴 **[JSON→HTML 파싱 플로우](important-docs/JSON_TO_HTML_FLOW.md)** 🚨 **가장 자주 참조**
+- 🔴 **[JSON→HTML 파싱 플로우](important-docs/03-JSON_TO_HTML_FLOW.md)** 🚨 **가장 자주 참조**
   - API JSON 응답 → HTML 생성 전체 파이프라인
   - `extractArticleText()` 상세 설명
   - 자주 발생하는 실수 패턴
 
-- 🔴 **[RAG Architecture](important-docs/RAG_ARCHITECTURE.md)**
+- 🔴 **[RAG Architecture](important-docs/05-RAG_ARCHITECTURE.md)**
   - Google File Search RAG 시스템 구조
   - SSE 버퍼 처리 패턴 (답변 잘림 방지)
   - API 응답 파싱 (XML vs JSON)
 
-- 🟡 **[Debugging Guide](important-docs/DEBUGGING_GUIDE.md)**
+- 🟡 **[Debugging Guide](important-docs/02-DEBUGGING_GUIDE.md)**
   - 자주 발생하는 에러 패턴 및 해결법
   - Debug Console 사용법
   - 환경별 디버깅 방법
 
-- 🟢 **[Change Log](important-docs/CHANGELOG.md)**
+- 🟢 **[Change Log](important-docs/01-CHANGELOG.md)**
   - 날짜별 상세 변경 이력
   - 문제 → 해결 → 영향 기록
   - 과거 버그 재발 방지
 
 ### 📄 Additional Documentation
 
-- `docs/API_INTEGRATION.md` - API 통합 가이드
-- `docs/DATABASE_SCHEMA.md` - Turso DB 스키마
-- `docs/DEPLOYMENT_GUIDE.md` - 배포 가이드
-- `docs/GEMINI_FILE_SEARCH_GUIDE.md` - File Search 설정
-- `docs/CODE_EXAMPLES.md` - 코드 예시 모음
+- `docs/06-GEMINI_FILE_SEARCH_GUIDE.md` - File Search 설정 (핵심)
+- `docs/11-REFACTORING_PLAN_V3.md` - 현재 진행중 리팩토링 계획
+- `docs/13-bmad-architect-full-project-analysis.md` - 전체 아키텍처 분석
+- `.claude/agent.md` - 에이전트 활용 가이드
+- `task.md` - 작업 로그
 - `docs/future/` - 미래 기능 계획 (Phase 8+)
-- `docs/archived/` - 완료된 구현 문서
+- `docs/archived/` - 완료된 구현 문서 (29개)
 
 ---
 
@@ -68,7 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 3. **사용자 답변 확인 후 작업 시작**:
    - 모든 불명확한 사항 해결 확인
-   - agent.md 참조하여 적절한 에이전트 활용 검토
+   - .claude/agent.md 참조하여 적절한 에이전트 활용 검토
 
 **예시**:
 ```
@@ -117,10 +117,10 @@ components/
 
 ```typescript
 // 예시: HTML 생성 관련 작업을 할 때
-1. Read important-docs/JSON_TO_HTML_FLOW.md
+1. Read important-docs/03-JSON_TO_HTML_FLOW.md
 2. 문서의 패턴 확인
 3. 작업 진행
-4. 디버깅 필요 시 important-docs/DEBUGGING_GUIDE.md 참조
+4. 디버깅 필요 시 important-docs/02-DEBUGGING_GUIDE.md 참조
 ```
 
 ### 불확실성 처리 원칙
@@ -151,13 +151,13 @@ components/
 
 1. 해당 important-docs 문서를 먼저 업데이트
 2. 문제 → 해결 → 영향을 명확히 기록
-3. CHANGELOG.md에 날짜별로 추가
+3. 01-CHANGELOG.md에 날짜별로 추가
 4. 이 CLAUDE.md는 참조 링크만 유지
 
 **예시**:
 ```
 ❌ CLAUDE.md에 500줄 추가
-✅ important-docs/JSON_TO_HTML_FLOW.md 업데이트 + CHANGELOG.md 날짜별 기록
+✅ important-docs/03-JSON_TO_HTML_FLOW.md 업데이트 + 01-CHANGELOG.md 날짜별 기록
 ```
 
 ---
@@ -175,7 +175,7 @@ if (buffer.trim()) {
 }
 ```
 📍 `file-search-rag-view.tsx:142-172`
-📖 상세: [RAG_ARCHITECTURE.md](important-docs/RAG_ARCHITECTURE.md)
+📖 상세: [RAG_ARCHITECTURE.md](important-docs/05-RAG_ARCHITECTURE.md)
 
 ### 2. API Response Parsing (XML vs JSON)
 ```typescript
@@ -187,7 +187,7 @@ const doc = new DOMParser().parseFromString(xml, 'text/xml')
 const json = await response.json()
 const lawData = json?.법령  // Direct access
 ```
-📖 상세: [JSON_TO_HTML_FLOW.md](important-docs/JSON_TO_HTML_FLOW.md)
+📖 상세: [JSON_TO_HTML_FLOW.md](important-docs/03-JSON_TO_HTML_FLOW.md)
 
 ### 3. JO Code System (6-digit format)
 ```typescript
@@ -416,12 +416,12 @@ headers: {
 1. **새로운 중요 패턴 발견 시**:
    - important-docs/에 새 파일 생성 또는 기존 파일 업데이트
    - 이 CLAUDE.md에 참조 링크 추가
-   - CHANGELOG.md에 날짜별 기록
+   - 01-CHANGELOG.md에 날짜별 기록
 
 2. **버그 수정 시**:
-   - important-docs/JSON_TO_HTML_FLOW.md 또는 DEBUGGING_GUIDE.md 업데이트
+   - important-docs/03-JSON_TO_HTML_FLOW.md 또는 02-DEBUGGING_GUIDE.md 업데이트
    - "자주 발생하는 실수" 섹션에 추가
-   - CHANGELOG.md에 기록
+   - 01-CHANGELOG.md에 기록
 
 3. **이 CLAUDE.md는**:
    - 300줄 이하 유지
@@ -456,13 +456,13 @@ Task: "JSON 파싱 버그 수정"
   ↓
 1. Read CLAUDE.md (Quick Reference 확인)
   ↓
-2. Read important-docs/JSON_TO_HTML_FLOW.md (상세 패턴 확인)
+2. Read important-docs/03-JSON_TO_HTML_FLOW.md (상세 패턴 확인)
   ↓
 3. 버그 수정
   ↓
-4. JSON_TO_HTML_FLOW.md 업데이트 ("자주 발생하는 실수" 추가)
+4. 03-JSON_TO_HTML_FLOW.md 업데이트 ("자주 발생하는 실수" 추가)
   ↓
-5. CHANGELOG.md에 날짜별 기록
+5. 01-CHANGELOG.md에 날짜별 기록
 ```
 
 ---
@@ -501,6 +501,6 @@ hooks/
 
 ---
 
-**Last Updated**: 2025-11-25
+**Last Updated**: 2025-11-28
 **Total Lines**: ~380
-**Important Docs**: JSON_TO_HTML_FLOW, RAG_ARCHITECTURE, DEBUGGING_GUIDE, CHANGELOG
+**Important Docs**: 03-JSON_TO_HTML_FLOW, 05-RAG_ARCHITECTURE, 02-DEBUGGING_GUIDE, 01-CHANGELOG

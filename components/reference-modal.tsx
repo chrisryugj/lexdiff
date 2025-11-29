@@ -5,7 +5,8 @@ import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, Copy, Check, ExternalLink, ArrowLeft } from "lucide-react"
+import { ZoomIn, ZoomOut, ExternalLink, ArrowLeft } from "lucide-react"
+import { CopyButton } from "@/components/ui/copy-button"
 
 interface ReferenceModalProps {
   isOpen: boolean
@@ -24,7 +25,6 @@ interface ReferenceModalProps {
 export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
-  const [copied, setCopied] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   const canShowOriginal = !!originalUrl
@@ -47,13 +47,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
   const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 18))
   const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 11))
 
-  // 복사 기능
-  const handleCopy = async () => {
-    if (!contentRef.current) return
-    const textContent = contentRef.current.innerText
-    await navigator.clipboard.writeText(`${title}\n\n${textContent}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  // 복사 텍스트 가져오기
+  const getCopyText = () => {
+    if (!contentRef.current) return title
+    return `${title}\n\n${contentRef.current.innerText}`
   }
 
   // HTML은 그대로 사용 (CSS로 간격 처리)
@@ -179,19 +176,11 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               </div>
 
               {/* 복사 버튼 */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
+              <CopyButton
+                getText={getCopyText}
+                message="복사됨"
                 className="p-1 h-7 w-7"
-                title="내용 복사"
-              >
-                {copied ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
+              />
 
               {/* 법제처 원문 링크 */}
               {molegUrl && (
