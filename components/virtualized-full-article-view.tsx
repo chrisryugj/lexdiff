@@ -111,6 +111,13 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
 
   // 조문 복사
   const copyArticle = useCallback(async (article: LawArticle, e: React.MouseEvent) => {
+    // ⚠️ CRITICAL: await 전에 좌표를 먼저 저장해야 함
+    // React 이벤트 객체는 풀링되어 await 후에는 currentTarget이 null이 됨
+    const button = e.currentTarget as HTMLElement
+    const rect = button.getBoundingClientRect()
+    const feedbackX = rect.left + rect.width / 2
+    const feedbackY = rect.top
+
     const joLabel = formatJO(article.jo)
     const title = article.title ? ` (${article.title})` : ''
     const content = extractArticleText(article, false, lawTitle)
@@ -122,17 +129,12 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       await navigator.clipboard.writeText(fullText)
       setCopiedJo(article.jo)
 
-      // 복사 피드백 위치 설정 - 버튼의 viewport 좌표 사용
-      const button = e.currentTarget as HTMLElement | null
-      if (button) {
-        const rect = button.getBoundingClientRect()
-        // viewport 기준 좌표 (fixed positioning에 맞게)
-        setCopyFeedback({
-          x: rect.left + rect.width / 2,
-          y: rect.top,
-          show: true
-        })
-      }
+      // 복사 피드백 위치 설정 - 미리 저장한 좌표 사용
+      setCopyFeedback({
+        x: feedbackX,
+        y: feedbackY,
+        show: true
+      })
 
       setTimeout(() => {
         setCopiedJo(null)
