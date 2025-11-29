@@ -50,6 +50,7 @@ function replaceEmojisWithIcons(text: string): string {
     '✅': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1" style="color: #10b981;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', // CheckCircle2
     '📌': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1" style="color: #94a3b8;"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>', // Pin
     '🔔': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1" style="color: #94a3b8;"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>', // Bell
+    '⚠️': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1" style="color: #f59e0b;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>', // AlertTriangle (조건·예외)
   }
 
   // 상세 내용 하위 이모지 → 아이콘 (단순 색상)
@@ -469,6 +470,14 @@ function indentSection(text: string, sectionTitle: string, options: IndentOption
 
       // ✅ 📌 🔔 이모지가 있는 경우 → hanging indent (핵심 요약 섹션 전용)
       if (sectionTitle === '📋 핵심 요약' && /^[✅📌🔔]/.test(cleanText)) {
+        contentLines.push(
+          `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${cleanText}</div>`
+        )
+        return
+      }
+
+      // ⚠️ 조건·예외 → 핵심 요약 하위 항목(✅📌🔔)과 같은 들여쓰기 (어떤 섹션에 있든)
+      if (/^⚠️/.test(cleanText)) {
         contentLines.push(
           `<div style="${marginTop}margin-left: ${options.indent}; text-indent: -1.5em; padding-left: 1.5em;">${cleanText}</div>`
         )

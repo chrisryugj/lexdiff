@@ -76,11 +76,16 @@ export function AIAnswerSidebar({
                 <div className="space-y-2">
                     {relatedArticles.length > 0 ? (
                         (() => {
-                            // 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
+                            // 1. "알 수 없음" 항목 필터링
+                            const validArticles = relatedArticles.filter(law =>
+                                law.lawName && law.lawName !== '알 수 없음'
+                            )
+
+                            // 2. 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
                             const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
 
-                            relatedArticles.forEach(law => {
-                                const key = `${law.lawName}|${law.jo}`
+                            validArticles.forEach(law => {
+                                const key = `${law.lawName}|${law.jo || 'all'}`
                                 const existing = grouped.get(key)
                                 if (existing) {
                                     existing.sources.add(law.source)

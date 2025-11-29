@@ -29,6 +29,7 @@ export type AnswerSectionType =
   | 'detail'        // 상세 내용
   | 'tip'           // 추가 참고
   | 'related_laws'  // 관련 법령
+  | 'conditions'    // 조건·예외
 
 /**
  * 상세 내용 하위 섹션 타입
@@ -37,7 +38,6 @@ export type DetailSubsectionType =
   | 'article_quote' // 조문 발췌
   | 'interpretation' // 핵심 해석
   | 'practice'      // 실무 적용
-  | 'conditions'    // 조건·예외
 
 /**
  * 경고/알림 타입
@@ -90,6 +90,13 @@ export const SECTION_CONFIGS: Record<AnswerSectionType, {
     iconColor: 'text-cyan-500 dark:text-cyan-400',
     bgColor: 'bg-cyan-50 dark:bg-cyan-950/20',
     borderColor: 'border-cyan-200 dark:border-cyan-800'
+  },
+  conditions: {
+    icon: AlertTriangle,
+    label: '조건·예외',
+    iconColor: 'text-amber-500 dark:text-amber-400',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+    borderColor: 'border-amber-200 dark:border-amber-800'
   }
 }
 
@@ -115,11 +122,6 @@ export const DETAIL_SUBSECTION_CONFIGS: Record<DetailSubsectionType, {
     icon: CheckCircle2,
     label: '실무 적용',
     iconColor: 'text-green-600 dark:text-green-400'
-  },
-  conditions: {
-    icon: AlertCircle,
-    label: '조건·예외',
-    iconColor: 'text-red-600 dark:text-red-400'
   }
 }
 
@@ -221,6 +223,7 @@ export function detectSectionType(text: string): AnswerSectionType | null {
   if (trimmed.includes('상세 내용') || trimmed.includes('상세내용')) return 'detail'
   if (trimmed.includes('추가 참고') || trimmed.includes('추가참고')) return 'tip'
   if (trimmed.includes('관련 법령') || trimmed.includes('관련법령')) return 'related_laws'
+  if (trimmed.includes('조건') && trimmed.includes('예외')) return 'conditions'
 
   return null
 }
@@ -234,7 +237,6 @@ export function detectDetailSubsectionType(text: string): DetailSubsectionType |
   if (trimmed.includes('조문 발췌') || trimmed.includes('조문발췌') || trimmed.includes('조문 인용')) return 'article_quote'
   if (trimmed.includes('핵심 해석') || trimmed.includes('핵심해석')) return 'interpretation'
   if (trimmed.includes('실무 적용') || trimmed.includes('실무적용')) return 'practice'
-  if (trimmed.includes('조건') && trimmed.includes('예외')) return 'conditions'
 
   return null
 }

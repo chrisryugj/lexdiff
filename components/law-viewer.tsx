@@ -686,17 +686,10 @@ export function LawViewer({
         ) {
           articleLabel = next.getAttribute("data-article") || ""
         }
-        if (articleLabel) {
-          await openExternalLawArticleModal(lawName, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-        } else {
-          // 자치법규 여부 감지
-          const isOrdinance = /조례|규칙/.test(lawName) ||
-            /(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName)
-          const lawPath = isOrdinance ? '자치법규' : '법령'
-          window.open(`https://www.law.go.kr/${lawPath}/${encodeURIComponent(lawName)}`, "_blank", "noopener")
-          setLastExternalRef({ lawName })
-        }
+
+        // 조문 번호가 있든 없든 모달로 표시 (없으면 첫 번째 조문)
+        await openExternalLawArticleModal(lawName, articleLabel)
+        setLastExternalRef({ lawName, joLabel: articleLabel })
       } else if (refType === "regulation") {
         const clickedText = target.textContent || ""
 

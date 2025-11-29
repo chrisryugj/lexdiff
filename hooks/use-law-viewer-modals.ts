@@ -47,7 +47,15 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
         try {
           // 1. 자치법규 검색 API로 ID 조회
-          const ordinSearchRes = await fetch(`/api/ordin-search?query=${encodeURIComponent(cleanedLawName)}`)
+          // 검색어에서 특수문자(중간점 등) 제거하여 검색 성공률 높임
+          const searchQuery = cleanedLawName
+            .replace(/[·•‧]/g, ' ')  // 중간점 → 공백
+            .replace(/\s+/g, ' ')     // 연속 공백 정리
+            .trim()
+
+          debugLogger.info('[citation] 자치법규 검색 쿼리', { original: cleanedLawName, searchQuery })
+
+          const ordinSearchRes = await fetch(`/api/ordin-search?query=${encodeURIComponent(searchQuery)}`)
           if (!ordinSearchRes.ok) {
             throw new Error('자치법규 검색 실패')
           }
@@ -56,11 +64,14 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
           // 기존 파서 사용하여 검색 결과 파싱
           const ordinSearchResults = parseOrdinanceSearchXML(ordinSearchXml)
-          const normalizedSearchName = cleanedLawName.replace(/\s+/g, "")
+
+          // 특수문자와 공백 모두 제거하여 비교
+          const normalizeForCompare = (s: string) => s.replace(/[·•‧\s]/g, "")
+          const normalizedSearchName = normalizeForCompare(cleanedLawName)
 
           // 정확한 이름 매칭 우선
           const exactMatch = ordinSearchResults.find(result => {
-            const resultName = result.ordinName.replace(/\s+/g, "")
+            const resultName = normalizeForCompare(result.ordinName)
             return resultName === normalizedSearchName
           })
 
@@ -104,7 +115,52 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
             articleCount: ordinArticles.length
           })
 
-          // 4. 특정 조문 찾기
+          // 4. 조문 번호 유무 확인
+          const hasArticleLabel = articleLabel && articleLabel.trim() && /제?\d+/.test(articleLabel)
+
+          // 조문 번호가 없으면 전체 조문(전문) 표시
+          if (!hasArticleLabel) {
+            debugLogger.info('[citation] 조문 번호 없음 - 전체 조문 표시', {
+              articleLabel,
+              totalArticles: ordinArticles.length
+            })
+
+            // 전체 조문을 HTML로 변환
+            const allArticlesHtml = ordinArticles
+              .map(article => {
+                const titlePart = article.title ? ` (${article.title})` : ''
+                const header = `<div class="font-semibold text-primary mb-1">${article.joNum}${titlePart}</div>`
+                const content = extractArticleText(article, true, cleanedLawName)
+                return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}${content}</div>`
+              })
+              .join('')
+
+            // 현재 모달이 열려있으면 히스토리에 저장
+            if (refModal.open && refModal.title) {
+              setRefModalHistory(prev => [...prev, {
+                title: refModal.title!,
+                html: refModal.html,
+                forceWhiteTheme: refModal.forceWhiteTheme,
+                lawName: refModal.lawName,
+                articleNumber: refModal.articleNumber,
+              }])
+            }
+
+            setRefModal({
+              open: true,
+              title: `${cleanedLawName} 전문`,
+              html: `<div class="space-y-2">${allArticlesHtml}</div>`,
+              lawName: cleanedLawName,
+              articleNumber: '',
+            })
+
+            debugLogger.success('[citation] 자치법규 전문 모달 열기 완료', { lawName: cleanedLawName, articleCount: ordinArticles.length })
+            return
+          }
+
+          // 특정 조문 찾기
+          let targetArticle: typeof ordinArticles[0] | undefined
+
           // 조문 번호만 추출 (제N조 또는 제N조의M)
           const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
 
@@ -127,7 +183,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           })
 
           // JO 코드로 매칭
-          let targetArticle = ordinArticles.find(a => a.jo === targetJo)
+          targetArticle = ordinArticles.find(a => a.jo === targetJo)
 
           // 못 찾으면 joNum으로 매칭 시도
           if (!targetArticle) {
@@ -139,11 +195,11 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           }
 
           if (!targetArticle) {
-            const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
+            const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}`
             setRefModal({
               open: true,
-              title: `${cleanedLawName} ${articleLabel}`,
-              html: `<div class="space-y-3"><p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground">조문이 삭제되었거나 번호가 변경되었을 수 있습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} 전문 보기 →</a></div></div>`,
+              title: `${cleanedLawName}`,
+              html: `<div class="space-y-3"><p>조문을 찾을 수 없습니다.</p><div class="pt-3 border-t"><a href="${lawGoKrUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${cleanedLawName} 전문 보기 →</a></div></div>`,
               lawName: cleanedLawName,
               articleNumber: articleLabel,
             })
@@ -247,11 +303,17 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       // Extract just the article number (제X조 or 제X조의Y) from articleLabel
       // articleLabel might be "제5조제2항" or "제55조제12호" but buildJO only handles "제5조"
       // Remove 항(paragraph) and 호(item) parts: 제N항, 제N호
+
+      // 조문 번호가 없거나 빈 경우 확인
+      const hasArticleLabel = articleLabel && articleLabel.trim() && /제?\d+/.test(articleLabel)
+
       let joCode = ""
-      try {
-        const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
-        joCode = buildJO(articleOnly)
-      } catch (err) {
+      if (hasArticleLabel) {
+        try {
+          const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
+          joCode = buildJO(articleOnly)
+        } catch (err) {
+        }
       }
 
       const identifierParams = new URLSearchParams()
@@ -285,7 +347,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
             : []
 
 
-        const normalizedJo = joCode || ((articleUnits[0]?.조문키 || "").slice(0, 6))
+        let normalizedJo = joCode || ""
 
         // 🔍 디버깅: 조문 검색 상세 로그
         debugLogger.info('[citation] Article search details', {
@@ -293,6 +355,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           articleLabel,
           joCode,
           normalizedJo,
+          hasArticleLabel,
           totalArticles: articleUnits.length,
           firstArticle: articleUnits[0] ? {
             조문키: articleUnits[0]?.조문키,
@@ -300,10 +363,55 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           } : null
         })
 
+        // 조문 번호가 없으면 전체 조문(전문) 표시
+        if (!hasArticleLabel) {
+          debugLogger.info('[citation] 조문 번호 없음 - 전체 조문 표시', {
+            articleLabel,
+            totalArticles: articleUnits.length
+          })
+
+          // 조문여부가 "조문"인 것만 필터링
+          const allArticleUnits = articleUnits.filter((unit: any) => unit?.조문여부 === "조문")
+
+          // 전체 조문을 HTML로 변환
+          const allArticlesHtml = allArticleUnits
+            .map((unit: any) => {
+              const joNum = `제${unit.조문번호}조`
+              const titlePart = unit.조문제목 ? ` (${unit.조문제목})` : ''
+              const header = `<div class="font-semibold text-primary mb-1">${joNum}${titlePart}</div>`
+              const content = unit.조문내용 || ''
+              return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed whitespace-pre-wrap">${content}</div></div>`
+            })
+            .join('')
+
+          // 현재 모달이 열려있으면 히스토리에 저장
+          if (refModal.open && refModal.title) {
+            setRefModalHistory(prev => [...prev, {
+              title: refModal.title!,
+              html: refModal.html,
+              forceWhiteTheme: refModal.forceWhiteTheme,
+              lawName: refModal.lawName,
+              articleNumber: refModal.articleNumber,
+            }])
+          }
+
+          setRefModal({
+            open: true,
+            title: `${cleanedLawName} 전문`,
+            html: `<div class="space-y-2">${allArticlesHtml}</div>`,
+            lawName: cleanedLawName,
+            articleNumber: '',
+          })
+
+          debugLogger.success('[citation] 법령 전문 모달 열기 완료', { lawName: cleanedLawName, articleCount: allArticleUnits.length })
+          return
+        }
 
         // ⚠️ 조문여부가 "조문"인 것만 찾기 (전문 제외)
+        let targetUnit: any = null
 
-        const targetUnit =
+        // 조문 번호가 있는 경우: 해당 조문 검색
+        targetUnit =
           articleUnits.find((unit: any) => {
             const isArticle = unit?.조문여부 === "조문"
             const hasKey = typeof unit?.조문키 === "string"
@@ -316,14 +424,11 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
             return unit?.조문여부 === "조문" && num !== "" && targetNum !== "" && num === targetNum
           })
 
-        if (targetUnit) {
-        }
-
         if (!targetUnit) {
           setRefModal({
             open: true,
-            title: `${cleanedLawName} ${articleLabel}`,
-            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
+            title: `${cleanedLawName} ${articleLabel || ''}`.trim(),
+            html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
           })
           return
         }
@@ -420,9 +525,12 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           }]
         }
 
+        // 조문 번호는 articleLabel 사용 (이 시점에서 hasArticleLabel은 항상 true)
+        const actualJoNum = articleLabel
+
         const lawArticle: LawArticle = {
           jo: normalizedJo,
-          joNum: articleLabel,
+          joNum: actualJoNum,
           title,
           content: rawContent,
           isPreamble: false,
@@ -460,7 +568,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           title: articleTitle,
           html: htmlContent,
           lawName: lawName,
-          articleNumber: articleLabel,
+          articleNumber: actualJoNum,
         })
       } catch (fetchErr: any) {
         setRefModal({
