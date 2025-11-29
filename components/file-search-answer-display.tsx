@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check, AlertCircle } from 'lucide-react'
+import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react'
 import { CopyButton } from '@/components/ui/copy-button'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
@@ -67,16 +67,7 @@ function CollapsibleBlockquote({
 
   const textContent = extractAllText(children).trim()
 
-  // 하위 섹션 제목 감지 (조건·예외 등)
-  const isSubsectionTitle = (line: string): boolean => {
-    const trimmed = line.trim().toLowerCase()
-    return (trimmed.includes('조건') && trimmed.includes('예외')) ||
-           trimmed.includes('핵심 해석') || trimmed.includes('핵심해석') ||
-           trimmed.includes('실무 적용') || trimmed.includes('실무적용')
-  }
-
   // 항/호 줄구분 처리 - 복사 시 번호 포함되도록 수정
-  // 하위 섹션 제목이 발견되면 그 이전까지만 blockquote에 포함
   const renderContent = () => {
     // Extract text from React elements
     const text = extractAllText(children)
@@ -84,60 +75,11 @@ function CollapsibleBlockquote({
     // Split by lines and filter empty
     const lines = text.split(/\n+/).filter(line => line.trim())
 
-    // 하위 섹션 제목 이전까지만 렌더링
-    const contentLines: string[] = []
-    for (const line of lines) {
-      if (isSubsectionTitle(line)) {
-        break // 하위 섹션 제목 발견 시 중단
-      }
-      contentLines.push(line)
-    }
-
-    return contentLines.map((line, i) => (
+    return lines.map((line, i) => (
       <div key={i} className="text-gray-200">
         {line}
       </div>
     ))
-  }
-
-  // 하위 섹션 제목 이후 내용 (blockquote 밖에 렌더링)
-  const renderAfterContent = () => {
-    const text = extractAllText(children)
-    const lines = text.split(/\n+/).filter(line => line.trim())
-
-    let foundSubsection = false
-    const afterLines: { line: string; isTitle: boolean }[] = []
-
-    for (const line of lines) {
-      if (isSubsectionTitle(line)) {
-        foundSubsection = true
-        afterLines.push({ line, isTitle: true })
-      } else if (foundSubsection) {
-        afterLines.push({ line, isTitle: false })
-      }
-    }
-
-    if (afterLines.length === 0) return null
-
-    return (
-      <div className="mt-2">
-        {afterLines.map((item, i) => {
-          if (item.isTitle) {
-            return (
-              <h3 key={i} className="text-gray-200 flex items-center gap-1.5 flex-nowrap" style={{ fontSize: 'clamp(14px, 4vw, 16px)', fontWeight: 700, marginTop: 'clamp(8px, 2vw, 12px)', marginBottom: '4px' }}>
-                <AlertCircle className="flex-shrink-0 text-red-600 dark:text-red-400" style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />
-                <span className="whitespace-nowrap">{item.line.replace(/^[⚠️\s]+/, '')}</span>
-              </h3>
-            )
-          }
-          return (
-            <div key={i} className="text-gray-200 ml-6" style={{ fontSize: 'inherit' }}>
-              {item.line}
-            </div>
-          )
-        })}
-      </div>
-    )
   }
 
   // 관련법령 섹션: 제목 클릭으로 접기/펼치기
@@ -167,24 +109,18 @@ function CollapsibleBlockquote({
   }
 
   // 일반 blockquote (관련법령 아닌 경우)
-  // 하위 섹션 제목이 있으면 blockquote 밖에 별도 렌더링
-  const afterContent = renderAfterContent()
-
   return (
-    <>
-      <div className="my-1 ml-4">
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
-          <div
-            className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-1"
-            style={{ fontSize: `${fontSize}px` }}
-          >
-            {renderContent()}
-          </div>
+    <div className="my-1 ml-4">
+      <div className="relative">
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
+        <div
+          className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-1"
+          style={{ fontSize: `${fontSize}px` }}
+        >
+          {renderContent()}
         </div>
       </div>
-      {afterContent}
-    </>
+    </div>
   )
 }
 
@@ -251,16 +187,19 @@ export function FileSearchAnswerDisplay({
   }
 
   // 관련법령 섹션 전처리: H3 제목을 CollapsibleBlockquote title로 전달
+  // + blockquote 안의 "조건·예외" 섹션을 밖으로 분리
   const { processedAnswer, lawArticleTitles } = React.useMemo(() => {
     if (!answer) return { processedAnswer: '', lawArticleTitles: [] }
 
-    // 📖 관련 법령 섹션만 찾아서 처리
+    let processed = answer
+
+    // 📖 관련 법령 섹션 처리
     const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
-    const match = answer.match(relatedLawsPattern)
+    const match = processed.match(relatedLawsPattern)
 
-    if (!match) return { processedAnswer: answer, lawArticleTitles: [] }
+    if (!match) return { processedAnswer: processed, lawArticleTitles: [] }
 
-    const beforeSection = answer.substring(0, match.index!)
+    const beforeSection = processed.substring(0, match.index!)
     let relatedLawsSection = match[0]
 
     // H3 제목 추출 (다음 줄 괄호 병합)
@@ -326,7 +265,7 @@ export function FileSearchAnswerDisplay({
           </h2>
         )
       },
-      // H3 - 하위 섹션 (조문 발췌, 핵심 해석, 실무 적용, 조건·예외)
+      // H3 - 하위 섹션 (조문 발췌, 핵심 해석, 실무 적용)
       h3: ({ children }) => {
         if (inRelatedLawsSection) {
           return null // 관련법령 섹션의 H3는 렌더링하지 않음
@@ -416,6 +355,32 @@ export function FileSearchAnswerDisplay({
     ),
     // 문단
     p: ({ children }) => {
+      // 텍스트 추출
+      const childArray = React.Children.toArray(children)
+      const text = childArray.map(child =>
+        typeof child === 'string' ? child : ''
+      ).join('')
+
+      // [1], [2], [3] 단계 패턴 감지
+      const stepMatch = text.match(/^\[(\d+)\]\s*(.+)/)
+      if (stepMatch) {
+        const stepNum = stepMatch[1]
+        const stepContent = stepMatch[2]
+        return (
+          <div className="flex items-start gap-3 my-1 ml-4">
+            <div
+              className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+              style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+            >
+              {stepNum}
+            </div>
+            <div className="flex-1 text-gray-200" style={{ fontSize: `${fontSize}px`, paddingTop: '2px' }}>
+              {stepContent}
+            </div>
+          </div>
+        )
+      }
+
       return (
         <p className="my-0.5 text-gray-200 leading-relaxed" style={{ fontSize: `${fontSize}px` }}>
           {children}
