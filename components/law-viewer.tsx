@@ -495,7 +495,7 @@ export function LawViewer({
     timeThreshold: 400, // Within 400ms
   })
 
-  const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 2, 24))
+  const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 2, 28))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 2, 10))
   const resetFontSize = () => setFontSize(15)
 

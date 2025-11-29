@@ -44,7 +44,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
       : null
 
   // 폰트 크기 조절
-  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 18))
+  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 28))
   const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 11))
 
   // 복사 텍스트 가져오기
@@ -58,6 +58,24 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     if (!html) return "연결된 본문을 불러올 수 없습니다."
     return html
   }, [html])
+
+  // 접근성: 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
+  useEffect(() => {
+    if (!isOpen) return
+
+    const timer = setTimeout(() => {
+      // 뒤로가기 버튼이 있으면 그걸 포커스, 아니면 첫 번째 버튼
+      const dialog = document.querySelector('[role="dialog"]')
+      if (dialog) {
+        const firstFocusable = dialog.querySelector<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+        firstFocusable?.focus()
+      }
+    }, 150) // Dialog 애니메이션 완료 후
+
+    return () => clearTimeout(timer)
+  }, [isOpen])
 
   // Attach event listener to the content div
   useEffect(() => {
@@ -167,7 +185,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   variant="ghost"
                   size="sm"
                   onClick={increaseFontSize}
-                  disabled={fontSize >= 18}
+                  disabled={fontSize >= 28}
                   className="p-1 h-6 w-6"
                   title="글자 크게"
                 >

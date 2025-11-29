@@ -46,6 +46,23 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     }
   }, [isOpen, lawId, mst])
 
+  // 접근성: 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
+  useEffect(() => {
+    if (!isOpen) return
+
+    const timer = setTimeout(() => {
+      const dialog = document.querySelector('[role="dialog"]')
+      if (dialog) {
+        const firstFocusable = dialog.querySelector<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+        firstFocusable?.focus()
+      }
+    }, 150)
+
+    return () => clearTimeout(timer)
+  }, [isOpen])
+
 
   useEffect(() => {
     if (comparison && targetJo && oldScrollRef.current && newScrollRef.current) {
@@ -196,7 +213,7 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     }, 50)
   }
 
-  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 20))
+  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 28))
   const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 12))
 
   const goToPreviousRevision = () => {
@@ -373,7 +390,7 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
                 variant="ghost"
                 size="sm"
                 onClick={increaseFontSize}
-                disabled={fontSize >= 20}
+                disabled={fontSize >= 28}
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-l-none border-l border-border"
               >
                 <ZoomIn className="h-3 w-3" />

@@ -158,7 +158,7 @@ export function FileSearchAnswerDisplay({
 
   // 폰트 크기 조절
   const increaseFontSize = () => {
-    setFontSize(prev => Math.min(prev + 2, 20))
+    setFontSize(prev => Math.min(prev + 2, 28))
   }
 
   const decreaseFontSize = () => {
@@ -433,7 +433,6 @@ export function FileSearchAnswerDisplay({
 
   useEffect(() => {
     let isCancelled = false
-    let progressInterval: NodeJS.Timeout | null = null
 
     const fetchAnswer = async () => {
       setIsLoading(true)
@@ -442,13 +441,9 @@ export function FileSearchAnswerDisplay({
       setCitations([])
       setProgress(0)
 
-      // 프로그레스 시뮬레이션 (0-90%까지)
-      progressInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) return prev
-          return prev + Math.random() * 10
-        })
-      }, 300)
+      // 단계별 프로그레스 (무작위 제거, 명확한 단계)
+      // 0-20%: 연결 중, 20-50%: 검색 중, 50-95%: 답변 생성 중, 100%: 완료
+      setProgress(10) // 연결 시작
 
       try {
         const response = await fetch('/api/file-search-rag', {
@@ -461,7 +456,7 @@ export function FileSearchAnswerDisplay({
           throw new Error('File Search RAG 요청 실패')
         }
 
-        setProgress(30)
+        setProgress(20) // 연결 완료
 
         const reader = response.body?.getReader()
         if (!reader) {
@@ -471,8 +466,9 @@ export function FileSearchAnswerDisplay({
         const decoder = new TextDecoder()
         let buffer = ''
 
-        setProgress(50)
+        setProgress(35) // 스트림 시작, 검색 진행 중
 
+        let chunkCount = 0
         while (true) {
           const { done, value } = await reader.read()
           if (done || isCancelled) break
@@ -497,7 +493,9 @@ export function FileSearchAnswerDisplay({
 
                 if (parsed.text) {
                   setAnswer(prev => prev + parsed.text)
-                  setProgress(prev => Math.min(prev + 2, 95))
+                  chunkCount++
+                  // 청크 수에 따른 점진적 증가 (50% → 95%)
+                  setProgress(Math.min(50 + Math.floor(chunkCount * 1.5), 95))
                 }
 
                 if (parsed.citations) {
@@ -525,9 +523,6 @@ export function FileSearchAnswerDisplay({
           setError(err instanceof Error ? err.message : 'Unknown error')
         }
       } finally {
-        if (progressInterval) {
-          clearInterval(progressInterval)
-        }
         if (!isCancelled) {
           setIsLoading(false)
         }
@@ -538,9 +533,6 @@ export function FileSearchAnswerDisplay({
 
     return () => {
       isCancelled = true
-      if (progressInterval) {
-        clearInterval(progressInterval)
-      }
     }
   }, [query])
 
@@ -642,7 +634,7 @@ export function FileSearchAnswerDisplay({
                 variant="ghost"
                 size="sm"
                 onClick={increaseFontSize}
-                disabled={fontSize >= 20}
+                disabled={fontSize >= 28}
                 className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="글자 크게"
               >
