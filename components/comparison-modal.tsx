@@ -277,19 +277,18 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
         <DialogHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-0 shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="flex items-center gap-2 text-lg sm:text-2xl font-bold text-foreground mb-1">
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-2xl font-bold text-foreground mb-2">
                 <GitCompare className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0" />
                 신·구법 대조표
               </DialogTitle>
-              {/* 아이콘 너비(w-5/w-6) + gap-2(8px) 만큼 들여쓰기 */}
-              <DialogDescription className="text-sm sm:text-base font-semibold text-muted-foreground truncate ml-[28px] sm:ml-[32px]">
+              <DialogDescription className="text-sm sm:text-base font-semibold text-muted-foreground truncate pl-[5px]">
                 {lawTitle}
               </DialogDescription>
             </div>
           </div>
 
           {comparison && (
-            <div className="flex flex-wrap items-center gap-1 mt-2">
+            <div className="flex flex-wrap items-center gap-1 mt-1">
               {comparison.meta.promulgation?.date && (
                 <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
                   <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
