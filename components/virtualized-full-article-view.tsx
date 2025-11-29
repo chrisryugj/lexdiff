@@ -122,14 +122,16 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       await navigator.clipboard.writeText(fullText)
       setCopiedJo(article.jo)
 
-      // 복사 피드백 위치 설정
-      const button = e.currentTarget as HTMLElement
-      const rect = button.getBoundingClientRect()
-      setCopyFeedback({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 8,
-        show: true
-      })
+      // 복사 피드백 위치 설정 (버튼이 있을 때만)
+      const button = e.currentTarget as HTMLElement | null
+      if (button) {
+        const rect = button.getBoundingClientRect()
+        setCopyFeedback({
+          x: rect.left + rect.width / 2,
+          y: rect.top - 8,
+          show: true
+        })
+      }
 
       setTimeout(() => {
         setCopiedJo(null)
