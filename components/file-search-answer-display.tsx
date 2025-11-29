@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react'
+import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut } from 'lucide-react'
+import { CopyButton } from '@/components/ui/copy-button'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import {
@@ -148,20 +149,11 @@ export function FileSearchAnswerDisplay({
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
-  const [copied, setCopied] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})  // ✅ 접기/펼치기 상태
 
   // 섹션 토글
   const toggleSection = (sectionKey: string) => {
     setExpandedSections(prev => ({ ...prev, [sectionKey]: !prev[sectionKey] }))
-  }
-
-  // 복사 함수
-  const handleCopy = async () => {
-    const fullText = `질문: ${query}\n\n${answer}`
-    await navigator.clipboard.writeText(fullText)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   // 폰트 크기 조절
@@ -628,19 +620,11 @@ export function FileSearchAnswerDisplay({
                 <ZoomIn className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
               {/* 복사 버튼 */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
+              <CopyButton
+                getText={() => `질문: ${query}\n\n${answer}`}
+                message="복사됨"
                 className="p-1 h-6 w-6 sm:h-7 sm:w-7"
-                title="답변 복사"
-              >
-                {copied ? (
-                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
-                ) : (
-                  <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
-                )}
-              </Button>
+              />
             </div>
           </div>
 
