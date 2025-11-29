@@ -1,12 +1,16 @@
 "use client"
 
-import React, { useRef, useMemo, useEffect } from "react"
+import React, { useRef, useMemo, useEffect, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Separator } from "@/components/ui/separator"
-import { BookmarkCheck, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { BookmarkCheck, AlertCircle, Star, Copy, Check } from "lucide-react"
 import type { LawArticle } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
 import { formatJO } from "@/lib/law-parser"
+import { favoritesStore } from "@/lib/favorites-store"
+import { cn } from "@/lib/utils"
 
 // ✅ 성능 최적화: 컴포넌트를 외부로 이동 (매번 재생성 방지)
 const ArticleContent = React.memo(function ArticleContent({
@@ -29,6 +33,9 @@ interface VirtualizedFullArticleViewProps {
   activeJo: string
   fontSize: number
   lawTitle: string
+  lawId?: string
+  mst?: string
+  effectiveDate?: string
   onContentClick: (e: React.MouseEvent<HTMLDivElement>) => void
   articleRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
   scrollParentRef?: React.RefObject<HTMLDivElement | null>
@@ -46,11 +53,92 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   activeJo,
   fontSize,
   lawTitle,
+  lawId,
+  mst,
+  effectiveDate,
   onContentClick,
   articleRefs,
   scrollParentRef,
 }: VirtualizedFullArticleViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [copiedJo, setCopiedJo] = useState<string | null>(null)
+  const [copyFeedback, setCopyFeedback] = useState<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false })
+
+  // 즐겨찾기 상태 동기화
+  useEffect(() => {
+    const updateFavorites = () => {
+      const favs = favoritesStore.getFavorites()
+      const favSet = new Set(
+        favs
+          .filter(f => f.lawTitle === lawTitle)
+          .map(f => f.jo)
+      )
+      setFavorites(favSet)
+    }
+
+    updateFavorites()
+    const unsubscribe = favoritesStore.subscribe(updateFavorites)
+    return () => unsubscribe()
+  }, [lawTitle])
+
+  // 즐겨찾기 토글
+  const toggleFavorite = useCallback((article: LawArticle) => {
+    const jo = article.jo
+    const isFav = favoritesStore.isFavorite(lawTitle, jo)
+
+    if (isFav) {
+      const favs = favoritesStore.getFavorites()
+      const fav = favs.find(f => f.lawTitle === lawTitle && f.jo === jo)
+      if (fav) {
+        favoritesStore.removeFavorite(fav.id)
+      }
+    } else {
+      // 조문 내용에서 서명 생성
+      const content = article.content || ''
+      const signature = content.substring(0, 100)
+
+      favoritesStore.addFavorite({
+        lawId,
+        mst,
+        lawTitle,
+        jo,
+        lastSeenSignature: signature,
+        effectiveDate,
+      })
+    }
+  }, [lawTitle, lawId, mst, effectiveDate])
+
+  // 조문 복사
+  const copyArticle = useCallback(async (article: LawArticle, e: React.MouseEvent) => {
+    const joLabel = formatJO(article.jo)
+    const title = article.title ? ` (${article.title})` : ''
+    const content = extractArticleText(article, false, lawTitle)
+    // HTML 태그 제거
+    const plainText = content.replace(/<[^>]+>/g, '').trim()
+    const fullText = `${lawTitle} ${joLabel}${title}\n\n${plainText}`
+
+    try {
+      await navigator.clipboard.writeText(fullText)
+      setCopiedJo(article.jo)
+
+      // 복사 피드백 위치 설정
+      const button = e.currentTarget as HTMLElement
+      const rect = button.getBoundingClientRect()
+      setCopyFeedback({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 8,
+        show: true
+      })
+
+      setTimeout(() => {
+        setCopiedJo(null)
+        setCopyFeedback(prev => ({ ...prev, show: false }))
+      }, 1500)
+    } catch (err) {
+      console.error('복사 실패:', err)
+    }
+  }, [lawTitle])
 
   // ✅ 실제 스크롤 컨테이너 찾기
   const getScrollElement = () => {
@@ -199,18 +287,58 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
                 >
                   <div className="mb-2 pb-1 border-b border-border">
-                    <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-                      {formatSimpleJo(item.article.jo)}
-                      {item.article.title && (
-                        <span className="text-muted-foreground">({item.article.title})</span>
-                      )}
-                      {activeJo === item.article.jo && (
-                        <BookmarkCheck
-                          className="h-5 w-5 text-primary ml-2"
-                          title="현재 선택된 조문"
-                        />
-                      )}
-                    </h3>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-lg font-bold text-foreground flex items-center gap-2 flex-1 min-w-0">
+                        {formatSimpleJo(item.article.jo)}
+                        {item.article.title && (
+                          <span className="text-muted-foreground truncate">({item.article.title})</span>
+                        )}
+                        {activeJo === item.article.jo && (
+                          <BookmarkCheck
+                            className="h-5 w-5 text-primary flex-shrink-0"
+                            title="현재 선택된 조문"
+                          />
+                        )}
+                      </h3>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* 즐겨찾기 버튼 */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleFavorite(item.article)
+                          }}
+                          title={favorites.has(item.article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                        >
+                          <Star
+                            className={`h-4 w-4 ${
+                              favorites.has(item.article.jo)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-muted-foreground hover:text-yellow-400"
+                            }`}
+                          />
+                        </Button>
+                        {/* 복사 버튼 */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            copyArticle(item.article, e)
+                          }}
+                          title="조문 복사"
+                        >
+                          {copiedJo === item.article.jo ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   <div
@@ -249,6 +377,25 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
           )
         })}
       </div>
+
+      {/* 복사 피드백 포탈 */}
+      {copyFeedback.show && typeof document !== "undefined" && createPortal(
+        <div
+          className={cn(
+            "fixed z-[9999] pointer-events-none animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2"
+          )}
+          style={{
+            left: copyFeedback.x,
+            top: copyFeedback.y,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <div className="bg-foreground text-background px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
+            복사됨
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 })

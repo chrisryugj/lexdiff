@@ -205,7 +205,18 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     const targetRef = source === "old" ? newScrollRef : oldScrollRef
 
     if (sourceRef.current && targetRef.current) {
-      targetRef.current.scrollTop = sourceRef.current.scrollTop
+      // 비율 기반 동기 스크롤 (두 패널 높이가 달라도 정확히 동기화)
+      const sourceEl = sourceRef.current
+      const targetEl = targetRef.current
+      const sourceMaxScroll = sourceEl.scrollHeight - sourceEl.clientHeight
+      const targetMaxScroll = targetEl.scrollHeight - targetEl.clientHeight
+
+      if (sourceMaxScroll > 0 && targetMaxScroll > 0) {
+        const scrollRatio = sourceEl.scrollTop / sourceMaxScroll
+        targetEl.scrollTop = scrollRatio * targetMaxScroll
+      } else {
+        targetEl.scrollTop = sourceEl.scrollTop
+      }
     }
 
     setTimeout(() => {
