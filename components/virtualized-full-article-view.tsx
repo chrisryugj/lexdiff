@@ -122,13 +122,14 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       await navigator.clipboard.writeText(fullText)
       setCopiedJo(article.jo)
 
-      // 복사 피드백 위치 설정 (버튼이 있을 때만)
+      // 복사 피드백 위치 설정 - 버튼의 viewport 좌표 사용
       const button = e.currentTarget as HTMLElement | null
       if (button) {
         const rect = button.getBoundingClientRect()
+        // viewport 기준 좌표 (fixed positioning에 맞게)
         setCopyFeedback({
           x: rect.left + rect.width / 2,
-          y: rect.top - 8,
+          y: rect.top,
           show: true
         })
       }
@@ -384,15 +385,16 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       {copyFeedback.show && typeof document !== "undefined" && createPortal(
         <div
           className={cn(
-            "fixed z-[9999] pointer-events-none animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2"
+            "fixed z-[9999] pointer-events-none",
+            "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200"
           )}
           style={{
             left: copyFeedback.x,
-            top: copyFeedback.y,
+            top: copyFeedback.y - 8,
             transform: "translate(-50%, -100%)",
           }}
         >
-          <div className="bg-foreground text-background px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
+          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
             복사됨
           </div>
         </div>,
