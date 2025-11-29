@@ -876,3 +876,19 @@
     opacity: 0.8;
   }
 }
+
+/* 방문한 법령 링크 상태 표시 */
+a.law-ref:visited {
+  color: oklch(0.5 0.12 280) !important;
+  /* 방문한 링크: 어두운 보라색 */
+}
+
+a.law-ref:not(:visited) {
+  color: rgb(59 130 246);
+  /* 미방문 링크: 기본 파란색 */
+}
+
+a.law-ref:hover {
+  color: oklch(0.65 0.2 230) !important;
+  /* 호버: 밝은 시안 */
+}

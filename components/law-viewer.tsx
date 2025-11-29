@@ -495,6 +495,42 @@ export function LawViewer({
     timeThreshold: 400, // Within 400ms
   })
 
+  // 키보드 화살표 네비게이션 (조문 간 이동)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 입력 필드에 포커스 있으면 무시
+      const activeEl = document.activeElement
+      if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA') {
+        return
+      }
+
+      // 모달이 열려 있으면 무시
+      if (refModal.open) {
+        return
+      }
+
+      const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
+      if (currentIndex === -1) return
+
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        // 이전 조문
+        if (currentIndex > 0) {
+          e.preventDefault()
+          handleArticleClick(actualArticles[currentIndex - 1].jo)
+        }
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        // 다음 조문
+        if (currentIndex < actualArticles.length - 1) {
+          e.preventDefault()
+          handleArticleClick(actualArticles[currentIndex + 1].jo)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeJo, actualArticles, refModal.open])
+
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 2, 28))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 2, 10))
   const resetFontSize = () => setFontSize(15)
@@ -1213,6 +1249,9 @@ export function LawViewer({
                         activeJo={activeJo}
                         fontSize={fontSize}
                         lawTitle={meta.lawTitle}
+                        lawId={meta.lawId}
+                        mst={meta.mst}
+                        effectiveDate={meta.effectiveDate}
                         onContentClick={handleContentClick}
                         articleRefs={articleRefs}
                         scrollParentRef={contentRef}
