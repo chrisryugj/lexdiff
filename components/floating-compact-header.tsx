@@ -138,8 +138,8 @@ export function FloatingCompactHeader({
                   )}
 
 
-                  {/* 포커스 모드 */}
-                  <Button
+                  {/* 포커스 모드 - 미구현으로 임시 숨김 */}
+                  {/* <Button
                     variant={isFocusMode ? "default" : "ghost"}
                     size="icon"
                     onClick={onFocusModeToggle}
@@ -147,7 +147,7 @@ export function FloatingCompactHeader({
                     title="포커스 모드 (F11)"
                   >
                     <Maximize2 className="h-4 w-4" />
-                  </Button>
+                  </Button> */}
 
                   {/* 설정 */}
                   <Button
