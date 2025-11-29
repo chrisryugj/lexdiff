@@ -3,7 +3,8 @@ import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { buildJO, formatJO } from '@/lib/law-parser'
 import { extractArticleText } from '@/lib/law-xml-parser'
 import { debugLogger } from '@/lib/debug-logger'
-import { parseOrdinanceJSON, findOrdinanceArticle } from '@/lib/ordinance-parser'
+import { parseOrdinanceSearchXML } from '@/lib/ordin-search-parser'
+import { parseOrdinanceXML } from '@/lib/ordin-parser'
 
 interface ModalState {
   open: boolean
@@ -52,25 +53,23 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           }
 
           const ordinSearchXml = await ordinSearchRes.text()
-          const ordinParser = new DOMParser()
-          const ordinSearchDoc = ordinParser.parseFromString(ordinSearchXml, "text/xml")
 
-          // 검색 결과에서 자치법규 정보 추출
-          const ordinNodes = Array.from(ordinSearchDoc.querySelectorAll("law, 자치법규"))
+          // 기존 파서 사용하여 검색 결과 파싱
+          const ordinSearchResults = parseOrdinanceSearchXML(ordinSearchXml)
           const normalizedSearchName = cleanedLawName.replace(/\s+/g, "")
 
           // 정확한 이름 매칭 우선
-          const exactMatch = ordinNodes.find(node => {
-            const nodeName = (node.querySelector("자치법규명, ordinName")?.textContent || "").replace(/\s+/g, "")
-            return nodeName === normalizedSearchName
+          const exactMatch = ordinSearchResults.find(result => {
+            const resultName = result.ordinName.replace(/\s+/g, "")
+            return resultName === normalizedSearchName
           })
 
-          const ordinNode = exactMatch || ordinNodes[0]
+          const ordinResult = exactMatch || ordinSearchResults[0]
 
-          const ordinId = ordinNode?.querySelector("자치법규ID, ordinId, ID")?.textContent
-          const ordinSeq = ordinNode?.querySelector("자치법규일련번호, ordinSeq, MST")?.textContent
+          const ordinId = ordinResult?.ordinId
+          const ordinSeq = ordinResult?.ordinSeq
 
-          debugLogger.info('[citation] 자치법규 검색 결과', { ordinId, ordinSeq, foundCount: ordinNodes.length })
+          debugLogger.info('[citation] 자치법규 검색 결과', { ordinId, ordinSeq, foundCount: ordinSearchResults.length, ordinName: ordinResult?.ordinName })
 
           if (!ordinId && !ordinSeq) {
             // 검색 결과 없으면 법제처 링크로 폴백
@@ -85,7 +84,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
             return
           }
 
-          // 2. 자치법규 본문 조회
+          // 2. 자치법규 본문 조회 (XML)
           const ordinParams = new URLSearchParams()
           if (ordinId) ordinParams.append("ordinId", ordinId)
           else if (ordinSeq) ordinParams.append("ordinSeq", ordinSeq)
@@ -95,10 +94,10 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
             throw new Error('자치법규 본문 조회 실패')
           }
 
-          const ordinJson = await ordinRes.json()
+          const ordinXml = await ordinRes.text()
 
-          // 3. JSON 파싱
-          const { meta: ordinMeta, articles: ordinArticles } = parseOrdinanceJSON(ordinJson)
+          // 3. XML 파싱 (기존 parseOrdinanceXML 사용 - 법령 뷰어와 동일)
+          const { meta: ordinMeta, articles: ordinArticles } = parseOrdinanceXML(ordinXml)
 
           debugLogger.info('[citation] 자치법규 파싱 완료', {
             lawTitle: ordinMeta.lawTitle,
@@ -106,7 +105,38 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           })
 
           // 4. 특정 조문 찾기
-          const targetArticle = findOrdinanceArticle(ordinArticles, articleLabel)
+          // 조문 번호만 추출 (제N조 또는 제N조의M)
+          const articleOnly = articleLabel.match(/(제\d+조(?:의\d+)?)/)?.[1] || articleLabel
+
+          // JO 코드 생성 (조례 형식: AABBCC)
+          let targetJo = ""
+          const match = articleOnly.match(/제(\d+)조(?:의(\d+))?/)
+          if (match) {
+            const articleNum = parseInt(match[1], 10)
+            const branchNum = match[2] ? parseInt(match[2], 10) : 0
+            targetJo = articleNum.toString().padStart(2, "0") +
+                       branchNum.toString().padStart(2, "0") +
+                       "00"
+          }
+
+          debugLogger.info('[citation] 조문 검색', {
+            articleLabel,
+            articleOnly,
+            targetJo,
+            availableArticles: ordinArticles.map(a => ({ jo: a.jo, joNum: a.joNum }))
+          })
+
+          // JO 코드로 매칭
+          let targetArticle = ordinArticles.find(a => a.jo === targetJo)
+
+          // 못 찾으면 joNum으로 매칭 시도
+          if (!targetArticle) {
+            const targetNum = articleLabel.replace(/[^0-9]/g, "")
+            targetArticle = ordinArticles.find(a => {
+              const aNum = a.joNum.replace(/[^0-9]/g, "")
+              return aNum === targetNum
+            })
+          }
 
           if (!targetArticle) {
             const lawGoKrUrl = `https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}`
