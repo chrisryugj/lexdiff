@@ -151,7 +151,8 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           }
 
           // 5. HTML 생성 (extractArticleText 사용, isOrdinance=true)
-          const articleTitle = `${cleanedLawName} ${formatJO(targetArticle.jo)}${targetArticle.title ? ` (${targetArticle.title})` : ""}`
+          // 조례는 joNum을 직접 사용 (formatJO는 법령 형식 전용)
+          const articleTitle = `${cleanedLawName} ${targetArticle.joNum}${targetArticle.title ? ` (${targetArticle.title})` : ""}`
           const htmlContent = extractArticleText(targetArticle, true, cleanedLawName)
 
           if (!htmlContent || htmlContent.trim().length === 0) {

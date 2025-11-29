@@ -6,6 +6,37 @@
 
 ## 2025-11-28
 
+### [17:15 KST] 포커스 모드 버튼 임시 숨김
+- **Files**: `components/floating-compact-header.tsx` (modified)
+- **Changes**:
+  - 포커스 모드 버튼(Maximize2 아이콘) 주석 처리로 임시 숨김
+  - 상태(`isFocusMode`)만 존재하고 실제 UI 반영 로직이 미구현된 상태
+- **Impact**: 동작하지 않는 버튼 제거로 UX 혼란 방지
+- **TODO**: 추후 포커스 모드 기능 구현 시 주석 해제 필요
+  - 구현 내용: 사이드바/헤더 숨김, 콘텐츠 영역 전체화면화
+  - 위치: `search-result-view.tsx`에서 `isFocusMode` 상태에 따른 레이아웃 변경
+
+### [16:00 KST] AI 답변 품질 개선 Phase 7 - 간결성 및 UX 향상
+- **Files**:
+  - `lib/file-search-client.ts` (modified) - 프롬프트 전면 개편
+  - `lib/query-preprocessor.ts` (modified) - 쿼리 분류 키워드 확장
+  - `lib/ai-answer-processor.ts` (modified) - [1] [2] [3] 단계 CSS 스타일링
+  - `components/law-viewer-ai-answer.tsx` (modified) - 신뢰도/잘림 경고 배너
+  - `components/law-viewer.tsx` (modified) - aiIsTruncated props
+  - `components/ai-search-view.tsx` (modified) - isTruncated 상태 관리
+- **Changes**:
+  - **프롬프트 개편**: 장황한 설명형 답변 → 개조식(명사형 종결) + 800자 제한
+  - **쿼리 분류 확장**: 절차 질문 키워드 3개 → 17개 (신청, 등록, 허가, 발급, 신고, 인가, 승인, 면허, 지정, 선정, 추천, 제출, 제외, 면제, 적용, 대상, 인정)
+  - **단계 표시 스타일링**: [1] [2] [3] → CSS 원형 배지 (파란색, 그라데이션)
+  - **신뢰도 경고**: confidence='low' 시 빨간 경고 배너 표시
+  - **잘림 경고**: maxOutputTokens 도달 시 노란 경고 배너 표시
+- **Impact**:
+  - AI 답변 길이 약 70% 감소 예상 (토큰 비용 절감)
+  - 절차 관련 질문 정확 분류율 향상 (17개 키워드)
+  - 사용자 경험 개선 (시각적 피드백, 명확한 경고)
+  - 개조식 답변으로 핵심만 빠르게 파악 가능
+- **Reason**: AI 답변 과도한 장황함 개선 요청 (사용자 피드백)
+
 ### [14:30 KST] 사용법 안내 툴팁 및 상세 도움말 페이지 구현
 - **Files**:
   - `components/ui/popover.tsx` (created) - shadcn/ui Popover 컴포넌트
