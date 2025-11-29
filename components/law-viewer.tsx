@@ -48,6 +48,7 @@ import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { DelegationPanel } from "@/components/law-viewer-delegation-panel"
+import { CopyButton } from "@/components/ui/copy-button"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
 import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
@@ -1168,19 +1169,11 @@ export function LawViewer({
                       <ZoomIn className="h-3.5 w-3.5" />
                     </Button>
                     <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const content = actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')
-                        navigator.clipboard.writeText(content)
-                        toast({ title: "복사 완료", description: "법령 전체 내용이 클립보드에 복사되었습니다." })
-                      }}
-                      title="전체 복사"
-                      className="h-7 px-2"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    <CopyButton
+                      getText={() => actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')}
+                      message="전체 복사됨"
+                      className="h-7 w-7 p-0"
+                    />
                   </div>
                 </div>
               )
@@ -1331,19 +1324,11 @@ export function LawViewer({
                               <ZoomIn className="h-3.5 w-3.5" />
                             </Button>
                             <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const content = `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`
-                                navigator.clipboard.writeText(content)
-                                toast({ title: "복사 완료", description: "조문 내용이 클립보드에 복사되었습니다." })
-                              }}
-                              title="복사"
-                              className="h-7 px-2"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
+                            <CopyButton
+                              getText={() => `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
+                              message="복사됨"
+                              className="h-7 w-7 p-0"
+                            />
                           </div>
                         </div>
                       </div>
