@@ -4,6 +4,59 @@
 
 ---
 
+## 2025-11-29
+
+### [10:30 KST] UI/UX 개선 Phase 2 - 전문조회 복사 피드백 및 신구법 모달 레이아웃
+- **Files**:
+  - `components/virtualized-full-article-view.tsx` (modified)
+  - `components/comparison-modal.tsx` (modified)
+- **Changes**:
+  - **전문조회 복사 피드백**: viewport 좌표 계산 수정, 토스트 스타일 개선 (bg-primary)
+  - **신구법 모달 제목**: 순서 변경 (아이콘+법령명 → 신·구법 대조표 + 법령명)
+  - **법령명 들여쓰기**: '신' 글자와 정렬 (ml-[28px] sm:ml-[32px])
+- **Impact**: 복사 피드백 정상 표시, 모달 제목 계층 구조 개선
+- **Commit**: `49348f1`
+
+### [09:00 KST] UI/UX 종합 분석 및 P0/P1 개선 완료
+- **Files**:
+  - `docs/24-UI-UX-ANALYSIS-REPORT.md` (created) - 종합 분석 보고서
+  - `components/file-search-answer-display.tsx` - 프로그레스바 단계별 진행
+  - `components/reference-modal.tsx` - 포커스 관리, 폰트 크기 확장
+  - `components/comparison-modal.tsx` - 포커스 관리, 비율 기반 동기 스크롤
+  - `lib/unified-link-generator.ts` - aria-label 접근성 추가
+  - `components/law-viewer.tsx` - 키보드 화살표 네비게이션
+  - `components/virtualized-full-article-view.tsx` - 즐겨찾기/복사 버튼 추가
+  - `app/globals.css` - 방문 링크 스타일
+- **Changes**:
+  - **P0 완료**: 프로그레스바 정확도, 모달 포커스 관리, aria-label, 폰트 크기 범위
+  - **P1 완료**: 키보드 네비게이션, 방문 링크 스타일, 비율 기반 동기 스크롤
+  - **추가 구현**: 전문보기 즐겨찾기/복사 버튼 (포탈 토스트 피드백)
+- **Score**: 68/100 (Nielsen 59/100, WCAG Level A 부분 준수)
+- **Commits**: `32ee12b`, `c4f5a96`, `e7caf5c`, `49348f1`
+
+---
+
+## 남은 UI/UX 개선 작업
+
+### P1 미완료
+- [ ] **handleContentClick 함수 분리** (`law-viewer.tsx:577-810`)
+  - 링크 타입별 핸들러를 별도 훅으로 분리
+  - 코드 복잡도 감소, 유지보수성 향상
+
+### P2 중기 개선
+- [ ] **온보딩/튜토리얼 시스템** (`components/onboarding/`)
+  - 첫 방문 환영 모달
+  - 검색 타입 안내 (일반 vs AI)
+  - 법령 뷰어 사용법, 단축키 안내
+- [ ] **라이트 테마 구현** (`app/globals.css`)
+  - 현재 다크 모드만 지원
+  - `:root`에 라이트 모드 변수 추가
+- [ ] **시맨틱 HTML 구조 개선** (`lib/law-xml-parser.tsx`)
+  - `<article>`, `<section>` 태그 활용
+  - ARIA 속성 추가
+
+---
+
 ## 2025-11-28
 
 ### [17:15 KST] 포커스 모드 버튼 임시 숨김
