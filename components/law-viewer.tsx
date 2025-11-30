@@ -1125,51 +1125,54 @@ export function LawViewer({
                   <ScrollArea className="h-full" ref={contentRef}>
                     <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
                       <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
-                        {/* PC: 제목+배지+버튼 1줄 / 모바일: 제목+배지+즐겨찾기 1줄, 버튼 2줄 */}
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-0.5 lg:gap-2">
-                          {/* 제목 + 배지 + 즐겨찾기(모바일) */}
-                          <div className="flex items-center gap-2 min-w-0">
+                        {/* 모바일/PC 모두 1줄: 제목 + 배지 + 버튼들 */}
+                        <div className="flex items-center justify-between gap-1 lg:gap-2">
+                          {/* 제목 + 배지 */}
+                          <div className="flex items-center gap-1 lg:gap-2 min-w-0 flex-1">
                             <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
                               {formatSimpleJo(activeArticle.jo, isOrdinance)}
                               {activeArticle.title && (
-                                <span className="text-muted-foreground text-base lg:text-lg ml-2">({activeArticle.title})</span>
+                                <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
                               )}
                             </h2>
                             {meta.lawTitle === "대한민국헌법" ? (
-                              <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50">
+                              <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50 hidden sm:flex">
                                 <Landmark className="h-3 w-3 mr-1" />
                                 헌법
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs shrink-0">
+                              <Badge variant="outline" className="text-xs shrink-0 hidden sm:flex">
                                 {isOrdinance ? "자치법규" : "법률"}
                               </Badge>
                             )}
-                            {/* 즐겨찾기 버튼 - 모바일에서 제목줄 우측 */}
+                          </div>
+
+                          {/* 버튼 그룹: 즐겨찾기 + 글씨크기 + 복사 (컴팩트하게 1줄) */}
+                          <div className="flex items-center gap-0 shrink-0">
+                            {/* 즐겨찾기 버튼 */}
                             <Button
                               key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
                               variant="ghost"
                               size="sm"
                               onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                              className="lg:hidden ml-auto h-7 w-7 p-0 shrink-0"
+                              className="h-7 w-7 p-0"
                               title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                             >
                               <Star className={`h-4 w-4 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
                             </Button>
-                          </div>
-
-                          {/* 글씨크기 버튼 */}
-                          <div className="flex items-center justify-end gap-1 shrink-0">
-                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                            {/* 글씨크기 버튼 */}
+                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 w-7 p-0">
                               <ZoomOut className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 w-7 p-0">
                               <RotateCcw className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 w-7 p-0">
                               <ZoomIn className="h-3.5 w-3.5" />
                             </Button>
-                            <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
+                            {/* px 텍스트: PC에서만 표시 */}
+                            <span className="hidden lg:inline text-xs text-muted-foreground ml-1 mr-1">{fontSize}px</span>
+                            {/* 복사 버튼 */}
                             <CopyButton
                               getText={() => `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
                               message="복사됨"
@@ -1223,6 +1226,7 @@ export function LawViewer({
             articleNumber={refModal.articleNumber}
             hasHistory={refModalHistory.length > 0}
             onBack={handleRefModalBack}
+            loading={refModal.loading}
           />
         </div >
 

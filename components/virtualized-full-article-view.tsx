@@ -292,20 +292,20 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
                 >
                   <div className="mb-2 pb-1 border-b border-border">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-lg font-bold text-foreground flex items-center gap-2 flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <h3 className="text-lg font-bold text-foreground flex items-center gap-1 lg:gap-2 flex-1 min-w-0">
                         {formatSimpleJo(item.article.jo)}
                         {item.article.title && (
                           <span className="text-muted-foreground truncate">({item.article.title})</span>
                         )}
                         {activeJo === item.article.jo && (
                           <BookmarkCheck
-                            className="h-5 w-5 text-primary flex-shrink-0"
+                            className="h-4 w-4 lg:h-5 lg:w-5 text-primary flex-shrink-0"
                             title="현재 선택된 조문"
                           />
                         )}
                       </h3>
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex items-center gap-0 flex-shrink-0">
                         {/* 즐겨찾기 버튼 */}
                         <Button
                           variant="ghost"

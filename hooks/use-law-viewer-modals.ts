@@ -13,6 +13,7 @@ interface ModalState {
   forceWhiteTheme?: boolean
   lawName?: string
   articleNumber?: string
+  loading?: boolean
 }
 
 interface ModalHistoryItem {
@@ -31,9 +32,19 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
   // Handler: open external law article modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
+    // ✅ 법령명 정규화: 따옴표 제거 (「도로법」 → 도로법)
+    const cleanedLawName = lawName.replace(/[「」『』]/g, '').trim()
+
+    // 로딩 상태로 모달 먼저 열기
+    setRefModal({
+      open: true,
+      title: `${cleanedLawName} ${articleLabel || ''}`.trim(),
+      loading: true,
+      lawName: cleanedLawName,
+      articleNumber: articleLabel,
+    })
+
     try {
-      // ✅ 법령명 정규화: 따옴표 제거 (「도로법」 → 도로법)
-      const cleanedLawName = lawName.replace(/[「」『』]/g, '').trim()
 
       // 자치법규 여부 감지
       // "시행규칙", "시행령"은 국가법령이므로 제외

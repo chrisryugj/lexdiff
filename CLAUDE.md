@@ -72,7 +72,24 @@ npm run build    # 빌드
 npm run lint     # 린트
 ```
 
-**환경변수** (`.env.local`): `LAW_OC`, `GEMINI_API_KEY`, `GEMINI_FILE_SEARCH_STORE_ID`
+---
+
+## 🔴 환경변수 (`.env.local`)
+
+| 변수명 | 값 | 용도 |
+|--------|-----|------|
+| `LAW_OC` | `ryuseungin` | 법제처 API 인증키 |
+| `GEMINI_API_KEY` | (비공개) | Gemini AI API 키 |
+| `GEMINI_FILE_SEARCH_STORE_ID` | (비공개) | File Search RAG 스토어 ID |
+
+**CLI에서 API 테스트 시**:
+```bash
+# Windows PowerShell
+$env:LAW_OC="ryuseungin"; curl "https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=$env:LAW_OC&type=JSON&MST=000013&JO=002800"
+
+# Git Bash / WSL
+LAW_OC=ryuseungin curl "https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=$LAW_OC&type=JSON&MST=000013&JO=002800"
+```
 
 ---
 

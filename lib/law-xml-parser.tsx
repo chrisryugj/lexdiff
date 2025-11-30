@@ -275,7 +275,10 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
     if (article.content) {
       // 조문 제목 패턴 매치 - 제X조(제목) 형식 제거 (escape 전에)
-      const titleMatch = article.content.match(/^(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)\s*([\s\S]*)$/)
+      // CRITICAL: 괄호가 있는 경우만 제목으로 인식 (본문의 "제X조" 참조가 잘려나가는 버그 방지)
+      // 예: "제28조(과태료)" → 제목으로 인식
+      // 예: "제20조와 제23조" → 제목 아님 (본문 시작)
+      const titleMatch = article.content.match(/^(제\d+조(?:의\d+)?\s*\([^)]+\))\s*([\s\S]*)$/)
 
       let rawContent = article.content
       if (titleMatch) {

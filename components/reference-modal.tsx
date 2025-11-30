@@ -5,7 +5,7 @@ import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, ExternalLink, ArrowLeft } from "lucide-react"
+import { ZoomIn, ZoomOut, ExternalLink, ArrowLeft, Loader2 } from "lucide-react"
 import { CopyButton } from "@/components/ui/copy-button"
 
 interface ReferenceModalProps {
@@ -20,9 +20,10 @@ interface ReferenceModalProps {
   articleNumber?: string
   hasHistory?: boolean
   onBack?: () => void
+  loading?: boolean
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const contentRef = useRef<HTMLDivElement>(null)
@@ -224,7 +225,12 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             </div>
           </div>
         </DialogHeader>
-        {showOriginal && canShowOriginal ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-[40vh] gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">법령 조문을 불러오는 중...</p>
+          </div>
+        ) : showOriginal && canShowOriginal ? (
           <div className="w-full">
             <iframe src={originalUrl} className="w-full h-[65vh] border-0" />
           </div>
