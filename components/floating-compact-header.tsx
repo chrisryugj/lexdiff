@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { UsageGuidePopover } from "@/components/usage-guide-popover"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface FloatingCompactHeaderProps {
   onBack?: () => void
@@ -118,6 +119,9 @@ export function FloatingCompactHeader({
 
                 {/* 오른쪽: 버튼들 */}
                 <div className="flex items-center gap-1 lg:gap-2">
+                  {/* 테마 토글 */}
+                  <ThemeToggle />
+
                   {/* 사용법 안내 */}
                   <UsageGuidePopover type={guideType} />
 

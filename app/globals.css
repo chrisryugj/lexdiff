@@ -81,53 +81,55 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 라이트 테마 (기본값) */
 :root {
-  --background: oklch(0.12 0.01 240);
-  --foreground: oklch(0.95 0.01 240);
-  --card: oklch(0.16 0.01 240);
-  --card-foreground: oklch(0.95 0.01 240);
-  --popover: oklch(0.14 0.01 240);
-  --popover-foreground: oklch(0.95 0.01 240);
-  --primary: oklch(0.55 0.18 250);
+  --background: oklch(0.985 0.005 240);
+  --foreground: oklch(0.15 0.02 240);
+  --card: oklch(0.99 0.003 240);
+  --card-foreground: oklch(0.15 0.02 240);
+  --popover: oklch(0.99 0.003 240);
+  --popover-foreground: oklch(0.15 0.02 240);
+  --primary: oklch(0.5 0.2 250);
   --primary-foreground: oklch(0.98 0.01 240);
-  --secondary: oklch(0.22 0.02 240);
-  --secondary-foreground: oklch(0.95 0.01 240);
-  --muted: oklch(0.2 0.02 240);
-  --muted-foreground: oklch(0.65 0.02 240);
-  --accent: oklch(0.65 0.2 250);
+  --secondary: oklch(0.92 0.02 240);
+  --secondary-foreground: oklch(0.2 0.02 240);
+  --muted: oklch(0.94 0.015 240);
+  --muted-foreground: oklch(0.45 0.02 240);
+  --accent: oklch(0.55 0.18 250);
   --accent-foreground: oklch(0.98 0.01 240);
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(0.98 0.01 240);
-  --border: oklch(0.25 0.02 240);
-  --input: oklch(0.25 0.02 240);
-  --ring: oklch(0.55 0.18 250);
-  --chart-1: oklch(0.6 0.2 250);
-  --chart-2: oklch(0.65 0.18 200);
-  --chart-3: oklch(0.55 0.15 280);
-  --chart-4: oklch(0.7 0.16 150);
-  --chart-5: oklch(0.6 0.18 50);
+  --border: oklch(0.88 0.015 240);
+  --input: oklch(0.88 0.015 240);
+  --ring: oklch(0.5 0.2 250);
+  --chart-1: oklch(0.55 0.2 250);
+  --chart-2: oklch(0.6 0.18 200);
+  --chart-3: oklch(0.5 0.15 280);
+  --chart-4: oklch(0.65 0.16 150);
+  --chart-5: oklch(0.55 0.18 50);
   --radius: 0.5rem;
-  --sidebar: oklch(0.14 0.01 240);
-  --sidebar-foreground: oklch(0.95 0.01 240);
-  --sidebar-primary: oklch(0.55 0.18 250);
+  --sidebar: oklch(0.97 0.005 240);
+  --sidebar-foreground: oklch(0.15 0.02 240);
+  --sidebar-primary: oklch(0.5 0.2 250);
   --sidebar-primary-foreground: oklch(0.98 0.01 240);
-  --sidebar-accent: oklch(0.22 0.02 240);
-  --sidebar-accent-foreground: oklch(0.95 0.01 240);
-  --sidebar-border: oklch(0.25 0.02 240);
-  --sidebar-ring: oklch(0.55 0.18 250);
-  --success: oklch(0.6 0.18 150);
-  --warning: oklch(0.7 0.18 80);
-  --info: oklch(0.65 0.18 230);
-  --debug-bg: oklch(0.1 0.01 240);
-  --debug-border: oklch(0.3 0.02 240);
-  --color-destructive-bg: oklch(0.3 0.18 25);
-  --color-destructive-fg: oklch(1 0.05 25);
-  --color-success-bg: oklch(0.3 0.15 150);
-  --color-success-fg: oklch(1 0.05 150);
-  --color-warning-bg: oklch(0.4 0.15 80);
-  --color-warning-fg: oklch(0.05 0.01 80);
+  --sidebar-accent: oklch(0.92 0.02 240);
+  --sidebar-accent-foreground: oklch(0.2 0.02 240);
+  --sidebar-border: oklch(0.88 0.015 240);
+  --sidebar-ring: oklch(0.5 0.2 250);
+  --success: oklch(0.55 0.18 150);
+  --warning: oklch(0.65 0.18 80);
+  --info: oklch(0.6 0.18 230);
+  --debug-bg: oklch(0.96 0.01 240);
+  --debug-border: oklch(0.85 0.015 240);
+  --color-destructive-bg: oklch(0.95 0.08 25);
+  --color-destructive-fg: oklch(0.4 0.18 25);
+  --color-success-bg: oklch(0.95 0.06 150);
+  --color-success-fg: oklch(0.35 0.15 150);
+  --color-warning-bg: oklch(0.95 0.08 80);
+  --color-warning-fg: oklch(0.35 0.15 80);
 }
 
+/* 다크 테마 */
 .dark {
   --background: oklch(0.12 0.01 240);
   --foreground: oklch(0.95 0.01 240);
@@ -373,22 +375,23 @@
   }
 }
 
+/* 스크롤바 - 테마 대응 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: oklch(0.16 0.01 240);
+  background: var(--muted);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.02 240);
+  background: var(--border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.02 240);
+  background: var(--muted-foreground);
 }
 
 /* AI 모드 글로우 효과 */
@@ -458,18 +461,27 @@
    Apple-Style Unified Background System
    ============================================ */
 
-/* Base page background - unified dark */
+/* Base page background - 테마 대응 */
 .page-bg {
-  background: oklch(0.08 0.008 240);
+  background: var(--background);
   min-height: 100vh;
 }
 
-/* Fixed Hero Section - Header + Search stays fixed */
-.hero-section-fixed {
+/* Fixed Hero Section - Header + Search stays fixed (다크 모드) */
+.dark .hero-section-fixed {
   background: linear-gradient(180deg,
       oklch(0.18 0.025 250) 0%,
       oklch(0.12 0.015 250) 30%,
       oklch(0.08 0.008 240) 70%);
+  position: relative;
+}
+
+/* Fixed Hero Section - 라이트 모드 */
+.hero-section-fixed {
+  background: linear-gradient(180deg,
+      oklch(0.96 0.015 250) 0%,
+      oklch(0.98 0.008 250) 30%,
+      var(--background) 70%);
   position: relative;
 }
 
@@ -508,17 +520,17 @@
   pointer-events: none;
 }
 
-/* Section backgrounds - unified with hero */
+/* Section backgrounds - 테마 대응 */
 .section-primary {
-  background: oklch(0.08 0.008 240);
+  background: var(--background);
 }
 
 .section-elevated {
-  background: oklch(0.09 0.008 240);
+  background: var(--card);
 }
 
 .section-subtle {
-  background: oklch(0.08 0.008 240);
+  background: var(--background);
 }
 
 /* Progress dialog animations */
@@ -774,63 +786,60 @@
   transform: translateY(0);
 }
 
-/* Feature card hover effect - Apple style */
+/* Feature card hover effect - 테마 대응 */
 .feature-card {
-  background: oklch(0.15 0.012 240);
-  border: 1px solid oklch(0.22 0.02 240);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 16px;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .feature-card:hover {
   transform: translateY(-4px);
-  background: oklch(0.16 0.015 240);
-  border-color: oklch(0.28 0.03 250);
+  background: var(--secondary);
+  border-color: var(--ring);
   box-shadow:
-    0 20px 40px oklch(0 0 0 / 0.3),
-    0 0 0 1px oklch(0.55 0.18 250 / 0.1);
+    0 20px 40px oklch(0 0 0 / 0.15),
+    0 0 0 1px var(--ring);
 }
 
-/* Bento Grid Card - Futuristic style adapted */
+/* Bento Grid Card - 테마 대응 */
 .bento-card {
   padding: 1.25rem;
   border-radius: 1.25rem;
-  border: 1px solid oklch(0.22 0.015 240);
-  background: oklch(0.14 0.01 240 / 0.5);
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 50%, transparent);
   backdrop-filter: blur(12px);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .bento-card:hover {
-  border-color: oklch(0.3 0.025 250);
-  background: oklch(0.15 0.012 240 / 0.7);
+  border-color: var(--ring);
+  background: color-mix(in oklch, var(--card) 70%, transparent);
   transform: translateY(-2px);
   box-shadow:
-    0 16px 32px oklch(0 0 0 / 0.25),
-    0 0 0 1px oklch(0.55 0.15 250 / 0.08);
+    0 16px 32px oklch(0 0 0 / 0.1),
+    0 0 0 1px var(--ring);
 }
 
-/* Stats card styling */
+/* Stats card styling - 테마 대응 */
 .stat-card {
-  background: oklch(0.14 0.01 240 / 0.6);
+  background: color-mix(in oklch, var(--card) 60%, transparent);
   backdrop-filter: blur(12px);
-  border: 1px solid oklch(0.2 0.015 240);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 1.5rem;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .stat-card:hover {
-  background: oklch(0.15 0.012 240 / 0.8);
-  border-color: oklch(0.25 0.02 240);
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  border-color: var(--muted-foreground);
 }
 
-/* CTA Section gradient */
+/* CTA Section gradient - 테마 대응 */
 .cta-gradient {
-  background: linear-gradient(180deg,
-      oklch(0.11 0.008 240) 0%,
-      oklch(0.13 0.015 250) 50%,
-      oklch(0.11 0.008 240) 100%);
+  background: var(--secondary);
   position: relative;
 }
 
@@ -843,18 +852,18 @@
   width: 60%;
   height: 60%;
   background: radial-gradient(circle,
-      oklch(0.55 0.18 250 / 0.06) 0%,
+      var(--primary) / 0.06,
       transparent 70%);
   pointer-events: none;
 }
 
-/* Divider line */
+/* Divider line - 테마 대응 */
 .section-divider {
   height: 1px;
   background: linear-gradient(90deg,
       transparent 0%,
-      oklch(0.25 0.02 240) 20%,
-      oklch(0.25 0.02 240) 80%,
+      var(--border) 20%,
+      var(--border) 80%,
       transparent 100%);
 }
 
