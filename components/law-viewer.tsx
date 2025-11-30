@@ -56,6 +56,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
 import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
 import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
+import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
+import type { ContentClickContext, ContentClickActions } from "@/lib/content-click-handlers"
 import { useSwipe } from "@/hooks/use-swipe"
 import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
@@ -609,243 +611,48 @@ export function LawViewer({
     }
   }, [isOrdinance])
 
-  // Handle clicks on linkified references inside article content
-  const handleContentClick: React.MouseEventHandler<HTMLDivElement> = async (e) => {
-    const target = e.target as HTMLElement
-    if (target && target.tagName === "A") {
-      e.preventDefault()
-      e.stopPropagation() // 이벤트 버블링 차단
+  // Content Click Handlers - 링크 클릭 이벤트 처리 (분리된 훅 사용)
+  const contentClickContext: ContentClickContext = useMemo(() => ({
+    meta,
+    articles,
+    activeArticle,
+    aiAnswerMode,
+    userQuery,
+    aiAnswerContent,
+    aiCitations,
+    relatedArticles,
+    tierViewMode,
+    threeTierDelegation,
+    threeTierCitation,
+    validDelegations,
+    showAdminRules,
+    lastExternalRef,
+    refModal,
+  }), [
+    meta, articles, activeArticle, aiAnswerMode, userQuery, aiAnswerContent,
+    aiCitations, relatedArticles, tierViewMode, threeTierDelegation,
+    threeTierCitation, validDelegations, showAdminRules, lastExternalRef, refModal
+  ])
 
+  const contentClickActions: ContentClickActions = useMemo(() => ({
+    openExternalLawArticleModal,
+    setRefModal,
+    setRefModalHistory,
+    setLastExternalRef,
+    fetchThreeTierData,
+    setTierViewMode,
+    setDelegationActiveTab,
+    setShowAdminRules,
+    setAdminRuleViewMode,
+    setAdminRuleHtml,
+    toast,
+  }), [
+    openExternalLawArticleModal, setRefModal, setRefModalHistory, setLastExternalRef,
+    fetchThreeTierData, setTierViewMode, setDelegationActiveTab, setShowAdminRules,
+    setAdminRuleViewMode, setAdminRuleHtml, toast
+  ])
 
-      const refType = target.getAttribute("data-ref")
-      if (refType === "article") {
-        const articleLabel = target.getAttribute("data-article") || ""
-        // If immediately preceded by external law anchor, treat as external
-        const prev = target.previousElementSibling as HTMLElement | null
-        if (
-          prev &&
-          prev.tagName === "A" &&
-          prev.classList.contains("law-ref") &&
-          prev.getAttribute("data-ref") === "law"
-        ) {
-          const lawName = prev.getAttribute("data-law") || ""
-          await openExternalLawArticleModal(lawName, articleLabel)
-          setLastExternalRef({ lawName, joLabel: articleLabel })
-          return
-        }
-
-        // AI 답변 모드에서는 법령명을 자동으로 추론
-        if (aiAnswerMode) {
-          const { inferLawNameFromArticle } = await import('@/lib/ai-law-inference')
-
-          const inferred = inferLawNameFromArticle(articleLabel, {
-            userQuery,
-            relatedLaws: relatedArticles,
-            aiAnswerContent,
-            citations: aiCitations,
-          })
-
-          if (inferred) {
-            debugLogger.info('법령명 자동 추론', {
-              article: articleLabel,
-              lawName: inferred.lawName,
-              confidence: inferred.confidence,
-              reason: inferred.reason
-            })
-
-            await openExternalLawArticleModal(inferred.lawName, articleLabel)
-            setLastExternalRef({ lawName: inferred.lawName, joLabel: articleLabel })
-            return
-          }
-
-          // 추론 실패 시 lastExternalRef 사용 (fallback)
-          if (lastExternalRef?.lawName) {
-            await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
-            setLastExternalRef({ ...lastExternalRef, joLabel: articleLabel })
-            return
-          }
-
-          // 둘 다 실패 시 에러 메시지
-          toast({
-            title: "법령명을 찾을 수 없습니다",
-            description: `"${articleLabel}"의 법령명을 자동으로 찾을 수 없습니다. 법령명과 함께 명시된 링크를 클릭해주세요.`,
-            variant: "destructive"
-          })
-          return
-        }
-
-        // 일반 모드: 현재 법령에서 검색
-        try {
-          const joCode = buildJO(articleLabel)
-          const found = articles.find((a) => a.jo === joCode || formatJO(a.jo) === formatJO(joCode))
-          if (found) {
-            // 현재 모달이 열려있으면 히스토리에 저장
-            if (refModal.open && refModal.title) {
-              setRefModalHistory(prev => [...prev, {
-                title: refModal.title!,
-                html: refModal.html,
-                forceWhiteTheme: refModal.forceWhiteTheme,
-                lawName: refModal.lawName,
-                articleNumber: refModal.articleNumber,
-              }])
-            }
-
-            setRefModal({
-              open: true,
-              title: `${meta.lawTitle} ${formatJO(found.jo)}${found.title ? ` (${found.title})` : ""}`,
-              html: extractArticleText(found, false, meta.lawTitle),
-              lawName: meta.lawTitle,
-              articleNumber: formatJO(found.jo),
-            })
-            return
-          }
-        } catch { }
-
-        // 못 찾았으면 외부 법령으로 간주 (lastExternalRef 사용)
-        if (lastExternalRef && lastExternalRef.lawName) {
-          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
-          setLastExternalRef({ lawName: lastExternalRef.lawName, joLabel: articleLabel })
-        } else {
-          // Fallback: 새 창으로 법제처 검색
-          window.open(`https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle)}/${articleLabel}`, "_blank", "noopener")
-        }
-      } else if (refType === "law") {
-        const lawName = target.getAttribute("data-law") || ""
-        // Try to pair with next article anchor on the same line
-        let articleLabel = ""
-        const next = target.nextElementSibling as HTMLElement | null
-        if (
-          next &&
-          next.tagName === "A" &&
-          next.classList.contains("law-ref") &&
-          next.getAttribute("data-ref") === "article"
-        ) {
-          articleLabel = next.getAttribute("data-article") || ""
-        }
-
-        // 조문 번호가 있든 없든 모달로 표시 (없으면 첫 번째 조문)
-        await openExternalLawArticleModal(lawName, articleLabel)
-        setLastExternalRef({ lawName, joLabel: articleLabel })
-      } else if (refType === "regulation") {
-        const clickedText = target.textContent || ""
-
-        // Load 3-tier data first if not loaded
-        if (!threeTierDelegation && !threeTierCitation) {
-          await fetchThreeTierData()
-        }
-
-        // Enable admin rules, set list view mode, switch to 2-tier view, and open admin tab
-        if (!showAdminRules) {
-          setShowAdminRules(true)
-        }
-        setAdminRuleViewMode("list")
-        setTierViewMode("2-tier")
-        setDelegationActiveTab("admin") // 행정규칙 탭 자동 선택
-      } else if (refType === "law-article") {
-        const lawName = target.getAttribute("data-law") || ""
-        const articleLabel = target.getAttribute("data-article") || ""
-        const lawType = target.getAttribute("data-law-type") as 'law' | 'decree' | 'rule' | null
-
-        // 모바일 위임법령 탭뷰에서 링크 클릭 시 탭 전환 (tierViewMode === "2-tier"일 때만)
-        if (tierViewMode === "2-tier" && lawType) {
-          // 3-tier 데이터가 로드되지 않았다면 먼저 로드
-          if (!threeTierDelegation && !threeTierCitation) {
-            await fetchThreeTierData()
-          }
-
-          // 법령 타입에 따라 적절한 탭으로 전환
-          let tabSwitched = false
-          if (lawType === 'decree' && validDelegations.some(d => d.type === '시행령')) {
-            setDelegationActiveTab('decree')
-            tabSwitched = true
-            debugLogger.info('탭 전환: 시행령', { lawName, articleLabel })
-          } else if (lawType === 'rule' && validDelegations.some(d => d.type === '시행규칙')) {
-            setDelegationActiveTab('rule')
-            tabSwitched = true
-            debugLogger.info('탭 전환: 시행규칙', { lawName, articleLabel })
-          } else if (lawType === 'law') {
-            // 시행령/시행규칙 본문에서 법률 링크 클릭 시 → 1-tier로 전환
-            setTierViewMode("1-tier")
-            tabSwitched = true
-            debugLogger.info('탭 전환: 법률 본문', { lawName, articleLabel })
-          }
-
-          // 탭 전환에 성공했으면 모달 열지 않고 리턴 (모바일 UX)
-          if (tabSwitched) {
-            setLastExternalRef({ lawName, joLabel: articleLabel })
-            return
-          }
-        }
-
-        // 탭 전환 실패 또는 2-tier 모드가 아닐 때만 모달 열기
-        await openExternalLawArticleModal(lawName, articleLabel)
-        setLastExternalRef({ lawName, joLabel: articleLabel })
-      } else if (refType === "same") {
-        // Use last external reference law + current article, change to requested part
-        if (lastExternalRef && lastExternalRef.joLabel) {
-          const part = target.getAttribute("data-part") || ""
-          const base = lastExternalRef.joLabel.replace(/제\d+항(제\d+호)?/, "").trim()
-          const articleLabel = `${base}${part}`
-          await openExternalLawArticleModal(lastExternalRef.lawName, articleLabel)
-          setLastExternalRef({ lawName: lastExternalRef.lawName, joLabel: articleLabel })
-        }
-      } else if (refType === "related") {
-        const kind = target.getAttribute("data-kind") || "decree"
-
-        // AI 답변 모드: 시행령/시행규칙 → 법령명 추론하여 모달 열기
-        if (aiAnswerMode) {
-          const { inferLawNameFromArticle } = await import('@/lib/ai-law-inference')
-
-          // 컨텍스트에서 법령명 추론
-          const inferred = inferLawNameFromArticle('', {
-            userQuery,
-            relatedLaws: relatedArticles,
-            aiAnswerContent,
-            citations: aiCitations,
-          })
-
-          if (inferred) {
-            const baseLawName = inferred.lawName.replace(/\s*(법|규칙|조례)$/, '$1')
-            const relatedLawName = kind === 'decree'
-              ? `${baseLawName} 시행령`
-              : kind === 'rule'
-                ? `${baseLawName} 시행규칙`
-                : baseLawName
-
-            window.open(`https://www.law.go.kr/법령/${encodeURIComponent(relatedLawName)}`, "_blank", "noopener")
-            return
-          }
-        }
-
-        // 일반 모드: 3단 비교 뷰로 전환
-        if (!activeArticle) return
-
-        // Load 3-tier data first if not loaded
-        if (!threeTierDelegation && !threeTierCitation) {
-          await fetchThreeTierData()
-        }
-
-        // Close admin rules view and restore delegation view
-        setShowAdminRules(false)
-        setAdminRuleViewMode("list")
-        setAdminRuleHtml(null)
-
-        setTierViewMode("2-tier")
-
-        // Set appropriate tab based on kind
-        if (kind === "decree") {
-          setDelegationActiveTab("decree") // 시행령 탭
-          debugLogger.info('탭 전환 (related): 시행령')
-        } else if (kind === "rule") {
-          setDelegationActiveTab("rule") // 시행규칙 탭
-          debugLogger.info('탭 전환 (related): 시행규칙')
-        }
-
-        // 탭 전환 성공 - 모달 열지 않고 리턴
-        return
-      }
-    }
-  }
+  const { handleContentClick } = useContentClickHandlers(contentClickContext, contentClickActions)
 
 
 
