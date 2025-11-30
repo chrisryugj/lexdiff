@@ -100,6 +100,10 @@ export function normalizeLawSearchText(input: string): string {
 
   value = normalizeBasicTypos(value)
 
+  // 영문+한글 붙어있는 경우 띄어쓰기 추가 (예: "fta특별법" → "fta 특별법")
+  // 법제처 API가 붙어있으면 정확히 일치하는 것만 찾음
+  value = value.replace(/([a-zA-Z])([가-힣])/gu, "$1 $2")
+
   value = value
     .replace(/\s+/gu, " ")
     .replace(/\(\s+/gu, "(")
@@ -158,4 +162,51 @@ export function normalizeSearchQuery(query: string): string {
   normalized = normalizeArticleNumber(normalized)
 
   return normalized
+}
+
+/**
+ * 유사어 그룹 정의
+ * 검색어에 포함된 단어를 유사어로 확장
+ */
+const SYNONYM_GROUPS: string[][] = [
+  ["특별법", "특례법", "특례"],
+  ["시행령", "시행규칙", "규칙"],
+  ["기본법", "기본"],
+]
+
+export interface SynonymExpansion {
+  original: string           // 원본 검색어
+  expanded: string[]         // 확장된 검색어들
+  matchedSynonym?: string    // 매칭된 유사어 (없으면 undefined)
+}
+
+/**
+ * 검색어에서 유사어를 찾아 확장된 검색어 목록 반환
+ * 예: "fta 특별법" → ["fta 특례법", "fta 특례"]
+ */
+export function expandSearchSynonyms(query: string): SynonymExpansion {
+  const normalizedQuery = normalizeLawSearchText(query).toLowerCase()
+  const result: SynonymExpansion = {
+    original: query,
+    expanded: [],
+  }
+
+  for (const group of SYNONYM_GROUPS) {
+    for (const synonym of group) {
+      if (normalizedQuery.includes(synonym)) {
+        result.matchedSynonym = synonym
+        // 해당 그룹의 다른 유사어로 치환한 검색어 생성
+        for (const altSynonym of group) {
+          if (altSynonym !== synonym) {
+            const expanded = normalizedQuery.replace(synonym, altSynonym)
+            result.expanded.push(expanded)
+          }
+        }
+        debugLogger.debug("유사어 확장", { query, synonym, expanded: result.expanded })
+        return result
+      }
+    }
+  }
+
+  return result
 }

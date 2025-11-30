@@ -15,14 +15,13 @@ import {
     ZoomOut,
     RotateCcw,
     ZoomIn,
-    Copy,
     ChevronDown,
     BookOpen,
     Search,
     Scale,
     ListChecks,
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
@@ -249,8 +248,6 @@ export function AIAnswerContent({
     aiQueryType = 'general',
     isTruncated = false
 }: AIAnswerContentProps) {
-    const { toast } = useToast()
-
     // 신뢰도 배지 컴포넌트
     const ConfidenceBadge = () => {
         if (!aiCitations || aiCitations.length === 0) return null
@@ -373,18 +370,11 @@ export function AIAnswerContent({
                                 <ZoomIn className="h-4 w-4" />
                             </Button>
                             <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
+                            <CopyButton
+                                getText={() => aiAnswerHTML.replace(/<[^>]*>?/gm, '')}
+                                message="복사됨"
                                 className="h-8 w-8 p-0"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(aiAnswerHTML.replace(/<[^>]*>?/gm, ''))
-                                    toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
-                                }}
-                                title="복사"
-                            >
-                                <Copy className="h-4 w-4" />
-                            </Button>
+                            />
                         </div>
                     </div>
                 )}
@@ -401,18 +391,11 @@ export function AIAnswerContent({
                         <ZoomIn className="h-4 w-4" />
                     </Button>
                     <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                    <CopyButton
+                        getText={() => aiAnswerHTML.replace(/<[^>]*>?/gm, '')}
+                        message="복사됨"
                         className="h-8 w-8 p-0"
-                        onClick={() => {
-                            navigator.clipboard.writeText(aiAnswerHTML.replace(/<[^>]*>?/gm, ''))
-                            toast({ title: "복사 완료", description: "AI 답변이 클립보드에 복사되었습니다." })
-                        }}
-                        title="복사"
-                    >
-                        <Copy className="h-4 w-4" />
-                    </Button>
+                    />
                 </div>
             </div>
 

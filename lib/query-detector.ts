@@ -123,15 +123,15 @@ export function detectQueryType(query: string): QueryDetectionResult {
   // 패턴 5: 긴 쿼리 (15자 이상) → 자연어일 가능성 높음
   if (trimmedQuery.length >= 15) {
     // 단, 법령명이 길 수도 있으므로 신중하게
-    const hasLawKeywords = /(법|령|규칙|조례|규정|지침|고시|훈령|예규)/g
-    const lawKeywordCount = (trimmedQuery.match(hasLawKeywords) || []).length
+    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우) - 길이와 관계없이 우선 체크
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
 
-    if (lawKeywordCount === 1 && trimmedQuery.length < 25) {
-      // "지방자치단체를 당사자로 하는 계약에 관한 법률" 같은 긴 법령명
+    if (pureLawNamePattern.test(trimmedQuery)) {
+      // "자유무역협정의 이행을 위한 관세법의 특례에 관한 법률" 같은 긴 법령명도 처리
       return {
         type: 'structured',
-        confidence: 0.7,
-        reason: '긴 법령명으로 추정'
+        confidence: 0.95,
+        reason: '순수 법령명 (긴 법령명)'
       }
     }
 

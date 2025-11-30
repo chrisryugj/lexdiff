@@ -7,6 +7,23 @@
 import { debugLogger } from '@/lib/debug-logger'
 import type { ContentClickContext, ContentClickActions } from './types'
 
+/**
+ * 클릭된 요소에서 가장 가까운 article 요소를 찾아 jo 코드를 추출
+ * @param target 클릭된 HTML 요소
+ * @returns jo 코드 또는 null
+ */
+function findArticleJoFromTarget(target: HTMLElement): string | null {
+  // id="article-{jo}" 형식의 부모 요소 찾기
+  const articleEl = target.closest('[id^="article-"]')
+  if (articleEl) {
+    const id = articleEl.id
+    // "article-001202" -> "001202"
+    const jo = id.replace('article-', '')
+    return jo
+  }
+  return null
+}
+
 export async function handleRelatedRef(
   target: HTMLElement,
   context: ContentClickContext,
@@ -23,6 +40,7 @@ export async function handleRelatedRef(
     threeTierCitation,
   } = context
   const {
+    setActiveJo,
     fetchThreeTierData,
     setShowAdminRules,
     setAdminRuleViewMode,
@@ -63,7 +81,14 @@ export async function handleRelatedRef(
   }
 
   // 일반 모드: 3단 비교 뷰로 전환
-  if (!activeArticle) return
+  // 전문조회 모드에서 클릭한 조문의 jo를 추출하여 activeJo 업데이트
+  const clickedJo = findArticleJoFromTarget(target)
+  if (clickedJo) {
+    debugLogger.info('위임법령 링크 클릭: activeJo 업데이트', { clickedJo })
+    setActiveJo(clickedJo)
+  }
+
+  if (!activeArticle && !clickedJo) return
 
   // 3단 데이터 로드 (필요시)
   if (!threeTierDelegation && !threeTierCitation) {

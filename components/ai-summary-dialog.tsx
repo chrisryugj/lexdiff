@@ -4,8 +4,9 @@ import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Sparkles, Copy, Check, Type } from "lucide-react"
+import { Loader2, Sparkles, Type } from "lucide-react"
 import { debugLogger } from "@/lib/debug-logger"
+import { CopyButton } from "@/components/ui/copy-button"
 
 interface AISummaryDialogProps {
   isOpen: boolean
@@ -29,7 +30,6 @@ export function AISummaryDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("small")
 
   const generateSummary = async () => {
@@ -65,15 +65,6 @@ export function AISummaryDialog({
       debugLogger.error("AI 요약 생성 실패", err)
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleCopy = async () => {
-    if (summary) {
-      await navigator.clipboard.writeText(summary)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-      debugLogger.info("요약 복사 완료")
     }
   }
 
@@ -147,19 +138,15 @@ export function AISummaryDialog({
                     </Button>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleCopy}>
-                  {copied ? (
-                    <>
-                      <Check className="h-3 w-3 mr-2" />
-                      복사됨
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3 mr-2" />
-                      복사
-                    </>
-                  )}
-                </Button>
+                <CopyButton
+                  getText={() => summary || ""}
+                  message="복사됨"
+                  iconOnly={false}
+                  label="복사"
+                  variant="outline"
+                  size="sm"
+                  onCopySuccess={() => debugLogger.info("요약 복사 완료")}
+                />
               </div>
 
               <div className="flex-1 min-h-0 overflow-hidden">

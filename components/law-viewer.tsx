@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useMemo } from "react"
+import dynamic from "next/dynamic"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -40,9 +41,14 @@ import {
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
 import { buildJO, formatJO, formatSimpleJo, type ParsedRelatedLaw } from "@/lib/law-parser"
-import { ReferenceModal } from "@/components/reference-modal"
 import { RevisionHistory } from "@/components/revision-history"
 import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
+
+// Dynamic import for ReferenceModal (reduce initial bundle)
+const ReferenceModal = dynamic(
+  () => import("@/components/reference-modal").then(m => m.ReferenceModal),
+  { ssr: false }
+)
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
@@ -635,6 +641,7 @@ export function LawViewer({
   ])
 
   const contentClickActions: ContentClickActions = useMemo(() => ({
+    setActiveJo,
     openExternalLawArticleModal,
     setRefModal,
     setRefModalHistory,
@@ -647,7 +654,7 @@ export function LawViewer({
     setAdminRuleHtml,
     toast,
   }), [
-    openExternalLawArticleModal, setRefModal, setRefModalHistory, setLastExternalRef,
+    setActiveJo, openExternalLawArticleModal, setRefModal, setRefModalHistory, setLastExternalRef,
     fetchThreeTierData, setTierViewMode, setDelegationActiveTab, setShowAdminRules,
     setAdminRuleViewMode, setAdminRuleHtml, toast
   ])
@@ -939,7 +946,7 @@ export function LawViewer({
                       <Button
                         variant={tierViewMode === "2-tier" ? "default" : "outline"}
                         size="sm"
-                        disabled={isLoadingThreeTier || shouldDisableDelegationButton}
+                        disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && shouldDisableDelegationButton)}
                         onClick={async () => {
                           if (tierViewMode === "1-tier") {
                             // 2단 뷰로 전환 (데이터 없으면 먼저 로드)

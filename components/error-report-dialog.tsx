@@ -1,25 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Copy, Check } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useErrorReportStore } from "@/lib/error-report-store"
+import { CopyButton } from "@/components/ui/copy-button"
 
 export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
   const { currentError, showErrorDialog, clearCurrentError, getErrorReportText } = useErrorReportStore()
-  const [copied, setCopied] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
 
   if (!currentError) {
     return null
-  }
-
-  const handleCopy = async () => {
-    const reportText = getErrorReportText(currentError)
-    await navigator.clipboard.writeText(reportText)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   const handleClose = () => {
@@ -49,19 +39,15 @@ export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handleCopy} variant="outline" className="flex-1 bg-transparent" size="sm">
-              {copied ? (
-                <>
-                  <Check className="mr-1 h-3 w-3" />
-                  복사됨
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-1 h-3 w-3" />
-                  로그 복사
-                </>
-              )}
-            </Button>
+            <CopyButton
+              getText={() => getErrorReportText(currentError)}
+              message="복사됨"
+              iconOnly={false}
+              label="로그 복사"
+              variant="outline"
+              size="sm"
+              className="flex-1 bg-transparent"
+            />
             <Button onClick={handleClose} className="flex-1" size="sm">
               확인
             </Button>

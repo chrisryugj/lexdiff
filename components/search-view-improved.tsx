@@ -1,12 +1,19 @@
 "use client"
 
 import { SearchBar } from "@/components/search-bar"
-import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeatureCards } from "@/components/feature-cards"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { useState, useRef, useEffect } from "react"
+import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
 import { motion, AnimatePresence } from "framer-motion"
+
+// Dynamic import for FavoritesDialog (reduce initial bundle)
+const FavoritesDialog = dynamic(
+  () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
+  { ssr: false }
+)
 import { ChevronDown, Scale, Star, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { favoritesStore } from "@/lib/favorites-store"
@@ -151,6 +158,9 @@ export function SearchViewImproved({
               <div className="h-4 w-[1px] bg-border/50" />
 
               <div className="flex items-center gap-1">
+                {/* 테마 토글 */}
+                <ThemeToggle />
+
                 {favoritesCount > 0 && (
                   <Button
                     variant="ghost"
@@ -178,7 +188,7 @@ export function SearchViewImproved({
       </AnimatePresence>
 
       {/* Hero Section - 스크롤 가능 */}
-      <section className="hero-section-fixed pt-32 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6">
+      <section className="hero-section-fixed pt-32 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">
         <div className="container mx-auto max-w-4xl">
           <motion.div
             className="flex flex-col items-center text-center"

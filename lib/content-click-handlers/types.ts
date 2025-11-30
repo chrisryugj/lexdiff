@@ -71,6 +71,9 @@ export interface ToastOptions {
 
 /** 핸들러 공통 액션 (상태 변경 함수) */
 export interface ContentClickActions {
+  // Navigation
+  setActiveJo: (jo: string) => void
+
   // Modal
   openExternalLawArticleModal: (lawName: string, articleLabel: string) => Promise<void>
   setRefModal: (state: RefModalState) => void

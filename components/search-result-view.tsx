@@ -9,21 +9,33 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
 import { SearchBar } from "@/components/search-bar"
 import { LawViewer } from "@/components/law-viewer"
-import { ComparisonModal } from "@/components/comparison-modal"
-import { AISummaryDialog } from "@/components/ai-summary-dialog"
 import { FavoritesPanel } from "@/components/favorites-panel"
-import { FavoritesDialog } from "@/components/favorites-dialog"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
+
+// Dynamic imports for modals (reduce initial bundle size)
+const ComparisonModal = dynamic(
+  () => import("@/components/comparison-modal").then(m => m.ComparisonModal),
+  { ssr: false }
+)
+const AISummaryDialog = dynamic(
+  () => import("@/components/ai-summary-dialog").then(m => m.AISummaryDialog),
+  { ssr: false }
+)
+const FavoritesDialog = dynamic(
+  () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
+  { ssr: false }
+)
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { ModernProgressBar } from "@/components/ui/modern-progress-bar"
 import { detectQueryType } from "@/lib/query-detector"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
-import { normalizeLawSearchText } from "@/lib/search-normalizer"
+import { normalizeLawSearchText, expandSearchSynonyms, type SynonymExpansion } from "@/lib/search-normalizer"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { formatDate } from "@/lib/revision-parser"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
@@ -195,6 +207,11 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     results: OrdinanceSearchResult[]
     query: { lawName: string }
   } | null>(null)
+  // 관련 검색어 제안 (유사어 확장)
+  const [relatedSearches, setRelatedSearches] = useState<{
+    keyword: string
+    results: LawSearchResult[]
+  }[]>([])
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [comparisonModal, setComparisonModal] = useState<{
     isOpen: boolean
@@ -1580,6 +1597,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
               results: results,
               query: query,
             })
+            // 유사어 확장 검색 (백그라운드)
+            fetchRelatedSearches(lawName, results)
             updateProgress('complete', 100)
             setIsSearching(false)
             return
@@ -1631,6 +1650,8 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
           results,
           query: { lawName, article: articleNumber, jo },
         })
+        // 유사어 확장 검색 (백그라운드)
+        fetchRelatedSearches(lawName, results)
         setMobileView("list")
         updateProgress('complete', 100)
         setIsSearching(false)
@@ -1660,6 +1681,49 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
     }
   }
 
+  // 유사어 확장 검색 (비동기, 백그라운드에서 실행)
+  const fetchRelatedSearches = async (lawName: string, currentResults: LawSearchResult[]) => {
+    const expansion = expandSearchSynonyms(lawName)
+    if (expansion.expanded.length === 0) {
+      setRelatedSearches([])
+      return
+    }
+
+    const relatedResults: { keyword: string; results: LawSearchResult[] }[] = []
+    const currentLawIds = new Set(currentResults.map(r => r.lawId || r.mst))
+
+    for (const expandedQuery of expansion.expanded) {
+      try {
+        const response = await fetch(`/api/law-search?query=${encodeURIComponent(expandedQuery)}`)
+        if (!response.ok) continue
+
+        const xmlText = await response.text()
+        const results = parseLawSearchXML(xmlText)
+
+        // 현재 결과에 없는 법령만 필터링
+        const newResults = results.filter(r => !currentLawIds.has(r.lawId || r.mst))
+
+        if (newResults.length > 0) {
+          relatedResults.push({
+            keyword: expandedQuery,
+            results: newResults,
+          })
+        }
+      } catch (error) {
+        debugLogger.warning('유사어 확장 검색 실패', { query: expandedQuery, error })
+      }
+    }
+
+    setRelatedSearches(relatedResults)
+    if (relatedResults.length > 0) {
+      debugLogger.info('유사어 확장 검색 완료', {
+        original: lawName,
+        expanded: expansion.expanded,
+        foundCount: relatedResults.reduce((sum, r) => sum + r.results.length, 0),
+      })
+    }
+  }
+
   // Public handleSearch wrapper
   const handleSearch = (query: { lawName: string; article?: string; jo?: string }) => {
     handleSearchInternal(query)
@@ -1676,6 +1740,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
         jo: undefined,
       })
       setLawSelectionState(null)
+      setRelatedSearches([])
       setMobileView("content")
     } catch (error) {
       debugLogger.error("법령 조회 실패", error)
@@ -2123,6 +2188,7 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                     size="sm"
                     onClick={() => {
                       setLawSelectionState(null)
+                      setRelatedSearches([])
                       setIsSearching(false)
                       updateProgress('complete', 0)
                     }}
@@ -2198,6 +2264,57 @@ export function SearchResultView({ searchId, onBack, onProgressUpdate, onModeCha
                   </button>
                 ))}
               </div>
+
+              {/* 관련 검색어 제안 (유사어 확장) */}
+              {relatedSearches.length > 0 && (
+                <div className="max-w-6xl mx-auto mt-8 p-4 md:p-6 bg-card/30 backdrop-blur-sm border border-border/50 rounded-2xl">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                    <h3 className="text-lg font-semibold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
+                      관련 검색어
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {relatedSearches.map(({ keyword, results }) => (
+                      <div key={keyword}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                            {keyword}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{results.length}건</span>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {results.slice(0, 4).map((law) => (
+                            <button
+                              key={law.lawId || law.mst}
+                              onClick={() => handleLawSelect(law)}
+                              className="group relative p-4 bg-card/50 border border-border/50 rounded-xl hover:border-amber-500/50 hover:shadow-lg transition-all duration-200 text-left"
+                              style={{ fontFamily: "Pretendard, sans-serif" }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-sm leading-snug mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                    {String(law.lawName)}
+                                  </h4>
+                                  <Badge variant="secondary" className={`text-xs ${getLawTypeBadgeClass(String(law.lawType))}`}>
+                                    {String(law.lawType)}
+                                  </Badge>
+                                </div>
+                                <ChevronLeft className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-amber-500 transition-colors flex-shrink-0" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        {results.length > 4 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            외 {results.length - 4}건 더 있음
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : ordinanceSelectionState ? (
             <div className="py-4 md:py-8">
