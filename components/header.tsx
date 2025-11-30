@@ -6,6 +6,7 @@ import { Scale, Star, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface HeaderProps {
   onReset?: () => void
@@ -56,6 +57,9 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
 
         {/* 우측 버튼들 */}
         <div className="flex items-center gap-2">
+          {/* 테마 토글 */}
+          <ThemeToggle />
+
           {/* 즐겨찾기 */}
           {favoritesCount > 0 && (
             <Button variant="ghost" size="sm" onClick={onFavoritesClick} className="flex items-center gap-2">
@@ -66,7 +70,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick }: HeaderPro
             </Button>
           )}
 
-          {/* 설정 (NEW) */}
+          {/* 설정 */}
           <Button
             variant="ghost"
             size="sm"
