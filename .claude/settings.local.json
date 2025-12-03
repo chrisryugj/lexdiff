@@ -1,9 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "Bash(find:*)",
+      "Bash(cat:*)",
       "Bash(npm run build:*)",
-      "Bash(findstr:*)",
-      "Bash(ls \"c:\\github_project\\lexdiff\\components\"\" | grep -i \"rag|file.*search \")"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
