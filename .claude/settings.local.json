@@ -5,7 +5,15 @@
       "Bash(cat:*)",
       "Bash(npm run build:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(done)",
+      "Bash(for file in lib/ai-answer-processor-v2.ts lib/variant-generator.ts lib/variant-matcher.ts lib/vector-search.ts lib/embedding.ts lib/query-classifier.ts lib/query-preprocessor.ts lib/query-detector.ts lib/text-similarity.ts lib/intent-analyzer.ts lib/search-learning.ts lib/search-id-generator.ts)",
+      "Bash(do if [ -f \"$file\" ])",
+      "Bash(then echo \"EXISTS: $file\")",
+      "Bash(else echo \"NOT FOUND: $file\")",
+      "Bash(fi)",
+      "Bash(xargs:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
