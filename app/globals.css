@@ -127,8 +127,11 @@
   --color-success-fg: oklch(0.35 0.15 150);
   --color-warning-bg: oklch(0.95 0.08 80);
   --color-warning-fg: oklch(0.35 0.15 80);
-  --law-link: oklch(0.45 0.18 250);
-  --law-link-hover: oklch(0.35 0.2 250);
+  --law-link: oklch(0.35 0.2 250);
+  --law-link-hover: oklch(0.25 0.22 250);
+  --revision-tag-bg: oklch(0.85 0.08 250);
+  --revision-tag-fg: oklch(0.30 0.18 250);
+  --revision-tag-border: oklch(0.70 0.12 250);
 }
 
 /* 다크 테마 */
@@ -178,19 +181,34 @@
   --color-warning-fg: oklch(0.05 0.01 80);
   --law-link: oklch(0.65 0.18 250);
   --law-link-hover: oklch(0.75 0.2 250);
+  --revision-tag-bg: oklch(0.22 0.08 250);
+  --revision-tag-fg: oklch(0.75 0.15 250);
+  --revision-tag-border: oklch(0.35 0.1 250);
 }
 
 /* 법령 링크 스타일 */
-.law-ref {
-  cursor: pointer;
+a.law-ref,
+.prose a.law-ref {
   color: oklch(from var(--law-link) l c h);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 0.2s ease;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, oklch(from var(--law-link) l c h) 0%, oklch(from var(--law-link) l c h) 100%);
+  background-size: 0% 1.5px;
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.law-ref:hover {
+a.law-ref:hover,
+.prose a.law-ref:hover {
   color: oklch(from var(--law-link-hover) l c h);
+  background-size: 100% 2px;
+  background-color: oklch(from var(--law-link) l c h / 0.1);
+  box-shadow: 0 2px 8px oklch(from var(--law-link) l c h / 0.3);
+  transform: translateY(-1px);
 }
 
 @theme inline {
