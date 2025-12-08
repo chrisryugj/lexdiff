@@ -39,6 +39,7 @@ interface VirtualizedFullArticleViewProps {
   onContentClick: (e: React.MouseEvent<HTMLDivElement>) => void
   articleRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
   scrollParentRef?: React.RefObject<HTMLDivElement | null>
+  isOrdinance?: boolean
 }
 
 /**
@@ -59,6 +60,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   onContentClick,
   articleRefs,
   scrollParentRef,
+  isOrdinance = false,
 }: VirtualizedFullArticleViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -173,6 +175,34 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
 
   const formatSimpleJo = (jo: string): string => {
     try {
+      // Already formatted (e.g., "제1조", "제10조의2")
+      if (jo.startsWith("제") && jo.includes("조")) {
+        return jo
+      }
+
+      // 6자리 숫자 코드 처리
+      if (jo.length === 6 && /^\d{6}$/.test(jo)) {
+        if (isOrdinance) {
+          // Ordinance format: AABBCC (AA = article, BB = branch, CC = sub)
+          // Example: "010000" = 제1조, "010100" = 제1조의1
+          const articleNum = Number.parseInt(jo.substring(0, 2), 10)
+          const branchNum = Number.parseInt(jo.substring(2, 4), 10)
+          const subNum = Number.parseInt(jo.substring(4, 6), 10)
+
+          let result = `제${articleNum}조`
+          if (branchNum > 0) result += `의${branchNum}`
+          if (subNum > 0) result += `-${subNum}`
+
+          return result
+        } else {
+          // Law format: AAAABB (AAAA = article, BB = branch)
+          const articleNum = Number.parseInt(jo.substring(0, 4), 10)
+          const branchNum = Number.parseInt(jo.substring(4, 6), 10)
+          return branchNum === 0 ? `제${articleNum}조` : `제${articleNum}조의${branchNum}`
+        }
+      }
+
+      // Fallback to formatJO for other formats
       return formatJO(jo)
     } catch (e) {
       return jo

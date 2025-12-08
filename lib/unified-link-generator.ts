@@ -273,7 +273,8 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
   // 부정 후방탐색: 「법령명」 패턴 제외
   // 전방 허용: 괄호(, 공백, 문장 시작
   // 후방 허용: 한글 조사 "에", "의", "을", "를", 괄호) 등
-  const articleRegex = /(?<!「[^」]*)(제\s*(\d+)\s*조(?:의\s*(\d+))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?![」])/g
+  // ⚠️ "제3조의 4차산업" 버그 수정: "의" 뒤에 숫자만 허용 (공백 후 한글이 오면 제외)
+  const articleRegex = /(?<!「[^」]*)(제\s*(\d+)\s*조(?:의\s*(\d+)(?!\s*[가-힣]))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?![」])/g
   let match: RegExpExecArray | null
   let foundCount = 0
 

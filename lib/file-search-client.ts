@@ -377,7 +377,7 @@ export async function* queryFileSearchStream(
   console.log('[File Search] Store ID:', STORE_ID)
   console.log('[File Search] Request body:', JSON.stringify(requestBody, null, 2))
 
-  // Streaming API 호출 (File Search는 Gemini 2.5 이상 필수)
+  // Streaming API 호출 (File Search는 Gemini 2.5 Flash/Pro만 지원, Lite는 미지원)
   const response = await fetch(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
     {
