@@ -207,7 +207,7 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
             )}
             {/* 관련 법령 (해당 source를 포함하는 모든 조문) */}
             {relatedCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-300 border-blue-700/50 whitespace-nowrap px-2 py-0.5">
+                <Badge variant="outline" className="text-xs bg-[var(--revision-tag-bg)] text-[var(--revision-tag-fg)] border-[var(--revision-tag-border)] whitespace-nowrap px-2 py-0.5 shadow-none">
                     <Link2 className="h-3 w-3 mr-0.5" />
                     {relatedCount}
                 </Badge>
