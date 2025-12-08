@@ -259,8 +259,11 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
         scrollElement.scrollTop = targetVirtualItem.start
       } else {
         // 아직 렌더링 안 되었으면 virtualizer에게 스크롤 요청
+        // ⚠️ flushSync 에러 방지: 다음 프레임으로 지연
         console.log('[VirtualizedFullArticleView] Using virtualizer.scrollToIndex:', itemIndex)
-        virtualizer.scrollToIndex(itemIndex, { align: 'start' })
+        requestAnimationFrame(() => {
+          virtualizer.scrollToIndex(itemIndex, { align: 'start' })
+        })
       }
 
       // 스크롤 후 확인
