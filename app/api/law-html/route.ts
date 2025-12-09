@@ -3,6 +3,16 @@ import { load } from "cheerio"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 
+/**
+ * 개정 태그 키워드를 4가지 타입으로 분류
+ */
+function getRevisionType(keyword: string): 'new' | 'edit' | 'delete' | 'etc' {
+  if (/신설/.test(keyword)) return 'new'
+  if (/삭제/.test(keyword)) return 'delete'
+  if (/개정|전문개정|전부개정|제정/.test(keyword)) return 'edit'
+  return 'etc'
+}
+
 function absUrl(href: string): string {
   try {
     if (!href) return ""
@@ -137,8 +147,16 @@ export async function GET(req: Request) {
     let raw = extractArticleHtml($, joLabel || undefined)
     raw = raw.replace(/(?:<br\s*\/?>\s*){2,}/gi, '<br/>').replace(/^\s*(<br\s*\/?>\s*)+/i, '').replace(/(<br\s*\/?>\s*)+$/i, '')
     raw = raw
-      .replace(/\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]/g, '<span class="rev-mark">$&</span>')
-      .replace(/<\s*(?:개정|전문개정|전부개정|신설|삭제)[^>]*>/g, (m) => `<span class=\"rev-mark\">${m.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`)
+      .replace(/\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]/g, (match) => {
+        const keyword = match.match(/개정|전문개정|전부개정|신설|삭제/)?.[0] || ''
+        const type = getRevisionType(keyword)
+        return `<span class="rev-mark rev-mark-${type}">${match}</span>`
+      })
+      .replace(/<\s*(?:개정|전문개정|전부개정|신설|삭제)[^>]*>/g, (m) => {
+        const keyword = m.match(/개정|전문개정|전부개정|신설|삭제/)?.[0] || ''
+        const type = getRevisionType(keyword)
+        return `<span class="rev-mark rev-mark-${type}">${m.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`
+      })
     const withAnchors = rewriteAnchorsKeepHref(raw)
     let sanitized = sanitizeKeepAnchors(withAnchors)
     // Robust fallbacks

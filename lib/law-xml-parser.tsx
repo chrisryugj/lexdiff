@@ -479,45 +479,72 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;")
 }
 
+/**
+ * 개정 태그 키워드를 4가지 타입으로 분류
+ * @param keyword - 개정 태그 키워드 (예: "신설", "개정", "삭제" 등)
+ * @returns 'new' | 'edit' | 'delete' | 'etc'
+ */
+function getRevisionType(keyword: string): 'new' | 'edit' | 'delete' | 'etc' {
+  if (/신설/.test(keyword)) return 'new'
+  if (/삭제/.test(keyword)) return 'delete'
+  if (/개정|전문개정|전부개정|제정/.test(keyword)) return 'edit'
+  return 'etc'
+}
+
+/**
+ * 개정 태그에 타입별 스타일 적용
+ * - 신설: 녹색 (rev-mark-new)
+ * - 개정/전문개정/제정: 파란색 (rev-mark-edit)
+ * - 삭제: 빨간색 (rev-mark-delete)
+ * - 기타(종전/이동): 회색 (rev-mark-etc)
+ */
 function applyRevisionStyling(text: string): string {
   let styled = text
 
-  // <개정>, ＜개정＞ 형식
-  styled = styled.replace(
-    /&lt;(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
-    '<span class="rev-mark">＜$1 $2＞</span>',
-  )
+  // 1. ＜개정/신설/삭제 날짜＞ 형식 (HTML escaped & 전각 괄호)
+  const datePatterns = [
+    /&lt;(개정|신설|전문개정|전부개정|제정|삭제)\s+([0-9., ]+)&gt;/g,
+    /＜(개정|신설|전문개정|전부개정|제정|삭제)\s+([0-9., ]+)＞/g,
+  ]
 
-  styled = styled.replace(
-    /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g,
-    '<span class="rev-mark">＜$1 $2＞</span>',
-  )
+  for (const pattern of datePatterns) {
+    styled = styled.replace(pattern, (match, keyword, date) => {
+      const type = getRevisionType(keyword)
+      return `<span class="rev-mark rev-mark-${type}">＜${keyword} ${date}＞</span>`
+    })
+  }
 
-  // "삭제<날짜>" 또는 "삭제 <날짜>" 형식
+  // 2. "삭제 ＜날짜＞" 형식 (특수 케이스)
   styled = styled.replace(
     /(삭제)\s*&lt;([0-9., ]+)&gt;/g,
-    '<span class="rev-mark">$1 ＜$2＞</span>',
+    '<span class="rev-mark rev-mark-delete">$1 ＜$2＞</span>',
   )
 
   styled = styled.replace(
     /(삭제)\s*＜([0-9., ]+)＞/g,
-    '<span class="rev-mark">$1 ＜$2＞</span>',
+    '<span class="rev-mark rev-mark-delete">$1 ＜$2＞</span>',
   )
 
-  // [본조신설], [종전 ~ 이동], [제X조에서 이동] 형식
+  // 3. [본조신설/본조삭제]
   styled = styled.replace(
-    /\[(본조신설|본조삭제)[^\]]*\]/g,
-    '<span class="rev-mark">$&</span>',
+    /\[(본조신설)[^\]]*\]/g,
+    '<span class="rev-mark rev-mark-new">$&</span>',
   )
 
+  styled = styled.replace(
+    /\[(본조삭제)[^\]]*\]/g,
+    '<span class="rev-mark rev-mark-delete">$&</span>',
+  )
+
+  // 4. [종전...], [제X조에서 이동...]
   styled = styled.replace(
     /\[종전[^\]]*\]/g,
-    '<span class="rev-mark">$&</span>',
+    '<span class="rev-mark rev-mark-etc">$&</span>',
   )
 
   styled = styled.replace(
     /\[제\d+조[^\]]*에서 이동[^\]]*\]/g,
-    '<span class="rev-mark">$&</span>',
+    '<span class="rev-mark rev-mark-etc">$&</span>',
   )
 
   return styled
