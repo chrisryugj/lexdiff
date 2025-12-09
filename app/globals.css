@@ -460,13 +460,20 @@ a.law-ref:hover,
   /* 조문 발췌 내 법령명+조문번호(조문제목) 하이라이트 */
   .prose blockquote .quote-article-title {
     display: inline-block;
-    background: oklch(0.7 0.12 250 / 0.15);
-    color: oklch(0.88 0.08 250);
+    background: oklch(81.933% 0.06084 234.887 / 0.3);
+    /* 라이트 테마: 연한 배경 */
+    color: oklch(0.35 0.08 250);
+    /* 라이트 테마: 어두운 텍스트 */
     padding: 0.15em 0.5em 0.15em 0;
     border-radius: 0 4px 4px 0;
     font-size: 1.0em;
     margin-bottom: 0.3em;
     font-weight: normal;
+  }
+
+  .dark .prose blockquote .quote-article-title {
+    background: oklch(0.7 0.12 250 / 0.15);
+    color: oklch(0.88 0.08 250);
   }
 
   .prose blockquote .quote-article-title strong {
