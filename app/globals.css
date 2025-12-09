@@ -446,7 +446,7 @@ a.law-ref:hover,
     padding-right: 0.5rem;
     color: #000000;
     /* 라이트 테마: 어두운 텍스트 */
-    background-color: oklch(92.158% 0.03256 289.522) !important;
+    background-color: oklch(92.797% 0.00011 271.152 / 0.959) !important;
     /* 라이트 테마: 더 어두운 회색 배경 */
   }
 

@@ -4,6 +4,27 @@
 
 ---
 
+## 2025-12-09
+
+### [15:30 KST] 라이트 테마 UI 가독성 전반 개선
+- **Files**:
+  - `app/globals.css` (modified) - prose blockquote 테마별 색상 분리
+  - `components/search-bar.tsx` (modified) - AI 검색바 라이트 모드 배경
+  - `components/law-viewer-ai-answer.tsx` (modified) - AI 인용 아이콘/배지 색상
+  - `components/file-search-answer-display.tsx` (modified) - 조문 발췌 블록 배경
+  - `lib/file-search-client.ts` (modified) - RAG 프롬프트 개선
+- **Changes**:
+  - **AI 검색바**: 라이트 모드 `bg-purple-50`, 버튼 `bg-purple-700` (가독성 향상)
+  - **조문 발췌 블록**: 라이트 모드 `oklch(0.45 0.01 240)` 어두운 회색 배경, 텍스트 `#1f2937`
+  - **AI 인용 아이콘**: 사이드바 항목 `bg-emerald-600/20 text-emerald-700` (라이트 모드)
+  - **AI 인용 배지**: 헤더 `bg-emerald-200/40 text-emerald-900` (라이트 모드)
+  - **AI 경고 문구**: 라이트 모드 `bg-amber-50 text-amber-900` 추가
+  - **RAG 프롬프트**: 관련 법령에서 본문 출력 금지 규칙 강화 (조문번호+제목만)
+- **Impact**: 라이트 테마에서 주요 UI 요소 가독성 대폭 향상
+- **Commit**: `fcafdaa`
+
+---
+
 ## 2025-11-29
 
 ### [10:30 KST] UI/UX 개선 Phase 2 - 전문조회 복사 피드백 및 신구법 모달 레이아웃
