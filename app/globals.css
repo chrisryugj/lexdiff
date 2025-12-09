@@ -345,7 +345,7 @@ a.law-ref:hover,
   /* 항 마커(①②③) 앞 간격 조절 - 첫 번째 항 제외 */
   .para-marker {
     display: inline-block;
-    margin-top: 0.5em;
+    margin-top: 0.3em;
   }
 
   /* 항/호/목 hanging indent - 여러 줄 이어질 때 두 번째 줄부터 들여쓰기 */

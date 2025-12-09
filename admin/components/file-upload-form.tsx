@@ -13,9 +13,10 @@ interface FileUploadItem {
   result?: GeminiFile;
 }
 
+type UploadTab = 'general' | 'law' | 'ordinance';
+
 export default function FileUploadForm() {
-  const [stores, setStores] = useState<FileSearchStore[]>([]);
-  const [selectedStore, setSelectedStore] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<UploadTab>('general');
   const [uploads, setUploads] = useState<FileUploadItem[]>([]);
   const [metadata, setMetadata] = useState({
     law_name: '',
@@ -24,25 +25,6 @@ export default function FileUploadForm() {
     effective_date: '',
   });
   const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  async function fetchStores() {
-    try {
-      const res = await fetch('/api/stores');
-      const data = await res.json();
-      if (data.success) {
-        setStores(data.stores);
-        if (data.stores.length > 0) {
-          setSelectedStore(data.stores[0].name);
-        }
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch stores:', err);
-    }
-  }
 
   function handleFileSelect(files: FileList | null) {
     if (!files) return;
@@ -74,17 +56,15 @@ export default function FileUploadForm() {
     formData.append('file', upload.file);
     formData.append('displayName', upload.file.name);
 
-    if (selectedStore) {
-      formData.append('storeName', selectedStore);
-    }
-
     // Add metadata if any field is filled
-    if (
-      metadata.law_name ||
-      metadata.article_number ||
-      metadata.effective_date
-    ) {
-      formData.append('metadata', JSON.stringify(metadata));
+    const metadataObj: Record<string, string> = {};
+    if (metadata.law_name) metadataObj.law_name = metadata.law_name;
+    if (metadata.article_number) metadataObj.article_number = metadata.article_number;
+    if (metadata.law_type) metadataObj.law_type = metadata.law_type;
+    if (metadata.effective_date) metadataObj.effective_date = metadata.effective_date;
+
+    if (Object.keys(metadataObj).length > 0) {
+      formData.append('metadata', JSON.stringify(metadataObj));
     }
 
     try {
@@ -95,7 +75,7 @@ export default function FileUploadForm() {
         )
       );
 
-      const res = await fetch('/api/upload', {
+      const res = await fetch('/api/admin/upload-file', {
         method: 'POST',
         body: formData,
       });
@@ -111,7 +91,7 @@ export default function FileUploadForm() {
                   ...u,
                   status: 'completed',
                   progress: 100,
-                  result: data.file,
+                  result: data.document || data.file,
                 }
               : u
           )
@@ -219,86 +199,156 @@ export default function FileUploadForm() {
 
   return (
     <div className="space-y-6">
-      {/* Configuration */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Upload Configuration</h3>
-
-        {/* Target Store */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Target Store (Optional)
-          </label>
-          <select
-            value={selectedStore}
-            onChange={(e) => setSelectedStore(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Files API Only (no indexing)</option>
-            {stores.map((store) => (
-              <option key={store.name} value={store.name}>
-                {store.displayName || store.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Files uploaded to a store will be automatically indexed for search
-          </p>
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px">
+            <button
+              onClick={() => setActiveTab('general')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'general'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              📁 일반 파일 업로드
+            </button>
+            <button
+              onClick={() => setActiveTab('law')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'law'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              ⚖️ 법령 업로드
+            </button>
+            <button
+              onClick={() => setActiveTab('ordinance')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'ordinance'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              📜 조례 업로드
+            </button>
+          </nav>
         </div>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'general' && (
+        <>
+          {/* Drop Zone */}
+          <div
+            className={`bg-white rounded-lg shadow p-12 border-2 border-dashed transition-all duration-200 ${
+              dragging
+                ? 'border-purple-500 bg-purple-50 scale-[1.02]'
+                : 'border-gray-300 hover:border-purple-400 hover:bg-gray-50'
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            <div className="text-center">
+              <svg
+                className={`mx-auto h-16 w-16 transition-colors ${
+                  dragging ? 'text-purple-500' : 'text-gray-400'
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">
+                파일을 여기에 드래그하거나
+              </h3>
+              <label className="mt-4 inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-purple-800 cursor-pointer transition-all shadow-md hover:shadow-lg">
+                📁 파일 선택
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+              <p className="mt-6 text-xs text-gray-500 leading-relaxed">
+                <strong className="text-gray-700">지원 형식:</strong> PDF, HWP/HWPX, MS Office (DOC/XLS/PPT), 텍스트 (TXT/MD/HTML), 코드, 이미지, 오디오, 비디오
+                <br />
+                <strong className="text-gray-700">최대 용량:</strong> 파일당 2GB | 프로젝트당 20GB
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'law' && (
+        <>
+          {/* Configuration */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4">법령 메타데이터</h3>
 
         {/* Metadata */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Metadata (Optional)
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              value={metadata.law_name}
-              onChange={(e) =>
-                setMetadata({ ...metadata, law_name: e.target.value })
-              }
-              placeholder="Law Name (e.g., 관세법)"
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              value={metadata.article_number}
-              onChange={(e) =>
-                setMetadata({ ...metadata, article_number: e.target.value })
-              }
-              placeholder="Article Number (e.g., 38)"
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-              value={metadata.law_type}
-              onChange={(e) =>
-                setMetadata({ ...metadata, law_type: e.target.value })
-              }
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="law">Law (법률)</option>
-              <option value="decree">Decree (시행령)</option>
-              <option value="rule">Rule (시행규칙)</option>
-              <option value="ordinance">Ordinance (조례)</option>
-            </select>
-            <input
-              type="date"
-              value={metadata.effective_date}
-              onChange={(e) =>
-                setMetadata({ ...metadata, effective_date: e.target.value })
-              }
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="text"
+            value={metadata.law_name}
+            onChange={(e) =>
+              setMetadata({ ...metadata, law_name: e.target.value })
+            }
+            placeholder="법령명 (예: 관세법)"
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <input
+            type="text"
+            value={metadata.article_number}
+            onChange={(e) =>
+              setMetadata({ ...metadata, article_number: e.target.value })
+            }
+            placeholder="조문번호 (예: 38)"
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <select
+            value={metadata.law_type}
+            onChange={(e) =>
+              setMetadata({ ...metadata, law_type: e.target.value })
+            }
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="law">법률</option>
+            <option value="decree">시행령</option>
+            <option value="rule">시행규칙</option>
+            <option value="ordinance">조례</option>
+          </select>
+          <input
+            type="date"
+            value={metadata.effective_date}
+            onChange={(e) =>
+              setMetadata({ ...metadata, effective_date: e.target.value })
+            }
+            placeholder="시행일자"
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
         </div>
+        <p className="text-xs text-gray-500 mt-3">
+          💡 파일은 자동으로 File Search Store에 업로드되어 AI 검색에 사용됩니다
+        </p>
       </div>
 
       {/* Drop Zone */}
       <div
-        className={`bg-white rounded-lg shadow p-12 border-2 border-dashed transition-colors ${
+        className={`bg-white rounded-lg shadow p-12 border-2 border-dashed transition-all duration-200 ${
           dragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-purple-500 bg-purple-50 scale-[1.02]'
+            : 'border-gray-300 hover:border-purple-400 hover:bg-gray-50'
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -307,24 +357,25 @@ export default function FileUploadForm() {
       >
         <div className="text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            stroke="currentColor"
+            className={`mx-auto h-16 w-16 transition-colors ${
+              dragging ? 'text-purple-500' : 'text-gray-400'
+            }`}
             fill="none"
-            viewBox="0 0 48 48"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
             <path
-              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-              strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            Drag & Drop files here
+          <h3 className="mt-4 text-lg font-semibold text-gray-900">
+            파일을 여기에 드래그하거나
           </h3>
-          <p className="mt-1 text-sm text-gray-500">or</p>
-          <label className="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">
-            Browse Files
+          <label className="mt-4 inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-purple-800 cursor-pointer transition-all shadow-md hover:shadow-lg">
+            📁 파일 선택
             <input
               type="file"
               multiple
@@ -332,13 +383,116 @@ export default function FileUploadForm() {
               className="hidden"
             />
           </label>
-          <p className="mt-4 text-xs text-gray-500">
-            Supported: PDF, TXT, HTML, Images, Audio, Video, Code
+          <p className="mt-6 text-xs text-gray-500 leading-relaxed">
+            <strong className="text-gray-700">지원 형식:</strong> PDF, HWP/HWPX, MD 파일
             <br />
-            Max file size: 2GB | Max storage: 20GB per project
+            <strong className="text-gray-700">최대 용량:</strong> 파일당 2GB
           </p>
         </div>
       </div>
+        </>
+      )}
+
+      {activeTab === 'ordinance' && (
+        <>
+          {/* Configuration */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4">조례 메타데이터</h3>
+
+            {/* Metadata */}
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                type="text"
+                value={metadata.law_name}
+                onChange={(e) =>
+                  setMetadata({ ...metadata, law_name: e.target.value })
+                }
+                placeholder="조례명 (예: 서울특별시 도시계획 조례)"
+                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <input
+                type="text"
+                value={metadata.article_number}
+                onChange={(e) =>
+                  setMetadata({ ...metadata, article_number: e.target.value })
+                }
+                placeholder="조문번호 (예: 10)"
+                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <select
+                value={metadata.law_type}
+                onChange={(e) =>
+                  setMetadata({ ...metadata, law_type: e.target.value })
+                }
+                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="ordinance">조례</option>
+                <option value="rule">규칙</option>
+              </select>
+              <input
+                type="date"
+                value={metadata.effective_date}
+                onChange={(e) =>
+                  setMetadata({ ...metadata, effective_date: e.target.value })
+                }
+                placeholder="시행일자"
+                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              💡 파일은 자동으로 File Search Store에 업로드되어 AI 검색에 사용됩니다
+            </p>
+          </div>
+
+          {/* Drop Zone */}
+          <div
+            className={`bg-white rounded-lg shadow p-12 border-2 border-dashed transition-all duration-200 ${
+              dragging
+                ? 'border-purple-500 bg-purple-50 scale-[1.02]'
+                : 'border-gray-300 hover:border-purple-400 hover:bg-gray-50'
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            <div className="text-center">
+              <svg
+                className={`mx-auto h-16 w-16 transition-colors ${
+                  dragging ? 'text-purple-500' : 'text-gray-400'
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900">
+                조례 파일을 여기에 드래그하거나
+              </h3>
+              <label className="mt-4 inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-purple-800 cursor-pointer transition-all shadow-md hover:shadow-lg">
+                📜 조례 파일 선택
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+              <p className="mt-6 text-xs text-gray-500 leading-relaxed">
+                <strong className="text-gray-700">지원 형식:</strong> PDF, HWP/HWPX, MD 파일
+                <br />
+                <strong className="text-gray-700">최대 용량:</strong> 파일당 2GB
+              </p>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Upload List */}
       {uploads.length > 0 && (
@@ -356,18 +510,18 @@ export default function FileUploadForm() {
               {completedCount > 0 && (
                 <button
                   onClick={clearCompleted}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm transition-colors"
                 >
-                  Clear Completed
+                  완료 항목 지우기
                 </button>
               )}
               {pendingCount > 0 && (
                 <button
                   onClick={uploadAll}
                   disabled={uploadingCount > 0}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 text-sm"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 text-sm transition-colors shadow-sm"
                 >
-                  Upload All ({pendingCount})
+                  전체 업로드 ({pendingCount})
                 </button>
               )}
             </div>
@@ -388,7 +542,7 @@ export default function FileUploadForm() {
                       )}
                       {(upload.status === 'uploading' ||
                         upload.status === 'indexing') && (
-                        <div className="w-5 h-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"></div>
+                        <div className="w-5 h-5 rounded-full border-2 border-purple-600 border-t-transparent animate-spin"></div>
                       )}
                       {upload.status === 'completed' && (
                         <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -445,7 +599,7 @@ export default function FileUploadForm() {
                     <div className="mt-2">
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
-                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                          className="bg-purple-600 h-1.5 rounded-full transition-all duration-300"
                           style={{ width: `${upload.progress}%` }}
                         ></div>
                       </div>
@@ -458,17 +612,17 @@ export default function FileUploadForm() {
                   {upload.status === 'pending' && (
                     <button
                       onClick={() => removeUpload(upload.id)}
-                      className="text-red-600 hover:text-red-900 text-sm"
+                      className="text-red-600 hover:text-red-900 text-sm font-medium"
                     >
-                      Remove
+                      제거
                     </button>
                   )}
                   {upload.status === 'failed' && (
                     <button
                       onClick={() => uploadFile(upload)}
-                      className="text-blue-600 hover:text-blue-900 text-sm"
+                      className="text-purple-600 hover:text-purple-900 text-sm font-medium"
                     >
-                      Retry
+                      재시도
                     </button>
                   )}
                 </div>
