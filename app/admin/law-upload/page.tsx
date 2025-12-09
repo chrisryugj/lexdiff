@@ -29,6 +29,7 @@ type SubTab =
   | 'ordinances'
   | 'upload-laws'
   | 'upload-ordinances'
+  | 'upload-general'
   | 'store'
   | 'stats-overview'
 
@@ -207,7 +208,8 @@ export default function AdminDashboard() {
 
                 {activeTab === 'processing' && [
                   { id: 'upload-laws' as SubTab, label: '법령 업로드', desc: '법령/시행령/규칙/행정규칙' },
-                  { id: 'upload-ordinances' as SubTab, label: '조례 업로드', desc: '조례 및 시행규칙' }
+                  { id: 'upload-ordinances' as SubTab, label: '조례 업로드', desc: '조례 및 시행규칙' },
+                  { id: 'upload-general' as SubTab, label: '일반 파일 업로드', desc: 'PDF, HWP, Office 등' }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -353,6 +355,14 @@ export default function AdminDashboard() {
                     {headerButton}
                   </div>
                   <OrdinanceUploadPanel onRenderHeader={setHeaderButton} />
+                </div>
+              )}
+
+              {activeTab === 'processing' && activeSubTab === 'upload-general' && (
+                <div>
+                  <h2 className="text-xl font-bold text-foreground mb-2">일반 파일 업로드</h2>
+                  <p className="text-sm text-muted-foreground mb-6">PDF, HWP, Office 문서, 텍스트 등 모든 형식 업로드</p>
+                  <DocumentUploadPanel />
                 </div>
               )}
 
