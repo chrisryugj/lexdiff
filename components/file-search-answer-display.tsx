@@ -95,9 +95,9 @@ function CollapsibleBlockquote({
         </h3>
         {isExpanded && (
           <div className="relative ml-4">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-600 dark:bg-cyan-500 rounded-full" />
             <div
-              className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-0"
+              className="ml-3 bg-gray-500 dark:bg-gray-950 py-1.5 px-3 rounded-lg space-y-0"
               style={{ fontSize: `${fontSize}px` }}
             >
               {renderContent()}
@@ -112,9 +112,9 @@ function CollapsibleBlockquote({
   return (
     <div className="my-1 ml-4">
       <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-full" />
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-600 dark:bg-cyan-500 rounded-full" />
         <div
-          className="ml-3 bg-gray-950 py-1.5 px-3 rounded-lg space-y-1"
+          className="ml-3 bg-gray-300 dark:bg-gray-950 py-1.5 px-3 rounded-lg space-y-1"
           style={{ fontSize: `${fontSize}px` }}
         >
           {renderContent()}
@@ -337,57 +337,57 @@ export function FileSearchAnswerDisplay({
           {children}
         </a>
       ),
-    // 리스트 - 들여쓰기 개선
-    ul: ({ children }) => (
-      <ul className="ml-6 list-disc text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
-        {children}
-      </ul>
-    ),
-    ol: ({ children }) => (
-      <ol className="ml-6 list-decimal text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
-        {children}
-      </ol>
-    ),
-    li: ({ children }) => (
-      <li className="text-gray-300" style={{ marginBottom: '0px' }}>
-        {children}
-      </li>
-    ),
-    // 문단
-    p: ({ children }) => {
-      // 텍스트 추출
-      const childArray = React.Children.toArray(children)
-      const text = childArray.map(child =>
-        typeof child === 'string' ? child : ''
-      ).join('')
-
-      // [1], [2], [3] 단계 패턴 감지
-      const stepMatch = text.match(/^\[(\d+)\]\s*(.+)/)
-      if (stepMatch) {
-        const stepNum = stepMatch[1]
-        const stepContent = stepMatch[2]
-        return (
-          <div className="flex items-start gap-3 my-1 ml-4">
-            <div
-              className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-              style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
-            >
-              {stepNum}
-            </div>
-            <div className="flex-1 text-gray-200" style={{ fontSize: `${fontSize}px`, paddingTop: '2px' }}>
-              {stepContent}
-            </div>
-          </div>
-        )
-      }
-
-      return (
-        <p className="my-0.5 text-gray-200 leading-relaxed" style={{ fontSize: `${fontSize}px` }}>
+      // 리스트 - 들여쓰기 개선
+      ul: ({ children }) => (
+        <ul className="ml-6 list-disc text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
           {children}
-        </p>
-      )
-    },
-    // 코드 블록 - 접기/펼치기 지원
+        </ul>
+      ),
+      ol: ({ children }) => (
+        <ol className="ml-6 list-decimal text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
+          {children}
+        </ol>
+      ),
+      li: ({ children }) => (
+        <li className="text-gray-300" style={{ marginBottom: '0px' }}>
+          {children}
+        </li>
+      ),
+      // 문단
+      p: ({ children }) => {
+        // 텍스트 추출
+        const childArray = React.Children.toArray(children)
+        const text = childArray.map(child =>
+          typeof child === 'string' ? child : ''
+        ).join('')
+
+        // [1], [2], [3] 단계 패턴 감지
+        const stepMatch = text.match(/^\[(\d+)\]\s*(.+)/)
+        if (stepMatch) {
+          const stepNum = stepMatch[1]
+          const stepContent = stepMatch[2]
+          return (
+            <div className="flex items-start gap-3 my-1 ml-4">
+              <div
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+              >
+                {stepNum}
+              </div>
+              <div className="flex-1 text-gray-200" style={{ fontSize: `${fontSize}px`, paddingTop: '2px' }}>
+                {stepContent}
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <p className="my-0.5 text-gray-200 leading-relaxed" style={{ fontSize: `${fontSize}px` }}>
+            {children}
+          </p>
+        )
+      },
+      // 코드 블록 - 접기/펼치기 지원
       code: ({ node, inline, className, children, ...props }) => {
         if (inline) {
           return <code className="px-1 py-0.5 bg-gray-700 rounded text-cyan-300 text-xs">{children}</code>

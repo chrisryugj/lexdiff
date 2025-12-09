@@ -252,7 +252,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
               isAiMode && [
                 "ring-1 ring-purple-500/30 border-purple-500/50",
                 "shadow-[0_0_15px_rgba(139,92,246,0.15)]",
-                "bg-gradient-to-r from-purple-950/50 to-blue-950/50",
+                "bg-purple-50 dark:bg-gradient-to-r dark:from-purple-950/50 dark:to-blue-950/50",
                 "text-foreground placeholder:text-muted-foreground"
               ]
             )}
@@ -291,9 +291,10 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           className={cn(
             "h-12 px-6 sm:px-8 transition-all duration-300",
             isAiMode && [
-              "bg-purple-600/80",
+              "bg-purple-700",
               "hover:bg-purple-600",
-              "border-purple-500/50"
+              "border-purple-500/50",
+              "dark:bg-purple-600/80"
             ]
           )}
         >

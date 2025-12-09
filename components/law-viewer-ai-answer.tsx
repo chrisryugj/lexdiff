@@ -147,7 +147,7 @@ export function AIAnswerSidebar({
                                                     </div>
                                                 )}
                                                 {sources.has('citation') && (
-                                                    <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors" title="AI 인용 출처">
+                                                    <div className="p-1 rounded-md bg-emerald-600/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500 group-hover:bg-emerald-600/30 dark:group-hover:bg-emerald-500/20 transition-colors" title="AI 인용 출처">
                                                         <Sparkles className="h-3.5 w-3.5" />
                                                     </div>
                                                 )}
@@ -214,7 +214,7 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
             )}
             {/* AI 인용 (해당 source를 포함하는 모든 조문) */}
             {citationCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-emerald-900/30 text-emerald-300 border-emerald-700/50 whitespace-nowrap px-2 py-0.5">
+                <Badge variant="outline" className="text-xs bg-emerald-200/40 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-300 border-emerald-600/50 dark:border-emerald-700/50 whitespace-nowrap px-2 py-0.5">
                     <Sparkles className="h-3 w-3 mr-0.5" />
                     {citationCount}
                 </Badge>
@@ -480,9 +480,9 @@ export function AIAnswerContent({
 
                 {/* AI 답변 주의사항 */}
                 {aiAnswerHTML && (
-                    <div className="mt-6 flex items-start gap-2 text-xs text-amber-200/80 bg-amber-950/20 border border-amber-800/30 p-3 rounded-md">
-                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                        <p>이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
+                    <div className="mt-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/30 p-3 rounded-md text-amber-900 dark:text-amber-200/80">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>
                 )}
             </div>
