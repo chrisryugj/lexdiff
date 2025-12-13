@@ -274,7 +274,9 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
   // 전방 허용: 괄호(, 공백, 문장 시작
   // 후방 허용: 한글 조사 "에", "의", "을", "를", 괄호) 등
   // ⚠️ "제3조의 4차산업" 버그 수정: "의" 뒤에 숫자만 허용 (공백 후 한글이 오면 제외)
-  const articleRegex = /(?<!「[^」]*)(제\s*(\d+)\s*조(?:의\s*(\d+)(?!\s*[가-힣]))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?![」])/g
+  // ⚠️ "제10조의2" 버그 수정: "조\s*" → "조"로 변경 (공백이 의를 먹어버리는 문제)
+  //    그룹: (1)전체, (2)조번호, (3)의X전체, (4)X, (5)항, (6)호
+  const articleRegex = /(?<!「[^」]*)(제\s*(\d+)\s*조(의(\d+))?)(?:제\s*(\d+)\s*항)?(?:제\s*(\d+)\s*호)?(?![」])/g
   let match: RegExpExecArray | null
   let foundCount = 0
 
@@ -290,8 +292,9 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
       continue
     }
 
-    const joLabel = `제${match[2]}조${match[3] ? '의' + match[3] : ''}`
-    const fullLabel = match[1] + (match[4] ? `제${match[4]}항` : '') + (match[5] ? `제${match[5]}호` : '')
+    // 그룹: (1)전체, (2)조번호, (3)의X전체, (4)X, (5)항, (6)호
+    const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
+    const fullLabel = match[1] + (match[5] ? `제${match[5]}항` : '') + (match[6] ? `제${match[6]}호` : '')
 
     matches.push({
       start: match.index,
