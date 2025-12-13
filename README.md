@@ -230,10 +230,12 @@ lib/
 ├── law-content-cache.ts        # IndexedDB 쿼리 캐시
 └── favorites-store.ts          # 즐겨찾기 저장소 (pub/sub)
 __tests__/
-└── lib/                        # 유닛 테스트 (123개)
-    ├── law-parser.test.ts
-    ├── unified-link-generator.test.ts
-    └── ai-answer-processor.test.ts
+├── middleware.test.ts          # Rate Limiting 테스트 (30개)
+└── lib/                        # 유닛 테스트 (263개)
+    ├── law-parser.test.ts          # 86개
+    ├── ai-answer-processor.test.ts # 77개
+    ├── api-validation.test.ts      # 68개
+    └── unified-link-generator.test.ts # 32개
 hooks/
 ├── use-admin-rules.ts          # 행정규칙 상태 (Optimistic UI)
 ├── use-law-viewer-modals.ts    # 모달 상태
