@@ -12,6 +12,36 @@ import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Exponential Backoff 재시도 설정
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 1000,  // 1초
+  maxDelayMs: 10000,  // 최대 10초
+  retryableStatusCodes: [429, 500, 502, 503, 504],  // Rate limit + Server errors
+}
+
+/**
+ * Exponential Backoff delay 계산
+ */
+function calculateBackoffDelay(attempt: number): number {
+  const delay = Math.min(
+    RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
+    RETRY_CONFIG.maxDelayMs
+  )
+  // Jitter 추가 (±20%)
+  const jitter = delay * 0.2 * (Math.random() - 0.5)
+  return Math.round(delay + jitter)
+}
+
+/**
+ * 재시도 가능한 에러인지 확인
+ */
+function isRetryableError(status: number): boolean {
+  return RETRY_CONFIG.retryableStatusCodes.includes(status)
+}
+
 export interface LawMetadata {
   law_id: string
   law_name: string
@@ -381,26 +411,67 @@ export async function* queryFileSearchStream(
   console.log('[File Search] Store ID:', STORE_ID)
   console.log('[File Search] Request body:', JSON.stringify(requestBody, null, 2))
 
-  // Streaming API 호출 (File Search는 Gemini 2.5 Flash/Pro만 지원, Lite는 미지원)
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify(requestBody)
-    }
-  )
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Streaming API 호출 (Exponential Backoff 재시도 포함)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  let response: Response | null = null
+  let lastError: Error | null = null
 
-  if (!response.ok) {
-    // 에러 응답 본문 읽기
-    const errorText = await response.text()
-    console.error('[File Search] ❌ API Error Response:', errorText)
-    console.error('[File Search] Status:', response.status)
-    console.error('[File Search] Headers:', Object.fromEntries(response.headers.entries()))
-    throw new Error(`API error: ${response.status} - ${errorText}`)
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = calculateBackoffDelay(attempt - 1)
+        console.log(`[File Search] ⏳ 재시도 ${attempt}/${RETRY_CONFIG.maxRetries} - ${delay}ms 대기...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
+      response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify(requestBody)
+        }
+      )
+
+      if (response.ok) {
+        if (attempt > 0) {
+          console.log(`[File Search] ✅ 재시도 ${attempt} 성공!`)
+        }
+        break
+      }
+
+      // 재시도 가능한 에러인지 확인
+      if (isRetryableError(response.status) && attempt < RETRY_CONFIG.maxRetries) {
+        const errorText = await response.text()
+        console.warn(`[File Search] ⚠️ 재시도 가능한 에러 (${response.status}): ${errorText.substring(0, 200)}`)
+        lastError = new Error(`API error: ${response.status}`)
+        continue
+      }
+
+      // 재시도 불가능한 에러
+      const errorText = await response.text()
+      console.error('[File Search] ❌ API Error Response:', errorText)
+      console.error('[File Search] Status:', response.status)
+      console.error('[File Search] Headers:', Object.fromEntries(response.headers.entries()))
+      throw new Error(`API error: ${response.status} - ${errorText}`)
+
+    } catch (error) {
+      // 네트워크 에러 등 fetch 자체 실패
+      if (error instanceof TypeError && attempt < RETRY_CONFIG.maxRetries) {
+        console.warn(`[File Search] ⚠️ 네트워크 에러, 재시도 예정: ${error.message}`)
+        lastError = error as Error
+        continue
+      }
+      throw error
+    }
+  }
+
+  if (!response || !response.ok) {
+    throw lastError || new Error('모든 재시도 실패')
   }
 
   console.log('[File Search] ✅ Response OK, starting stream...')

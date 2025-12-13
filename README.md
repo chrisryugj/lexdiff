@@ -68,8 +68,8 @@
 | **State** | React Hooks + localStorage + IndexedDB |
 | **Database** | Turso/LibSQL (학습 데이터) |
 | **Caching** | HTTP Cache (1h/24h) + IndexedDB (7일 쿼리, 영구 행정규칙) |
-| **Testing** | Vitest + Testing Library (293개 테스트) |
-| **Security** | Rate Limiting 미들웨어 + Zod 입력 검증 + 보안 헤더 |
+| **Testing** | Vitest + Testing Library (314개 테스트) |
+| **Security** | Rate Limiting + 일일 쿼터 + Zod 입력 검증 + 보안 헤더 |
 | **CI/CD** | GitHub Actions (테스트/빌드 자동화) |
 
 ## 설치 및 실행
@@ -175,10 +175,17 @@ restart-server.cmd  # Node 프로세스 종료 + .next 캐시 삭제
 |-----------|------|--------|
 | 일반 API (`/api/*`) | 100 req | 1분 |
 | AI API (`/api/file-search-rag`, `/api/summarize`) | 20 req | 1분 |
+| AI 일일 쿼터 | 100 req | 24시간 |
 
 - IP 기반 요청 제한 (Edge Runtime 메모리 저장소)
 - 429 응답 시 `Retry-After` 헤더 제공
 - `X-RateLimit-Remaining`, `X-RateLimit-Reset` 헤더
+- `X-AI-Usage-Daily`, `X-AI-Usage-Remaining` 헤더 (AI API)
+
+**API 재시도 로직** (`lib/file-search-client.ts`):
+- Exponential Backoff: 1초 → 2초 → 4초 → 8초 (최대 10초)
+- 재시도 가능 에러: 429, 500, 502, 503, 504
+- Jitter 적용 (±20%)으로 thundering herd 방지
 
 **입력 검증** (`lib/api-validation.ts`):
 - Zod 스키마 기반 타입 안전 검증
@@ -222,19 +229,21 @@ components/
 └── ui/                         # shadcn/ui 컴포넌트
 lib/
 ├── unified-link-generator.ts   # 통합 링크 시스템 (핵심)
-├── file-search-client.ts       # Google File Search 클라이언트
+├── file-search-client.ts       # Google File Search 클라이언트 + 재시도 로직
 ├── ai-answer-processor.ts      # AI 답변 HTML 변환
 ├── law-parser.ts               # JO 코드 파서
 ├── api-validation.ts           # Zod 기반 입력 검증
+├── usage-tracker.ts            # AI 사용량 트래커 (일일 쿼터)
 ├── admin-rule-cache.ts         # IndexedDB 행정규칙 캐시
 ├── law-content-cache.ts        # IndexedDB 쿼리 캐시
 └── favorites-store.ts          # 즐겨찾기 저장소 (pub/sub)
 __tests__/
 ├── middleware.test.ts          # Rate Limiting 테스트 (30개)
-└── lib/                        # 유닛 테스트 (263개)
+└── lib/                        # 유닛 테스트 (284개)
     ├── law-parser.test.ts          # 86개
     ├── ai-answer-processor.test.ts # 77개
     ├── api-validation.test.ts      # 68개
+    ├── usage-tracker.test.ts       # 21개
     └── unified-link-generator.test.ts # 32개
 hooks/
 ├── use-admin-rules.ts          # 행정규칙 상태 (Optimistic UI)
@@ -272,18 +281,22 @@ MIT
 ## 최근 주요 업데이트
 
 ### 2025-12-13: 테스트 인프라 대폭 강화, 보안 강화, CI/CD 구축
-1. **Vitest 테스트 프레임워크 도입**: **293개 테스트 케이스** (153개 → 293개, +92%)
+1. **Vitest 테스트 프레임워크 도입**: **314개 테스트 케이스** (153개 → 314개, +105%)
    - `law-parser`: 86개 (JO 코드, 검색어 파싱, 법령 추출)
    - `ai-answer-processor`: 77개 (마크다운 처리, 섹션 스타일링, 링크 생성)
    - `unified-link-generator`: 32개 (법령 링크 패턴)
    - `api-validation`: 68개 (Zod 스키마, XSS 방지)
    - `middleware`: 30개 (Rate Limiting)
+   - `usage-tracker`: 21개 (AI 쿼터, Exponential Backoff)
 2. **Rate Limiting 미들웨어**: 일반 API 100req/min, AI API 20req/min
-3. **API 입력 검증**: Zod 스키마 기반 XSS 방지 및 파라미터 검증
-4. **에러 바운더리 컴포넌트**: ErrorBoundary, AISearchErrorBoundary 추가
-5. **보안 헤더 추가**: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
-6. **GitHub Actions CI/CD**: PR/Push 시 자동 테스트, 타입체크, 빌드 검증
-7. **제N조의M 버그 수정**: 가지 조문 패턴 정규식 수정
+3. **AI 일일 쿼터 시스템**: 100회/일, 80% 사용 시 경고, 사용량 헤더 제공
+4. **API 재시도 로직**: Exponential Backoff (429, 5xx 에러 자동 재시도)
+5. **API 입력 검증**: Zod 스키마 기반 XSS 방지 및 파라미터 검증
+6. **에러 바운더리 컴포넌트**: ErrorBoundary, AISearchErrorBoundary 추가
+7. **보안 헤더 추가**: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+8. **GitHub Actions CI/CD**: PR/Push 시 자동 테스트, 타입체크, 빌드 검증
+9. **제N조의M 버그 수정**: 가지 조문 패턴 정규식 수정
+10. **대용량 법령 가상화**: VirtualizedFullArticleView (React Virtual) - DOM 93% 감소
 
 ### 2025-11-15: AI 검색 시스템 3대 핵심 수정
 1. **SSE 스트리밍 버퍼 누락 수정**: 루프 종료 후 남은 버퍼 처리로 답변 잘림 방지

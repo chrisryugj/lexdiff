@@ -6,10 +6,41 @@
  */
 
 import { queryFileSearchStream } from '@/lib/file-search-client'
+import { recordAIUsage, isQuotaExceeded, getUsageHeaders, getUsageWarningMessage } from '@/lib/usage-tracker'
 import { NextRequest } from 'next/server'
+
+/**
+ * 클라이언트 IP 추출
+ */
+function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  const realIP = request.headers.get('x-real-ip')
+  if (realIP) {
+    return realIP
+  }
+  return '127.0.0.1'
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIP = getClientIP(request)
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 일일 쿼터 검사
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (isQuotaExceeded(clientIP)) {
+      return Response.json(
+        { error: '일일 AI 검색 한도를 초과했습니다. 내일 다시 시도해주세요.' },
+        {
+          status: 429,
+          headers: getUsageHeaders(clientIP),
+        }
+      )
+    }
+
     const { query, metadataFilter } = await request.json()
 
     if (!query || typeof query !== 'string') {
@@ -97,6 +128,27 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // 사용량 기록 (완료 시)
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          const usageStats = recordAIUsage(clientIP, fullResponse.length)
+          const warningMessage = getUsageWarningMessage(usageStats)
+
+          // 사용량 경고 전송 (80% 이상 사용 시)
+          if (warningMessage) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({
+                type: 'usage_warning',
+                message: warningMessage,
+                usage: {
+                  daily: usageStats.dailyUsage,
+                  remaining: usageStats.remainingQuota,
+                  percentUsed: Math.round(usageStats.percentUsed * 100),
+                }
+              })}\n\n`)
+            )
+          }
+
           // 완료 시그널
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
@@ -111,6 +163,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
+        ...getUsageHeaders(clientIP),  // 사용량 헤더 추가
         Connection: 'keep-alive',
       },
     })
