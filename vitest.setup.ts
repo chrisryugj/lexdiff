@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import '@testing-library/jest-dom'
 
 // Mock debugLogger to prevent console spam during tests
 vi.mock('./lib/debug-logger', () => ({
