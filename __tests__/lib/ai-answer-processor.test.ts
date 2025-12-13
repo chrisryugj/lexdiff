@@ -308,5 +308,312 @@ describe('ai-answer-processor', () => {
       // 단일 언더스코어 이탤릭은 처리되지 않을 수 있음 (구현 특성)
       expect(result).toContain('중첩')
     })
+
+    it('null 입력 처리', () => {
+      const result = convertAIAnswerToHTML(null as unknown as string)
+      expect(result).toBe('')
+    })
+
+    it('undefined 입력 처리', () => {
+      const result = convertAIAnswerToHTML(undefined as unknown as string)
+      expect(result).toBe('')
+    })
+
+    it('공백만 있는 입력', () => {
+      const result = convertAIAnswerToHTML('   \n\n   ')
+      expect(result.trim().replace(/<br>\n?/g, '')).toBe('')
+    })
+  })
+
+  describe('실제 AI 응답 패턴', () => {
+    it('전체 응답 구조 처리 (핵심요약 + 조문발췌 + 관련법령)', () => {
+      const markdown = `📋 핵심 요약
+✅ 관세 신고납부는 물품 수입 시 필수
+📌 「관세법」 제38조 적용
+🔔 기한 내 미납 시 가산세 부과
+
+⚖️ 조문 발췌
+📜 관세법 제38조 (신고납부)
+물품을 수입하려는 자는 관세를 신고하고 납부하여야 한다.
+
+📖 핵심 해석
+해석 내용입니다.
+
+🔗 관련 법령
+「관세법」 제39조 (수정신고)
+「관세법」 제40조 (경정청구)`
+      const result = convertAIAnswerToHTML(markdown)
+
+      // 모든 섹션이 처리되어야 함
+      expect(result).toContain('핵심 요약')
+      expect(result).toContain('<blockquote')  // 조문 발췌 블록
+      expect(result).toContain('핵심 해석')
+      expect(result).toContain('관련 법령')
+
+      // 법령 링크가 생성되어야 함
+      expect(result).toContain('law-ref')
+    })
+
+    it('절차형 응답 처리 (단계별 안내)', () => {
+      const markdown = `📋 핵심 요약
+✅ 수입신고 3단계 절차
+📌 「관세법」 제241조
+
+📄 단계별 절차
+[1] 수입신고서 작성 (품목분류, 과세가격)
+[2] 세관 심사 (서류심사 또는 물품검사)
+[3] 관세 납부 및 수입신고 수리
+
+⚠️ 조건·예외
+신선농산물은 우선통관 가능`
+      const result = convertAIAnswerToHTML(markdown)
+
+      expect(result).toContain('step-container')
+      expect(result).toContain('step-number')
+      expect(result).toContain('조건·예외')
+    })
+
+    it('비교형 응답 처리', () => {
+      const markdown = `📋 핵심 요약
+✅ A법과 B법의 차이점
+📌 적용 대상이 다름
+
+⚖️ 조문 비교
+「A법령」 제1조: 내용A
+「B법령」 제1조: 내용B
+
+🔗 관련 법령
+「A법령」 제2조
+「B법령」 제2조`
+      const result = convertAIAnswerToHTML(markdown)
+
+      expect(result).toContain('핵심 요약')
+      expect(result).toContain('law-ref')
+    })
+
+    it('조문 없음 응답 처리', () => {
+      const markdown = `📋 핵심 요약
+✅ 해당 사항 없음
+📌 관련 법령 없음
+
+⚖️ 조문 발췌
+(조문 내용 없음)
+
+🔗 관련 법령
+해당 없음`
+      const result = convertAIAnswerToHTML(markdown)
+
+      expect(result).toContain('조문 내용 없음')
+    })
+  })
+
+  describe('마크다운 구문 상세 테스트', () => {
+    it('H1 헤더 제거', () => {
+      const result = convertAIAnswerToHTML('# 제목')
+      expect(result).not.toContain('#')
+    })
+
+    it('H2 헤더 제거', () => {
+      const result = convertAIAnswerToHTML('## 제목')
+      expect(result).not.toContain('##')
+    })
+
+    it('H3 헤더 제거', () => {
+      const result = convertAIAnswerToHTML('### 제목')
+      expect(result).not.toContain('###')
+    })
+
+    it('H6 헤더 제거', () => {
+      const result = convertAIAnswerToHTML('###### 제목')
+      expect(result).not.toContain('######')
+    })
+
+    it('인라인 코드 제거', () => {
+      const result = convertAIAnswerToHTML('`코드` 내용')
+      expect(result).not.toContain('`')
+      expect(result).toContain('코드')
+    })
+
+    it('리스트 별표 제거', () => {
+      const result = convertAIAnswerToHTML('* 항목')
+      expect(result).not.toMatch(/^\* /m)
+    })
+
+    it('인용문 > 제거', () => {
+      const result = convertAIAnswerToHTML('> 인용문')
+      expect(result).not.toMatch(/^> /m)
+    })
+
+    it('구분선 제거', () => {
+      const result = convertAIAnswerToHTML('---')
+      expect(result).not.toContain('---')
+    })
+
+    it('구분선 (별표) 제거', () => {
+      const result = convertAIAnswerToHTML('***')
+      expect(result).not.toContain('***')
+    })
+  })
+
+  describe('이모지 아이콘 변환 상세', () => {
+    it('📌 Pin 아이콘으로 변환', () => {
+      const result = convertAIAnswerToHTML('📌 중요 사항')
+      expect(result).toContain('<svg')
+      expect(result).toContain('#94a3b8')  // 회색
+    })
+
+    it('🔔 Bell 아이콘으로 변환', () => {
+      const result = convertAIAnswerToHTML('🔔 알림')
+      expect(result).toContain('<svg')
+    })
+
+    it('📖 BookOpen 아이콘으로 변환', () => {
+      const result = convertAIAnswerToHTML('📖 핵심 해석')
+      expect(result).toContain('<svg')
+    })
+
+    it('📜 법령 아이콘으로 변환', () => {
+      const result = convertAIAnswerToHTML('📜 관세법 제38조')
+      expect(result).toContain('<svg')
+      expect(result).toContain('#60a5fa')  // 파란색
+    })
+
+    it('📝 PenLine 아이콘으로 변환', () => {
+      const result = convertAIAnswerToHTML('📝 실무 적용')
+      expect(result).toContain('<svg')
+    })
+  })
+
+  describe('법령 링크 생성 상세', () => {
+    it('시행령 링크 생성', () => {
+      const result = convertAIAnswerToHTML('「관세법 시행령」 제1조')
+      expect(result).toContain('law-ref')
+      expect(result).toContain('관세법 시행령')
+    })
+
+    it('시행규칙 링크 생성', () => {
+      const result = convertAIAnswerToHTML('「관세법 시행규칙」 제1조')
+      expect(result).toContain('law-ref')
+    })
+
+    it('가지 조문 링크 (제N조의M)', () => {
+      const result = convertAIAnswerToHTML('「관세법」 제10조의2')
+      expect(result).toContain('law-ref')
+    })
+
+    it('항/호 포함 링크', () => {
+      const result = convertAIAnswerToHTML('「관세법」 제38조제1항제2호')
+      expect(result).toContain('law-ref')
+    })
+
+    it('조례 링크 생성', () => {
+      const result = convertAIAnswerToHTML('「서울특별시 조례」 제1조')
+      expect(result).toContain('law-ref')
+    })
+
+    it('독립적인 제N조 링크', () => {
+      const result = convertAIAnswerToHTML('제38조에 따라 처리')
+      expect(result).toContain('data-ref="article"')
+    })
+  })
+
+  describe('조문 발췌 블록 상세', () => {
+    it('🔗 관련 법령으로 블록 종료', () => {
+      const markdown = `⚖️ 조문 발췌
+조문 내용
+🔗 관련 법령
+관련 법령 목록`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('<blockquote')
+      expect(result).toContain('</blockquote>')
+    })
+
+    it('📄 상세 내용으로 블록 종료', () => {
+      const markdown = `⚖️ 조문 발췌
+조문 내용
+📄 상세 내용
+상세 설명`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('<blockquote')
+    })
+
+    it('💡 추가 참고로 블록 종료', () => {
+      const markdown = `⚖️ 조문 발췌
+조문 내용
+💡 추가 참고
+참고 사항`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('<blockquote')
+    })
+
+    it('📝 실무로 블록 종료', () => {
+      const markdown = `⚖️ 조문 발췌
+조문 내용
+📝 실무 적용
+실무 내용`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('<blockquote')
+    })
+
+    it('마지막까지 열린 조문 발췌 블록 닫기', () => {
+      const markdown = `⚖️ 조문 발췌
+조문 내용입니다.`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('<blockquote')
+      expect(result).toContain('</blockquote>')
+    })
+  })
+
+  describe('단계 스타일링 상세', () => {
+    it('5단계까지 처리', () => {
+      const markdown = `[1] 1단계
+[2] 2단계
+[3] 3단계
+[4] 4단계
+[5] 5단계`
+      const result = convertAIAnswerToHTML(markdown)
+      const stepCount = (result.match(/step-number/g) || []).length
+      expect(stepCount).toBe(5)
+    })
+
+    it('단계 번호 스타일 (배경색, 원형)', () => {
+      const result = convertAIAnswerToHTML('[1] 첫 번째 단계')
+      // background: linear-gradient 사용
+      expect(result).toContain('background:')
+      expect(result).toContain('border-radius: 50%')
+    })
+
+    it('단계 내용 flex 레이아웃', () => {
+      const result = convertAIAnswerToHTML('[1] 내용')
+      expect(result).toContain('display: flex')
+    })
+  })
+
+  describe('서론 통합 상세', () => {
+    it('짧은 서론 (10자 이하)은 무시', () => {
+      const markdown = `안녕
+📋 핵심 요약
+✅ 내용`
+      const result = convertAIAnswerToHTML(markdown)
+      // 짧은 서론은 핵심 요약으로 이동하지 않음
+      expect(result).toContain('핵심 요약')
+    })
+
+    it('긴 서론은 핵심 요약 첫 항목으로 이동', () => {
+      const markdown = `이것은 긴 서론 텍스트입니다. 충분히 길어서 이동됩니다.
+📋 핵심 요약
+✅ 기존 항목`
+      const result = convertAIAnswerToHTML(markdown)
+      // 서론이 핵심 요약 내부에 있어야 함
+      expect(result).toContain('긴 서론 텍스트')
+    })
+
+    it('서론 없는 응답 정상 처리', () => {
+      const markdown = `📋 핵심 요약
+✅ 첫 번째 항목`
+      const result = convertAIAnswerToHTML(markdown)
+      expect(result).toContain('핵심 요약')
+      expect(result).toContain('첫 번째 항목')
+    })
   })
 })
