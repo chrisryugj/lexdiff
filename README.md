@@ -69,7 +69,8 @@
 | **Database** | Turso/LibSQL (학습 데이터) |
 | **Caching** | HTTP Cache (1h/24h) + IndexedDB (7일 쿼리, 영구 행정규칙) |
 | **Testing** | Vitest + Testing Library (123개 테스트) |
-| **Security** | Rate Limiting 미들웨어 + Zod 입력 검증 |
+| **Security** | Rate Limiting 미들웨어 + Zod 입력 검증 + 보안 헤더 |
+| **CI/CD** | GitHub Actions (테스트/빌드 자동화) |
 
 ## 설치 및 실행
 
@@ -245,11 +246,13 @@ MIT
 
 ## 최근 주요 업데이트
 
-### 2025-12-13: 테스트 인프라 및 보안 강화
+### 2025-12-13: 테스트 인프라, 보안 강화, CI/CD 구축
 1. **Vitest 테스트 프레임워크 도입**: 123개 테스트 케이스 (law-parser, unified-link-generator, ai-answer-processor)
 2. **Rate Limiting 미들웨어**: 일반 API 100req/min, AI API 20req/min
 3. **API 입력 검증**: Zod 스키마 기반 XSS 방지 및 파라미터 검증
 4. **에러 바운더리 컴포넌트**: ErrorBoundary, AISearchErrorBoundary 추가
+5. **보안 헤더 추가**: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+6. **GitHub Actions CI/CD**: PR/Push 시 자동 테스트, 타입체크, 빌드 검증
 
 ### 2025-11-15: AI 검색 시스템 3대 핵심 수정
 1. **SSE 스트리밍 버퍼 누락 수정**: 루프 종료 후 남은 버퍼 처리로 답변 잘림 방지
