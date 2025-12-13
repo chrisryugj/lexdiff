@@ -17,5 +17,6 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "chris-v1"
 }

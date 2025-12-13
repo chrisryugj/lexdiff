@@ -68,6 +68,8 @@
 | **State** | React Hooks + localStorage + IndexedDB |
 | **Database** | Turso/LibSQL (학습 데이터) |
 | **Caching** | HTTP Cache (1h/24h) + IndexedDB (7일 쿼리, 영구 행정규칙) |
+| **Testing** | Vitest + Testing Library (123개 테스트) |
+| **Security** | Rate Limiting 미들웨어 + Zod 입력 검증 |
 
 ## 설치 및 실행
 
@@ -98,6 +100,19 @@ npm run dev
 ```
 
 브라우저에서 `http://localhost:3000` 접속
+
+### 테스트 실행
+
+```bash
+# 단일 실행
+pnpm test:run
+
+# Watch 모드
+pnpm test
+
+# 커버리지 리포트
+pnpm test:coverage
+```
 
 ### 완전 클린 재시작 (Windows)
 
@@ -186,9 +201,15 @@ lib/
 ├── file-search-client.ts       # Google File Search 클라이언트
 ├── ai-answer-processor.ts      # AI 답변 HTML 변환
 ├── law-parser.ts               # JO 코드 파서
+├── api-validation.ts           # Zod 기반 입력 검증
 ├── admin-rule-cache.ts         # IndexedDB 행정규칙 캐시
 ├── law-content-cache.ts        # IndexedDB 쿼리 캐시
 └── favorites-store.ts          # 즐겨찾기 저장소 (pub/sub)
+__tests__/
+└── lib/                        # 유닛 테스트 (123개)
+    ├── law-parser.test.ts
+    ├── unified-link-generator.test.ts
+    └── ai-answer-processor.test.ts
 hooks/
 ├── use-admin-rules.ts          # 행정규칙 상태 (Optimistic UI)
 ├── use-law-viewer-modals.ts    # 모달 상태
@@ -223,6 +244,12 @@ MIT
 - 접속: `http://localhost:3000`
 
 ## 최근 주요 업데이트
+
+### 2025-12-13: 테스트 인프라 및 보안 강화
+1. **Vitest 테스트 프레임워크 도입**: 123개 테스트 케이스 (law-parser, unified-link-generator, ai-answer-processor)
+2. **Rate Limiting 미들웨어**: 일반 API 100req/min, AI API 20req/min
+3. **API 입력 검증**: Zod 스키마 기반 XSS 방지 및 파라미터 검증
+4. **에러 바운더리 컴포넌트**: ErrorBoundary, AISearchErrorBoundary 추가
 
 ### 2025-11-15: AI 검색 시스템 3대 핵심 수정
 1. **SSE 스트리밍 버퍼 누락 수정**: 루프 종료 후 남은 버퍼 처리로 답변 잘림 방지
