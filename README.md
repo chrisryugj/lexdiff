@@ -168,6 +168,29 @@ restart-server.cmd  # Node 프로세스 종료 + .next 캐시 삭제
 - `/api/admrul`: 행정규칙 본문 (XML)
 - `/api/summarize`: AI 변경 요약 (Gemini 2.5 Flash)
 
+### 보안 아키텍처
+
+**Rate Limiting** (`middleware.ts`):
+| 엔드포인트 | 제한 | 윈도우 |
+|-----------|------|--------|
+| 일반 API (`/api/*`) | 100 req | 1분 |
+| AI API (`/api/file-search-rag`, `/api/summarize`) | 20 req | 1분 |
+
+- IP 기반 요청 제한 (Edge Runtime 메모리 저장소)
+- 429 응답 시 `Retry-After` 헤더 제공
+- `X-RateLimit-Remaining`, `X-RateLimit-Reset` 헤더
+
+**입력 검증** (`lib/api-validation.ts`):
+- Zod 스키마 기반 타입 안전 검증
+- XSS 방지: HTML 태그, `javascript:` 프로토콜 제거
+- 파라미터별 스키마: `searchQuerySchema`, `lawMstSchema`, `joCodeSchema`
+
+**보안 헤더** (`next.config.mjs`):
+- `X-Frame-Options: DENY` (클릭재킹 방지)
+- `X-Content-Type-Options: nosniff` (MIME 스니핑 방지)
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy`: 카메라/마이크/위치 비활성화
+
 ### JO 코드 시스템
 
 6자리 조문 식별 코드:
