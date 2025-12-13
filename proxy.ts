@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 /**
- * Rate Limiting 미들웨어
+ * Rate Limiting Proxy (Next.js 16)
  *
  * - 일반 API: 100 req/min
  * - AI 관련 API (/api/file-search-rag, /api/summarize): 20 req/min
  *
- * Edge Runtime 환경에서 동작하므로 메모리 기반 저장소 사용
+ * Node.js 런타임에서 동작 (메모리 기반 저장소)
  * 실제 프로덕션에서는 Redis/Upstash 등 외부 저장소 권장
  */
 
@@ -25,7 +25,7 @@ const AI_ENDPOINTS = [
   '/api/intelligent-search',
 ]
 
-// IP별 요청 카운트 저장소 (Edge Runtime 메모리)
+// IP별 요청 카운트 저장소 (Node.js 런타임 메모리)
 const requestCounts = new Map<string, { count: number; resetTime: number }>()
 
 // 주기적으로 만료된 엔트리 정리 (메모리 누수 방지)
@@ -104,7 +104,7 @@ function checkRateLimit(
   }
 }
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // API 라우트만 처리

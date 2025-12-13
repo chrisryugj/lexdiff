@@ -65,7 +65,6 @@ import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
 import type { ContentClickContext, ContentClickActions } from "@/lib/content-click-handlers"
 import { useSwipe } from "@/hooks/use-swipe"
-import { convertAIAnswerToHTML } from '@/lib/ai-answer-processor'
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { AIAnswerSidebar, AIAnswerContent } from "@/components/law-viewer-ai-answer"
@@ -92,6 +91,7 @@ interface LawViewerProps {
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
   aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
   aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
+  onAiRefresh?: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
 }
 
 export function LawViewer({
@@ -114,6 +114,7 @@ export function LawViewer({
   aiConfidenceLevel = 'high',
   aiQueryType = 'general',
   aiIsTruncated = false,
+  onAiRefresh,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -139,11 +140,11 @@ export function LawViewer({
   // Swipe tutorial and hints
   const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
 
-  // AI 답변 HTML 변환 (섹션별 링크 처리)
-  const aiAnswerHTML = useMemo(() => {
-    if (!aiAnswerContent) return ''
-    return convertAIAnswerToHTML(aiAnswerContent)
-  }, [aiAnswerContent])
+  // ✅ AI 답변 법령 링크 클릭 핸들러
+  const handleLawLinkClick = (lawName: string, article?: string) => {
+    debugLogger.info('🔗 [AI답변] 법령 링크 클릭', { lawName, article })
+    openExternalLawArticleModal(lawName, article || '')
+  }
 
   // ✅ Citations를 ParsedRelatedLaw 형식으로 변환 및 병합
   const mergedRelatedArticles = useMemo(() => {
@@ -1079,20 +1080,21 @@ export function LawViewer({
                   </ScrollArea>
                 )
               ) : aiAnswerMode ? (
-                // ✅ Phase 7: AI 모드 - 헤더 유지하면서 AIAnswerContent 표시 (답변 없을 때도)
+                // ✅ Phase 8: AI 모드 - LegalMarkdownRenderer로 Markdown 직접 렌더링
                 <ScrollArea className="h-full" ref={contentRef}>
                   <div className="pb-20">
                     <AIAnswerContent
-                      aiAnswerHTML={aiAnswerHTML}
+                      aiAnswerContent={aiAnswerContent || ''}
                       userQuery={userQuery}
                       aiConfidenceLevel={aiConfidenceLevel}
                       fileSearchFailed={fileSearchFailed}
                       aiCitations={aiCitations}
                       fontSize={fontSize}
                       setFontSize={setFontSize}
-                      handleContentClick={handleContentClick}
+                      onLawClick={handleLawLinkClick}
                       aiQueryType={aiQueryType}
                       isTruncated={aiIsTruncated}
+                      onRefresh={onAiRefresh}
                     />
                   </div>
                 </ScrollArea>

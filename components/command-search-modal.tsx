@@ -87,16 +87,10 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   }
 
   const handleRecentClick = (query: string) => {
-    // 최근 검색은 parseSearchQuery로 파싱하여 조문 번호 추출
-    try {
-      const parsed = parseSearchQuery(query)
-      debugLogger.info('CommandSearchModal 최근 검색 파싱', { query, parsed })
-      onSearch(parsed)
-      onClose()
-    } catch (error) {
-      debugLogger.error('최근 검색 파싱 실패', error)
-      handleSearch(query)
-    }
+    // ✅ 검색 실행 대신 검색창에 자동완성만
+    setSearchQuery(query)
+    inputRef.current?.focus()
+    debugLogger.info('CommandSearchModal 최근 검색 자동완성', { query })
   }
 
   return (

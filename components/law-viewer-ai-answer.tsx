@@ -20,11 +20,13 @@ import {
     Search,
     Scale,
     ListChecks,
+    RefreshCw,
 } from "lucide-react"
 import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
+import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 
 interface AIAnswerSidebarProps {
     relatedArticles: ParsedRelatedLaw[]
@@ -224,29 +226,31 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
 }
 
 interface AIAnswerContentProps {
-    aiAnswerHTML: string
+    aiAnswerContent: string  // ✅ Phase 8: 원본 Markdown (HTML 대신)
     userQuery: string
     aiConfidenceLevel: 'high' | 'medium' | 'low'
     fileSearchFailed: boolean
     aiCitations: VerifiedCitation[]
     fontSize: number
     setFontSize: (size: number | ((prev: number) => number)) => void
-    handleContentClick: React.MouseEventHandler<HTMLDivElement>
+    onLawClick?: (lawName: string, article?: string) => void  // ✅ 법령 링크 클릭 핸들러
     aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
     isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
+    onRefresh?: () => void  // ✅ 강제 새로고침 (캐시 무시)
 }
 
 export function AIAnswerContent({
-    aiAnswerHTML,
+    aiAnswerContent,
     userQuery,
     aiConfidenceLevel,
     fileSearchFailed,
     aiCitations,
     fontSize,
     setFontSize,
-    handleContentClick,
+    onLawClick,
     aiQueryType = 'general',
-    isTruncated = false
+    isTruncated = false,
+    onRefresh
 }: AIAnswerContentProps) {
     // 신뢰도 배지 컴포넌트
     const ConfidenceBadge = () => {
@@ -360,6 +364,12 @@ export function AIAnswerContent({
                         </div>
                         {/* PC: 버튼들 우측 정렬 */}
                         <div className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
+                            {/* ✅ 강제 새로고침 버튼 (개발용) */}
+                            {onRefresh && (
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            )}
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                                 <ZoomOut className="h-4 w-4" />
                             </Button>
@@ -371,7 +381,7 @@ export function AIAnswerContent({
                             </Button>
                             <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
                             <CopyButton
-                                getText={() => aiAnswerHTML.replace(/<[^>]*>?/gm, '')}
+                                getText={() => aiAnswerContent}
                                 message="복사됨"
                                 className="h-8 w-8 p-0"
                             />
@@ -381,6 +391,12 @@ export function AIAnswerContent({
 
                 {/* 3줄: 모바일 전용 컨트롤 버튼들 (우측 정렬) */}
                 <div className="flex lg:hidden items-center justify-end gap-1">
+                    {/* ✅ 강제 새로고침 버튼 (개발용) */}
+                    {onRefresh && (
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
                         <ZoomOut className="h-4 w-4" />
                     </Button>
@@ -392,7 +408,7 @@ export function AIAnswerContent({
                     </Button>
                     <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
                     <CopyButton
-                        getText={() => aiAnswerHTML.replace(/<[^>]*>?/gm, '')}
+                        getText={() => aiAnswerContent}
                         message="복사됨"
                         className="h-8 w-8 p-0"
                     />
@@ -437,7 +453,7 @@ export function AIAnswerContent({
                 )}
 
                 {/* ✅ Phase 7: 답변 내용이 없을 때 (grounding metadata 없음) */}
-                {!aiAnswerHTML && (
+                {!aiAnswerContent && (
                     <>
                         {/* 신뢰도 낮음 배너 */}
                         <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
@@ -463,23 +479,18 @@ export function AIAnswerContent({
                     </>
                 )}
 
-                {aiAnswerHTML && <div
-                    className="prose prose-sm max-w-none w-full dark:prose-invert overflow-x-hidden
-        [&_h2]:text-[clamp(16px,4.5vw,24px)] [&_h2]:font-bold [&_h2]:mt-[clamp(12px,3vw,20px)] [&_h2]:mb-2 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-1.5 [&_h2]:flex-wrap
-        [&_h3]:text-[clamp(14px,4vw,16px)] [&_h3]:font-semibold [&_h3]:mt-[clamp(8px,2vw,12px)] [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-1.5 [&_h3]:flex-wrap
-        [&_blockquote]:border-l-2 [&_blockquote]:border-blue-500/25 [&_blockquote]:bg-blue-950/30 [&_blockquote]:pl-2 sm:[&_blockquote]:pl-3 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:ml-4 [&_blockquote]:not-italic
-        [&_blockquote_p]:my-1 [&_blockquote_p]:leading-relaxed [&_blockquote_p]:break-words
-        [&_ul]:my-2 sm:[&_ul]:my-3 [&_li]:my-1
-        [&_ol]:my-2 sm:[&_ol]:my-3 [&_ol_li]:my-1
-        [&_p]:leading-relaxed [&_p]:my-2 [&_p]:break-words
-        [&_*]:max-w-full [&_*]:overflow-wrap-anywhere"
-                    style={{ fontSize: `${fontSize}px`, overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                    onClick={handleContentClick}
-                    dangerouslySetInnerHTML={{ __html: aiAnswerHTML }}
-                />}
+                {/* ✅ Phase 8: LegalMarkdownRenderer로 Markdown 직접 렌더링 */}
+                {aiAnswerContent && (
+                    <div style={{ fontSize: `${fontSize}px` }}>
+                        <LegalMarkdownRenderer
+                            content={aiAnswerContent}
+                            onLawClick={onLawClick}
+                        />
+                    </div>
+                )}
 
                 {/* AI 답변 주의사항 */}
-                {aiAnswerHTML && (
+                {aiAnswerContent && (
                     <div className="mt-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/30 p-3 rounded-md text-amber-900 dark:text-amber-200/80">
                         <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>

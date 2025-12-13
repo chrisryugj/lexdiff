@@ -476,3 +476,43 @@ export function linkifyRefsAI(escapedText: string): string {
     return match
   })
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Markdown용 링크 생성 함수 (react-markdown 지원)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Markdown 텍스트 내의 법령 참조를 Markdown 링크로 변환
+ * 「법령명」 제N조 → [「법령명」 제N조](law://법령명/제N조)
+ *
+ * react-markdown에서 사용하기 위한 전처리 함수
+ */
+export function linkifyMarkdownLegalRefs(markdown: string): string {
+  if (!markdown) return ''
+
+  let result = markdown
+
+  // 패턴 1: 「법령명」 제N조 (가장 명확한 패턴)
+  // 예: 「민법」 제38조, 「민법」 제10조의2
+  result = result.replace(
+    /「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)/g,
+    (match, lawName, article) => {
+      const normalizedArticle = article.replace(/\s+/g, '')
+      const encodedLaw = encodeURIComponent(lawName.trim())
+      const encodedArticle = encodeURIComponent(normalizedArticle)
+      return `[「${lawName}」 ${article}](law://${encodedLaw}/${encodedArticle})`
+    }
+  )
+
+  // 패턴 2: 「법령명」 단독 (조문 없이 법령명만)
+  // 이미 링크로 변환된 부분은 제외
+  result = result.replace(
+    /(?<!\[)「([^」]+)」(?!\s*제\s*\d)(?!\])/g,
+    (match, lawName) => {
+      const encodedLaw = encodeURIComponent(lawName.trim())
+      return `[「${lawName}」](law://${encodedLaw})`
+    }
+  )
+
+  return result
+}

@@ -403,12 +403,12 @@ function styleLawQuotes(text: string): string {
 }
 
 /**
- * 주요 섹션 헤더 스타일링 (📋/📄/💡/🔗)
+ * 주요 섹션 헤더 스타일링 (🔗/📋/⚖️/📄/💡)
  * 모바일 최적화: 이모지와 텍스트가 함께 줄바꿈되지 않도록 white-space: nowrap 추가
  */
 function styleMainSectionHeadings(text: string): string {
-  // Phase 7: ⚖️ 조문 발췌를 주요 섹션으로 승격 (📋 핵심 요약과 같은 레벨)
-  const mainSections = ['📋 핵심 요약', '⚖️ 조문 발췌', '📄 상세 내용', '💡 추가 참고', '🔗 관련 법령']
+  // 🔗 관련 법령이 최상위 섹션 (프롬프트 v3.0)
+  const mainSections = ['🔗 관련 법령', '📋 핵심 요약', '⚖️ 조문 발췌', '⚖️ 조문 비교', '📄 단계별 절차', '📄 상세 내용', '💡 추가 참고', '⚠️ 조건·예외']
 
   let result = text
 

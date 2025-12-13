@@ -36,7 +36,7 @@ export interface UseSearchHandlersProps {
 
 export interface SearchHandlers {
   handleSearch: (query: SearchQuery) => void
-  handleSearchInternal: (query: SearchQuery, signal?: AbortSignal, forcedMode?: 'law' | 'ai') => Promise<void>
+  handleSearchInternal: (query: SearchQuery, signal?: AbortSignal, forcedMode?: 'law' | 'ai', skipCache?: boolean) => Promise<void>
   handleSearchChoice: (mode: 'law' | 'ai') => void
   handleNoResultChoice: (choice: 'ai' | 'cancel') => void
   handleLawSelect: (law: LawSearchResult) => Promise<void>
@@ -50,6 +50,7 @@ export interface SearchHandlers {
   handleReset: () => void
   handleFavoritesClick: () => void
   handleSettingsClick: () => void
+  handleAiRefresh: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
 }
@@ -247,7 +248,8 @@ export function useSearchHandlers({
   const handleSearchInternal = useCallback(async (
     query: SearchQuery,
     signal?: AbortSignal,
-    forcedMode?: 'law' | 'ai'
+    forcedMode?: 'law' | 'ai',
+    skipCache?: boolean  // ✅ 캐시 건너뛰기 옵션
   ) => {
     const fullQuery = buildFullQuery(query.lawName, query.article)
     actions.setSearchQuery(fullQuery)
@@ -310,10 +312,10 @@ export function useSearchHandlers({
     // AI 검색 분기
     // ============================================================
     if (isAiSearch) {
-      debugLogger.success('✨ 자연어 검색 감지 → AI 답변 모드', { query: fullQuery })
+      debugLogger.success('✨ 자연어 검색 감지 → AI 답변 모드', { query: fullQuery, skipCache })
 
-      // RAG 캐시 확인
-      const cached = await getCachedResponse(fullQuery)
+      // RAG 캐시 확인 (skipCache가 true면 캐시 무시)
+      const cached = skipCache ? null : await getCachedResponse(fullQuery)
       if (cached) {
         debugLogger.success('✅ RAG 캐시 히트 - API 호출 스킵')
 
@@ -984,6 +986,16 @@ export function useSearchHandlers({
     actions.setRelatedSearches(relatedResults)
   }, [actions])
 
+  // ✅ AI 답변 강제 새로고침 (캐시 무시)
+  const handleAiRefresh = useCallback(() => {
+    if (!state.userQuery) {
+      toast({ title: "새로고침 실패", description: "검색어가 없습니다.", variant: "destructive" })
+      return
+    }
+    debugLogger.info('🔄 AI 답변 강제 새로고침 (캐시 무시)', { query: state.userQuery })
+    handleSearchInternal({ lawName: state.userQuery }, undefined, 'ai', true)
+  }, [state.userQuery, handleSearchInternal, toast])
+
   return {
     handleSearch,
     handleSearchInternal,
@@ -1000,6 +1012,7 @@ export function useSearchHandlers({
     handleReset,
     handleFavoritesClick,
     handleSettingsClick,
+    handleAiRefresh,
     fetchLawContent,
     fetchRelatedSearches,
   }

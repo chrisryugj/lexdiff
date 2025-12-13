@@ -194,21 +194,11 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
   }
 
   const handleRecentClick = (search: string) => {
+    // ✅ 검색 실행 대신 검색창에 자동완성만
     setQuery(search)
     setShowRecent(false)
-    try {
-      // 해당 검색어가 AI 모드인지 확인
-      const queryDetection = detectQueryType(search)
-      if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
-        debugLogger.info("AI 검색 실행 (최근 검색)", { search })
-        onSearch({ lawName: search, article: undefined, jo: undefined })
-      } else {
-        const parsed = parseSearchQuery(search)
-        onSearch(parsed)
-      }
-    } catch (error) {
-      debugLogger.error("최근 검색 실행 실패", error)
-    }
+    inputRef.current?.focus()
+    debugLogger.info("최근 검색 자동완성", { search })
   }
 
   return (

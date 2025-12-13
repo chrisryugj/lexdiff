@@ -8,6 +8,8 @@
 import { GoogleGenAI } from '@google/genai'
 import type { FileSearchStore, FileMetadata } from '@google/genai'
 import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
+import { analyzeLegalQuery, type LegalQueryType } from './legal-query-analyzer'
+import { buildLegalPrompt } from './legal-prompt-builder'
 
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
@@ -256,126 +258,19 @@ export async function* queryFileSearchStream(
     confidence: processed.confidence
   })
 
-  // ✅ Phase 7: 개조식 간결 답변 프롬프트 (v2.0)
-  const PROMPT_TEMPLATES: Record<string, string> = {
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // specific: 특정 조문 질문
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    specific: `법령 RAG AI. File Search Store 검색 결과만 사용.
+  // ✅ Phase 8: 새로운 법률 질문 분류 시스템 (6가지 유형)
+  const legalAnalysis = analyzeLegalQuery(query)
 
-【답변 형식】개조식, 명사형 종결, 800자 이내
+  console.log('[File Search] Legal query analysis:', {
+    type: legalAnalysis.type,
+    confidence: legalAnalysis.confidence,
+    keywords: legalAnalysis.keywords,
+    laws: legalAnalysis.extractedLaws,
+    articles: legalAnalysis.extractedArticles
+  })
 
-📋 핵심 요약
-✅ 조문 핵심 (1줄)
-📌 적용 조건/예외 (1줄)
-
-⚖️ 조문 발췌
-「법령명」 제N조 (제목)
-① 원문 그대로 전체 인용 (요약 금지)
-
-🔗 관련 법령
-「법령명」 제N조 (조문번호만, 본문 금지, 최대 3개)
-
-【출력 규칙】
-1. 📋 핵심 요약으로 시작. 서론 금지
-2. 개조식: 명사형 종결 (종결어미 생략)
-3. 불릿(-) 금지. 줄바꿈만 사용
-4. 조문 발췌: 원문 그대로 전체 인용 (요약 금지)
-5. 법령명은 「」 사용
-6. 🔗 관련 법령은 「법령명」 제N조 (조문제목) 형식으로만 표시. 본문 절대 금지`,
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // general: 일반 법령 질문
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    general: `법령 RAG AI. File Search Store 검색 결과만 사용.
-
-【답변 형식】개조식, 명사형 종결, 800자 이내
-
-📋 핵심 요약
-✅ 결론 (핵심 1줄)
-📌 관련 법령 (법령명만)
-🔔 실무 포인트 (1가지)
-
-⚖️ 조문 발췌 (선택)
-「법령명」 제N조 - 원문 그대로 전체 인용 (요약 금지)
-
-🔗 관련 법령
-「법령명」 제N조 (조문번호만, 본문 금지, 최대 5개)
-
-【출력 규칙】
-1. 📋 핵심 요약으로 시작. 서론 금지
-2. 개조식: 명사형 종결 (종결어미 생략)
-3. 불릿(-) 금지. 줄바꿈만 사용
-4. 장황한 설명 금지, 핵심만
-5. 법령명은 「」 사용
-6. 단계/절차 설명 시 반드시 [1] [2] [3] 형식 사용
-7. 🔗 관련 법령은 「법령명」 제N조 (조문제목) 형식으로만 표시. 본문 절대 금지`,
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // comparison: 비교 질문
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    comparison: `법령 RAG AI. File Search Store 검색 결과만 사용.
-
-【답변 형식】개조식, 명사형 종결, 800자 이내
-
-📋 핵심 요약
-✅ 핵심 차이 (1줄)
-📌 A: 특징 / B: 특징
-🔔 실무 주의점
-
-⚖️ 조문 비교
-「A법령」 제N조: 내용
-「B법령」 제N조: 내용
-
-🔗 관련 법령
-「법령명」 제N조 (조문번호만, 본문 금지, 최대 3개)
-
-【출력 규칙】
-1. 📋 핵심 요약으로 시작. 서론 금지
-2. 개조식: 명사형 종결 (종결어미 생략)
-3. 불릿(-) 금지. 줄바꿈만 사용
-4. A/B 대비 명확히
-5. 법령명은 「」 사용
-6. 🔗 관련 법령은 「법령명」 제N조 (조문제목) 형식으로만 표시. 본문 절대 금지`,
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // procedural: 절차/방법 질문 (단계별 안내)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    procedural: `법령 RAG AI. File Search Store 검색 결과만 사용.
-
-【답변 형식】개조식, 명사형 종결, 800자 이내
-
-📋 핵심 요약
-✅ 전체 흐름 (A → B → C 형식)
-📌 필수 요건
-🔔 주의사항
-
-📄 단계별 절차
-[1] 첫 번째 단계 (구체 내용)
-[2] 두 번째 단계 (구체 내용)
-[3] 세 번째 단계 (구체 내용)
-※ 단계는 3~5개로 압축
-
-⚖️ 조문 발췌
-「법령명」 제N조 - 원문 그대로 전체 인용 (요약 금지)
-
-⚠️ 조건·예외 (해당 시)
-특수 상황, 예외 케이스
-
-🔗 관련 법령
-「법령명」 제N조 (조문번호만, 본문 금지, 최대 3개)
-
-【출력 규칙】
-1. 📋 핵심 요약으로 시작. 서론 금지
-2. 개조식: 명사형 종결 (종결어미 생략)
-3. 불릿(-) 금지. 줄바꿈만 사용
-4. 단계는 반드시 [1] [2] [3] 형식
-5. 단계별 내용은 간결하게 1줄
-6. 법령명은 「」 사용
-7. 🔗 관련 법령은 「법령명」 제N조 (조문제목) 형식으로만 표시. 본문 절대 금지`
-  }
-
-  const systemInstruction = PROMPT_TEMPLATES[processed.queryType] || PROMPT_TEMPLATES.general
+  // 새 프롬프트 빌더 사용
+  const systemInstruction = buildLegalPrompt(legalAnalysis.type)
 
   // ✅ Phase 6 C7: Metadata Filter 적용 (options 또는 전처리 결과 사용)
   const effectiveMetadataFilter = options?.metadataFilter || processed.metadataFilter
@@ -788,7 +683,7 @@ export async function* queryFileSearchStream(
     done: true,
     citations,
     finishReason: lastFinishReason,
-    queryType: processed.queryType  // ✅ 쿼리 타입 포함
+    queryType: legalAnalysis.type  // ✅ 새로운 6가지 질문 유형
   }
 }
 

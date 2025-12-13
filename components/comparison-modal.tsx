@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo, memo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2, ArrowLeftRight, Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, History, X, GitCompare } from "lucide-react"
 import type { OldNewComparison } from "@/lib/law-types"
 import { parseOldNewXML, highlightDifferences } from "@/lib/oldnew-parser"
@@ -22,7 +21,7 @@ interface ComparisonModalProps {
   targetJo?: string
 }
 
-export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJo }: ComparisonModalProps) {
+export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJo }: ComparisonModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [comparison, setComparison] = useState<OldNewComparison | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -196,7 +195,7 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     }
   }
 
-  const handleScroll = (source: "old" | "new") => {
+  const handleScroll = useCallback((source: "old" | "new") => {
     if (!syncScroll || isScrollingRef.current) return
 
     isScrollingRef.current = true
@@ -222,10 +221,10 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     setTimeout(() => {
       isScrollingRef.current = false
     }, 50)
-  }
+  }, [syncScroll])
 
-  const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 28))
-  const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 12))
+  const increaseFontSize = useCallback(() => setFontSize(prev => Math.min(prev + 1, 28)), [])
+  const decreaseFontSize = useCallback(() => setFontSize(prev => Math.max(prev - 1, 12)), [])
 
   const goToPreviousRevision = () => {
     if (!comparison?.oldVersion.promulgationDate) return
@@ -267,9 +266,13 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
     comparison?.oldVersion.promulgationDate !== comparison?.newVersion.promulgationDate
   const canGoToNext = currentRevisionIndex > 0
 
-  const { oldHighlighted, newHighlighted } = comparison
-    ? highlightDifferences(comparison.oldVersion.content, comparison.newVersion.content)
-    : { oldHighlighted: "", newHighlighted: "" }
+  // 차이 강조 처리 메모이제이션 (비용이 높은 연산)
+  const { oldHighlighted, newHighlighted } = useMemo(() => {
+    if (!comparison) {
+      return { oldHighlighted: "", newHighlighted: "" }
+    }
+    return highlightDifferences(comparison.oldVersion.content, comparison.newVersion.content)
+  }, [comparison])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -578,4 +581,6 @@ export function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJ
       </DialogContent>
     </Dialog>
   )
-}
+})
+
+ComparisonModal.displayName = 'ComparisonModal'
