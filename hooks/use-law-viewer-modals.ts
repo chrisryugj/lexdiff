@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { buildJO, formatJO } from '@/lib/law-parser'
 import { extractArticleText } from '@/lib/law-xml-parser'
@@ -24,11 +24,26 @@ interface ModalHistoryItem {
   articleNumber?: string
 }
 
+/** 별표 모달 상태 */
+interface AnnexModalState {
+  open: boolean
+  annexNumber: string
+  lawName: string
+  lawId?: string
+}
+
 export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | undefined) {
   // Modal state
   const [refModal, setRefModal] = useState<ModalState>({ open: false })
   const [refModalHistory, setRefModalHistory] = useState<ModalHistoryItem[]>([])
   const [lastExternalRef, setLastExternalRef] = useState<{ lawName: string; joLabel?: string } | null>(null)
+
+  // 별표 모달 상태
+  const [annexModal, setAnnexModal] = useState<AnnexModalState>({
+    open: false,
+    annexNumber: '',
+    lawName: '',
+  })
 
   // Handler: open external law article modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
@@ -551,7 +566,8 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
 
 
-        const htmlContent = extractArticleText(lawArticle, false, meta.lawTitle)
+        // ✅ FIX: meta.lawTitle 대신 cleanedLawName 사용 (AI 모드에서 meta가 비어있을 수 있음)
+        const htmlContent = extractArticleText(lawArticle, false, cleanedLawName)
 
         // ⚠️ 조문 내용이 비어있는 경우 에러 메시지 표시
         if (!htmlContent || htmlContent.trim().length === 0) {
@@ -785,6 +801,26 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     }
   }
 
+  // Handler: 별표 모달 열기
+  const openAnnexModal = useCallback((annexNumber: string, lawName: string, lawId?: string) => {
+    debugLogger.info('[modal] 별표 모달 열기', { annexNumber, lawName, lawId })
+    setAnnexModal({
+      open: true,
+      annexNumber,
+      lawName,
+      lawId,
+    })
+  }, [])
+
+  // Handler: 별표 모달 닫기
+  const closeAnnexModal = useCallback(() => {
+    setAnnexModal({
+      open: false,
+      annexNumber: '',
+      lawName: '',
+    })
+  }, [])
+
   return {
     // State
     refModal,
@@ -794,10 +830,18 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     lastExternalRef,
     setLastExternalRef,
 
+    // 별표 모달 상태
+    annexModal,
+    setAnnexModal,
+
     // Handlers
     openExternalLawArticleModal,
     openRelatedLawModal,
     openLawHierarchyModal,
     handleRefModalBack,
+
+    // 별표 모달 핸들러
+    openAnnexModal,
+    closeAnnexModal,
   }
 }

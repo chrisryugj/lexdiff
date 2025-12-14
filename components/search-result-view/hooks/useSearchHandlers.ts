@@ -326,6 +326,7 @@ export function useSearchHandlers({
         actions.setAiAnswerContent(cached.response)
         actions.setAiRelatedLaws(relatedLaws)
         actions.setAiCitations(cached.citations || [])
+        actions.setAiQueryType((cached.queryType || 'application') as any)  // ✅ 캐시에서 queryType 복원
         actions.setFileSearchFailed(false)
 
         const aiLawData: LawDataState = {
@@ -387,7 +388,7 @@ export function useSearchHandlers({
         let fullContent = ''
         let receivedCitations: any[] = []
         let receivedConfidenceLevel: 'high' | 'medium' | 'low' = 'high'
-        let receivedQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' = 'application'
+        let receivedQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' = 'application'
         let progressValue = 60
 
         while (true) {
@@ -479,7 +480,8 @@ export function useSearchHandlers({
                   aiRelatedLaws: relatedLaws,
                   aiCitations: receivedCitations,
                   userQuery: fullQuery,
-                  fileSearchFailed: searchFailed
+                  fileSearchFailed: searchFailed,
+                  aiQueryType: receivedQueryType  // ✅ aiQueryType 저장
                 }
               })
             }

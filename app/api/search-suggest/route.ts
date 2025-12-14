@@ -2,6 +2,8 @@
  * 검색어 자동완성 API
  *
  * 법령 검색과 AI 질문을 구분하여 추천 키워드를 반환
+ * - 법령: 법제처 API 실시간 검색
+ * - AI 질문: 템플릿 기반 생성
  *
  * GET /api/search-suggest?q=관세
  *
@@ -18,41 +20,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-// 자주 검색되는 법령 목록 (캐시용)
-const POPULAR_LAWS = [
-  // 관세/무역
-  '관세법', '관세법 시행령', '관세법 시행규칙',
-  '자유무역협정의 이행을 위한 관세법의 특례에 관한 법률',
-  '대외무역법', '외국환거래법', '수출용원재료에대한관세등환급에관한특례법',
-
-  // 행정
-  '행정절차법', '행정기본법', '행정심판법', '행정소송법',
-  '민원 처리에 관한 법률', '공공기관의 정보공개에 관한 법률',
-
-  // 공무원
-  '국가공무원법', '지방공무원법', '공무원연금법', '공무원보수규정',
-  '공무원임용령', '공무원징계령',
-
-  // 세법
-  '국세기본법', '소득세법', '법인세법', '부가가치세법',
-  '상속세 및 증여세법', '종합부동산세법', '지방세법',
-
-  // 민사
-  '민법', '상법', '민사소송법', '민사집행법',
-  '주택임대차보호법', '상가건물 임대차보호법',
-
-  // 노동
-  '근로기준법', '최저임금법', '노동조합 및 노동관계조정법',
-  '산업안전보건법', '산업재해보상보험법',
-
-  // 형사
-  '형법', '형사소송법', '도로교통법',
-
-  // 공공기관/계약
-  '국가를 당사자로 하는 계약에 관한 법률',
-  '지방자치단체를 당사자로 하는 계약에 관한 법률',
-  '공공기관의 운영에 관한 법률',
-]
+const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
+const OC = process.env.LAW_OC || ""
 
 // 도메인별 AI 질문 템플릿
 const AI_QUESTION_TEMPLATES: Record<string, string[]> = {
@@ -123,10 +92,68 @@ const AI_QUESTION_TEMPLATES: Record<string, string[]> = {
   ],
 }
 
+// 받침 유무에 따라 "이란/란" 선택
+function getPostposition(word: string): string {
+  if (!word) return '이란'
+  const lastChar = word.charAt(word.length - 1)
+  const code = lastChar.charCodeAt(0)
+  // 한글 범위: 0xAC00 ~ 0xD7A3
+  if (code < 0xAC00 || code > 0xD7A3) return '이란'
+  // 받침 유무: (code - 0xAC00) % 28 === 0 이면 받침 없음
+  const hasFinalConsonant = (code - 0xAC00) % 28 !== 0
+  return hasFinalConsonant ? '이란' : '란'
+}
+
+// 법제처 API에서 법령명 검색
+async function searchLawNames(query: string): Promise<Array<{ name: string; category: string }>> {
+  if (!OC || query.length < 2) return []
+
+  try {
+    const url = `${LAW_API_BASE}?OC=${OC}&target=law&type=XML&query=${encodeURIComponent(query)}&display=10`
+    const response = await fetch(url, {
+      next: { revalidate: 300 }, // 5분 캐시
+      signal: AbortSignal.timeout(3000) // 3초 타임아웃
+    })
+
+    if (!response.ok) return []
+
+    const xml = await response.text()
+    const results: Array<{ name: string; category: string }> = []
+
+    // XML에서 법령명 추출: <법령명한글>...</법령명한글>
+    const lawNameRegex = /<법령명한글>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령명한글>/g
+    const lawTypeRegex = /<법령구분>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령구분>/g
+
+    const names: string[] = []
+    const types: string[] = []
+
+    let match
+    while ((match = lawNameRegex.exec(xml)) !== null) {
+      names.push(match[1].trim())
+    }
+    while ((match = lawTypeRegex.exec(xml)) !== null) {
+      types.push(match[1].trim())
+    }
+
+    for (let i = 0; i < names.length; i++) {
+      results.push({
+        name: names[i],
+        category: types[i] || '법령'
+      })
+    }
+
+    return results
+  } catch {
+    // 타임아웃 또는 네트워크 에러 - 조용히 실패
+    return []
+  }
+}
+
 // 일반적인 질문 패턴 생성
 function generateAiQuestions(keyword: string): string[] {
+  const postposition = getPostposition(keyword)
   const patterns = [
-    `${keyword}이란?`,
+    `${keyword}${postposition}?`,
     `${keyword} 요건은?`,
     `${keyword} 절차는?`,
     `${keyword} 방법은?`,
@@ -143,7 +170,8 @@ interface Suggestion {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const query = searchParams.get('q')?.trim().toLowerCase() || ''
+  const query = searchParams.get('q')?.trim() || ''
+  const queryLower = query.toLowerCase()
   const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20)
 
   if (!query || query.length < 1) {
@@ -152,17 +180,19 @@ export async function GET(request: NextRequest) {
 
   const suggestions: Suggestion[] = []
 
-  // 1. 법령명 매칭
-  for (const law of POPULAR_LAWS) {
-    if (law.toLowerCase().includes(query)) {
+  // 1. 법제처 API에서 법령명 검색 (2글자 이상)
+  if (query.length >= 2) {
+    const lawResults = await searchLawNames(query)
+    for (const law of lawResults) {
       // 시작 위치에 따른 점수 (앞에서 매칭될수록 높은 점수)
-      const matchIndex = law.toLowerCase().indexOf(query)
-      const score = 100 - matchIndex + (law.startsWith(query) ? 50 : 0)
+      const matchIndex = law.name.toLowerCase().indexOf(queryLower)
+      const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
+      const score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
 
       suggestions.push({
-        text: law,
+        text: law.name,
         type: 'law',
-        category: '법령',
+        category: law.category,
         score
       })
     }
@@ -170,7 +200,7 @@ export async function GET(request: NextRequest) {
 
   // 2. AI 질문 템플릿 매칭
   for (const [keyword, questions] of Object.entries(AI_QUESTION_TEMPLATES)) {
-    if (keyword.includes(query) || query.includes(keyword)) {
+    if (keyword.includes(queryLower) || queryLower.includes(keyword)) {
       for (const q of questions) {
         suggestions.push({
           text: q,

@@ -109,6 +109,7 @@ export function SearchResultView({
           actions.setAiCitations(cached.aiMode.aiCitations || [])
           actions.setUserQuery(cached.aiMode.userQuery || cached.query.lawName)
           actions.setFileSearchFailed(cached.aiMode.fileSearchFailed || false)
+          actions.setAiQueryType(cached.aiMode.aiQueryType || 'application')  // ✅ aiQueryType 복원
 
           const aiLawData = {
             meta: {

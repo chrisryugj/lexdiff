@@ -26,7 +26,7 @@ function detectLawType(lawName: string): 'decree' | 'rule' | 'law' {
 /**
  * 접근성: 링크 타입별 aria-label 생성
  */
-function getAriaLabel(type: string, lawName?: string, article?: string): string {
+function getAriaLabel(type: string, lawName?: string, article?: string, annexNumber?: string): string {
   const labels: Record<string, string> = {
     'law-quoted': '법령 참조',
     'law-article': '법령 조문 참조',
@@ -36,8 +36,10 @@ function getAriaLabel(type: string, lawName?: string, article?: string): string 
     'decree': '시행령 참조',
     'rule': '시행규칙 참조',
     'regulation': '행정규칙 참조',
+    'annex': '별표 보기',
   }
   const baseLabel = labels[type] || '법령 참조'
+  if (annexNumber) return `별표 ${annexNumber} ${baseLabel}`
   if (lawName && article) return `${lawName} ${article} ${baseLabel}`
   if (lawName) return `${lawName} ${baseLabel}`
   if (article) return `${article} ${baseLabel}`
@@ -47,9 +49,10 @@ function getAriaLabel(type: string, lawName?: string, article?: string): string 
 interface LinkMatch {
   start: number
   end: number
-  type: 'law-quoted' | 'law-article' | 'law-name' | 'article' | 'decree' | 'rule' | 'same-law'
+  type: 'law-quoted' | 'law-article' | 'law-name' | 'article' | 'decree' | 'rule' | 'same-law' | 'annex'
   lawName?: string
   article?: string
+  annexNumber?: string  // 별표 번호 (예: "1", "2의3")
   displayText: string
   html: string
 }
@@ -80,6 +83,9 @@ export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' 
   if (config.enableAdminRules) {
     collectAdminRuleMatches(text, matches)
   }
+
+  // 별표 패턴 수집 (항상 활성화)
+  collectAnnexMatches(text, matches)
 
   // DEBUG: 매칭 결과 로깅
   // 2단계: 충돌 해결 (위치 기반 중복 제거)
@@ -365,6 +371,104 @@ function collectAdminRuleMatches(text: string, matches: LinkMatch[]): void {
 }
 
 /**
+ * 별표 앞에서 법령명 추출
+ * 「법령명」 별표 1 → "법령명" 반환
+ * 별표 1 (법령명 없음) → undefined 반환
+ */
+function extractLawNameBeforeAnnex(text: string, annexIndex: number): string | undefined {
+  // 별표 앞 50자 내에서 「법령명」 패턴 검색
+  const searchStart = Math.max(0, annexIndex - 50)
+  const beforeText = text.substring(searchStart, annexIndex)
+
+  // 가장 가까운 「법령명」 찾기 (마지막 매칭)
+  const lawNamePattern = /「([^」]+)」/g
+  let lastMatch: RegExpExecArray | null = null
+  let match: RegExpExecArray | null
+
+  while ((match = lawNamePattern.exec(beforeText)) !== null) {
+    lastMatch = match
+  }
+
+  if (lastMatch) {
+    // 「법령명」과 별표 사이에 다른 법령명이 없는지 확인
+    const between = beforeText.substring(lastMatch.index + lastMatch[0].length)
+    // 중간에 다른 「」가 없어야 함
+    if (!between.includes('「')) {
+      return lastMatch[1]
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * 별표(附表) 패턴 수집
+ * 패턴:
+ * - [별표 1], [별표 2의3] (대괄호 포함)
+ * - 별표 1, 별표 2의3 (대괄호 없음)
+ * - 별표 1과 같다, 별표 1에 따른 (문맥)
+ *
+ * AI 답변 등에서 법령명 컨텍스트 없이 호출될 수 있으므로
+ * 앞에 「법령명」이 있으면 data-law 속성 추가
+ */
+function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
+  // 패턴 1: [별표 X] 또는 [별표 X의Y] (대괄호 포함)
+  const bracketPattern = /\[별표\s*(\d+)(?:의(\d+))?\]/g
+  let match: RegExpExecArray | null
+
+  while ((match = bracketPattern.exec(text)) !== null) {
+    const annexNum = match[2] ? `${match[1]}의${match[2]}` : match[1]
+    const lawName = extractLawNameBeforeAnnex(text, match.index)
+
+    // 이미 처리된 영역인지 확인
+    const isOverlap = matches.some(m =>
+      match!.index >= m.start && match!.index < m.end
+    )
+
+    if (!isOverlap) {
+      const dataLawAttr = lawName ? ` data-law="${lawName}"` : ''
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: 'annex',
+        lawName,
+        annexNumber: annexNum,
+        displayText: match[0],
+        html: `<a href="javascript:void(0)" class="law-ref annex-ref" data-ref="annex" data-annex="${annexNum}"${dataLawAttr} aria-label="${getAriaLabel('annex', lawName, undefined, annexNum)}">${match[0]}</a>`
+      })
+    }
+  }
+
+  // 패턴 2: 별표 X (대괄호 없이, 문맥 포함)
+  // "별표 1과 같다", "별표 1에 따른", "별표 1에서 정하는" 등
+  const plainPattern = /(?<!\[)별표\s*(\d+)(?:의(\d+))?(?:\s*(?:과|와|에|을|를|의|이|가)\s*(?:같다|따른|따르는|따라|정하는|정한|따름|해당))?/g
+
+  while ((match = plainPattern.exec(text)) !== null) {
+    const annexNum = match[2] ? `${match[1]}의${match[2]}` : match[1]
+    const lawName = extractLawNameBeforeAnnex(text, match.index)
+
+    // 이미 처리된 영역인지 확인 (대괄호 패턴과 중복 방지)
+    const isOverlap = matches.some(m =>
+      (match!.index >= m.start && match!.index < m.end) ||
+      (m.start >= match!.index && m.start < match!.index + match![0].length)
+    )
+
+    if (!isOverlap) {
+      const dataLawAttr = lawName ? ` data-law="${lawName}"` : ''
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: 'annex',
+        lawName,
+        annexNumber: annexNum,
+        displayText: match[0],
+        html: `<a href="javascript:void(0)" class="law-ref annex-ref" data-ref="annex" data-annex="${annexNum}"${dataLawAttr} aria-label="${getAriaLabel('annex', lawName, undefined, annexNum)}">${match[0]}</a>`
+      })
+    }
+  }
+}
+
+/**
  * 충돌 해결 (겹치는 매칭 제거)
  */
 function resolveConflicts(matches: LinkMatch[]): LinkMatch[] {
@@ -389,6 +493,7 @@ function resolveConflicts(matches: LinkMatch[]): LinkMatch[] {
         'same-law': 90,
         'law-article': 80,
         'law-name': 70,
+        'annex': 65,
         'article': 60,
         'decree': 50,
         'rule': 40

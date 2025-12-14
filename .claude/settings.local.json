@@ -14,7 +14,10 @@
       "Bash(fi)",
       "Bash(xargs:*)",
       "Bash(wc:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(dir node_moduleshwp.jsbuild)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []

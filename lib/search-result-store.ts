@@ -74,6 +74,7 @@ export interface SearchResultCache {
     }>
     userQuery?: string
     fileSearchFailed?: boolean
+    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope'
     comparisonLaw?: {
       lawName: string
       article?: string

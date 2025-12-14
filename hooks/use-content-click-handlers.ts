@@ -8,6 +8,7 @@ import type {
   ContentClickContext,
   ContentClickActions,
   RefHandler,
+  AnnexActions,
 } from '@/lib/content-click-handlers'
 import {
   handleArticleRef,
@@ -16,6 +17,7 @@ import {
   handleLawArticleRef,
   handleSameRef,
   handleRelatedRef,
+  handleAnnexRef,
 } from '@/lib/content-click-handlers'
 
 /** 링크 타입별 핸들러 매핑 */
@@ -26,6 +28,7 @@ const HANDLERS: Record<string, RefHandler> = {
   'law-article': handleLawArticleRef,
   same: handleSameRef,
   related: handleRelatedRef,
+  annex: handleAnnexRef as RefHandler,
 }
 
 /**

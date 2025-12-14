@@ -3,10 +3,12 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Sparkles, Type } from "lucide-react"
+import { Loader2, Sparkles, Type, Calendar } from "lucide-react"
 import { debugLogger } from "@/lib/debug-logger"
 import { CopyButton } from "@/components/ui/copy-button"
+import { formatDate } from "@/lib/revision-parser"
 
 interface AISummaryDialogProps {
   isOpen: boolean
@@ -84,9 +86,14 @@ export function AISummaryDialog({
                 <Sparkles className="h-5 w-5 text-primary" />
                 AI 변경 요약
               </DialogTitle>
-              <DialogDescription className="mt-2">
-                {lawTitle} {joNum}
-                {effectiveDate && <span className="ml-2 text-xs">• 시행일: {effectiveDate}</span>}
+              <DialogDescription className="mt-2 flex items-center gap-2 flex-wrap">
+                <span>{lawTitle} {joNum}</span>
+                {effectiveDate && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {formatDate(effectiveDate)}
+                  </Badge>
+                )}
               </DialogDescription>
             </div>
           </div>

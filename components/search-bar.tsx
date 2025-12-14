@@ -162,7 +162,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
   // 키보드 네비게이션
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const totalItems = suggestions.length + (query.trim() ? 0 : recentSearches.length)
+    // 항상 최근 검색 + suggestions 합산
+    const totalItems = suggestions.length + recentSearches.length
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -172,9 +173,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
       e.preventDefault()
-      const allItems = query.trim()
-        ? suggestions.map(s => s.text)
-        : [...recentSearches, ...suggestions.map(s => s.text)]
+      // 항상 최근 검색이 먼저
+      const allItems = [...recentSearches, ...suggestions.map(s => s.text)]
 
       if (allItems[selectedIndex]) {
         handleSuggestionClick(allItems[selectedIndex])
@@ -290,13 +290,11 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     }
   }
 
-  // 드롭다운에 표시할 항목들
-  const dropdownItems = query.trim()
-    ? suggestions
-    : [
-        ...recentSearches.map(s => ({ text: s, type: 'recent' as const, category: '최근 검색' })),
-        ...suggestions
-      ]
+  // 드롭다운에 표시할 항목들 - 항상 최근 검색을 먼저 표시
+  const dropdownItems = [
+    ...recentSearches.map(s => ({ text: s, type: 'recent' as const, category: '최근 검색' })),
+    ...suggestions
+  ]
 
   const hasDropdownItems = dropdownItems.length > 0
 
@@ -368,8 +366,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                     </div>
                   )}
 
-                  {/* 그룹별 표시 */}
-                  {!query.trim() && recentSearches.length > 0 && (
+                  {/* 최근 검색 - 항상 맨 위에 표시 */}
+                  {recentSearches.length > 0 && (
                     <>
                       <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
                         <Clock className="h-3 w-3" />
@@ -405,9 +403,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                       {suggestions
                         .filter(s => s.type === 'law')
                         .map((suggestion, index) => {
-                          const globalIndex = query.trim()
-                            ? index
-                            : recentSearches.length + index
+                          // 항상 최근 검색이 먼저이므로 recentSearches.length를 더함
+                          const globalIndex = recentSearches.length + index
 
                           return (
                             <button
@@ -441,9 +438,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                         .filter(s => s.type === 'ai')
                         .map((suggestion, index) => {
                           const lawCount = suggestions.filter(s => s.type === 'law').length
-                          const globalIndex = query.trim()
-                            ? lawCount + index
-                            : recentSearches.length + lawCount + index
+                          // 항상 최근 검색이 먼저이므로 recentSearches.length를 더함
+                          const globalIndex = recentSearches.length + lawCount + index
 
                           return (
                             <button

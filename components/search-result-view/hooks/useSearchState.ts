@@ -69,7 +69,7 @@ export interface SearchState {
   aiCitations: VerifiedCitation[]
   userQuery: string
   fileSearchFailed: boolean
-  aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'
+  aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope'
 
   // RAG 상태
   ragLoading: boolean
@@ -115,7 +115,7 @@ export interface SearchStateActions {
   setAiCitations: (citations: VerifiedCitation[]) => void
   setUserQuery: (query: string) => void
   setFileSearchFailed: (value: boolean) => void
-  setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence') => void
+  setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope') => void
 
   // RAG 상태 업데이트
   setRagLoading: (value: boolean) => void

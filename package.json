@@ -72,6 +72,7 @@
     "embla-carousel-react": "latest",
     "express": "^5.1.0",
     "framer-motion": "^12.23.24",
+    "hwp.js": "^0.0.3",
     "iconv-lite": "latest",
     "immer": "latest",
     "input-otp": "latest",

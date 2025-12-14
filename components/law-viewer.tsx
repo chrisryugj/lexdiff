@@ -49,6 +49,12 @@ const ReferenceModal = dynamic(
   () => import("@/components/reference-modal").then(m => m.ReferenceModal),
   { ssr: false }
 )
+
+// Dynamic import for AnnexModal (별표 모달)
+const AnnexModal = dynamic(
+  () => import("@/components/annex-modal").then(m => m.AnnexModal),
+  { ssr: false }
+)
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
@@ -300,6 +306,10 @@ export function LawViewer({
     openRelatedLawModal,
     openLawHierarchyModal,
     handleRefModalBack,
+    // 별표 모달
+    annexModal,
+    openAnnexModal,
+    closeAnnexModal,
   } = useLawViewerModals(meta, activeArticle)
 
   useEffect(() => {
@@ -658,10 +668,12 @@ export function LawViewer({
     setAdminRuleViewMode,
     setAdminRuleHtml,
     toast,
+    // 별표 모달 액션
+    openAnnexModal,
   }), [
     setActiveJo, openExternalLawArticleModal, setRefModal, setRefModalHistory, setLastExternalRef,
     fetchThreeTierData, setTierViewMode, setDelegationActiveTab, setShowAdminRules,
-    setAdminRuleViewMode, setAdminRuleHtml, toast
+    setAdminRuleViewMode, setAdminRuleHtml, toast, openAnnexModal
   ])
 
   const { handleContentClick } = useContentClickHandlers(contentClickContext, contentClickActions)
@@ -1001,27 +1013,31 @@ export function LawViewer({
             {
               isOrdinance && (
                 <div className="border-b border-border px-3 sm:px-4 py-0.5 pt-2 sm:pt-3 pb-2 sm:pb-3">
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" onClick={openLawCenter} className="mr-2 bg-transparent h-7 px-2">
+                  <div className="flex items-center justify-between gap-1">
+                    {/* 좌측: 원문 보기 */}
+                    <Button variant="outline" size="sm" onClick={openLawCenter} className="bg-transparent h-7 px-2">
                       <ExternalLink className="h-3.5 w-3.5 mr-1" />
                       원문 보기
                     </Button>
 
-                    <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                      <ZoomOut className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                      <RotateCcw className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                      <ZoomIn className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                    <CopyButton
-                      getText={() => actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')}
-                      message="전체 복사됨"
-                      className="h-7 w-7 p-0"
-                    />
+                    {/* 우측: 글자크기 + 복사 */}
+                    <div className="flex items-center gap-0.5">
+                      <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
+                      <CopyButton
+                        getText={() => actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')}
+                        message="전체 복사됨"
+                        className="h-7 w-7 p-0"
+                      />
+                    </div>
                   </div>
                 </div>
               )
@@ -1234,6 +1250,20 @@ export function LawViewer({
             hasHistory={refModalHistory.length > 0}
             onBack={handleRefModalBack}
             loading={refModal.loading}
+          />
+          <AnnexModal
+            isOpen={annexModal.open}
+            onClose={closeAnnexModal}
+            annexNumber={annexModal.annexNumber}
+            lawName={annexModal.lawName}
+            lawId={annexModal.lawId}
+            onLawClick={(lawName, article) => {
+              // 별표 모달 내에서 법령 링크 클릭 시
+              closeAnnexModal()
+              if (article) {
+                openExternalLawArticleModal(lawName, article)
+              }
+            }}
           />
         </div >
 

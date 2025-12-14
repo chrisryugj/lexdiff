@@ -92,6 +92,9 @@ export interface ContentClickActions {
 
   // Utilities
   toast: (options: ToastOptions) => void
+
+  // 별표 모달 (선택적 - 별표 핸들러 전용)
+  openAnnexModal?: (annexNumber: string, lawName: string, lawId?: string) => void
 }
 
 /** 핸들러 함수 시그니처 */

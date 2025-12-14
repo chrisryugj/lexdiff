@@ -164,3 +164,38 @@ export interface LawData {
   articles: LawArticle[]
   articleCount?: number
 }
+
+// 별표(附表) 관련 타입
+export type AnnexKind = "1" | "2" | "3" | "4" | "5"
+
+export const ANNEX_KIND_LABELS: Record<AnnexKind, string> = {
+  "1": "별표",
+  "2": "서식",
+  "3": "별지",
+  "4": "별도",
+  "5": "부록",
+}
+
+export interface LawAnnex {
+  annexId: string // 별표일련번호
+  annexNumber: string // "[별표 1]", "[별표 2의3]"
+  annexName: string // 별표명 (예: "관세율표")
+  annexKind: AnnexKind // 별표 종류
+  lawName: string // 관련법령명
+  lawId: string // 관련법령ID
+  fileLink?: string // HWP 등 원본 파일
+  pdfLink?: string // PDF 파일 링크
+  detailLink?: string // 상세 페이지 링크
+  promulgationDate?: string // 공포일자
+  localGovernment?: string // 지자체명 (조례용)
+}
+
+export interface AnnexCacheEntry {
+  key: string // "${lawId}_${annexNumber}"
+  timestamp: number
+  lawName: string
+  annexNumber: string
+  markdown: string
+  pdfFlSeq: string
+  annexName?: string
+}

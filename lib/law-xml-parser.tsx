@@ -293,6 +293,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         }
       }
 
+      // 0. 항 번호(①②③) 바로 뒤 공백 정규화: 모든 공백/줄바꿈 제거 후 공백 1칸 추가
+      rawContent = rawContent.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])[\s\r\n\t\u00A0]*/g, '$1 ')
+
       // 1. 링크 생성 (escape 전에)
       content = linkifyRefsB(rawContent, currentLawName)
 
@@ -349,17 +352,22 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
     const allItems = article.paragraphs.flatMap(para => para.items || [])
 
     if (hasParaContent) {
-      // 항내용이 있는 경우: 본문과 항 사이 줄바꿈 추가
-      if (text) text += "\n"
-
-      article.paragraphs.forEach((para) => {
-        const paraContent = para.content || ""
+      // 항내용이 있는 경우
+      article.paragraphs.forEach((para, paraIndex) => {
+        let paraContent = para.content || ""
         const paraNum = para.num || ""
+
+        // 항 번호(①②③) 바로 뒤 공백 정규화: 모든 공백/줄바꿈 제거 후 공백 1칸 추가
+        paraContent = paraContent.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])[\s\r\n\t\u00A0]*/g, '$1 ')
 
         const startsWithNumber = paraContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
         // CORRECT order: linkify → selective escape → styling
         let styledParaContent = linkifyRefsB(paraContent, currentLawName)
+
+        // 항 번호 뒤에 생긴 <br> 태그도 제거 후 공백 1칸 추가
+        styledParaContent = styledParaContent.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])(?:<br\s*\/?>|\s)*/gi, '$1 ')
+
         styledParaContent = styledParaContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
           if (tag) return tag
           if (text) return escapeHtml(text)
@@ -368,11 +376,18 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         styledParaContent = applyRevisionStyling(styledParaContent)
 
         if (startsWithNumber) {
-          text += "<br><br>" + styledParaContent + "<br>"
+          // 첫 번째 항은 본문 바로 다음에 이어지고, 이후 항은 줄바꿈 후 표시
+          if (paraIndex === 0 && text) {
+            text += "<br>" + styledParaContent
+          } else if (paraIndex === 0) {
+            text += styledParaContent
+          } else {
+            text += "<br>" + styledParaContent
+          }
         } else if (paraNum) {
-          text += "\n" + paraNum + ". " + styledParaContent + "\n"
+          text += "\n" + paraNum + ". " + styledParaContent
         } else {
-          text += "\n" + styledParaContent + "\n"
+          text += "\n" + styledParaContent
         }
 
         if (para.items) {
