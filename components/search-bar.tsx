@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { Search, Loader2, Clock, Scale, Building2, Sparkles, Bot, Brain, HelpCircle } from "lucide-react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { Search, Loader2, Clock, Scale, Building2, Brain, HelpCircle, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,23 +24,53 @@ interface SearchBarProps {
   searchMode?: 'basic' | 'rag'
 }
 
+interface Suggestion {
+  text: string
+  type: 'law' | 'ai' | 'recent'
+  category: string
+}
+
 const MAX_RECENT = 5
+
+// debounce 훅
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
 
 export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchBarProps) {
   const [query, setQuery] = useState("")
-  const [showRecent, setShowRecent] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const [searchType, setSearchType] = useState<"law" | "ordinance" | "ai" | null>(null)
   const [isNaturalQuery, setIsNaturalQuery] = useState(false)
-  const [forceAiMode, setForceAiMode] = useState(false)  // NEW: 수동 AI 모드 전환
-  const [showChoiceDialog, setShowChoiceDialog] = useState(false)  // 선택 다이얼로그
-  const [pendingQuery, setPendingQuery] = useState("")  // 대기중인 쿼리
+  const [forceAiMode, setForceAiMode] = useState(false)
+  const [showChoiceDialog, setShowChoiceDialog] = useState(false)
+  const [pendingQuery, setPendingQuery] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // debounce된 쿼리
+  const debouncedQuery = useDebounce(query, 200)
 
   // 자동 감지 + 수동 전환 병합
   const isAiMode = forceAiMode || (searchMode === 'rag') || (searchType === 'ai')
 
+  // 검색 타입 감지
   useEffect(() => {
     if (!query.trim()) {
       setSearchType(null)
@@ -48,17 +78,14 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
-    // 우선순위 1: 자연어 감지를 먼저 수행
     const queryDetection = detectQueryType(query)
 
-    // 우선순위 2: 자연어 패턴이 감지되면 AI 검색 우선
     if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
       setSearchType("ai")
       setIsNaturalQuery(true)
       return
     }
 
-    // 우선순위 3: 자연어가 아닌 경우 법령/조례 키워드 확인
     const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query)
     const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
     const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
@@ -69,11 +96,11 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
-    // 기본값: 법령 검색
     setSearchType("law")
     setIsNaturalQuery(false)
   }, [query])
 
+  // 최근 검색 로드
   useEffect(() => {
     const stored = localStorage.getItem("recentSearches")
     if (stored) {
@@ -81,11 +108,42 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         const parsed = JSON.parse(stored)
         setRecentSearches(parsed.slice(0, MAX_RECENT))
       } catch (error) {
-        console.error("[v0] Failed to parse recent searches:", error)
+        console.error("[SearchBar] Failed to parse recent searches:", error)
       }
     }
   }, [])
 
+  // 자동완성 API 호출
+  const fetchSuggestions = useCallback(async (q: string) => {
+    if (!q || q.length < 1) {
+      setSuggestions([])
+      return
+    }
+
+    setIsLoadingSuggestions(true)
+    try {
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=8`)
+      if (res.ok) {
+        const data = await res.json()
+        setSuggestions(data.suggestions || [])
+      }
+    } catch (error) {
+      console.error("[SearchBar] Failed to fetch suggestions:", error)
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }, [])
+
+  // debounced 쿼리 변경 시 자동완성 호출
+  useEffect(() => {
+    if (debouncedQuery.trim()) {
+      fetchSuggestions(debouncedQuery.trim())
+    } else {
+      setSuggestions([])
+    }
+  }, [debouncedQuery, fetchSuggestions])
+
+  // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -94,13 +152,38 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         inputRef.current &&
         !inputRef.current.contains(event.target as Node)
       ) {
-        setShowRecent(false)
+        setShowDropdown(false)
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  // 키보드 네비게이션
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const totalItems = suggestions.length + (query.trim() ? 0 : recentSearches.length)
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev + 1) % totalItems)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
+    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+      e.preventDefault()
+      const allItems = query.trim()
+        ? suggestions.map(s => s.text)
+        : [...recentSearches, ...suggestions.map(s => s.text)]
+
+      if (allItems[selectedIndex]) {
+        handleSuggestionClick(allItems[selectedIndex])
+      }
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false)
+      setSelectedIndex(-1)
+    }
+  }
 
   const saveRecentSearch = (searchQuery: string) => {
     const stored = localStorage.getItem("recentSearches")
@@ -110,7 +193,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       try {
         searches = JSON.parse(stored)
       } catch (error) {
-        console.error("[v0] Failed to parse recent searches:", error)
+        console.error("[SearchBar] Failed to parse recent searches:", error)
       }
     }
 
@@ -130,49 +213,51 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
+    executeSearch(query.trim())
+  }
+
+  const executeSearch = (searchQuery: string) => {
     try {
       // 수동으로 AI 모드를 선택한 경우
       if (forceAiMode) {
-        debugLogger.info("AI 검색 실행 (수동 선택)", { query })
-        saveRecentSearch(query.trim())
-        onSearch({ lawName: query.trim(), article: undefined, jo: undefined })
-        setShowRecent(false)
+        debugLogger.info("AI 검색 실행 (수동 선택)", { query: searchQuery })
+        saveRecentSearch(searchQuery)
+        onSearch({ lawName: searchQuery, article: undefined, jo: undefined })
+        setShowDropdown(false)
         return
       }
 
       // 자동 감지로 AI 모드가 확실한 경우
       if (searchType === 'ai' && isNaturalQuery) {
-        debugLogger.info("AI 검색 실행 (자동 감지)", { query })
-        saveRecentSearch(query.trim())
-        onSearch({ lawName: query.trim(), article: undefined, jo: undefined })
-        setShowRecent(false)
+        debugLogger.info("AI 검색 실행 (자동 감지)", { query: searchQuery })
+        saveRecentSearch(searchQuery)
+        onSearch({ lawName: searchQuery, article: undefined, jo: undefined })
+        setShowDropdown(false)
         return
       }
 
       // 애매한 경우 판별
-      const queryDetection = detectQueryType(query)
-      const hasArticleNumber = /제?\s*\d+\s*조(?:의\s*\d+)?/.test(query)
+      const queryDetection = detectQueryType(searchQuery)
+      const hasArticleNumber = /제?\s*\d+\s*조(?:의\s*\d+)?/.test(searchQuery)
 
-      // 조문번호가 있고 confidence가 애매한 경우 (0.6 ~ 0.9)
       if (hasArticleNumber && queryDetection.confidence >= 0.6 && queryDetection.confidence < 0.95) {
-        setPendingQuery(query.trim())
+        setPendingQuery(searchQuery)
         setShowChoiceDialog(true)
         return
       }
 
       // 명확한 법령 검색
-      const parsed = parseSearchQuery(query)
+      const parsed = parseSearchQuery(searchQuery)
       debugLogger.info("통합 검색 실행", parsed)
 
-      saveRecentSearch(query.trim())
+      saveRecentSearch(searchQuery)
       onSearch(parsed)
-      setShowRecent(false)
+      setShowDropdown(false)
     } catch (error) {
       debugLogger.error("검색어 파싱 실패", error)
     }
   }
 
-  // 선택 다이얼로그에서 선택 처리
   const handleSearchChoice = (choice: 'law' | 'ai') => {
     setShowChoiceDialog(false)
     saveRecentSearch(pendingQuery)
@@ -193,165 +278,291 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setPendingQuery("")
   }
 
-  const handleRecentClick = (search: string) => {
-    // ✅ 검색 실행 대신 검색창에 자동완성만
-    setQuery(search)
-    setShowRecent(false)
+  const handleSuggestionClick = (text: string) => {
+    setQuery(text)
+    setShowDropdown(false)
+    setSelectedIndex(-1)
     inputRef.current?.focus()
-    debugLogger.info("최근 검색 자동완성", { search })
+
+    // AI 질문 패턴이면 바로 검색 실행
+    if (text.endsWith('?') || text.includes('요건') || text.includes('절차') || text.includes('방법')) {
+      setTimeout(() => executeSearch(text), 100)
+    }
   }
+
+  // 드롭다운에 표시할 항목들
+  const dropdownItems = query.trim()
+    ? suggestions
+    : [
+        ...recentSearches.map(s => ({ text: s, type: 'recent' as const, category: '최근 검색' })),
+        ...suggestions
+      ]
+
+  const hasDropdownItems = dropdownItems.length > 0
 
   return (
     <>
       <form onSubmit={handleSubmit} className="w-full max-w-3xl relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
         <div className="flex gap-2">
-        {/* AI 모드 전환 버튼 (NEW) */}
-        <Button
-          type="button"
-          variant={forceAiMode ? "default" : "outline"}
-          size="icon"
-          onClick={() => setForceAiMode(!forceAiMode)}
-          className={cn(
-            "h-12 w-12 transition-all duration-300",
-            forceAiMode && "bg-gradient-to-br from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
-          )}
-          title={forceAiMode ? "기본 검색으로 전환" : "AI 검색으로 전환"}
-        >
-          <Brain className={cn("h-5 w-5", forceAiMode && "animate-pulse")} />
-        </Button>
-
-        <div className="relative flex-1">
-          {isAiMode ? (
-            <Brain className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
-          ) : searchType === "ordinance" ? (
-            <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
-          ) : searchType === "law" ? (
-            <Scale className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
-          ) : (
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          )}
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setShowRecent(true)}
+          {/* AI 모드 전환 버튼 */}
+          <Button
+            type="button"
+            variant={forceAiMode ? "default" : "outline"}
+            size="icon"
+            onClick={() => setForceAiMode(!forceAiMode)}
             className={cn(
-              "pl-11 h-12 text-base transition-all duration-300",
+              "h-12 w-12 transition-all duration-300",
+              forceAiMode && "bg-gradient-to-br from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
+            )}
+            title={forceAiMode ? "기본 검색으로 전환" : "AI 검색으로 전환"}
+          >
+            <Brain className={cn("h-5 w-5", forceAiMode && "animate-pulse")} />
+          </Button>
+
+          <div className="relative flex-1">
+            {isAiMode ? (
+              <Brain className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
+            ) : searchType === "ordinance" ? (
+              <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+            ) : searchType === "law" ? (
+              <Scale className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
+            ) : (
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            )}
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setSelectedIndex(-1)
+              }}
+              onFocus={() => setShowDropdown(true)}
+              onKeyDown={handleKeyDown}
+              className={cn(
+                "pl-11 h-12 text-base transition-all duration-300",
+                isAiMode && [
+                  "ring-1 ring-purple-500/30 border-purple-500/50",
+                  "shadow-[0_0_15px_rgba(139,92,246,0.15)]",
+                  "bg-purple-50 dark:bg-gradient-to-r dark:from-purple-950/50 dark:to-blue-950/50",
+                  "text-foreground placeholder:text-muted-foreground"
+                ]
+              )}
+              disabled={isLoading}
+              autoComplete="off"
+            />
+
+            {/* 자동완성 드롭다운 */}
+            {showDropdown && hasDropdownItems && (
+              <div
+                ref={dropdownRef}
+                className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto"
+              >
+                <div className="p-1.5">
+                  {/* 로딩 표시 */}
+                  {isLoadingSuggestions && query.trim() && (
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>검색 중...</span>
+                    </div>
+                  )}
+
+                  {/* 그룹별 표시 */}
+                  {!query.trim() && recentSearches.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                        <Clock className="h-3 w-3" />
+                        <span>최근 검색</span>
+                      </div>
+                      {recentSearches.map((search, index) => (
+                        <button
+                          key={`recent-${index}`}
+                          type="button"
+                          onClick={() => handleSuggestionClick(search)}
+                          className={cn(
+                            "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
+                            selectedIndex === index ? "bg-accent" : "hover:bg-secondary"
+                          )}
+                        >
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate">{search}</span>
+                        </button>
+                      ))}
+                      {suggestions.length > 0 && (
+                        <div className="border-t border-border my-1.5" />
+                      )}
+                    </>
+                  )}
+
+                  {/* 법령 추천 */}
+                  {suggestions.filter(s => s.type === 'law').length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                        <Scale className="h-3 w-3 text-amber-500" />
+                        <span>법령</span>
+                      </div>
+                      {suggestions
+                        .filter(s => s.type === 'law')
+                        .map((suggestion, index) => {
+                          const globalIndex = query.trim()
+                            ? index
+                            : recentSearches.length + index
+
+                          return (
+                            <button
+                              key={`law-${index}`}
+                              type="button"
+                              onClick={() => handleSuggestionClick(suggestion.text)}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
+                                selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
+                              )}
+                            >
+                              <Scale className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                              <span className="truncate">{suggestion.text}</span>
+                            </button>
+                          )
+                        })}
+                    </>
+                  )}
+
+                  {/* AI 질문 추천 */}
+                  {suggestions.filter(s => s.type === 'ai').length > 0 && (
+                    <>
+                      {suggestions.filter(s => s.type === 'law').length > 0 && (
+                        <div className="border-t border-border my-1.5" />
+                      )}
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                        <Sparkles className="h-3 w-3 text-purple-500" />
+                        <span>AI 질문</span>
+                      </div>
+                      {suggestions
+                        .filter(s => s.type === 'ai')
+                        .map((suggestion, index) => {
+                          const lawCount = suggestions.filter(s => s.type === 'law').length
+                          const globalIndex = query.trim()
+                            ? lawCount + index
+                            : recentSearches.length + lawCount + index
+
+                          return (
+                            <button
+                              key={`ai-${index}`}
+                              type="button"
+                              onClick={() => handleSuggestionClick(suggestion.text)}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2 group",
+                                selectedIndex === globalIndex ? "bg-purple-50 dark:bg-purple-950/30" : "hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
+                              )}
+                            >
+                              <Brain className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                              <span className="truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
+                            </button>
+                          )
+                        })}
+                    </>
+                  )}
+                </div>
+
+                {/* 하단 팁 */}
+                <div className="border-t border-border px-3 py-2 bg-muted/30">
+                  <div className="text-xs text-muted-foreground flex items-center gap-4">
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px]">↑↓</kbd>
+                      이동
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px]">Enter</kbd>
+                      선택
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px]">Esc</kbd>
+                      닫기
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isLoading || !query.trim()}
+            className={cn(
+              "h-12 px-6 sm:px-8 transition-all duration-300",
               isAiMode && [
-                "ring-1 ring-purple-500/30 border-purple-500/50",
-                "shadow-[0_0_15px_rgba(139,92,246,0.15)]",
-                "bg-purple-50 dark:bg-gradient-to-r dark:from-purple-950/50 dark:to-blue-950/50",
-                "text-foreground placeholder:text-muted-foreground"
+                "bg-purple-700",
+                "hover:bg-purple-600",
+                "border-purple-500/50",
+                "dark:bg-purple-600/80"
               ]
             )}
-            disabled={isLoading}
-          />
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span className="hidden sm:inline">{isAiMode ? 'AI 검색 중' : '검색 중'}</span>
+                <span className="sm:hidden">검색</span>
+              </>
+            ) : (
+              <>
+                {isAiMode && <Brain className="mr-2 h-4 w-4" />}
+                <span className="hidden sm:inline">{isAiMode ? 'AI 검색' : '검색'}</span>
+                <span className="sm:hidden">검색</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
 
-          {showRecent && recentSearches.length > 0 && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-xl z-[100] max-h-60 overflow-y-auto"
+      {/* 검색 모드 선택 다이얼로그 */}
+      <Dialog open={showChoiceDialog} onOpenChange={setShowChoiceDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-blue-500" />
+              검색 방법을 선택하세요
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              <div className="text-sm text-muted-foreground mb-3">
+                입력하신 "<span className="font-medium text-foreground">{pendingQuery}</span>"를 어떻게 검색할까요?
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <Button
+              onClick={() => handleSearchChoice('law')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/20"
             >
-              <div className="p-2">
-                <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
-                  <Clock className="h-3 w-3" />
-                  <span>최근 검색</span>
+              <Scale className="h-8 w-8 text-amber-500" />
+              <div className="text-center">
+                <div className="font-semibold">법령 검색</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  조문 직접 확인
                 </div>
-                {recentSearches.map((search, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleRecentClick(search)}
-                    className="w-full text-left px-3 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
-                    style={{ fontFamily: "Pretendard, sans-serif" }}
-                  >
-                    {search}
-                  </button>
-                ))}
               </div>
-            </div>
-          )}
-        </div>
-        <Button
-          type="submit"
-          size="lg"
-          disabled={isLoading || !query.trim()}
-          className={cn(
-            "h-12 px-6 sm:px-8 transition-all duration-300",
-            isAiMode && [
-              "bg-purple-700",
-              "hover:bg-purple-600",
-              "border-purple-500/50",
-              "dark:bg-purple-600/80"
-            ]
-          )}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span className="hidden sm:inline">{isAiMode ? 'AI 검색 중' : '검색 중'}</span>
-              <span className="sm:hidden">검색</span>
-            </>
-          ) : (
-            <>
-              {isAiMode && <Brain className="mr-2 h-4 w-4" />}
-              <span className="hidden sm:inline">{isAiMode ? 'AI 검색' : '검색'}</span>
-              <span className="sm:hidden">검색</span>
-            </>
-          )}
-        </Button>
-      </div>
-    </form>
-
-    {/* 검색 모드 선택 다이얼로그 */}
-    <Dialog open={showChoiceDialog} onOpenChange={setShowChoiceDialog}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-blue-500" />
-            검색 방법을 선택하세요
-          </DialogTitle>
-          <DialogDescription className="pt-2">
-            <div className="text-sm text-muted-foreground mb-3">
-              입력하신 "<span className="font-medium text-foreground">{pendingQuery}</span>"를 어떻게 검색할까요?
-            </div>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <Button
-            onClick={() => handleSearchChoice('law')}
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-          >
-            <Scale className="h-8 w-8 text-amber-500" />
-            <div className="text-center">
-              <div className="font-semibold">법령 검색</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                조문 직접 확인
+            </Button>
+            <Button
+              onClick={() => handleSearchChoice('ai')}
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+            >
+              <Brain className="h-8 w-8 text-purple-500" />
+              <div className="text-center">
+                <div className="font-semibold">AI 검색</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  자연어로 설명
+                </div>
               </div>
-            </div>
-          </Button>
-          <Button
-            onClick={() => handleSearchChoice('ai')}
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-          >
-            <Brain className="h-8 w-8 text-purple-500" />
-            <div className="text-center">
-              <div className="font-semibold">AI 검색</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                자연어로 설명
-              </div>
-            </div>
-          </Button>
-        </div>
-        <div className="text-xs text-muted-foreground text-center mt-3">
-          💡 Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
-        </div>
-      </DialogContent>
-    </Dialog>
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground text-center mt-3">
+            💡 Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
