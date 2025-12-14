@@ -109,22 +109,18 @@ export function AnnexModal({
     const flSeq = extractFlSeq(annexData.pdfLink)
     if (!flSeq) return
 
-    // 파일 확장자 결정
-    const ext = fileType === "hwp" ? "hwp" : "pdf"
-    // 파일명: 법령명_별표번호_별표명.확장자
-    const annexName = annexData.annexName
-      ? `_${annexData.annexName.replace(/[\\/:*?"<>|]/g, "")}`  // 파일명 금지 문자 제거
+    // 파일명: 법령명 별표 번호 (별표명) - 확장자는 API에서 추가
+    const annexNamePart = annexData.annexName
+      ? ` (${annexData.annexName.replace(/[\\/:*?"<>|]/g, "")})`  // 파일명 금지 문자 제거
       : ""
-    const filename = `${lawName}_별표${annexNumber}${annexName}.${ext}`
+    const filename = `${lawName} 별표 ${annexNumber}${annexNamePart}`
 
-    const downloadUrl = `/api/annex-pdf?flSeq=${flSeq}`
-    const link = document.createElement("a")
-    link.href = downloadUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }, [annexData, lawName, annexNumber, fileType])
+    // API에 filename 쿼리 파라미터로 전달
+    const downloadUrl = `/api/annex-pdf?flSeq=${flSeq}&filename=${encodeURIComponent(filename)}`
+
+    // 새 탭으로 열어서 다운로드 (Content-Disposition 헤더가 처리)
+    window.open(downloadUrl, '_blank')
+  }, [annexData, lawName, annexNumber])
 
   // 별표 데이터 가져오기
   const fetchAnnexData = useCallback(async () => {
@@ -413,7 +409,7 @@ export function AnnexModal({
             fileUrl={`/api/annex-pdf?flSeq=${extractFlSeq(annexData?.pdfLink || "")}`}
             onDownload={handleDownload}
             externalUrl={molegUrl}
-            fileName={annexData?.annexName || `별표 ${annexNumber}`}
+            fileName={`${lawName} 별표 ${annexNumber}${annexData?.annexName ? ` (${annexData.annexName})` : ""}`}
           />
         ) : (
           <Tabs

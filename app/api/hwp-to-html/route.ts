@@ -9,6 +9,9 @@ import { debugLogger } from "@/lib/debug-logger"
  * Body: { hwpUrl: string }
  *
  * 반환: { success: boolean, html?: string, error?: string }
+ *
+ * ⚠️ 한계: hwp.js 라이브러리는 표 형식의 HWP 문서 텍스트 추출이 불완전함
+ *    법제처 별표는 대부분 표 형식이라 텍스트 추출이 제한적
  */
 export async function POST(request: Request) {
   try {
@@ -31,30 +34,58 @@ export async function POST(request: Request) {
     }
 
     const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
     // 2. hwp.js로 파싱 (서버사이드)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const HWPDocument = require("hwp.js").default
+    const hwpjs = require("hwp.js")
+    const parse = hwpjs.parse
 
-    const hwpDoc = new HWPDocument(arrayBuffer)
-    const sections = hwpDoc.sections()
+    // parse(data, options) - options.type: 'binary' | 'base64' | 'buffer'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hwpDoc: any = parse(buffer, { type: "buffer" })
 
-    if (!sections || sections.length === 0) {
+    debugLogger.info("[hwp-to-html] HWP 파싱 완료", {
+      keys: Object.keys(hwpDoc),
+      sectionsCount: hwpDoc.sections?.length,
+    })
+
+    if (!hwpDoc.sections || hwpDoc.sections.length === 0) {
       throw new Error("HWP 문서에 내용이 없습니다")
     }
 
-    // 3. HTML로 변환
+    // 3. HTML로 변환 - 텍스트 추출 시도
     let html = '<div class="hwp-document">'
+    let hasContent = false
 
-    for (const section of sections) {
+    // 재귀적으로 텍스트 추출
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function extractTextFromContent(content: any[]): string {
+      let text = ""
+      for (const item of content) {
+        // 문자열 값 추출
+        if (item.value !== undefined && typeof item.value === "string") {
+          text += item.value
+        }
+        // 중첩된 content 처리
+        if (item.content && Array.isArray(item.content)) {
+          text += extractTextFromContent(item.content)
+        }
+      }
+      return text
+    }
+
+    for (const section of hwpDoc.sections) {
       html += '<div class="hwp-section">'
 
-      const paragraphs = section.paragraphs || []
+      const paragraphs = section.content || []
       for (const paragraph of paragraphs) {
-        const text = paragraph.text || ""
-        if (text.trim()) {
-          // 텍스트를 HTML로 변환 (줄바꿈 처리)
-          const escapedText = text
+        const content = paragraph.content || []
+        const paragraphText = extractTextFromContent(content)
+
+        if (paragraphText.trim()) {
+          hasContent = true
+          const escapedText = paragraphText
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -69,8 +100,18 @@ export async function POST(request: Request) {
 
     html += "</div>"
 
+    // 텍스트 추출 실패 시 (표 형식 문서 등)
+    if (!hasContent) {
+      debugLogger.warning("[hwp-to-html] HWP 텍스트 추출 실패 (표 형식 문서)")
+      return NextResponse.json({
+        success: false,
+        error: "HWP 문서의 텍스트를 추출할 수 없습니다. 표 형식 문서는 지원되지 않습니다.",
+        isTableDocument: true,
+      })
+    }
+
     debugLogger.success("[hwp-to-html] HWP 변환 완료", {
-      sections: sections.length,
+      sections: hwpDoc.sections.length,
       htmlLength: html.length,
     })
 

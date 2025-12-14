@@ -17,7 +17,8 @@
       "Bash(npm install:*)",
       "Bash(curl:*)",
       "Bash(dir node_moduleshwp.jsbuild)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

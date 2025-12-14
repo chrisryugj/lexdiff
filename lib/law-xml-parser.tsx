@@ -309,8 +309,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
       // 3. 개정 마커 스타일링
       content = applyRevisionStyling(content)
-    } else if (article.title) {
-      // article.content가 없고 title만 있는 경우
+    } else if (article.title && !(article.paragraphs && article.paragraphs.length > 0)) {
+      // article.content가 없고 title만 있고, paragraphs도 없는 경우에만 제목 표시
+      // (paragraphs가 있으면 모달 헤더에 이미 제목이 표시되므로 본문에는 출력하지 않음)
       const joDisplay = article.joNum || ('제' + article.jo + '조')
       content = '<strong>' + joDisplay
       if (article.title) {
@@ -368,8 +369,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         // 항 번호 뒤에 생긴 <br> 태그도 제거 후 공백 1칸 추가
         styledParaContent = styledParaContent.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])(?:<br\s*\/?>|\s)*/gi, '$1 ')
 
-        styledParaContent = styledParaContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
-          if (tag) return tag
+        styledParaContent = styledParaContent.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, text) => {
+          if (linkTag) return linkTag  // <a> 태그만 보존
+          if (otherTag) return escapeHtml(otherTag)  // <개정> 같은 것은 escape
           if (text) return escapeHtml(text)
           return match
         })
@@ -399,8 +401,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
             // CORRECT order: linkify → selective escape → styling
             let styledItemContent = linkifyRefsB(itemContent, currentLawName)
-            styledItemContent = styledItemContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
-              if (tag) return tag
+            styledItemContent = styledItemContent.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, text) => {
+              if (linkTag) return linkTag  // <a> 태그만 보존
+              if (otherTag) return escapeHtml(otherTag)  // <개정> 같은 것은 escape
               if (text) return escapeHtml(text)
               return match
             })
@@ -427,8 +430,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
         // CORRECT order: linkify → selective escape → styling
         let styledItemContent = linkifyRefsB(itemContent, currentLawName)
-        styledItemContent = styledItemContent.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, text) => {
-          if (tag) return tag
+        styledItemContent = styledItemContent.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, text) => {
+          if (linkTag) return linkTag  // <a> 태그만 보존
+          if (otherTag) return escapeHtml(otherTag)  // <개정> 같은 것은 escape
           if (text) return escapeHtml(text)
           return match
         })
@@ -458,8 +462,9 @@ export function formatDelegationContent(content: string, currentLawName?: string
 
   // CORRECT order: linkify → selective escape → styling
   let text = linkifyRefsB(content, currentLawName)
-  text = text.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, txt) => {
-    if (tag) return tag
+  text = text.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, txt) => {
+    if (linkTag) return linkTag  // <a> 태그만 보존
+    if (otherTag) return escapeHtml(otherTag)  // <개정> 같은 것은 escape
     if (txt) return escapeHtml(txt)
     return match
   })

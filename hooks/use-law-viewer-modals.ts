@@ -32,6 +32,164 @@ interface AnnexModalState {
   lawId?: string
 }
 
+/**
+ * API 값을 안전하게 문자열로 변환
+ * 배열인 경우 (특히 조문내용이 [[...]] 형태인 경우) 결합하여 반환
+ */
+function safeString(value: any): string {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number") return String(value)
+  // 배열인 경우 - 조문내용이 [["...", "...", ...]] 형태일 수 있음
+  if (Array.isArray(value)) {
+    // 중첩 배열 평탄화 후 문자열만 결합
+    const flatten = (arr: any[]): string[] => {
+      const result: string[] = []
+      for (const item of arr) {
+        if (typeof item === "string") {
+          // <img> 태그와 </img>만 제외 (표 테두리는 유지)
+          if (!item.startsWith("<img") && !item.startsWith("</img")) {
+            result.push(item)
+          }
+        } else if (Array.isArray(item)) {
+          result.push(...flatten(item))
+        }
+      }
+      return result
+    }
+    return flatten(value).join("\n")
+  }
+  return ""  // 기타 객체는 빈 문자열
+}
+
+/**
+ * API 조문단위(unit)를 LawArticle 구조로 변환
+ * extractArticleText에서 항/호를 올바르게 파싱하기 위함
+ */
+function convertUnitToLawArticle(unit: any): LawArticle {
+  const joNum = safeString(unit.조문번호)
+  const title = safeString(unit.조문제목)
+  let rawContent = safeString(unit.조문내용)
+  const joKey = safeString(unit.조문키)
+
+  // 먼저 조문키에서 실제 조문번호 파싱 (제목 제거에 사용)
+  let actualArticleNum = 0
+  let actualBranchNum = 0
+  if (joKey.length === 7) {
+    actualArticleNum = parseInt(joKey.substring(0, 4), 10)
+    actualBranchNum = parseInt(joKey.substring(4, 6), 10)
+  } else {
+    actualArticleNum = parseInt(joNum, 10) || 0
+  }
+
+  // 조문내용에서 제목 부분 제거 (제N조 또는 제N조의M 형식 모두 처리)
+  // 특수문자 이스케이프
+  const escapedTitle = title ? title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : ''
+  // 제N조의M(제목) 또는 제N조(제목) 형식 모두 매칭
+  const displayJoNumForRemoval = actualBranchNum > 0
+    ? `제${actualArticleNum}조의${actualBranchNum}`
+    : `제${actualArticleNum}조(?:의\\d+)?`
+
+  // 조문내용에서 제목 제거
+  if (rawContent && title) {
+    const titlePattern = new RegExp(`^${displayJoNumForRemoval}\\s*[\\(\\（]${escapedTitle}[\\)\\）]\\s*`, 'i')
+    if (titlePattern.test(rawContent)) {
+      rawContent = rawContent.replace(titlePattern, '')
+    }
+  }
+
+  // 항 배열 처리
+  const hangArray = Array.isArray(unit.항)
+    ? unit.항
+    : unit.항
+      ? [unit.항]
+      : []
+
+  // paragraphs 구조 생성
+  let paragraphs: LawArticle['paragraphs'] = undefined
+
+  if (hangArray.length > 0) {
+    const hasHangContent = hangArray.some((hang: any) => safeString(hang?.항내용).trim())
+    const allHo = hangArray.flatMap((hang: any) => {
+      const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
+      return hoInHang
+    })
+
+    if (hasHangContent) {
+      // 항내용이 있는 경우
+      paragraphs = hangArray.map((hang: any) => {
+        const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
+        let hangContent = safeString(hang?.항내용)
+
+        // 항내용에서도 제목 부분 제거 (제N조의M(제목) 형식)
+        if (hangContent && escapedTitle) {
+          const titlePatternInHang = new RegExp(`^${displayJoNumForRemoval}\\s*[\\(\\（]${escapedTitle}[\\)\\）]\\s*`, 'i')
+          hangContent = hangContent.replace(titlePatternInHang, '')
+        }
+
+        return {
+          num: safeString(hang?.항번호),
+          content: hangContent,
+          items: hoInHang.length > 0
+            ? hoInHang.map((ho: any) => ({
+                num: safeString(ho?.호번호),
+                content: safeString(ho?.호내용)
+              }))
+            : undefined
+        }
+      })
+      // 항내용이 있으면 rawContent는 비움 (paragraphs에서 처리)
+      rawContent = ""
+    } else if (allHo.length > 0) {
+      // 항내용 없고 호만 있는 경우
+      paragraphs = [{
+        num: "",
+        content: "",
+        items: allHo.map((ho: any) => ({
+          num: safeString(ho?.호번호),
+          content: safeString(ho?.호내용)
+        }))
+      }]
+    }
+  } else if (Array.isArray(unit.호) && unit.호.length > 0) {
+    // 최상위 호만 있는 경우
+    paragraphs = [{
+      num: "",
+      content: "",
+      items: unit.호.map((ho: any) => ({
+        num: safeString(ho?.호번호),
+        content: safeString(ho?.호내용)
+      }))
+    }]
+  }
+
+  // JO 코드 생성 및 조문번호 표시 형식 결정
+  // 위에서 파싱한 actualArticleNum, actualBranchNum 재사용
+  let normalizedJo = ""
+  let displayJoNum = ""
+
+  if (actualArticleNum > 0) {
+    normalizedJo = actualArticleNum.toString().padStart(4, "0") + actualBranchNum.toString().padStart(2, "0")
+    if (actualBranchNum > 0) {
+      displayJoNum = `제${actualArticleNum}조의${actualBranchNum}`
+    } else {
+      displayJoNum = `제${actualArticleNum}조`
+    }
+  } else {
+    // fallback: 조문번호 그대로 사용
+    displayJoNum = joNum.startsWith("제") ? joNum : `제${joNum}조`
+  }
+
+  return {
+    jo: normalizedJo,
+    joNum: displayJoNum,
+    title,
+    content: rawContent,
+    isPreamble: false,
+    paragraphs
+  }
+}
+
 export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | undefined) {
   // Modal state
   const [refModal, setRefModal] = useState<ModalState>({ open: false })
@@ -399,14 +557,16 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           // 조문여부가 "조문"인 것만 필터링
           const allArticleUnits = articleUnits.filter((unit: any) => unit?.조문여부 === "조문")
 
-          // 전체 조문을 HTML로 변환
+          // 전체 조문을 HTML로 변환 (extractArticleText 사용)
           const allArticlesHtml = allArticleUnits
             .map((unit: any) => {
-              const joNum = `제${unit.조문번호}조`
-              const titlePart = unit.조문제목 ? ` (${unit.조문제목})` : ''
-              const header = `<div class="font-semibold text-primary mb-1">${joNum}${titlePart}</div>`
-              const content = unit.조문내용 || ''
-              return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed whitespace-pre-wrap">${content}</div></div>`
+              // LawArticle 구조로 변환하여 extractArticleText 사용
+              const lawArticle = convertUnitToLawArticle(unit)
+              const titlePart = lawArticle.title ? ` (${lawArticle.title})` : ''
+              const header = `<div class="font-semibold text-primary mb-1">${lawArticle.joNum}${titlePart}</div>`
+              const content = extractArticleText(lawArticle, false, cleanedLawName)
+
+              return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed">${content}</div></div>`
             })
             .join('')
 
@@ -459,111 +619,9 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           return
         }
 
-        // ⚠️ 조문내용이 제목만 있는 경우가 많으므로 항 배열을 텍스트로 변환
-        let rawContent = targetUnit.조문내용 || ""
-        const title = targetUnit.조문제목 || ""
-
-
-        // 먼저 조문내용에서 제목 부분 제거 (항/호 처리 전에)
-        if (rawContent && title) {
-          // 제1조(목적) 이 법은... → 이 법은...
-          const titlePattern = new RegExp(`^제${targetUnit.조문번호}조(?:의\\d+)?\\s*\\(${title}\\)\\s*`, 'i')
-          if (titlePattern.test(rawContent)) {
-            rawContent = rawContent.replace(titlePattern, '')
-          }
-        }
-
-        // 항 처리: 배열 또는 단일 객체일 수 있음
-        const hangArray = Array.isArray(targetUnit.항)
-          ? targetUnit.항
-          : targetUnit.항
-            ? [targetUnit.항]
-            : []
-
-        if (hangArray.length > 0) {
-          // ✅ 먼저 항내용이 있는지 확인
-          const hasHangContent = hangArray.some((hang: any) => (hang?.항내용 || "").trim())
-
-          // 호 내용 추출
-          const allHo = hangArray.flatMap((hang: any) => {
-            const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
-            return hoInHang
-          })
-
-          if (hasHangContent) {
-            // 항내용이 있는 경우 → 기존 로직 (항내용 + 호)
-            const paragraphsText = hangArray.map((hang: any) => {
-              const hangContent = hang?.항내용 || ""
-              const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
-
-              if (hoInHang.length > 0) {
-                const itemsText = hoInHang.map((ho: any) => ho?.호내용 || "").join('\n')
-                return hangContent ? `${hangContent}\n${itemsText}` : itemsText
-              }
-
-              return hangContent
-            }).join('\n\n')
-
-            rawContent = paragraphsText
-          } else if (allHo.length > 0) {
-            // 항내용 없고 호만 있는 경우 → paragraphs 구조로 전달 (extractArticleText가 처리)
-            // rawContent는 본문만 유지, 호는 별도로 처리
-            // rawContent는 본문만 유지 (호 합치지 않음)
-          } else {
-            // 항내용도 없고 호도 없음 → rawContent 그대로
-          }
-        }
-        // 항 없이 최상위 호만 있는 경우 처리
-        else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
-          // rawContent는 본문만 유지 (호 합치지 않음)
-        } else {
-        }
-
-        // paragraphs 구조 생성 (항내용 없고 호만 있는 경우)
-        let paragraphs: any[] | undefined
-        if (hangArray.length > 0) {
-          const hasHangContent = hangArray.some((hang: any) => (hang?.항내용 || "").trim())
-          const allHo = hangArray.flatMap((hang: any) => {
-            const hoInHang = Array.isArray(hang?.호) ? hang.호 : hang?.호 ? [hang.호] : []
-            return hoInHang
-          })
-
-          if (!hasHangContent && allHo.length > 0) {
-            // 항내용 없고 호만 있는 경우 → paragraphs 구조로 전달
-            paragraphs = [{
-              num: "",
-              content: "",
-              items: allHo.map((ho: any, idx: number) => ({
-                num: `${idx + 1}`,
-                content: ho?.호내용 || ""
-              }))
-            }]
-          }
-        } else if (Array.isArray(targetUnit.호) && targetUnit.호.length > 0) {
-          // 최상위 호만 있는 경우
-          paragraphs = [{
-            num: "",
-            content: "",
-            items: targetUnit.호.map((ho: any, idx: number) => ({
-              num: `${idx + 1}`,
-              content: ho?.호내용 || ""
-            }))
-          }]
-        }
-
-        // 조문 번호는 articleLabel 사용 (이 시점에서 hasArticleLabel은 항상 true)
-        const actualJoNum = articleLabel
-
-        const lawArticle: LawArticle = {
-          jo: normalizedJo,
-          joNum: actualJoNum,
-          title,
-          content: rawContent,
-          isPreamble: false,
-          paragraphs
-        }
-
-        const articleTitle = `${lawName} ${formatJO(lawArticle.jo)}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
+        // convertUnitToLawArticle 사용하여 LawArticle 구조로 변환
+        const lawArticle = convertUnitToLawArticle(targetUnit)
+        const articleTitle = `${lawName} ${lawArticle.joNum}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
 
 
         // ✅ FIX: meta.lawTitle 대신 cleanedLawName 사용 (AI 모드에서 meta가 비어있을 수 있음)
@@ -595,16 +653,18 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           title: articleTitle,
           html: htmlContent,
           lawName: lawName,
-          articleNumber: actualJoNum,
+          articleNumber: lawArticle.joNum,
         })
       } catch (fetchErr: any) {
+        debugLogger.error('[citation] eflaw fetch 오류', { error: fetchErr?.message || fetchErr, stack: fetchErr?.stack, lawName, articleLabel })
         setRefModal({
           open: true,
           title: `${lawName} ${articleLabel}`,
           html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 ${lawName} ${articleLabel} 보기</a></div></div>`,
         })
       }
-    } catch (err) {
+    } catch (err: any) {
+      debugLogger.error('[citation] 전체 오류', { error: err?.message || err, stack: err?.stack, lawName, articleLabel })
       setRefModal({
         open: true,
         title: `${lawName} ${articleLabel}`,

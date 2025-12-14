@@ -23,6 +23,30 @@ function convertArticleNumberToCode(
 }
 
 /**
+ * Helper: 중첩 배열 평탄화 후 문자열 결합 (<img> 태그 제외)
+ */
+function flattenArrayContent(value: any): string {
+  if (typeof value === "string") return value
+  if (!Array.isArray(value)) return ""
+
+  const flatten = (arr: any[]): string[] => {
+    const result: string[] = []
+    for (const item of arr) {
+      if (typeof item === "string") {
+        // <img> 태그만 제외 (표 테두리는 유지)
+        if (!item.startsWith("<img") && !item.startsWith("</img")) {
+          result.push(item)
+        }
+      } else if (Array.isArray(item)) {
+        result.push(...flatten(item))
+      }
+    }
+    return result
+  }
+  return flatten(value).join("\n")
+}
+
+/**
  * Helper: Extract content from 항 array (recursive for 호/목)
  */
 function extractContentFromHangArray(hangArray: any[]): string {
@@ -35,13 +59,7 @@ function extractContentFromHangArray(hangArray: any[]): string {
   for (const hang of hangArray) {
     // Extract 항내용 (paragraph content)
     if (hang.항내용) {
-      let hangContent = hang.항내용
-
-      // Handle array format (some 항내용 are arrays of strings)
-      if (Array.isArray(hangContent)) {
-        hangContent = hangContent.join("\n")
-      }
-
+      const hangContent = flattenArrayContent(hang.항내용)
       content += (content ? "\n" : "") + hangContent
     }
 
@@ -49,12 +67,7 @@ function extractContentFromHangArray(hangArray: any[]): string {
     if (hang.호 && Array.isArray(hang.호)) {
       for (const ho of hang.호) {
         if (ho.호내용) {
-          let hoContent = ho.호내용
-
-          if (Array.isArray(hoContent)) {
-            hoContent = hoContent.join("\n")
-          }
-
+          const hoContent = flattenArrayContent(ho.호내용)
           content += "\n" + hoContent
         }
 
@@ -62,12 +75,7 @@ function extractContentFromHangArray(hangArray: any[]): string {
         if (ho.목 && Array.isArray(ho.목)) {
           for (const mok of ho.목) {
             if (mok.목내용) {
-              let mokContent = mok.목내용
-
-              if (Array.isArray(mokContent)) {
-                mokContent = mokContent.join("\n")
-              }
-
+              const mokContent = flattenArrayContent(mok.목내용)
               content += "\n" + mokContent
             }
           }
@@ -122,8 +130,29 @@ export function parseLawJSON(jsonData: any): LawData {
       let paraContent = ""  // 항/호에서 추출
 
       // STEP 1: 본문 추출 (조문내용에서)
-      if (unit.조문내용 && typeof unit.조문내용 === "string") {
-        let rawContent = unit.조문내용.trim()
+      // 조문내용이 배열인 경우 [[...]] 형태로 올 수 있음 (예: 제7조의3 연가 당겨쓰기)
+      let rawContentValue = unit.조문내용
+      if (Array.isArray(rawContentValue)) {
+        // 중첩 배열 평탄화 후 문자열만 결합 (<img> 태그 제외)
+        const flatten = (arr: any[]): string[] => {
+          const result: string[] = []
+          for (const item of arr) {
+            if (typeof item === "string") {
+              // <img> 태그만 제외 (표 테두리는 유지)
+              if (!item.startsWith("<img") && !item.startsWith("</img")) {
+                result.push(item)
+              }
+            } else if (Array.isArray(item)) {
+              result.push(...flatten(item))
+            }
+          }
+          return result
+        }
+        rawContentValue = flatten(rawContentValue).join("\n")
+      }
+
+      if (rawContentValue && typeof rawContentValue === "string") {
+        let rawContent = rawContentValue.trim()
 
         // 제목 패턴 매칭: 제X조(제목) 형식
         const headerMatch = rawContent.match(/^(제\d+조(?:의\d+)?\s*(?:\([^)]+\))?)[\s\S]*/)
@@ -155,10 +184,7 @@ export function parseLawJSON(jsonData: any): LawData {
         if (Array.isArray(unit.항.호)) {
           for (const ho of unit.항.호) {
             if (ho.호내용) {
-              let hoContent = ho.호내용
-              if (Array.isArray(hoContent)) {
-                hoContent = hoContent.join("\n")
-              }
+              const hoContent = flattenArrayContent(ho.호내용)
               paraContent += "\n" + hoContent
             }
           }

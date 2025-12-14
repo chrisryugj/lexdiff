@@ -1,159 +1,91 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Loader2, AlertCircle, Download, ExternalLink } from "lucide-react"
+import { Download, ExternalLink, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface HwpViewerProps {
-  /** HWP 파일 URL (프록시 경로) */
+  /** HWP 파일 URL (프록시 경로, 예: /api/annex-pdf?flSeq=xxx) */
   fileUrl: string
   /** 다운로드 핸들러 */
   onDownload?: () => void
-  /** 외부 링크 URL */
+  /** 외부 링크 URL (법제처 원본) */
   externalUrl?: string
   /** 파일명 (표시용) */
   fileName?: string
 }
 
-type LoadingState = "loading" | "converting" | "done" | "error"
+/**
+ * URL에서 flSeq 추출
+ */
+function extractFlSeq(url: string): string {
+  const match = url.match(/flSeq=(\d+)/)
+  return match?.[1] || ""
+}
 
 /**
  * HWP 파일 뷰어 컴포넌트
- * 서버 API를 통해 HWP를 HTML로 변환하여 표시
+ *
+ * HWP는 한컴오피스 독점 포맷으로 브라우저에서 직접 렌더링이 불가능합니다.
+ * 다운로드 및 새 탭에서 열기 옵션을 제공합니다.
  */
 export function HwpViewer({
   fileUrl,
   onDownload,
   externalUrl,
+  fileName,
 }: HwpViewerProps) {
-  const [loadingState, setLoadingState] = useState<LoadingState>("loading")
-  const [error, setError] = useState<string | null>(null)
-  const [html, setHtml] = useState<string | null>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
+  // flSeq 추출하여 법제처 원본 URL 생성
+  const flSeq = extractFlSeq(fileUrl)
+  const lawGoKrUrl = flSeq
+    ? `https://www.law.go.kr/LSW/flDownload.do?flSeq=${flSeq}`
+    : ""
 
-  useEffect(() => {
-    if (!fileUrl) return
+  return (
+    <div className="flex flex-col items-center justify-center h-[50vh] gap-5 px-4">
+      {/* HWP 아이콘 */}
+      <div className="relative">
+        <FileText className="w-20 h-20 text-blue-500/70" strokeWidth={1.5} />
+        <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+          HWP
+        </span>
+      </div>
 
-    let isMounted = true
-
-    async function loadHwp() {
-      try {
-        setLoadingState("loading")
-        setError(null)
-        setHtml(null)
-
-        // 서버 API로 HWP → HTML 변환 요청
-        setLoadingState("converting")
-
-        const response = await fetch("/api/hwp-to-html", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hwpUrl: fileUrl }),
-        })
-
-        const data = await response.json()
-
-        if (!isMounted) return
-
-        if (!data.success || !data.html) {
-          throw new Error(data.error || "HWP 변환 실패")
-        }
-
-        setHtml(data.html)
-        setLoadingState("done")
-      } catch (err) {
-        console.error("[HwpViewer] 렌더링 실패:", err)
-        if (!isMounted) return
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "HWP 파일을 렌더링할 수 없습니다."
-        )
-        setLoadingState("error")
-      }
-    }
-
-    loadHwp()
-
-    return () => {
-      isMounted = false
-    }
-  }, [fileUrl])
-
-  // 로딩 중
-  if (loadingState === "loading" || loadingState === "converting") {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">
-          {loadingState === "loading"
-            ? "HWP 파일을 불러오는 중..."
-            : "문서를 변환하는 중..."}
+      {/* 파일명 */}
+      <div className="text-center">
+        <p className="text-lg font-medium mb-1">
+          {fileName || "HWP 문서"}
+        </p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          HWP 파일은 브라우저에서 직접 볼 수 없습니다.
+          <br />
+          다운로드하여 한컴오피스로 열거나, 법제처에서 확인하세요.
         </p>
       </div>
-    )
-  }
 
-  // 에러 발생 시 폴백 UI
-  if (loadingState === "error") {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
-        <AlertCircle className="w-12 h-12 text-amber-500/60" />
-        <div className="text-center">
-          <p className="text-sm font-medium mb-1">
-            HWP 뷰어를 사용할 수 없습니다
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {error || "복잡한 문서 형식은 지원되지 않을 수 있습니다."}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {onDownload && (
-            <Button onClick={onDownload} size="sm" className="gap-2">
+      {/* 액션 버튼들 */}
+      <div className="flex gap-3 flex-wrap justify-center">
+        {lawGoKrUrl && (
+          <Button asChild className="gap-2">
+            <a href={lawGoKrUrl} target="_blank" rel="noopener noreferrer">
               <Download className="w-4 h-4" />
-              HWP 다운로드
-            </Button>
-          )}
-          {externalUrl && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={externalUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                법제처에서 보기
-              </a>
-            </Button>
-          )}
-        </div>
+              다운로드
+            </a>
+          </Button>
+        )}
+        {externalUrl && (
+          <Button variant="outline" asChild className="gap-2">
+            <a href={externalUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="w-4 h-4" />
+              법제처에서 보기
+            </a>
+          </Button>
+        )}
       </div>
-    )
-  }
 
-  // 렌더링 완료
-  return (
-    <ScrollArea className="h-[65vh]">
-      <div
-        ref={contentRef}
-        className="hwp-content p-4 sm:p-6"
-        style={{
-          fontFamily: "Pretendard, 'Malgun Gothic', sans-serif",
-          fontSize: "14px",
-          lineHeight: "1.8",
-        }}
-        dangerouslySetInnerHTML={{ __html: html || "" }}
-      />
-      <style jsx global>{`
-        .hwp-document {
-          max-width: 100%;
-        }
-        .hwp-section {
-          margin-bottom: 1rem;
-        }
-        .hwp-paragraph {
-          margin-bottom: 0.5rem;
-          word-break: keep-all;
-        }
-      `}</style>
-    </ScrollArea>
+      {/* 안내 메시지 */}
+      <p className="text-xs text-muted-foreground/70 text-center mt-2">
+        💡 Windows에서는 한컴오피스 뷰어를 설치하면 브라우저에서 바로 볼 수 있습니다.
+      </p>
+    </div>
   )
 }

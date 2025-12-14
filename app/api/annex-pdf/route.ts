@@ -16,6 +16,7 @@ import { debugLogger } from "@/lib/debug-logger"
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const flSeq = searchParams.get("flSeq")
+  const customFilename = searchParams.get("filename") // 클라이언트에서 지정한 파일명
 
   if (!flSeq) {
     return NextResponse.json({ error: "flSeq(파일일련번호)가 필요합니다" }, { status: 400 })
@@ -45,34 +46,51 @@ export async function GET(request: Request) {
     const contentType = response.headers.get("content-type") || ""
     const buffer = await response.arrayBuffer()
 
-    // 파일 타입 판별
-    const isPdf = contentType.includes("pdf")
-    const isHwp = contentType.includes("hwp")
-    const isOctetStream = contentType.includes("octet-stream")
-
     // HTML 오류 페이지 감지
     if (contentType.includes("text/html")) {
       debugLogger.error("HTML 오류 페이지 응답", { contentType })
       throw new Error("파일을 찾을 수 없습니다")
     }
 
+    // 파일 시그니처(매직 바이트)로 실제 파일 타입 판별
+    const bytes = new Uint8Array(buffer.slice(0, 8))
+    const isPdfBySignature = bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 // %PDF
+    const isHwpBySignature = bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0 // OLE (HWP)
+
+    // Content-Type과 시그니처 종합 판단
+    const isPdf = contentType.includes("pdf") || isPdfBySignature
+    const isHwp = contentType.includes("hwp") || isHwpBySignature
+
+    debugLogger.info("파일 타입 감지", {
+      contentType,
+      isPdfBySignature,
+      isHwpBySignature,
+      firstBytes: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ')
+    })
+
     // 응답 Content-Type 결정
     let responseContentType = "application/octet-stream"
     let disposition = "attachment"
-    let filename = `annex-${flSeq}`
+    let ext = ""
 
     if (isPdf) {
       responseContentType = "application/pdf"
       disposition = "inline"
-      filename += ".pdf"
+      ext = ".pdf"
     } else if (isHwp) {
       responseContentType = "application/hwp+zip"
       disposition = "attachment"
-      filename += ".hwp"
-    } else if (isOctetStream) {
-      // octet-stream인 경우 확장자 추측
-      responseContentType = "application/octet-stream"
-      disposition = "attachment"
+      ext = ".hwp"
+    }
+
+    // 파일명: 클라이언트 지정 > 기본값
+    let filename = customFilename
+      ? customFilename.replace(/[\\/:*?"<>|]/g, "") // 금지 문자 제거
+      : `annex-${flSeq}`
+
+    // 확장자가 없으면 추가
+    if (ext && !filename.toLowerCase().endsWith(ext)) {
+      filename += ext
     }
 
     debugLogger.success("별표 파일 다운로드 완료", {
@@ -82,10 +100,15 @@ export async function GET(request: Request) {
       responseContentType,
     })
 
+    // RFC 5987: 한글 파일명 인코딩
+    // filename: ASCII 폴백 (한글 제거), filename*: UTF-8 인코딩
+    const asciiFilename = filename.replace(/[^\x00-\x7F]/g, "_") // 비-ASCII → _
+    const encodedFilename = encodeURIComponent(filename).replace(/'/g, "%27")
+
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": responseContentType,
-        "Content-Disposition": `${disposition}; filename="${filename}"`,
+        "Content-Disposition": `${disposition}; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
         "X-File-Type": isPdf ? "pdf" : isHwp ? "hwp" : "unknown",
         // PDF 임베딩 허용
