@@ -7,6 +7,93 @@ import type {
   CitationItem,
 } from "./law-types"
 
+function normalizeWhitespace(text: string): string {
+  return (text || "").replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function normalizeDelegationTitle(title: string, joNum?: string): string {
+  let t = normalizeWhitespace(title)
+  if (!t) return ""
+
+  // Common pattern from 3-tier API: "제10조(인사기록)" → "인사기록"
+  const mParen = t.match(/^제\s*\d+\s*조(?:의\s*\d+)?\s*\(([^)]+)\)$/)
+  if (mParen?.[1]) return normalizeWhitespace(mParen[1])
+
+  // If title starts with joNum, strip it.
+  const j = normalizeWhitespace(joNum || "").replace(/\s+/g, "")
+  if (j) {
+    const compact = t.replace(/\s+/g, "")
+    if (compact.startsWith(j)) {
+      t = t.substring(t.indexOf(j) + j.length).trim()
+      t = t.replace(/^[\s:：-]+/, "").trim()
+    }
+  }
+
+  // Strip leading "제N조/제N조의M" if still present.
+  t = t.replace(/^제\s*\d+\s*조(?:의\s*\d+)?\s*/, "").trim()
+  t = t.replace(/^[\s:：-]+/, "").trim()
+
+  return t
+}
+
+function stripLeadingJoHeaderFromContent(content: string): string {
+  if (!content) return ""
+  const raw = content.trim()
+  const m = raw.match(/^(제\s*\d+\s*조(?:의\s*\d+)?\s*(?:\([^)]+\))?)\s*([\s\S]*)$/)
+  if (!m) return raw
+
+  const header = m[1] || ""
+  const body = (m[2] || "").trim()
+  // Only strip when the header looks like a real 조문 헤더 (parentheses present).
+  if (/\([^)]+\)/.test(header) && body) return body
+  return raw
+}
+
+function pickBestLawName(a?: string, b?: string, type?: DelegationItem["type"], meta?: ThreeTierMeta): string {
+  const aa = normalizeWhitespace(a || "")
+  const bb = normalizeWhitespace(b || "")
+  if (!aa) return bb
+  if (!bb) return aa
+
+  // Prefer names that are not the "default" 시행령/시행규칙 name from meta when duplicates exist.
+  if (meta && type === "시행령") {
+    const def = normalizeWhitespace(meta.sihyungryungName || "")
+    if (def && aa === def && bb !== def) return bb
+    if (def && bb === def && aa !== def) return aa
+  }
+  if (meta && type === "시행규칙") {
+    const def = normalizeWhitespace(meta.sihyungkyuchikName || "")
+    if (def && aa === def && bb !== def) return bb
+    if (def && bb === def && aa !== def) return aa
+  }
+
+  // Otherwise prefer longer (more specific) name.
+  return bb.length > aa.length ? bb : aa
+}
+
+function dedupeDelegations(items: DelegationItem[], meta: ThreeTierMeta): DelegationItem[] {
+  const map = new Map<string, DelegationItem>()
+
+  for (const item of items) {
+    const key = item.jo ? `${item.type}|${item.jo}` : `${item.type}|${normalizeWhitespace(item.lawName || "")}|${normalizeWhitespace(item.title || "")}`
+    const prev = map.get(key)
+    if (!prev) {
+      map.set(key, item)
+      continue
+    }
+
+    const merged: DelegationItem = {
+      ...prev,
+      lawName: pickBestLawName(prev.lawName, item.lawName, item.type, meta),
+      title: normalizeWhitespace(prev.title || "").length >= normalizeWhitespace(item.title || "").length ? prev.title : item.title,
+      content: prev.content && prev.content.trim().length >= item.content.trim().length ? prev.content : item.content,
+    }
+    map.set(key, merged)
+  }
+
+  return Array.from(map.values())
+}
+
 /**
  * 조번호를 6자리 JO 코드로 변환
  * 예: "0038" + "00" => "003800"
@@ -130,14 +217,18 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         })
 
         for (const item of sihyungryung) {
+          const joCode = item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined
+          const joNumDisplay = joCode ? formatJoNum(joCode) : undefined
+          const lawName = item.법령명 || item.시행령명 || item.법령명_한글 || meta.sihyungryungName
+          const normalizedTitle = normalizeDelegationTitle(item.조제목 || "", joNumDisplay)
           article.delegations.push({
             type: "시행령",
             // CRITICAL: 일부 응답은 시행령 조문마다 법령명이 포함될 수 있음 (다른 시행령 혼재 케이스)
-            lawName: item.법령명 || meta.sihyungryungName,
-            jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
-            joNum: item.조번호 ? formatJoNum(convertToJO(item.조번호, item.조가지번호 || "00")) : undefined,
-            title: item.조제목 || "",
-            content: item.조내용 || "",
+            lawName,
+            jo: joCode,
+            joNum: joNumDisplay,
+            title: normalizedTitle,
+            content: stripLeadingJoHeaderFromContent(item.조내용 || ""),
           })
         }
       } else {
@@ -162,13 +253,17 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         })
 
         for (const item of sihyungkyuchik) {
+          const joCode = item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined
+          const joNumDisplay = joCode ? formatJoNum(joCode) : undefined
+          const lawName = item.법령명 || meta.sihyungkyuchikName
+          const normalizedTitle = normalizeDelegationTitle(item.조제목 || "", joNumDisplay)
           article.delegations.push({
             type: "시행규칙",
-            lawName: item.법령명 || meta.sihyungkyuchikName,
-            jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
-            joNum: item.조번호 ? formatJoNum(convertToJO(item.조번호, item.조가지번호 || "00")) : undefined,
-            title: item.조제목 || "",
-            content: item.조내용 || "",
+            lawName,
+            jo: joCode,
+            joNum: joNumDisplay,
+            title: normalizedTitle,
+            content: stripLeadingJoHeaderFromContent(item.조내용 || ""),
           })
         }
       } else {
@@ -200,6 +295,9 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
 
     // Map에서 배열로 변환 (위임조문이 있는 경우에만)
     for (const article of articleMap.values()) {
+      if (article.delegations.length > 0) {
+        article.delegations = dedupeDelegations(article.delegations, meta)
+      }
       if (article.delegations.length > 0) {
         articles.push(article)
       }

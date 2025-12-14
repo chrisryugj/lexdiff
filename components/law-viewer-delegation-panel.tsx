@@ -53,6 +53,20 @@ function groupDelegationsByLawName(items: DelegationItem[], baseLawTitle: string
     return groups
 }
 
+function formatDelegationHeader(joNum?: string, title?: string): string {
+    const j = (joNum || "").trim()
+    const t = (title || "").trim()
+    if (!j) return t
+    if (!t) return j
+
+    const compactJ = j.replace(/\s+/g, "")
+    const compactT = t.replace(/\s+/g, "")
+    if (compactT.startsWith(compactJ)) return t
+
+    if (t.startsWith("(") || t.startsWith("（")) return `${j}${t}`
+    return `${j}(${t})`
+}
+
 interface DelegationPanelProps {
     // Data
     activeArticle: LawArticle
@@ -132,11 +146,12 @@ export function DelegationPanel({
         validDelegations.forEach((delegation, idx) => {
             if (delegation.content) {
                 const key = `${delegation.type}-${idx}`
-                cache.set(key, formatDelegationContent(delegation.content))
+                const currentLawName = normalizeDelegationLawName(delegation, meta.lawTitle)
+                cache.set(key, formatDelegationContent(delegation.content, currentLawName))
             }
         })
         return cache
-    }, [validDelegations])
+    }, [validDelegations, meta.lawTitle])
 
     // ✅ DelegationItem 참조 → 원본 인덱스 매핑 (filter/map에서 findIndex 반복 방지)
     const delegationIndexByRef = useMemo(() => {
@@ -266,10 +281,12 @@ export function DelegationPanel({
                                             <div className="space-y-3">
                                                 {group.items.map((delegation) => {
                                                     const originalIdx = delegationIndexByRef.get(delegation)
-                                                    const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
-                                                    const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                    const cacheKey = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                    const itemKey =
+                                                        cacheKey || `${group.lawName}-${delegation.jo || ""}-${delegation.joNum || ""}-${delegation.title || ""}`
+                                                    const header = formatDelegationHeader(delegation.joNum, delegation.title)
                                                     return (
-                                                        <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                        <div key={itemKey || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
                                                             {header && (
                                                                 <p className="font-semibold text-sm text-foreground mb-2">
                                                                     {header}
@@ -285,7 +302,7 @@ export function DelegationPanel({
                                                                         wordBreak: "break-word",
                                                                     }}
                                                                     onClick={handleContentClick}
-                                                                    dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                    dangerouslySetInnerHTML={{ __html: cacheKey ? delegationsHtmlCache.get(cacheKey) || '' : '' }}
                                                                 />
                                                             )}
                                                         </div>
@@ -330,10 +347,12 @@ export function DelegationPanel({
                                             <div className="space-y-3">
                                                 {group.items.map((delegation) => {
                                                     const originalIdx = delegationIndexByRef.get(delegation)
-                                                    const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
-                                                    const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                    const cacheKey = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                    const itemKey =
+                                                        cacheKey || `${group.lawName}-${delegation.jo || ""}-${delegation.joNum || ""}-${delegation.title || ""}`
+                                                    const header = formatDelegationHeader(delegation.joNum, delegation.title)
                                                     return (
-                                                        <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                        <div key={itemKey || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
                                                             {header && (
                                                                 <p className="font-semibold text-sm text-foreground mb-2">
                                                                     {header}
@@ -349,7 +368,7 @@ export function DelegationPanel({
                                                                         wordBreak: "break-word",
                                                                     }}
                                                                     onClick={handleContentClick}
-                                                                    dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                    dangerouslySetInnerHTML={{ __html: cacheKey ? delegationsHtmlCache.get(cacheKey) || '' : '' }}
                                                                 />
                                                             )}
                                                         </div>
@@ -580,7 +599,7 @@ export function DelegationPanel({
                                                                         .map((group) => {
                                                                             const body = group.items
                                                                                 .map((d) => {
-                                                                                    const header = [d.joNum, d.title].filter(Boolean).join(" ")
+                                                                                    const header = formatDelegationHeader(d.joNum, d.title)
                                                                                     return `${header}\n\n${d.content || ""}`.trim()
                                                                                 })
                                                                                 .join("\n\n---\n\n")
@@ -613,10 +632,12 @@ export function DelegationPanel({
                                                                 <div className="space-y-3">
                                                                     {group.items.map((delegation) => {
                                                                         const originalIdx = delegationIndexByRef.get(delegation)
-                                                                        const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
-                                                                        const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                                        const cacheKey = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                                        const itemKey =
+                                                                            cacheKey || `${group.lawName}-${delegation.jo || ""}-${delegation.joNum || ""}-${delegation.title || ""}`
+                                                                        const header = formatDelegationHeader(delegation.joNum, delegation.title)
                                                                         return (
-                                                                            <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                                            <div key={itemKey || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
                                                                                 {header && (
                                                                                     <p className="font-semibold text-sm text-foreground mb-2">
                                                                                         {header}
@@ -632,7 +653,7 @@ export function DelegationPanel({
                                                                                             wordBreak: "break-word",
                                                                                         }}
                                                                                         onClick={handleContentClick}
-                                                                                        dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                                        dangerouslySetInnerHTML={{ __html: cacheKey ? delegationsHtmlCache.get(cacheKey) || '' : '' }}
                                                                                     />
                                                                                 )}
                                                                             </div>
@@ -684,7 +705,7 @@ export function DelegationPanel({
                                                                         .map((group) => {
                                                                             const body = group.items
                                                                                 .map((d) => {
-                                                                                    const header = [d.joNum, d.title].filter(Boolean).join(" ")
+                                                                                    const header = formatDelegationHeader(d.joNum, d.title)
                                                                                     return `${header}\n\n${d.content || ""}`.trim()
                                                                                 })
                                                                                 .join("\n\n---\n\n")
@@ -717,10 +738,12 @@ export function DelegationPanel({
                                                                 <div className="space-y-3">
                                                                     {group.items.map((delegation) => {
                                                                         const originalIdx = delegationIndexByRef.get(delegation)
-                                                                        const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
-                                                                        const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                                        const cacheKey = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                                        const itemKey =
+                                                                            cacheKey || `${group.lawName}-${delegation.jo || ""}-${delegation.joNum || ""}-${delegation.title || ""}`
+                                                                        const header = formatDelegationHeader(delegation.joNum, delegation.title)
                                                                         return (
-                                                                            <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                                            <div key={itemKey || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
                                                                                 {header && (
                                                                                     <p className="font-semibold text-sm text-foreground mb-2">
                                                                                         {header}
@@ -736,7 +759,7 @@ export function DelegationPanel({
                                                                                             wordBreak: "break-word",
                                                                                         }}
                                                                                         onClick={handleContentClick}
-                                                                                        dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                                        dangerouslySetInnerHTML={{ __html: cacheKey ? delegationsHtmlCache.get(cacheKey) || '' : '' }}
                                                                                     />
                                                                                 )}
                                                                             </div>
