@@ -277,7 +277,7 @@ export function useSearchHandlers({
         if (isClearArticle) {
           queryDetection = { type: 'structured', confidence: 1.0, reason: '명확한 조문 번호 포함' }
         } else {
-          const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+          const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
           const isPureLawName = pureLawNamePattern.test(fullQuery.trim())
 
           if (isPureLawName) {

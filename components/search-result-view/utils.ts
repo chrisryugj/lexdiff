@@ -112,7 +112,7 @@ export function extractContentFromHangArray(hangArray: any[]): string {
 // ============================================================
 
 export function hasLawKeyword(query: string): boolean {
-  return /법|법률|시행령|시행규칙/.test(query)
+  return /법|법률|시행령|시행규칙|규정/.test(query)
 }
 
 export function hasOrdinanceKeyword(query: string): boolean {

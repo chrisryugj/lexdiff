@@ -67,7 +67,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
     const textWithoutArticle = trimmedQuery.replace(articlePattern, '').trim()
 
     // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
 
     // 법령명만 있고 추가 텍스트가 없는 경우 → 구조화 검색
     if (pureLawNamePattern.test(textWithoutArticle)) {
@@ -141,7 +141,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
   if (trimmedQuery.length >= 15) {
     // 단, 법령명이 길 수도 있으므로 신중하게
     // 순수 법령명 패턴 (법령 키워드로 끝나는 경우) - 길이와 관계없이 우선 체크
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
 
     if (pureLawNamePattern.test(trimmedQuery)) {
       // "자유무역협정의 이행을 위한 관세법의 특례에 관한 법률" 같은 긴 법령명도 처리
@@ -163,7 +163,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
   // 예: "관세법", "지방세법", "FTA특례법"
   if (trimmedQuery.length < 15) {
     // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|조례|지침|고시|훈령|예규)$/
+    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
 
     if (pureLawNamePattern.test(trimmedQuery)) {
       return {
