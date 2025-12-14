@@ -355,6 +355,12 @@ export function parseRelatedLawTitle(title: string, source: 'excerpt' | 'related
 
   const [, lawName, article, titlePart] = match
 
+  // 법령명이 너무 긴 경우 파싱 오류로 판단 (정상적인 법령명은 50자 이하)
+  if (lawName.trim().length > 50) {
+    debugLogger.warning('법령명이 너무 길어 파싱 스킵', { lawName: lawName.substring(0, 50) + '...' })
+    return null
+  }
+
   try {
     // 제38조 → 003800 변환
     const jo = buildJO(article)

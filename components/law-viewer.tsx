@@ -89,7 +89,7 @@ interface LawViewerProps {
   aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
-  aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
+  aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'  // ✅ 6가지 법률 질문 유형
   aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
   onAiRefresh?: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
 }
@@ -112,7 +112,7 @@ export function LawViewer({
   aiCitations = [],
   userQuery = '',
   aiConfidenceLevel = 'high',
-  aiQueryType = 'general',
+  aiQueryType = 'application',
   aiIsTruncated = false,
   onAiRefresh,
 }: LawViewerProps) {

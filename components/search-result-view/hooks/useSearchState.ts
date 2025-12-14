@@ -69,6 +69,7 @@ export interface SearchState {
   aiCitations: VerifiedCitation[]
   userQuery: string
   fileSearchFailed: boolean
+  aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'
 
   // RAG 상태
   ragLoading: boolean
@@ -114,6 +115,7 @@ export interface SearchStateActions {
   setAiCitations: (citations: VerifiedCitation[]) => void
   setUserQuery: (query: string) => void
   setFileSearchFailed: (value: boolean) => void
+  setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence') => void
 
   // RAG 상태 업데이트
   setRagLoading: (value: boolean) => void
@@ -179,6 +181,7 @@ export function useSearchState({
   const [aiCitations, setAiCitations] = useState<VerifiedCitation[]>([])
   const [userQuery, setUserQuery] = useState<string>('')
   const [fileSearchFailed, setFileSearchFailed] = useState(false)
+  const [aiQueryType, setAiQueryType] = useState<'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'>('application')
 
   // ============================================================
   // RAG 상태
@@ -295,6 +298,7 @@ export function useSearchState({
     aiCitations,
     userQuery,
     fileSearchFailed,
+    aiQueryType,
     ragLoading,
     ragError,
     ragProgress,
@@ -329,6 +333,7 @@ export function useSearchState({
     setAiCitations,
     setUserQuery,
     setFileSearchFailed,
+    setAiQueryType,
     setRagLoading,
     setRagError,
     setRagProgress,

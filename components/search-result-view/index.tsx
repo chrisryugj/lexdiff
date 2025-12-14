@@ -332,6 +332,7 @@ export function SearchResultView({
                       fileSearchFailed={state.fileSearchFailed}
                       aiCitations={state.aiCitations}
                       userQuery={state.userQuery}
+                      aiQueryType={state.aiQueryType}
                       onAiRefresh={handlers.handleAiRefresh}
                     />
                   </div>
@@ -373,6 +374,7 @@ export function SearchResultView({
                   fileSearchFailed={state.fileSearchFailed}
                   aiCitations={state.aiCitations}
                   userQuery={state.userQuery}
+                  aiQueryType={state.aiQueryType}
                   onAiRefresh={handlers.handleAiRefresh}
                 />
               </div>

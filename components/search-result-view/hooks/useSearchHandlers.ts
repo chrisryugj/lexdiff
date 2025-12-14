@@ -387,7 +387,7 @@ export function useSearchHandlers({
         let fullContent = ''
         let receivedCitations: any[] = []
         let receivedConfidenceLevel: 'high' | 'medium' | 'low' = 'high'
-        let receivedQueryType: 'specific' | 'general' | 'comparison' | 'procedural' = 'general'
+        let receivedQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' = 'application'
         let progressValue = 60
 
         while (true) {
@@ -444,6 +444,7 @@ export function useSearchHandlers({
         actions.setAiAnswerContent(processedContent)
         actions.setAiRelatedLaws(relatedLaws)
         actions.setAiCitations(receivedCitations)
+        actions.setAiQueryType(receivedQueryType as any)
 
         const aiLawData: LawDataState = {
           meta: {

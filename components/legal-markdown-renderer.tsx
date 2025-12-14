@@ -9,55 +9,42 @@
  * - 테이블 반응형 처리
  */
 
-import React, { useMemo } from 'react'
-import ReactMarkdown from 'react-markdown'
+import React, { useMemo, useEffect, useState } from 'react'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
+
+// 방문한 법령 링크 저장 키
+const VISITED_LAWS_KEY = 'lexdiff-visited-laws'
+
+// 방문한 법령 링크 관리
+function getVisitedLaws(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const stored = localStorage.getItem(VISITED_LAWS_KEY)
+    return stored ? new Set(JSON.parse(stored)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function markLawVisited(lawKey: string) {
+  if (typeof window === 'undefined') return
+  try {
+    const visited = getVisitedLaws()
+    visited.add(lawKey)
+    // 최대 500개까지만 저장
+    const arr = Array.from(visited).slice(-500)
+    localStorage.setItem(VISITED_LAWS_KEY, JSON.stringify(arr))
+  } catch {
+    // localStorage 에러 무시
+  }
+}
 
 interface LegalMarkdownRendererProps {
   content: string
   onLawClick?: (lawName: string, article?: string) => void
   className?: string
-}
-
-/**
- * 법령 링크 컴포넌트
- */
-function LawLink({
-  href,
-  children,
-  onLawClick
-}: {
-  href: string
-  children: React.ReactNode
-  onLawClick?: (lawName: string, article?: string) => void
-}) {
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-
-    // law://법령명/제N조 형식에서 파싱
-    if (href.startsWith('law://')) {
-      const path = href.replace('law://', '')
-      const parts = path.split('/')
-      const lawName = decodeURIComponent(parts[0])
-      const article = parts[1] ? decodeURIComponent(parts[1]) : undefined
-
-      if (onLawClick) {
-        onLawClick(lawName, article)
-      }
-    }
-  }
-
-  return (
-    <a
-      href={href}
-      onClick={handleClick}
-      className="law-ref text-primary hover:underline cursor-pointer font-medium"
-      data-ref="law-article"
-    >
-      {children}
-    </a>
-  )
 }
 
 /**
@@ -68,6 +55,14 @@ export function LegalMarkdownRenderer({
   onLawClick,
   className = ''
 }: LegalMarkdownRendererProps) {
+  // 방문한 링크 상태 (클라이언트에서만)
+  const [visitedLaws, setVisitedLaws] = useState<Set<string>>(new Set())
+
+  // 컴포넌트 마운트 시 localStorage에서 방문 기록 로드
+  useEffect(() => {
+    setVisitedLaws(getVisitedLaws())
+  }, [])
+
   // 1. 법령 링크 전처리 (「법령명」 제N조 → Markdown 링크)
   const linkedContent = useMemo(() => {
     if (!content) return ''
@@ -78,6 +73,12 @@ export function LegalMarkdownRenderer({
     <div className={`legal-markdown-content prose prose-sm dark:prose-invert max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={(url) => {
+          // react-markdown 기본 sanitizer가 커스텀 스킴을 제거해서 href가 ''가 될 수 있음.
+          // 조문 모달용 커스텀 스킴(law://)은 허용하고, 그 외는 기본 변환 규칙을 그대로 사용.
+          if (url?.startsWith('law://')) return url
+          return defaultUrlTransform(url)
+        }}
         components={{
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 링크 처리 (법령 링크 vs 법제처 URL vs 일반 링크)
@@ -89,6 +90,8 @@ export function LegalMarkdownRenderer({
 
               e.preventDefault()
               e.stopPropagation()
+
+              console.log('[LegalMarkdown] Link click:', { href })
 
               // href에서 법령 정보 추출 시도
               let lawName: string | undefined
@@ -110,15 +113,18 @@ export function LegalMarkdownRenderer({
                 }
               }
 
-              // 3. 링크 텍스트에서 법령 패턴 추출
+              // 3. 링크 텍스트에서 법령 패턴 추출 (href가 없거나 실패했을 때 보완)
               if (!lawName) {
                 // React children을 텍스트로 변환
                 const getTextFromChildren = (c: React.ReactNode): string => {
                   if (typeof c === 'string') return c
                   if (typeof c === 'number') return String(c)
                   if (Array.isArray(c)) return c.map(getTextFromChildren).join('')
-                  if (React.isValidElement(c) && c.props?.children) {
-                    return getTextFromChildren(c.props.children)
+                  if (React.isValidElement(c)) {
+                    const props = c.props as { children?: React.ReactNode }
+                    if (props?.children) {
+                      return getTextFromChildren(props.children)
+                    }
                   }
                   return ''
                 }
@@ -132,17 +138,31 @@ export function LegalMarkdownRenderer({
                 }
               }
 
-              console.log('[LegalMarkdown] Link click:', { href, lawName, article })
-
               if (lawName) {
+                // 방문 기록 저장
+                const lawKey = `${lawName}|${article || ''}`
+                markLawVisited(lawKey)
+                setVisitedLaws(prev => new Set([...prev, lawKey]))
+
                 onLawClick(lawName, article)
               } else {
-                // 법령 정보 추출 실패 시 새 창으로 열기
+                // 법령 정보 추출 실패 시 새 창으로 열기 (href가 유효할 때만)
                 if (href && href.startsWith('http')) {
                   window.open(href, '_blank', 'noopener,noreferrer')
                 }
               }
             }
+
+            // 방문 여부 체크
+            let lawKey = ''
+            if (href?.startsWith('law://')) {
+              const path = href.replace('law://', '')
+              const parts = path.split('/')
+              const ln = decodeURIComponent(parts[0])
+              const art = parts[1] ? decodeURIComponent(parts[1]) : ''
+              lawKey = `${ln}|${art}`
+            }
+            const isVisited = lawKey && visitedLaws.has(lawKey)
 
             // onLawClick이 있으면 모든 링크에 클릭 핸들러 적용
             if (onLawClick) {
@@ -150,7 +170,7 @@ export function LegalMarkdownRenderer({
                 <a
                   href={href || '#'}
                   onClick={handleAnyLinkClick}
-                  className="law-ref text-primary hover:underline cursor-pointer font-medium"
+                  className={`law-ref hover:underline cursor-pointer font-medium ${isVisited ? 'law-ref-visited' : ''}`}
                   data-ref="law-article"
                 >
                   {children}
@@ -174,13 +194,167 @@ export function LegalMarkdownRenderer({
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 인용 블록 (조문 인용)
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-4 pr-3 py-3 my-4 rounded-r-md not-italic">
-              <div className="text-sm leading-relaxed text-foreground/90">
-                {children}
-              </div>
-            </blockquote>
-          ),
+          blockquote: ({ children }) => {
+            // 텍스트 추출 헬퍼 (줄바꿈 보존을 위해 join('\n') 사용)
+            const getText = (node: React.ReactNode): string => {
+              if (typeof node === 'string') return node
+              if (typeof node === 'number') return String(node)
+              // 블록 요소의 형제들이면 줄바꿈으로 연결
+              if (Array.isArray(node)) return node.map(getText).join('\n')
+
+              if (React.isValidElement(node)) {
+                const props = node.props as { children?: React.ReactNode }
+                if (props?.children) {
+                  // Element 내부(P 태그 안)는 인라인이므로 재귀 호출 시 join('') 사용해야 함.
+                  // 하지만 여기서는 편의상 getText를 그대로 사용하되, 
+                  // P 태그 내부의 children이 배열일 경우(Text + Link + Text)에도 \n이 들어가버릴 수 있음.
+                  // 이를 방지하기 위해 내부용 함수 분리.
+                  return getTextInner(props.children)
+                }
+              }
+              return ''
+            }
+
+            const getTextInner = (node: React.ReactNode): string => {
+              if (typeof node === 'string') return node
+              if (typeof node === 'number') return String(node)
+              if (Array.isArray(node)) return node.map(getTextInner).join('') // 인라인은 붙임
+              if (React.isValidElement(node)) {
+                const props = node.props as { children?: React.ReactNode }
+                if (props?.children) return getTextInner(props.children)
+              }
+              return ''
+            }
+
+            // 노드 트리 분할 헬퍼 (Clone with Key)
+            const splitNodes = (nodes: React.ReactNode[], splitIndex: number): [React.ReactNode[], React.ReactNode[]] => {
+              let currentLength = 0
+              const left: React.ReactNode[] = []
+              const right: React.ReactNode[] = []
+              let splitFound = false
+
+              React.Children.forEach(nodes, (node, index) => {
+                if (splitFound) {
+                  right.push(node)
+                  return
+                }
+
+                const nodeText = getTextInner(node)
+                const nodeLength = nodeText.length
+
+                if (currentLength + nodeLength <= splitIndex) {
+                  // 노드가 완전히 Split 지점 이전에 있음
+                  left.push(node)
+                  currentLength += nodeLength
+                } else {
+                  // Split 지점이 이 노드 내부에 있음 -> 노드 쪼개기
+                  splitFound = true
+                  const localSplitIndex = splitIndex - currentLength
+
+                  if (typeof node === 'string') {
+                    left.push(node.substring(0, localSplitIndex))
+                    right.push(node.substring(localSplitIndex))
+                  } else if (React.isValidElement(node)) {
+                    // 재귀적으로 자식 노드 분할
+                    const props = node.props as { children?: React.ReactNode; key?: React.Key }
+                    const childNodes = React.Children.toArray(props.children)
+                    const [childLeft, childRight] = splitNodes(childNodes, localSplitIndex)
+
+                    // Key preservation strategy
+                    const baseKey = props.key || `split-${index}`
+
+                    if (childLeft.length > 0) {
+                      left.push(React.cloneElement(node, {
+                        ...props,
+                        key: `${baseKey}-left`,
+                        children: childLeft
+                      } as React.Attributes & { children?: React.ReactNode }))
+                    }
+                    if (childRight.length > 0) {
+                      right.push(React.cloneElement(node, {
+                        ...props,
+                        key: `${baseKey}-right`,
+                        children: childRight
+                      } as React.Attributes & { children?: React.ReactNode }))
+                    }
+                  } else {
+                    left.push(node)
+                  }
+                  currentLength += nodeLength
+                }
+              })
+
+              return [left, right]
+            }
+
+            const childrenArray = React.Children.toArray(children)
+            const fullText = getText(childrenArray).trim()
+
+            // 법령 조문 패턴: "법령명 제N조 (제목) 본문" 형태 파싱
+            // 정규식 개선 for Robust Capture (닫는 괄호 포함 보장)
+            // (.+?(?:조|항|호)(?:의\d+)?(?:\s*\(.*?\))?) -> Non-greedy start + valid suffix + optional parens
+            const match = fullText.match(/^(.+?(?:조|항|호)(?:의\d+)?(?:\s*\(.*?\))?)([\s\n]+)([\s\S]+)$/)
+
+            if (match) {
+              const titleText = match[1]
+              const separatorText = match[2]
+
+              const titleEndIndex = fullText.indexOf(titleText) + titleText.length
+              const separatorLength = separatorText.length
+
+              // 1차 분할: Title vs (Separator + Content)
+              const [titleNodes, restNodes] = splitNodes(childrenArray, titleEndIndex)
+
+              // 2차 분할: Separator vs Content
+              const [, contentNodes] = splitNodes(restNodes, separatorLength)
+
+              // 조문 제목에서 괄호 ( ) 제거 (User Request: "조문 제목 앞 ( 도 없애서 일관성있게")
+              // 재귀적으로 텍스트 노드 탐색하여 제거
+              const removeParentheses = (nodes: React.ReactNode[]): React.ReactNode[] => {
+                return nodes.map((node, i) => {
+                  if (typeof node === 'string') {
+                    // 괄호 제거
+                    return node.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim()
+                  }
+                  if (React.isValidElement(node)) {
+                    const props = node.props as { children?: React.ReactNode; key?: React.Key }
+                    const newChildren = props.children ? removeParentheses(React.Children.toArray(props.children)) : undefined
+                    return React.cloneElement(node, {
+                      ...props,
+                      children: newChildren
+                    } as any)
+                  }
+                  return node
+                })
+              }
+
+              const cleanTitleNodes = removeParentheses(titleNodes)
+
+              return (
+                <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible">
+                  <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
+                    {/* 조문 제목 Group */}
+                    <div className="text-muted-foreground font-medium text-sm break-words">
+                      {cleanTitleNodes}
+                    </div>
+                    {/* 조문 본문 Group */}
+                    <div className="text-foreground dark:text-white text-sm leading-relaxed mt-0.5">
+                      {contentNodes}
+                    </div>
+                  </div>
+                </blockquote>
+              )
+            }
+
+            // 기본 렌더링 (ml-0 강제 적용, Compact)
+            return (
+              <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible [&_p]:my-0 [&_p:first-of-type]:text-muted-foreground [&_p:first-of-type]:mb-1 [&_p:not(:first-of-type)]:text-foreground dark:[&_p:not(:first-of-type)]:text-white">
+                <div className="leading-relaxed">
+                  {children}
+                </div>
+              </blockquote>
+            )
+          },
 
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 테이블 (반응형)

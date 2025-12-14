@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -17,10 +17,13 @@ import {
     ZoomIn,
     ChevronDown,
     BookOpen,
-    Search,
     Scale,
     ListChecks,
     RefreshCw,
+    CircleHelp,
+    ClipboardCheck,
+    GitCompare,
+    Zap,
 } from "lucide-react"
 import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
@@ -43,6 +46,91 @@ export function AIAnswerSidebar({
     showHeader = true,
     onCollapseClick
 }: AIAnswerSidebarProps) {
+    const [hydratedTitles, setHydratedTitles] = useState<Record<string, string | null>>({})
+
+    const groupedEntries = useMemo(() => {
+        // 1. 필터링: "알 수 없음", 너무 긴 법령명(파싱 오류) 제외
+        const validArticles = relatedArticles.filter(law =>
+            law.lawName &&
+            law.lawName !== '알 수 없음' &&
+            law.lawName.length <= 50 // 법령명이 50자 이상이면 파싱 오류
+        )
+
+        // 2. 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
+        // NOTE: 같은 key에 title이 있는 항목이 뒤늦게 들어오는 경우가 있어, title/fullText 등은 "더 풍부한" 값으로 병합한다.
+        const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
+
+        validArticles.forEach(law => {
+            const key = `${law.lawName}|${law.jo || 'all'}`
+            const existing = grouped.get(key)
+            if (existing) {
+                existing.sources.add(law.source)
+
+                // ✅ 제목/전문이 없는 케이스 보완: 더 풍부한 값으로 업그레이드
+                if (!existing.law.title && law.title) existing.law.title = law.title
+                if (!existing.law.fullText && law.fullText) existing.law.fullText = law.fullText
+
+                // title이 생겼다면 display도 보완 (UI에서는 display를 직접 쓰진 않지만, 데이터 정합성 유지)
+                if (existing.law.title && !existing.law.display.includes(existing.law.title)) {
+                    existing.law.display = `${existing.law.lawName} ${existing.law.article} ${existing.law.title}`.trim()
+                }
+            } else {
+                grouped.set(key, { law: { ...law }, sources: new Set([law.source]) })
+            }
+        })
+
+        return Array.from(grouped.entries()).map(([key, value]) => ({ key, ...value }))
+    }, [relatedArticles])
+
+    const missingTitleRequests = useMemo(() => {
+        return groupedEntries
+            .filter(({ key, law }) => {
+                const alreadyHydrated = Object.prototype.hasOwnProperty.call(hydratedTitles, key)
+                return !alreadyHydrated && !law.title && !!law.lawName && !!law.article
+            })
+            .map(({ key, law }) => ({ key, lawName: law.lawName, article: law.article }))
+    }, [groupedEntries, hydratedTitles])
+
+    useEffect(() => {
+        if (missingTitleRequests.length === 0) return
+
+        let canceled = false
+
+        const run = async () => {
+            // 너무 많은 호출 방지: 한 번에 최대 10개만 hydrate
+            const batch = missingTitleRequests.slice(0, 10)
+
+            await Promise.all(batch.map(async ({ key, lawName, article }) => {
+                try {
+                    const qs = new URLSearchParams({ lawName, article })
+                    const res = await fetch(`/api/article-title?${qs.toString()}`)
+                    if (!res.ok) {
+                        if (!canceled) {
+                            setHydratedTitles(prev => ({ ...prev, [key]: null }))
+                        }
+                        return
+                    }
+                    const data = (await res.json()) as { title?: string | null }
+                    const title = typeof data?.title === 'string' && data.title.trim() ? data.title.trim() : null
+
+                    if (!canceled) {
+                        setHydratedTitles(prev => ({ ...prev, [key]: title }))
+                    }
+                } catch (e) {
+                    if (!canceled) {
+                        setHydratedTitles(prev => ({ ...prev, [key]: null }))
+                    }
+                }
+            }))
+        }
+
+        run()
+
+        return () => {
+            canceled = true
+        }
+    }, [missingTitleRequests])
+
     return (
         <>
             {showHeader ? (
@@ -77,25 +165,7 @@ export function AIAnswerSidebar({
                 <div className="space-y-2">
                     {relatedArticles.length > 0 ? (
                         (() => {
-                            // 1. "알 수 없음" 항목 필터링
-                            const validArticles = relatedArticles.filter(law =>
-                                law.lawName && law.lawName !== '알 수 없음'
-                            )
-
-                            // 2. 법령명+조문으로 그룹화 (같은 법령이 발췌+관련 둘 다 있을 수 있음)
-                            const grouped = new Map<string, { law: ParsedRelatedLaw; sources: Set<string> }>()
-
-                            validArticles.forEach(law => {
-                                const key = `${law.lawName}|${law.jo || 'all'}`
-                                const existing = grouped.get(key)
-                                if (existing) {
-                                    existing.sources.add(law.source)
-                                } else {
-                                    grouped.set(key, { law, sources: new Set([law.source]) })
-                                }
-                            })
-
-                            return Array.from(grouped.values()).map(({ law, sources }, idx) => {
+                            return groupedEntries.map(({ key, law, sources }, idx) => {
                                 const handleClick = () => {
                                     debugLogger.info('🔗 [사이드바] 법령 링크 클릭 - 모달로 열기', {
                                         lawName: law.lawName,
@@ -129,11 +199,19 @@ export function AIAnswerSidebar({
                                                     <span className="text-muted-foreground/70">{law.article}</span>
                                                 </div>
                                                 {/* 조문제목 - 괄호 제거 */}
-                                                {law.title && (
-                                                    <div className="text-sm text-muted-foreground truncate">
-                                                        {law.title.replace(/^\(|\)$/g, '')}
-                                                    </div>
-                                                )}
+                                                <div className="text-sm text-muted-foreground truncate">
+                                                    {(() => {
+                                                        const hydrated = hydratedTitles[key]
+                                                        const title = law.title || hydrated
+                                                        if (typeof title === 'string' && title.trim()) {
+                                                            return title.replace(/^\(|\)$/g, '')
+                                                        }
+                                                        if (Object.prototype.hasOwnProperty.call(hydratedTitles, key) && hydrated === null) {
+                                                            return '제목 없음'
+                                                        }
+                                                        return '조문 제목 불러오는 중…'
+                                                    })()}
+                                                </div>
                                             </div>
 
                                             {/* Icon Indicator - 우측 상단 절대 위치 */}
@@ -234,7 +312,7 @@ interface AIAnswerContentProps {
     fontSize: number
     setFontSize: (size: number | ((prev: number) => number)) => void
     onLawClick?: (lawName: string, article?: string) => void  // ✅ 법령 링크 클릭 핸들러
-    aiQueryType?: 'specific' | 'general' | 'comparison' | 'procedural'  // ✅ 쿼리 타입
+    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'  // ✅ 6가지 법률 질문 유형
     isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
     onRefresh?: () => void  // ✅ 강제 새로고침 (캐시 무시)
 }
@@ -248,7 +326,7 @@ export function AIAnswerContent({
     fontSize,
     setFontSize,
     onLawClick,
-    aiQueryType = 'general',
+    aiQueryType = 'application',
     isTruncated = false,
     onRefresh
 }: AIAnswerContentProps) {
@@ -343,15 +421,17 @@ export function AIAnswerContent({
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                             <span className="break-words line-clamp-2">{userQuery}</span>
-                            {/* 쿼리 타입 배지 */}
+                            {/* 쿼리 타입 배지 (6가지 법률 질문 유형) */}
                             {(() => {
-                                const typeConfigs = {
-                                    specific: { icon: BookOpen, label: '특정 조문', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
-                                    general: { icon: Search, label: '일반 질문', bgColor: 'bg-gray-500/10', borderColor: 'border-gray-500/30', textColor: 'text-gray-500' },
-                                    comparison: { icon: Scale, label: '비교 질문', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
-                                    procedural: { icon: ListChecks, label: '절차 질문', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' }
+                                const typeConfigs: Record<string, { icon: typeof BookOpen, label: string, bgColor: string, borderColor: string, textColor: string }> = {
+                                    definition: { icon: CircleHelp, label: '개념/정의', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', textColor: 'text-cyan-500' },
+                                    requirement: { icon: ClipboardCheck, label: '요건/조건', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30', textColor: 'text-orange-500' },
+                                    procedure: { icon: ListChecks, label: '절차/방법', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' },
+                                    comparison: { icon: GitCompare, label: '비교', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
+                                    application: { icon: Scale, label: '적용 판단', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
+                                    consequence: { icon: Zap, label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' }
                                 }
-                                const config = typeConfigs[aiQueryType]
+                                const config = typeConfigs[aiQueryType] || typeConfigs.application
                                 const TypeIcon = config.icon
 
                                 return (

@@ -19,7 +19,7 @@ interface DownloadRequest {
 }
 
 /**
- * Search law by name
+ * Search law by name - finds exact match from search results
  */
 async function searchLaw(lawName: string) {
   const params = new URLSearchParams({
@@ -38,21 +38,40 @@ async function searchLaw(lawName: string) {
     return null
   }
 
-  // Parse XML to find MST
-  const mstMatch = xml.match(/<법령일련번호>(\d+)<\/법령일련번호>/)
-  const idMatch = xml.match(/<법령ID>(\d+)<\/법령ID>/)
-  const nameMatch = xml.match(/<법령명한글>([^<]+)<\/법령명한글>/)
+  // Parse all search results and find exact match
+  // XML structure: <law><법령일련번호>...</법령일련번호><법령명한글>...</법령명한글></law>
+  const lawEntries = xml.match(/<law>[\s\S]*?<\/law>/g) || []
 
-  const mst = mstMatch ? mstMatch[1] : idMatch ? idMatch[1] : null
+  // Normalize search name for comparison (remove spaces)
+  const normalizedSearchName = lawName.replace(/\s+/g, '')
 
-  if (!mst) {
-    return null
+  for (const entry of lawEntries) {
+    const mstMatch = entry.match(/<법령일련번호>(\d+)<\/법령일련번호>/)
+    const idMatch = entry.match(/<법령ID>(\d+)<\/법령ID>/)
+    const nameMatch = entry.match(/<법령명한글>([^<]+)<\/법령명한글>/)
+
+    if (!nameMatch) continue
+
+    const foundName = nameMatch[1]
+    const normalizedFoundName = foundName.replace(/\s+/g, '')
+
+    // Check for exact match (with normalized comparison)
+    if (normalizedFoundName === normalizedSearchName) {
+      const mst = mstMatch ? mstMatch[1] : idMatch ? idMatch[1] : null
+
+      if (mst) {
+        console.log(`[searchLaw] Exact match found: "${foundName}" for query "${lawName}"`)
+        return {
+          lawId: mst,
+          lawName: foundName
+        }
+      }
+    }
   }
 
-  return {
-    lawId: mst,
-    lawName: nameMatch ? nameMatch[1] : lawName
-  }
+  // No exact match found
+  console.log(`[searchLaw] No exact match for "${lawName}" in ${lawEntries.length} results`)
+  return null
 }
 
 /**

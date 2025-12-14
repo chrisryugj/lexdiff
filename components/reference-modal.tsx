@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import type React from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { ZoomIn, ZoomOut, ExternalLink, ArrowLeft, Loader2 } from "lucide-react"
@@ -80,37 +80,21 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   // Attach event listener to the content div
   useEffect(() => {
-    // ⚠️ CRITICAL: isOpen이 false면 DOM이 렌더링되지 않음
-    if (!isOpen) return
+    // ⚠️ CRITICAL: isOpen이 false거나 loading 중이면 스킵
+    if (!isOpen || loading) return
 
     // 🔥 CRITICAL FIX: DOM 렌더링 완료 대기
     const timer = setTimeout(() => {
       const contentEl = contentRef.current
-      if (!contentEl) {
-        console.log('[ReferenceModal] contentRef.current is null after timeout, skipping event listener')
-        return
-      }
+      if (!contentEl) return
 
       const handleClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement
-
-        console.log('[ReferenceModal] Click detected:', {
-          tagName: target.tagName,
-          className: target.className,
-          href: target.getAttribute('href')
-        })
 
         // ✅ CRITICAL: 링크인 경우에만 처리
         if (target && target.tagName === "A") {
           e.preventDefault()
           e.stopPropagation()
-
-          console.log('[ReferenceModal] Link clicked:', {
-            href: target.getAttribute('href'),
-            dataRef: target.getAttribute('data-ref'),
-            dataArticle: target.getAttribute('data-article'),
-            dataLaw: target.getAttribute('data-law')
-          })
 
           // onContentClick이 있으면 호출
           if (onContentClick) {
@@ -120,12 +104,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         }
       }
 
-      console.log('[ReferenceModal] Attaching event listener to:', contentEl, 'HTML length:', contentEl.innerHTML.length)
       contentEl.addEventListener("click", handleClick, true) // useCapture = true
 
       // Cleanup function
       return () => {
-        console.log('[ReferenceModal] Removing event listener')
         contentEl.removeEventListener("click", handleClick, true)
       }
     }, 100) // 100ms 대기 (Dialog 애니메이션 완료 대기)
@@ -133,7 +115,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     return () => {
       clearTimeout(timer)
     }
-  }, [isOpen, onContentClick, html])
+  }, [isOpen, loading, onContentClick, html])
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
@@ -167,6 +149,9 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   return title
                 })()}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
+              </DialogDescription>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* 폰트 크기 조절 */}
