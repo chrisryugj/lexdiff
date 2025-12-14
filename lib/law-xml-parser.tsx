@@ -3,6 +3,161 @@ import { debugLogger } from "./debug-logger"
 import { buildJO } from "./law-parser"
 import { linkifyRefsB } from "./unified-link-generator"
 
+type BoxTableReplacement = { token: string; html: string }
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function renderInlineLawText(text: string, currentLawName?: string): string {
+  // CORRECT order: linkify → selective escape → styling
+  let rendered = linkifyRefsB(text, currentLawName)
+  rendered = rendered.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, plainText) => {
+    if (linkTag) return linkTag
+    if (otherTag) return escapeHtml(otherTag)
+    if (plainText) return escapeHtml(plainText)
+    return match
+  })
+  rendered = applyRevisionStyling(rendered)
+  return rendered
+}
+
+function splitBoxTableRow(line: string): string[] | null {
+  const trimmed = line.trim()
+  const isVertical = (ch: string) => ch === "│" || ch === "┃" || ch === "|"
+  if (trimmed.length < 2) return null
+  if (!isVertical(trimmed[0]) || !isVertical(trimmed[trimmed.length - 1])) return null
+
+  const inner = trimmed.slice(1, -1)
+  const parts = inner.split(/[│┃|]/g)
+  if (parts.length < 2) return null
+
+  return parts.map((p) =>
+    p
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  )
+}
+
+function parseBoxDrawingTableBlock(blockLines: string[], currentLawName?: string): string | null {
+  const rows: Array<{ lineIndex: number; cells: string[] }> = []
+  for (let i = 0; i < blockLines.length; i++) {
+    const cells = splitBoxTableRow(blockLines[i])
+    if (cells) rows.push({ lineIndex: i, cells })
+  }
+
+  if (rows.length === 0) return null
+  const columnCount = Math.max(...rows.map((r) => r.cells.length))
+  if (columnCount < 2) return null
+
+  const firstSeparatorIndex = blockLines.findIndex((line) => {
+    const t = line.trim()
+    return (
+      (t.startsWith("├") || t.startsWith("┣") || t.startsWith("╞") || t.startsWith("╟")) &&
+      (t.includes("┼") || t.includes("╪") || t.includes("╫"))
+    )
+  })
+
+  const headerRows = firstSeparatorIndex >= 0 ? rows.filter((r) => r.lineIndex < firstSeparatorIndex) : rows.slice(0, 1)
+  const bodyRows = firstSeparatorIndex >= 0 ? rows.filter((r) => r.lineIndex > firstSeparatorIndex) : rows.slice(1)
+
+  const padCells = (cells: string[]) => {
+    if (cells.length === columnCount) return cells
+    const padded = cells.slice()
+    while (padded.length < columnCount) padded.push("")
+    return padded
+  }
+
+  const thead =
+    headerRows.length > 0
+      ? `<thead>${headerRows
+          .map(({ cells }) => {
+            const safeCells = padCells(cells).map((c) => renderInlineLawText(c, currentLawName))
+            return `<tr>${safeCells
+              .map(
+                (c) =>
+                  `<th class="border border-border bg-muted/40 px-2 py-1 text-left font-semibold align-top">${c || "&nbsp;"}</th>`,
+              )
+              .join("")}</tr>`
+          })
+          .join("")}</thead>`
+      : ""
+
+  const tbody = `<tbody>${bodyRows
+    .map(({ cells }) => {
+      const safeCells = padCells(cells).map((c) => renderInlineLawText(c, currentLawName))
+      return `<tr>${safeCells
+        .map((c) => `<td class="border border-border px-2 py-1 align-top">${c || "&nbsp;"}</td>`)
+        .join("")}</tr>`
+    })
+    .join("")}</tbody>`
+
+  // whitespace-pre-wrap 컨테이너 내부에서 테이블은 일반 whitespace로 렌더링하는 편이 자연스러움
+  return (
+    `<div class="my-3 overflow-x-auto whitespace-normal">` +
+    `<table class="w-full min-w-[320px] border-collapse border border-border text-sm">` +
+    thead +
+    tbody +
+    `</table></div>`
+  )
+}
+
+function replaceBoxTablesWithTokens(rawText: string, currentLawName?: string): { text: string; replacements: BoxTableReplacement[] } {
+  const lines = rawText.split("\n")
+  const out: string[] = []
+  const replacements: BoxTableReplacement[] = []
+
+  let tableIndex = 0
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const t = line.trim()
+    const isTopBorder = t.startsWith("┌") || t.startsWith("┏")
+    if (!isTopBorder) {
+      out.push(line)
+      continue
+    }
+
+    // Find the matching bottom border line.
+    let end = -1
+    for (let j = i + 1; j < lines.length; j++) {
+      const tj = lines[j].trim()
+      if (tj.startsWith("└") || tj.startsWith("┗")) {
+        end = j
+        break
+      }
+    }
+
+    if (end === -1) {
+      out.push(line)
+      continue
+    }
+
+    const block = lines.slice(i, end + 1)
+    const tableHtml = parseBoxDrawingTableBlock(block, currentLawName)
+    if (!tableHtml) {
+      out.push(line)
+      continue
+    }
+
+    const token = `__LEXDIFF_BOX_TABLE_${tableIndex}__`
+    tableIndex++
+    replacements.push({ token, html: tableHtml })
+    out.push(token)
+    i = end
+  }
+
+  return { text: out.join("\n"), replacements }
+}
+
+function applyBoxTableReplacements(html: string, replacements: BoxTableReplacement[]): string {
+  let out = html
+  for (const { token, html: tableHtml } of replacements) {
+    out = out.replace(new RegExp(escapeRegExp(token), "g"), tableHtml)
+  }
+  return out
+}
+
 export function parseLawXML(xmlText: string): {
   meta: LawMeta
   articles: LawArticle[]
@@ -268,6 +423,7 @@ function extractRevisionMarks(
 
 export function extractArticleText(article: LawArticle, isOrdinance = false, currentLawName?: string): string {
   let text = ""
+  const boxTableReplacements: BoxTableReplacement[] = []
 
   // CRITICAL FIX: article.content가 없어도 title이 있으면 표시
   if (article.content || article.title) {
@@ -291,6 +447,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         } else {
           rawContent = ''  // 본문 없음 (호만 있는 경우)
         }
+      }
+
+      // 박스(유니코드) 표를 HTML 테이블로 렌더링하기 위해 먼저 토큰으로 치환
+      // (escape 단계에서 <table> 같은 태그는 모두 escape 되므로 마지막에 토큰을 HTML로 교체한다)
+      {
+        const boxed = replaceBoxTablesWithTokens(rawContent, currentLawName)
+        rawContent = boxed.text
+        boxTableReplacements.push(...boxed.replacements)
       }
 
       // 0. 항 번호(①②③) 바로 뒤 공백 정규화: 모든 공백/줄바꿈 제거 후 공백 1칸 추가
@@ -358,6 +522,12 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         let paraContent = para.content || ""
         const paraNum = para.num || ""
 
+        {
+          const boxed = replaceBoxTablesWithTokens(paraContent, currentLawName)
+          paraContent = boxed.text
+          boxTableReplacements.push(...boxed.replacements)
+        }
+
         // 항 번호(①②③) 바로 뒤 공백 정규화: 모든 공백/줄바꿈 제거 후 공백 1칸 추가
         paraContent = paraContent.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])[\s\r\n\t\u00A0]*/g, '$1 ')
 
@@ -394,8 +564,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 
         if (para.items) {
           para.items.forEach((item) => {
-            const itemContent = item.content || ""
+            let itemContent = item.content || ""
             const itemNum = item.num || ""
+
+            {
+              const boxed = replaceBoxTablesWithTokens(itemContent, currentLawName)
+              itemContent = boxed.text
+              boxTableReplacements.push(...boxed.replacements)
+            }
 
             const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
@@ -423,8 +599,14 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       // 항내용 없고 호만 있는 경우: 본문은 이미 위에서 처리했고, 호만 추가
       // (관세법 제2조 같은 경우 - 호내용에 이미 번호 포함)
       allItems.forEach((item, index) => {
-        const itemContent = item.content || ""
+        let itemContent = item.content || ""
         const itemNum = item.num || ""
+
+        {
+          const boxed = replaceBoxTablesWithTokens(itemContent, currentLawName)
+          itemContent = boxed.text
+          boxTableReplacements.push(...boxed.replacements)
+        }
 
         const startsWithNumber = itemContent.trim().match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|\d+\.)/)
 
@@ -448,6 +630,7 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
     }
   }
 
+  text = applyBoxTableReplacements(text, boxTableReplacements)
   return text.trim()
 }
 
@@ -458,6 +641,13 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
 export function formatDelegationContent(content: string, currentLawName?: string): string {
   if (!content || content.trim().length === 0) {
     return ""
+  }
+
+  const boxTableReplacements: BoxTableReplacement[] = []
+  {
+    const boxed = replaceBoxTablesWithTokens(content, currentLawName)
+    content = boxed.text
+    boxTableReplacements.push(...boxed.replacements)
   }
 
   // CORRECT order: linkify → selective escape → styling
@@ -487,6 +677,7 @@ export function formatDelegationContent(content: string, currentLawName?: string
   // This prevents matching sentence endings like "...을 말한다."
   text = text.replace(/(^|<br>|<br\/>|<br \/>)\s*([가-힣]\.)\s+/g, '$1&nbsp;&nbsp;$2 ')
 
+  text = applyBoxTableReplacements(text, boxTableReplacements)
   return text
 }
 
@@ -572,12 +763,4 @@ function applyRevisionStyling(text: string): string {
 
 // 기존 linkifyRefsB 및 linkifyOrdinanceRefs 함수는 통합 시스템(unified-link-generator)으로 대체됨
 // import { linkifyRefsB } from "./unified-link-generator"를 사용
-
-
-
-
-
-
-
-
 

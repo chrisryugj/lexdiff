@@ -24,6 +24,35 @@ import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skele
 import type { AdminRuleMatch } from "@/lib/use-admin-rules"
 import { useToast } from "@/hooks/use-toast"
 
+type DelegationGroup = { lawName: string; items: DelegationItem[] }
+
+function normalizeDelegationLawName(item: DelegationItem, baseLawTitle: string): string {
+    const name = (item.lawName || "").trim()
+    if (name) return name
+    if (item.type === "시행령") return `${baseLawTitle} 시행령`
+    if (item.type === "시행규칙") return `${baseLawTitle} 시행규칙`
+    if (item.type === "행정규칙") return "행정규칙"
+    return baseLawTitle
+}
+
+function groupDelegationsByLawName(items: DelegationItem[], baseLawTitle: string): DelegationGroup[] {
+    const groups: DelegationGroup[] = []
+    const idxByName = new Map<string, number>()
+
+    for (const item of items) {
+        const lawName = normalizeDelegationLawName(item, baseLawTitle)
+        const idx = idxByName.get(lawName)
+        if (idx === undefined) {
+            idxByName.set(lawName, groups.length)
+            groups.push({ lawName, items: [item] })
+        } else {
+            groups[idx].items.push(item)
+        }
+    }
+
+    return groups
+}
+
 interface DelegationPanelProps {
     // Data
     activeArticle: LawArticle
@@ -108,6 +137,29 @@ export function DelegationPanel({
         })
         return cache
     }, [validDelegations])
+
+    // ✅ DelegationItem 참조 → 원본 인덱스 매핑 (filter/map에서 findIndex 반복 방지)
+    const delegationIndexByRef = useMemo(() => {
+        const map = new Map<DelegationItem, number>()
+        validDelegations.forEach((d, i) => map.set(d, i))
+        return map
+    }, [validDelegations])
+
+    // ✅ 시행령/시행규칙이 여러 법령(여러 시행령/시행규칙)로 섞여있는 경우 그룹화
+    const decreeGroups = useMemo(() => {
+        const items = validDelegations.filter((d) => d.type === "시행령")
+        return groupDelegationsByLawName(items, meta.lawTitle)
+    }, [validDelegations, meta.lawTitle])
+
+    const ruleGroups = useMemo(() => {
+        const items = validDelegations.filter((d) => d.type === "시행규칙")
+        return groupDelegationsByLawName(items, meta.lawTitle)
+    }, [validDelegations, meta.lawTitle])
+
+    const mobileRuleGroups = useMemo(() => {
+        const items = validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
+        return groupDelegationsByLawName(items, meta.lawTitle)
+    }, [validDelegations, meta.lawTitle])
 
     // 조문 또는 법률 변경 시 행정규칙 초기화
     useEffect(() => {
@@ -201,33 +253,47 @@ export function DelegationPanel({
                                     </h3>
                                 </div>
                                 <div className="space-y-3">
-                                    {validDelegations
-                                        .filter((d) => d.type === "시행령")
-                                        .map((delegation, idx) => {
-                                            const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                            return (
-                                                <div key={idx} className="p-3 rounded-lg border border-border">
-                                                    {delegation.title && (
-                                                        <p className="font-semibold text-sm text-foreground mb-2">
-                                                            {delegation.title}
-                                                        </p>
-                                                    )}
-                                                    {delegation.content && (
-                                                        <div
-                                                            className="text-xs text-foreground leading-relaxed break-words"
-                                                            style={{
-                                                                fontSize: `${fontSize}px`,
-                                                                lineHeight: "1.8",
-                                                                overflowWrap: "break-word",
-                                                                wordBreak: "break-word",
-                                                            }}
-                                                            onClick={handleContentClick}
-                                                            dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                        />
-                                                    )}
-                                                </div>
-                                            )
-                                        })}
+                                    {decreeGroups.map((group) => (
+                                        <div key={group.lawName} className="p-3 rounded-lg border border-border">
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                <p className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">
+                                                    {group.lawName}
+                                                </p>
+                                                <Badge variant="outline" className="text-xs shrink-0">
+                                                    {group.items.length}개
+                                                </Badge>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {group.items.map((delegation) => {
+                                                    const originalIdx = delegationIndexByRef.get(delegation)
+                                                    const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                    const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                    return (
+                                                        <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                            {header && (
+                                                                <p className="font-semibold text-sm text-foreground mb-2">
+                                                                    {header}
+                                                                </p>
+                                                            )}
+                                                            {delegation.content && (
+                                                                <div
+                                                                    className="text-xs text-foreground leading-relaxed break-words"
+                                                                    style={{
+                                                                        fontSize: `${fontSize}px`,
+                                                                        lineHeight: "1.8",
+                                                                        overflowWrap: "break-word",
+                                                                        wordBreak: "break-word",
+                                                                    }}
+                                                                    onClick={handleContentClick}
+                                                                    dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                     {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
                                         <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
                                     )}
@@ -251,36 +317,47 @@ export function DelegationPanel({
                                     </h3>
                                 </div>
                                 <div className="space-y-3">
-                                    {validDelegations
-                                        .filter((d) => d.type === "시행규칙" || d.type === "행정규칙")
-                                        .map((delegation, idx) => {
-                                            const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className="p-3 rounded-lg border border-border"
-                                                >
-                                                    {delegation.title && (
-                                                        <p className="font-semibold text-sm text-foreground mb-2">
-                                                            {delegation.title}
-                                                        </p>
-                                                    )}
-                                                    {delegation.content && (
-                                                        <div
-                                                            className="text-xs text-foreground leading-relaxed break-words"
-                                                            style={{
-                                                                fontSize: `${fontSize}px`,
-                                                                lineHeight: "1.8",
-                                                                overflowWrap: "break-word",
-                                                                wordBreak: "break-word",
-                                                            }}
-                                                            onClick={handleContentClick}
-                                                            dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                        />
-                                                    )}
-                                                </div>
-                                            )
-                                        })}
+                                    {mobileRuleGroups.map((group) => (
+                                        <div key={group.lawName} className="p-3 rounded-lg border border-border">
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                <p className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">
+                                                    {group.lawName}
+                                                </p>
+                                                <Badge variant="outline" className="text-xs shrink-0">
+                                                    {group.items.length}개
+                                                </Badge>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {group.items.map((delegation) => {
+                                                    const originalIdx = delegationIndexByRef.get(delegation)
+                                                    const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                    const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                    return (
+                                                        <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                            {header && (
+                                                                <p className="font-semibold text-sm text-foreground mb-2">
+                                                                    {header}
+                                                                </p>
+                                                            )}
+                                                            {delegation.content && (
+                                                                <div
+                                                                    className="text-xs text-foreground leading-relaxed break-words"
+                                                                    style={{
+                                                                        fontSize: `${fontSize}px`,
+                                                                        lineHeight: "1.8",
+                                                                        overflowWrap: "break-word",
+                                                                        wordBreak: "break-word",
+                                                                    }}
+                                                                    onClick={handleContentClick}
+                                                                    dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                     {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
                                         <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                                     )}
@@ -499,10 +576,17 @@ export function DelegationPanel({
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 onClick={() => {
-                                                                    const content = validDelegations
-                                                                        .filter((d) => d.type === "시행령")
-                                                                        .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
-                                                                        .join('\n\n---\n\n')
+                                                                    const content = decreeGroups
+                                                                        .map((group) => {
+                                                                            const body = group.items
+                                                                                .map((d) => {
+                                                                                    const header = [d.joNum, d.title].filter(Boolean).join(" ")
+                                                                                    return `${header}\n\n${d.content || ""}`.trim()
+                                                                                })
+                                                                                .join("\n\n---\n\n")
+                                                                            return `${group.lawName}\n\n${body}`.trim()
+                                                                        })
+                                                                        .join("\n\n==========\n\n")
                                                                     navigator.clipboard.writeText(content)
                                                                     toast({ title: "복사 완료", description: "시행령 내용이 클립보드에 복사되었습니다." })
                                                                 }}
@@ -516,33 +600,47 @@ export function DelegationPanel({
                                                 </div>
                                                 <ScrollArea className="h-[calc(100vh-12rem)]">
                                                     <div className="space-y-3 pr-4">
-                                                        {validDelegations
-                                                            .filter((d) => d.type === "시행령")
-                                                            .map((delegation, idx) => {
-                                                                const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                                                return (
-                                                                    <div key={idx} className="py-3 border-b border-border last:border-0">
-                                                                        {delegation.title && (
-                                                                            <p className="font-semibold text-sm text-foreground mb-2">
-                                                                                {delegation.title}
-                                                                            </p>
-                                                                        )}
-                                                                        {delegation.content && (
-                                                                            <div
-                                                                                className="text-xs text-foreground leading-relaxed break-words"
-                                                                                style={{
-                                                                                    fontSize: `${fontSize}px`,
-                                                                                    lineHeight: "1.8",
-                                                                                    overflowWrap: "break-word",
-                                                                                    wordBreak: "break-word",
-                                                                                }}
-                                                                                onClick={handleContentClick}
-                                                                                dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                )
-                                                            })}
+                                                        {decreeGroups.map((group) => (
+                                                            <div key={group.lawName} className="p-3 rounded-lg border border-border">
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <p className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">
+                                                                        {group.lawName}
+                                                                    </p>
+                                                                    <Badge variant="outline" className="text-xs shrink-0">
+                                                                        {group.items.length}개
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="space-y-3">
+                                                                    {group.items.map((delegation) => {
+                                                                        const originalIdx = delegationIndexByRef.get(delegation)
+                                                                        const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                                        const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                                        return (
+                                                                            <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                                                {header && (
+                                                                                    <p className="font-semibold text-sm text-foreground mb-2">
+                                                                                        {header}
+                                                                                    </p>
+                                                                                )}
+                                                                                {delegation.content && (
+                                                                                    <div
+                                                                                        className="text-xs text-foreground leading-relaxed break-words"
+                                                                                        style={{
+                                                                                            fontSize: `${fontSize}px`,
+                                                                                            lineHeight: "1.8",
+                                                                                            overflowWrap: "break-word",
+                                                                                            wordBreak: "break-word",
+                                                                                        }}
+                                                                                        onClick={handleContentClick}
+                                                                                        dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                         {validDelegations.filter((d) => d.type === "시행령").length === 0 && (
                                                             <p className="text-xs text-muted-foreground text-center py-4">시행령 없음</p>
                                                         )}
@@ -582,10 +680,17 @@ export function DelegationPanel({
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 onClick={() => {
-                                                                    const content = validDelegations
-                                                                        .filter((d) => d.type === "시행규칙")
-                                                                        .map((d) => `${d.title || ''}\n\n${d.content || ''}`)
-                                                                        .join('\n\n---\n\n')
+                                                                    const content = ruleGroups
+                                                                        .map((group) => {
+                                                                            const body = group.items
+                                                                                .map((d) => {
+                                                                                    const header = [d.joNum, d.title].filter(Boolean).join(" ")
+                                                                                    return `${header}\n\n${d.content || ""}`.trim()
+                                                                                })
+                                                                                .join("\n\n---\n\n")
+                                                                            return `${group.lawName}\n\n${body}`.trim()
+                                                                        })
+                                                                        .join("\n\n==========\n\n")
                                                                     navigator.clipboard.writeText(content)
                                                                     toast({ title: "복사 완료", description: "시행규칙 내용이 클립보드에 복사되었습니다." })
                                                                 }}
@@ -599,33 +704,47 @@ export function DelegationPanel({
                                                 </div>
                                                 <ScrollArea className="h-[calc(100vh-12rem)]">
                                                     <div className="space-y-3 pr-4">
-                                                        {validDelegations
-                                                            .filter((d) => d.type === "시행규칙")
-                                                            .map((delegation, idx) => {
-                                                                const originalIdx = validDelegations.findIndex(d => d === delegation)
-                                                                return (
-                                                                    <div key={idx} className="py-3 border-b border-border last:border-0">
-                                                                        {delegation.title && (
-                                                                            <p className="font-semibold text-sm text-foreground mb-2">
-                                                                                {delegation.title}
-                                                                            </p>
-                                                                        )}
-                                                                        {delegation.content && (
-                                                                            <div
-                                                                                className="text-xs text-foreground leading-relaxed break-words"
-                                                                                style={{
-                                                                                    fontSize: `${fontSize}px`,
-                                                                                    lineHeight: "1.8",
-                                                                                    overflowWrap: "break-word",
-                                                                                    wordBreak: "break-word",
-                                                                                }}
-                                                                                onClick={handleContentClick}
-                                                                                dangerouslySetInnerHTML={{ __html: delegationsHtmlCache.get(`${delegation.type}-${originalIdx}`) || '' }}
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                )
-                                                            })}
+                                                        {ruleGroups.map((group) => (
+                                                            <div key={group.lawName} className="p-3 rounded-lg border border-border">
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <p className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">
+                                                                        {group.lawName}
+                                                                    </p>
+                                                                    <Badge variant="outline" className="text-xs shrink-0">
+                                                                        {group.items.length}개
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="space-y-3">
+                                                                    {group.items.map((delegation) => {
+                                                                        const originalIdx = delegationIndexByRef.get(delegation)
+                                                                        const key = originalIdx === undefined ? "" : `${delegation.type}-${originalIdx}`
+                                                                        const header = [delegation.joNum, delegation.title].filter(Boolean).join(" ")
+                                                                        return (
+                                                                            <div key={key || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
+                                                                                {header && (
+                                                                                    <p className="font-semibold text-sm text-foreground mb-2">
+                                                                                        {header}
+                                                                                    </p>
+                                                                                )}
+                                                                                {delegation.content && (
+                                                                                    <div
+                                                                                        className="text-xs text-foreground leading-relaxed break-words"
+                                                                                        style={{
+                                                                                            fontSize: `${fontSize}px`,
+                                                                                            lineHeight: "1.8",
+                                                                                            overflowWrap: "break-word",
+                                                                                            wordBreak: "break-word",
+                                                                                        }}
+                                                                                        onClick={handleContentClick}
+                                                                                        dangerouslySetInnerHTML={{ __html: key ? delegationsHtmlCache.get(key) || '' : '' }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                         {validDelegations.filter((d) => d.type === "시행규칙").length === 0 && (
                                                             <p className="text-xs text-muted-foreground text-center py-4">시행규칙 없음</p>
                                                         )}

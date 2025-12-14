@@ -132,7 +132,8 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
         for (const item of sihyungryung) {
           article.delegations.push({
             type: "시행령",
-            lawName: meta.sihyungryungName,
+            // CRITICAL: 일부 응답은 시행령 조문마다 법령명이 포함될 수 있음 (다른 시행령 혼재 케이스)
+            lawName: item.법령명 || meta.sihyungryungName,
             jo: item.조번호 ? convertToJO(item.조번호, item.조가지번호 || "00") : undefined,
             joNum: item.조번호 ? formatJoNum(convertToJO(item.조번호, item.조가지번호 || "00")) : undefined,
             title: item.조제목 || "",
