@@ -256,12 +256,12 @@ export function LegalMarkdownRenderer({
                     right.push(node.substring(localSplitIndex))
                   } else if (React.isValidElement(node)) {
                     // 재귀적으로 자식 노드 분할
-                    const props = node.props as { children?: React.ReactNode; key?: React.Key }
+                    const props = node.props as { children?: React.ReactNode }
                     const childNodes = React.Children.toArray(props.children)
                     const [childLeft, childRight] = splitNodes(childNodes, localSplitIndex)
 
-                    // Key preservation strategy
-                    const baseKey = props.key || `split-${index}`
+                    // Key preservation strategy (node.key 사용 - props.key는 React 특수 prop으로 접근 불가)
+                    const baseKey = node.key || `split-${index}`
 
                     if (childLeft.length > 0) {
                       left.push(React.cloneElement(node, {
@@ -330,16 +330,49 @@ export function LegalMarkdownRenderer({
 
               const cleanTitleNodes = removeParentheses(titleNodes)
 
+              // [부분 인용] 감지
+              const isPartialQuote = fullText.includes('[부분 인용]') || fullText.includes('[부분인용]')
+
+              // 제목에서 [부분 인용] 텍스트 제거 (배지로 대체)
+              const removeBracketText = (nodes: React.ReactNode[]): React.ReactNode[] => {
+                return nodes.map((node) => {
+                  if (typeof node === 'string') {
+                    return node.replace(/\s*\[부분\s?인용\]\s*/g, ' ').trim()
+                  }
+                  if (React.isValidElement(node)) {
+                    const props = node.props as { children?: React.ReactNode }
+                    const newChildren = props.children ? removeBracketText(React.Children.toArray(props.children)) : undefined
+                    return React.cloneElement(node, {
+                      ...props,
+                      children: newChildren
+                    } as any)
+                  }
+                  return node
+                })
+              }
+
+              const finalTitleNodes = isPartialQuote ? removeBracketText(cleanTitleNodes) : cleanTitleNodes
+              // 본문에서도 [부분 인용] 텍스트 제거
+              const finalContentNodes = isPartialQuote ? removeBracketText(contentNodes) : contentNodes
+
               return (
                 <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible">
                   <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
                     {/* 조문 제목 Group */}
-                    <div className="text-muted-foreground font-medium text-sm break-words">
-                      {cleanTitleNodes}
+                    <div className="text-muted-foreground font-medium text-sm break-words flex items-center gap-1.5 flex-wrap">
+                      {finalTitleNodes}
+                      {isPartialQuote && (
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded cursor-help"
+                          title="부분 인용된 조문입니다. 전문 확인은 좌측 법령을 클릭하세요."
+                        >
+                          부분 인용
+                        </span>
+                      )}
                     </div>
                     {/* 조문 본문 Group */}
                     <div className="text-foreground dark:text-white text-sm leading-relaxed mt-0.5">
-                      {contentNodes}
+                      {finalContentNodes}
                     </div>
                   </div>
                 </blockquote>

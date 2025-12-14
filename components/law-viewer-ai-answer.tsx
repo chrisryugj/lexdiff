@@ -24,6 +24,7 @@ import {
     ClipboardCheck,
     GitCompare,
     Zap,
+    Ruler,
 } from "lucide-react"
 import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
@@ -312,7 +313,7 @@ interface AIAnswerContentProps {
     fontSize: number
     setFontSize: (size: number | ((prev: number) => number)) => void
     onLawClick?: (lawName: string, article?: string) => void  // ✅ 법령 링크 클릭 핸들러
-    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'  // ✅ 6가지 법률 질문 유형
+    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope'  // ✅ 7가지 법률 질문 유형
     isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
     onRefresh?: () => void  // ✅ 강제 새로고침 (캐시 무시)
 }
@@ -421,7 +422,7 @@ export function AIAnswerContent({
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                             <span className="break-words line-clamp-2">{userQuery}</span>
-                            {/* 쿼리 타입 배지 (6가지 법률 질문 유형) */}
+                            {/* 쿼리 타입 배지 (7가지 법률 질문 유형) */}
                             {(() => {
                                 const typeConfigs: Record<string, { icon: typeof BookOpen, label: string, bgColor: string, borderColor: string, textColor: string }> = {
                                     definition: { icon: CircleHelp, label: '개념/정의', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', textColor: 'text-cyan-500' },
@@ -429,7 +430,8 @@ export function AIAnswerContent({
                                     procedure: { icon: ListChecks, label: '절차/방법', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' },
                                     comparison: { icon: GitCompare, label: '비교', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
                                     application: { icon: Scale, label: '적용 판단', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
-                                    consequence: { icon: Zap, label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' }
+                                    consequence: { icon: Zap, label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' },
+                                    scope: { icon: Ruler, label: '범위/금액', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', textColor: 'text-amber-500' }
                                 }
                                 const config = typeConfigs[aiQueryType] || typeConfigs.application
                                 const TypeIcon = config.icon
