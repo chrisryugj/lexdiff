@@ -18,7 +18,6 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
-import { HwpViewer } from "@/components/hwp-viewer"
 import type { LawAnnex } from "@/lib/law-types"
 import { getAnnexCache, setAnnexCache } from "@/lib/annex-cache"
 
@@ -404,13 +403,50 @@ export function AnnexModal({
             </div>
           </div>
         ) : fileType === "hwp" ? (
-          // HWP 파일인 경우: HwpViewer로 렌더링 시도
-          <HwpViewer
-            fileUrl={`/api/annex-pdf?flSeq=${extractFlSeq(annexData?.pdfLink || "")}`}
-            onDownload={handleDownload}
-            externalUrl={molegUrl}
-            fileName={`${lawName} 별표 ${annexNumber}${annexData?.annexName ? ` (${annexData.annexName})` : ""}`}
-          />
+          // HWP 파일인 경우: 컴팩트한 레이아웃
+          <div className="flex flex-col items-center justify-center py-8 gap-4 px-4">
+            {/* HWP 아이콘 */}
+            <div className="relative">
+              <FileText className="w-16 h-16 text-blue-500/70" strokeWidth={1.5} />
+              <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                HWP
+              </span>
+            </div>
+
+            {/* 파일명 */}
+            <div className="text-center">
+              <p className="text-base font-medium mb-1">
+                {lawName} 별표 {annexNumber}
+                {annexData?.annexName && ` (${annexData.annexName})`}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                HWP 파일은 브라우저에서 직접 볼 수 없습니다.
+                <br />
+                다운로드하여 한컴오피스로 열거나, 법제처에서 확인하세요.
+              </p>
+            </div>
+
+            {/* 액션 버튼들 */}
+            <div className="flex gap-3 flex-wrap justify-center">
+              <Button asChild className="gap-2">
+                <a href={`https://www.law.go.kr/LSW/flDownload.do?flSeq=${extractFlSeq(annexData?.pdfLink || "")}`} target="_blank" rel="noopener noreferrer">
+                  <Download className="w-4 h-4" />
+                  다운로드
+                </a>
+              </Button>
+              <Button variant="outline" asChild className="gap-2">
+                <a href={molegUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                  법제처에서 보기
+                </a>
+              </Button>
+            </div>
+
+            {/* 안내 메시지 */}
+            <p className="text-xs text-muted-foreground/70 text-center">
+              💡 Windows에서는 한컴오피스 뷰어를 설치하면 브라우저에서 바로 볼 수 있습니다.
+            </p>
+          </div>
         ) : (
           <Tabs
             value={viewMode}

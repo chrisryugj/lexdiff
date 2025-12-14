@@ -41,7 +41,7 @@ export function HwpViewer({
     : ""
 
   return (
-    <div className="flex flex-col items-center justify-center h-[50vh] gap-5 px-4">
+    <div className="flex flex-col items-center justify-center w-full h-[50vh] gap-5 px-4">
       {/* HWP 아이콘 */}
       <div className="relative">
         <FileText className="w-20 h-20 text-blue-500/70" strokeWidth={1.5} />
