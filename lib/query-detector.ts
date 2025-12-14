@@ -2,13 +2,30 @@
  * 검색 쿼리 타입 감지 유틸리티
  *
  * 기본 검색 vs RAG(자연어 검색) 자동 판별
+ * - structured: 법령명 + 조문번호 조회 (법제처 API)
+ * - natural: 자연어 질문 (AI RAG 검색)
+ *
+ * @updated 2024-12 관세/공직/행정 도메인 특화 패턴 강화
  */
 
+import { analyzeEnhancedLegalQuery, type LegalQueryType } from './legal-query-analyzer'
+
 export type QueryType = 'structured' | 'natural'
+export type SearchMode = 'law' | 'ordinance' | 'ai'
 
 interface QueryDetectionResult {
   type: QueryType
   confidence: number // 0-1 범위
+  reason: string
+}
+
+// 통합 분류 결과
+export interface UnifiedClassificationResult {
+  searchMode: SearchMode
+  queryType: QueryType
+  legalQueryType: LegalQueryType
+  confidence: number
+  domain: string
   reason: string
 }
 
@@ -178,4 +195,100 @@ export function detectQueryType(query: string): QueryDetectionResult {
 export function isNaturalLanguageQuery(query: string): boolean {
   const result = detectQueryType(query)
   return result.type === 'natural' && result.confidence >= 0.75
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 통합 분류 함수 (검색 모드 + 질문 유형 + 도메인 한 번에)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 통합 검색 분류 함수
+ *
+ * 검색 모드(law/ordinance/ai), 질문 유형(7종), 도메인(관세/행정/공직/세법)을
+ * 한 번의 호출로 모두 분류
+ *
+ * @example
+ * classifySearchQuery("관세법 제38조 요건은?")
+ * // → { searchMode: 'ai', queryType: 'natural', legalQueryType: 'requirement',
+ * //     confidence: 0.95, domain: 'customs', reason: '질문형 + 관세 도메인' }
+ *
+ * classifySearchQuery("관세법 제38조")
+ * // → { searchMode: 'law', queryType: 'structured', legalQueryType: 'definition',
+ * //     confidence: 0.98, domain: 'customs', reason: '순수 법령명 + 조문 번호' }
+ */
+export function classifySearchQuery(query: string): UnifiedClassificationResult {
+  const trimmedQuery = query.trim()
+
+  // 빈 쿼리 처리
+  if (!trimmedQuery) {
+    return {
+      searchMode: 'law',
+      queryType: 'structured',
+      legalQueryType: 'application',
+      confidence: 0.5,
+      domain: 'general',
+      reason: '빈 쿼리'
+    }
+  }
+
+  // 1. 기본 쿼리 타입 감지 (structured vs natural)
+  const basicDetection = detectQueryType(trimmedQuery)
+
+  // 2. 확장 법률 질문 분석 (질문 유형 + 도메인)
+  const enhancedAnalysis = analyzeEnhancedLegalQuery(trimmedQuery)
+
+  // 3. 조례 여부 판단
+  const isOrdinanceQuery = /조례|규칙/.test(trimmedQuery) &&
+    /(특별시|광역시|도|시|군|구)\s*[가-힣]/.test(trimmedQuery)
+
+  // 4. 검색 모드 결정
+  let searchMode: SearchMode
+
+  if (basicDetection.type === 'structured' && basicDetection.confidence >= 0.9) {
+    // 명확한 구조화 검색
+    searchMode = isOrdinanceQuery ? 'ordinance' : 'law'
+  } else if (basicDetection.type === 'natural' && basicDetection.confidence >= 0.75) {
+    // 명확한 자연어 질문
+    searchMode = 'ai'
+  } else {
+    // 애매한 경우: 법령 분석 결과 참고
+    // 질문 유형이 definition이고 조문이 있으면 law, 아니면 confidence 기반
+    if (enhancedAnalysis.type === 'definition' &&
+        enhancedAnalysis.extractedArticles.length > 0 &&
+        enhancedAnalysis.extractedLaws.length > 0) {
+      searchMode = isOrdinanceQuery ? 'ordinance' : 'law'
+    } else if (enhancedAnalysis.confidence >= 0.7) {
+      searchMode = 'ai'
+    } else {
+      searchMode = isOrdinanceQuery ? 'ordinance' : 'law'
+    }
+  }
+
+  // 5. 최종 신뢰도 계산 (두 분석 결과 종합)
+  const confidence = Math.max(basicDetection.confidence, enhancedAnalysis.confidence)
+
+  // 6. 이유 생성
+  let reason = basicDetection.reason
+  if (enhancedAnalysis.domain !== 'general') {
+    reason += ` + ${enhancedAnalysis.domain} 도메인`
+  }
+  if (enhancedAnalysis.isCompound) {
+    reason += ' (복합 질문)'
+  }
+
+  return {
+    searchMode,
+    queryType: basicDetection.type,
+    legalQueryType: enhancedAnalysis.type,
+    confidence,
+    domain: enhancedAnalysis.domain,
+    reason
+  }
+}
+
+/**
+ * 검색 모드만 빠르게 판단 (UI용)
+ */
+export function getSearchMode(query: string): SearchMode {
+  return classifySearchQuery(query).searchMode
 }

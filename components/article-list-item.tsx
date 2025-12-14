@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Star, Bookmark, BookmarkCheck, AlertCircle } from "lucide-react"
+import { Star, AlertCircle, Trash2 } from "lucide-react"
 import type { LawArticle } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
 
@@ -13,6 +13,27 @@ interface ArticleListItemProps {
   isOrdinance: boolean
   onClick: () => void
   onToggleFavorite: (e: React.MouseEvent | React.KeyboardEvent) => void
+}
+
+/**
+ * 삭제된 조문인지 판별
+ * - "삭제 ＜2008.12.26＞" 형식
+ * - "삭제" 단독
+ * - content와 title 모두 비어있는 경우
+ */
+function isDeletedArticle(article: LawArticle): boolean {
+  const content = article.content?.trim() || ""
+  const title = article.title?.trim() || ""
+
+  // "삭제 ＜날짜＞" 또는 "삭제" 패턴 감지 (전각/반각 괄호 모두 지원)
+  // 예: "삭제 ＜2008.12.26＞", "삭제 <2008.12.26>", "삭제"
+  const deletedPattern = /^삭제\s*[＜<]?\s*[\d.,-]*\s*[＞>]?\s*$/
+  if (deletedPattern.test(content)) return true
+
+  // content와 title 모두 비어있는 경우
+  if (!content && !title) return true
+
+  return false
 }
 
 export const ArticleListItem = React.memo(function ArticleListItem({
@@ -29,6 +50,8 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     return formatJO(jo)
   }
 
+  const isDeleted = isDeletedArticle(article)
+
   return (
     <button
       onClick={onClick}
@@ -37,14 +60,20 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         isActive
           ? "bg-primary text-primary-foreground font-bold"
           : "hover:bg-secondary text-foreground font-medium"
-      } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
+      } ${isLoading ? "opacity-50 cursor-wait" : ""} ${isDeleted ? "opacity-60" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-base font-bold">
+          <div className="flex items-center gap-1.5 text-base font-bold">
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
+            {isDeleted && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground rounded">
+                <Trash2 className="h-2.5 w-2.5" />
+                삭제
+              </span>
+            )}
           </div>
-          {article.title && (
+          {article.title && !isDeleted && (
             <div
               className="text-sm opacity-75 mt-0.5 truncate"
               title={article.title}
