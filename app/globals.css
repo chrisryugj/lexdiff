@@ -441,8 +441,9 @@ a.law-ref:hover,
   .prose blockquote {
     font-family: 'Pretendard', sans-serif;
     font-size: 1.0em;
-    margin-left: 2.5rem;
-    margin-right: 1.5rem;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 1rem;
     padding-right: 0.5rem;
     color: #000000;
     /* 라이트 테마: 어두운 텍스트 */
@@ -997,18 +998,18 @@ a.law-ref:hover,
   }
 }
 
-/* 방문한 법령 링크 상태 표시 */
-a.law-ref:visited {
-  color: oklch(0.5 0.12 280) !important;
-  /* 방문한 링크: 어두운 보라색 */
+/* 법령 링크: 기본 색상 */
+a.law-ref,
+a.law-ref:visited,
+a.law-ref:link {
+  color: oklch(0.65 0.2 250) !important;
 }
 
-a.law-ref:not(:visited) {
-  color: rgb(59 130 246);
-  /* 미방문 링크: 기본 파란색 */
+/* 법령 링크: 실제 클릭한 링크 (JS로 추적) */
+a.law-ref.law-ref-visited {
+  color: oklch(0.5 0.12 280) !important;
 }
 
 a.law-ref:hover {
-  color: oklch(0.65 0.2 230) !important;
-  /* 호버: 밝은 시안 */
+  color: oklch(0.8 0.25 250) !important;
 }

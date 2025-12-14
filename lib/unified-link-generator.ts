@@ -492,15 +492,29 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
 
   let result = markdown
 
-  // 패턴 1: 「법령명」 제N조 (가장 명확한 패턴)
-  // 예: 「민법」 제38조, 「민법」 제10조의2
+  // 패턴 1: 「법령명」 제N조, 제M조 (쉼표로 연결된 복수 조문)
+  // 예: 「민법」 제390조, 제393조 → 각각 개별 링크
   result = result.replace(
-    /「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)/g,
-    (match, lawName, article) => {
-      const normalizedArticle = article.replace(/\s+/g, '')
+    /「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)((?:\s*,\s*제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)*)/g,
+    (match, lawName, firstArticle, restArticles) => {
       const encodedLaw = encodeURIComponent(lawName.trim())
-      const encodedArticle = encodeURIComponent(normalizedArticle)
-      return `[「${lawName}」 ${article}](law://${encodedLaw}/${encodedArticle})`
+
+      // 첫 번째 조문 링크
+      const normalizedFirst = firstArticle.replace(/\s+/g, '')
+      let result = `[「${lawName}」 ${firstArticle}](law://${encodedLaw}/${encodeURIComponent(normalizedFirst)})`
+
+      // 나머지 조문들 (쉼표로 구분)
+      if (restArticles) {
+        const additionalArticles = restArticles.match(/제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?/g)
+        if (additionalArticles) {
+          for (const article of additionalArticles) {
+            const normalizedArticle = article.replace(/\s+/g, '')
+            result += `, [${article}](law://${encodedLaw}/${encodeURIComponent(normalizedArticle)})`
+          }
+        }
+      }
+
+      return result
     }
   )
 

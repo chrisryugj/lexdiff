@@ -17,6 +17,7 @@ export type LegalQueryType =
   | 'comparison'    // 비교
   | 'application'   // 적용 판단
   | 'consequence'   // 효과/결과
+  | 'scope'         // 범위/금액/산정
 
 export interface LegalQueryAnalysis {
   type: LegalQueryType
@@ -36,7 +37,7 @@ const QUERY_PATTERNS: Record<LegalQueryType, {
   weight: number  // 기본 가중치 (빈도 반영)
 }> = {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // definition: 개념/정의 질문
+  // definition: 개념/정의 질문 (강화된 패턴)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   definition: {
     keywords: [
@@ -45,12 +46,14 @@ const QUERY_PATTERNS: Record<LegalQueryType, {
       '어떤 것', '어떤것'
     ],
     patterns: [
+      /이란\s*\??$/,                             // ~이란? (끝나는 패턴, 최우선)
+      /란\s*\??$/,                               // ~란? (끝나는 패턴)
       /(.+)(이?란|이란)\s*(무엇|뭐|뭔가)/,      // ~란 무엇인가요
       /(.+)(의\s*정의|의\s*개념|의\s*뜻)/,      // ~의 정의
       /(.+)(은|는)\s*(무엇|뭐|뭔가)/,           // ~는 무엇인가요
-      /^(.+)(이란|란)\?*$/,                     // ~란?
+      /상\s+.+(이란|란)/,                        // ~상 ~이란 (예: 민법상 선의취득이란)
     ],
-    weight: 0.05  // 5%
+    weight: 0.15  // 15% (기본 가중치 상향)
   },
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -140,7 +143,7 @@ const QUERY_PATTERNS: Record<LegalQueryType, {
     keywords: [
       '결과', '효과', '효력', '영향', '불이익',
       '하면', '안하면', '위반', '벌칙', '처벌',
-      '손해', '배상', '책임', '어떻게 되'
+      '어떻게 되'
     ],
     patterns: [
       /(.+)(하면|안\s*하면)\s*(어떻게|뭐가)/,        // ~하면 어떻게
@@ -148,9 +151,31 @@ const QUERY_PATTERNS: Record<LegalQueryType, {
       /(.+)(위반|불이행)\s*(시|하면)/,               // ~위반 시
       /(.+)(처벌|벌칙|제재)(는|은|이)/,              // ~처벌은
       /어떻게\s*되/,                                  // 어떻게 되나요
-      /(.+)(책임|손해|배상)(이|을|은)/,              // ~책임이
     ],
     weight: 0.10  // 10%
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // scope: 범위/금액/산정 질문
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  scope: {
+    keywords: [
+      '범위', '금액', '산정', '계산', '산출',
+      '얼마', '어느 정도', '몇', '액수',
+      '손해', '배상', '책임', '보상', '위약금',
+      '한도', '상한', '하한', '최대', '최소',
+      '기준', '산식', '공식'
+    ],
+    patterns: [
+      /(.+)(범위|한도)(는|은|이|가)/,                // ~범위는
+      /(.+)(얼마|어느\s*정도|몇)/,                   // 얼마나
+      /(.+)(금액|액수)\s*(은|는|이|를)/,             // ~금액은
+      /(.+)(산정|계산|산출)\s*(방법|기준|방식)/,     // ~산정 방법
+      /(.+)(손해|배상|책임)\s*(범위|금액|액수)/,     // 손해배상 범위
+      /(.+)(위약금|보상금|배상금)\s*(은|는|이)/,     // ~위약금은
+      /(최대|최소|상한|하한)\s*(.+)(은|는|이)/,      // 최대 ~은
+    ],
+    weight: 0.12  // 12% - consequence보다 약간 높게
   }
 }
 
@@ -260,6 +285,19 @@ export function analyzeLegalQuery(query: string): LegalQueryAnalysis {
   const extractedLaws = extractLaws(query)
   const extractedArticles = extractArticles(query)
 
+  // ✅ 우선 처리: "~이란?" 패턴은 무조건 definition
+  // application의 높은 가중치보다 우선
+  if (/이란\s*\??$/.test(query) || /란\s*\??$/.test(query)) {
+    console.log('[LegalQueryAnalyzer] 강제 definition 분류 (이란/란 패턴)')
+    return {
+      type: 'definition',
+      confidence: 0.95,
+      extractedLaws,
+      extractedArticles,
+      keywords: ['이란', '란']
+    }
+  }
+
   // 2. 유형별 점수 계산
   const scores = calculateTypeScores(query)
 
@@ -330,7 +368,8 @@ export function getQueryTypeForPrompt(query: string): {
     procedure: 'procedural',    // 절차 → procedural
     comparison: 'comparison',   // 비교 → comparison
     application: 'general',     // 적용 → general
-    consequence: 'general'      // 효과 → general
+    consequence: 'general',     // 효과 → general
+    scope: 'general'            // 범위 → general
   }
 
   return {
