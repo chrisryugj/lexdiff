@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Star, AlertCircle, Trash2 } from "lucide-react"
+import { Star, AlertCircle } from "lucide-react"
 import type { LawArticle } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
 
@@ -60,16 +60,15 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         isActive
           ? "bg-primary text-primary-foreground font-bold"
           : "hover:bg-secondary text-foreground font-medium"
-      } ${isLoading ? "opacity-50 cursor-wait" : ""} ${isDeleted ? "opacity-60" : ""}`}
+      } ${isLoading ? "opacity-50 cursor-wait" : ""} ${isDeleted ? "opacity-40 text-muted-foreground" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 text-base font-bold">
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
             {isDeleted && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground rounded">
-                <Trash2 className="h-2.5 w-2.5" />
-                삭제
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded">
+                삭제된 조문
               </span>
             )}
           </div>
