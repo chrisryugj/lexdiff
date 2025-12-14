@@ -13,6 +13,93 @@ import React, { useMemo, useEffect, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
+import {
+  BookOpen,
+  Scale,
+  FileText,
+  ListChecks,
+  GitCompare,
+  AlertTriangle,
+  Lightbulb,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Clock,
+  Gavel,
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Users,
+  Building,
+  Coins,
+  ShieldAlert,
+  FileSearch,
+  type LucideIcon
+} from 'lucide-react'
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 섹션 헤더 아이콘 매핑
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 단색으로 통일 - 다크/라이트 테마 모두 대응
+const SECTION_ICON_COLOR = 'text-foreground/70'
+
+const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: LucideIcon }> = [
+  // 공통 섹션
+  { pattern: /^정의/, icon: BookOpen },
+  { pattern: /^법적\s*성질/, icon: Scale },
+  { pattern: /^조문\s*원문/, icon: FileText },
+  { pattern: /^구성\s*요건/, icon: ListChecks },
+  { pattern: /^유사\s*개념/, icon: GitCompare },
+  { pattern: /^예시/, icon: Lightbulb },
+  { pattern: /^관계\s*법령/, icon: BookOpen },
+
+  // requirement (요건) 섹션
+  { pattern: /^결론/, icon: CheckCircle2 },
+  { pattern: /^적극적\s*요건/, icon: CheckCircle2 },
+  { pattern: /^소극적\s*요건/, icon: XCircle },
+  { pattern: /^예외|특례/, icon: AlertTriangle },
+  { pattern: /^주의사항/, icon: AlertTriangle },
+
+  // procedure (절차) 섹션
+  { pattern: /^전체\s*흐름/, icon: ArrowRight },
+  { pattern: /^단계별\s*안내/, icon: ListChecks },
+  { pattern: /^기한\s*요약/, icon: Clock },
+  { pattern: /^불복\s*절차/, icon: Gavel },
+
+  // comparison (비교) 섹션
+  { pattern: /^핵심\s*차이/, icon: GitCompare },
+  { pattern: /^비교표/, icon: BarChart3 },
+  { pattern: /^선택\s*기준/, icon: CheckCircle2 },
+
+  // application (적용) 섹션
+  { pattern: /^요건별\s*검토/, icon: FileSearch },
+  { pattern: /^다음\s*행동/, icon: ArrowRight },
+
+  // consequence (효과) 섹션
+  { pattern: /^법적\s*효과/, icon: Scale },
+  { pattern: /^행정적\s*효과/, icon: Building },
+  { pattern: /^민사적\s*효과/, icon: Users },
+  { pattern: /^형사적\s*효과/, icon: ShieldAlert },
+  { pattern: /^구제\s*방법/, icon: Gavel },
+
+  // scope (범위/금액) 섹션
+  { pattern: /^산정\s*기준/, icon: Calculator },
+  { pattern: /^법정\s*기준/, icon: Scale },
+  { pattern: /^가산|감경/, icon: TrendingUp },
+  { pattern: /^계산\s*예시/, icon: Calculator },
+  { pattern: /^실무\s*참고/, icon: Lightbulb },
+]
+
+function getSectionIcon(text: string): { Icon: LucideIcon; color: string } | null {
+  const trimmed = text.trim()
+  for (const { pattern, icon } of SECTION_ICON_MAP) {
+    if (pattern.test(trimmed)) {
+      return { Icon: icon, color: SECTION_ICON_COLOR }
+    }
+  }
+  return null
+}
 
 // 방문한 법령 링크 저장 키
 const VISITED_LAWS_KEY = 'lexdiff-visited-laws'
@@ -70,7 +157,7 @@ export function LegalMarkdownRenderer({
   }, [content])
 
   return (
-    <div className={`legal-markdown-content prose prose-sm dark:prose-invert max-w-none ${className}`}>
+    <div className={`legal-markdown-content prose dark:prose-invert max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={(url) => {
@@ -332,16 +419,18 @@ export function LegalMarkdownRenderer({
 
               // [부분 인용] 감지
               const isPartialQuote = fullText.includes('[부분 인용]') || fullText.includes('[부분인용]')
+              // [...] 감지 (이하 생략)
+              const isOmitted = fullText.includes('[...]') || fullText.includes('[…]')
 
               // 제목에서 [부분 인용] 텍스트 제거 (배지로 대체)
-              const removeBracketText = (nodes: React.ReactNode[]): React.ReactNode[] => {
+              const removePartialQuoteText = (nodes: React.ReactNode[]): React.ReactNode[] => {
                 return nodes.map((node) => {
                   if (typeof node === 'string') {
                     return node.replace(/\s*\[부분\s?인용\]\s*/g, ' ').trim()
                   }
                   if (React.isValidElement(node)) {
                     const props = node.props as { children?: React.ReactNode }
-                    const newChildren = props.children ? removeBracketText(React.Children.toArray(props.children)) : undefined
+                    const newChildren = props.children ? removePartialQuoteText(React.Children.toArray(props.children)) : undefined
                     return React.cloneElement(node, {
                       ...props,
                       children: newChildren
@@ -351,9 +440,43 @@ export function LegalMarkdownRenderer({
                 })
               }
 
-              const finalTitleNodes = isPartialQuote ? removeBracketText(cleanTitleNodes) : cleanTitleNodes
-              // 본문에서도 [부분 인용] 텍스트 제거
-              const finalContentNodes = isPartialQuote ? removeBracketText(contentNodes) : contentNodes
+              // 본문에서 [...] 를 인라인 배지로 대체
+              const replaceOmittedWithBadge = (nodes: React.ReactNode[]): React.ReactNode[] => {
+                return nodes.flatMap((node, idx) => {
+                  if (typeof node === 'string') {
+                    // [...] 또는 […] 패턴을 배지로 대체
+                    const parts = node.split(/(\[\.{3}\]|\[…\])/)
+                    return parts.map((part, i) => {
+                      if (part === '[...]' || part === '[…]') {
+                        return (
+                          <span
+                            key={`omit-${idx}-${i}`}
+                            className="inline-flex items-center mx-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/30 rounded cursor-help align-middle"
+                            title="이하 내용이 생략되었습니다. 링크를 통해 전문을 확인하세요."
+                          >
+                            이하 생략
+                          </span>
+                        )
+                      }
+                      return part
+                    })
+                  }
+                  if (React.isValidElement(node)) {
+                    const props = node.props as { children?: React.ReactNode }
+                    const newChildren = props.children ? replaceOmittedWithBadge(React.Children.toArray(props.children)) : undefined
+                    return React.cloneElement(node, {
+                      ...props,
+                      children: newChildren
+                    } as any)
+                  }
+                  return node
+                })
+              }
+
+              const finalTitleNodes = isPartialQuote ? removePartialQuoteText(cleanTitleNodes) : cleanTitleNodes
+              // 본문에서 [부분 인용] 제거 + [...] 배지 대체
+              let processedContentNodes = isPartialQuote ? removePartialQuoteText(contentNodes) : contentNodes
+              const finalContentNodes = isOmitted ? replaceOmittedWithBadge(processedContentNodes) : processedContentNodes
 
               return (
                 <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible">
@@ -364,7 +487,7 @@ export function LegalMarkdownRenderer({
                       {isPartialQuote && (
                         <span
                           className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded cursor-help"
-                          title="부분 인용된 조문입니다. 전문 확인은 좌측 법령을 클릭하세요."
+                          title="부분 인용된 조문입니다. 링크를 통해 전문을 확인하세요."
                         >
                           부분 인용
                         </span>
@@ -416,18 +539,32 @@ export function LegalMarkdownRenderer({
           ),
 
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          // 헤더 스타일링
+          // 헤더 스타일링 (섹션 아이콘 포함)
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          h2: ({ children }) => (
-            <h2 className="text-base font-bold mt-6 mb-3 pb-2 border-b border-border text-foreground">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90">
-              {children}
-            </h3>
-          ),
+          h2: ({ children }) => {
+            const text = typeof children === 'string' ? children :
+              React.Children.toArray(children).map(c => typeof c === 'string' ? c : '').join('')
+            const iconInfo = getSectionIcon(text)
+
+            return (
+              <h2 className="text-base font-bold mt-6 mb-3 pb-2 border-b border-border text-foreground flex items-center gap-2">
+                {iconInfo && <iconInfo.Icon className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
+                {children}
+              </h2>
+            )
+          },
+          h3: ({ children }) => {
+            const text = typeof children === 'string' ? children :
+              React.Children.toArray(children).map(c => typeof c === 'string' ? c : '').join('')
+            const iconInfo = getSectionIcon(text)
+
+            return (
+              <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 flex items-center gap-1.5">
+                {iconInfo && <iconInfo.Icon className={`h-3.5 w-3.5 ${iconInfo.color} shrink-0`} />}
+                {children}
+              </h3>
+            )
+          },
 
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 리스트 스타일링
