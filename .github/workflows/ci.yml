@@ -20,9 +20,7 @@ jobs:
           node-version: '20'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
+        uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
@@ -38,7 +36,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run tests
         run: pnpm test:run
@@ -65,9 +63,7 @@ jobs:
           node-version: '20'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
+        uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
@@ -83,7 +79,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build
         run: pnpm build
