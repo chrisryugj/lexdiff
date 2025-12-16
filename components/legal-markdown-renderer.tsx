@@ -12,6 +12,7 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
 import {
   BookOpen,
@@ -158,8 +159,29 @@ export function LegalMarkdownRenderer({
 
   return (
     <div className={`legal-markdown-content prose dark:prose-invert max-w-none ${className}`}>
+      <style>{`
+        .hwpx-num-item {
+          font-weight: 600;
+          margin: 1em 0 0.25em 0;
+          font-size: inherit;
+        }
+        .hwpx-section {
+          padding-left: 1.5em;
+          margin-bottom: 0.5em;
+          font-size: inherit;
+        }
+        .hwpx-sub-item {
+          margin: 0.15em 0;
+          font-size: inherit;
+        }
+        .hwpx-content {
+          margin: 0.15em 0;
+          font-size: inherit;
+        }
+      `}</style>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
         urlTransform={(url) => {
           // react-markdown 기본 sanitizer가 커스텀 스킴을 제거해서 href가 ''가 될 수 있음.
           // 조문 모달용 커스텀 스킴(law://)은 허용하고, 그 외는 기본 변환 규칙을 그대로 사용.
@@ -513,11 +535,11 @@ export function LegalMarkdownRenderer({
           },
 
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          // 테이블 (반응형)
+          // 테이블 (반응형) - 부모 fontSize 상속
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           table: ({ children }) => (
             <div className="overflow-x-auto my-4 -mx-1">
-              <table className="min-w-full border-collapse text-sm">
+              <table className="min-w-full border-collapse" style={{ fontSize: 'inherit' }}>
                 {children}
               </table>
             </div>
@@ -528,12 +550,12 @@ export function LegalMarkdownRenderer({
             </thead>
           ),
           th: ({ children }) => (
-            <th className="px-3 py-2 text-left font-semibold text-foreground/80 whitespace-nowrap">
+            <th className="px-3 py-2 text-left font-semibold text-foreground/80 whitespace-nowrap" style={{ fontSize: 'inherit' }}>
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="px-3 py-2 border-b border-border/50">
+            <td className="px-3 py-2 border-b border-border/50" style={{ fontSize: 'inherit' }}>
               {children}
             </td>
           ),
@@ -547,7 +569,7 @@ export function LegalMarkdownRenderer({
             const iconInfo = getSectionIcon(text)
 
             return (
-              <h2 className="text-base font-bold mt-6 mb-3 pb-2 border-b border-border text-foreground flex items-center gap-2">
+              <h2 className="text-base font-bold mt-0 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2">
                 {iconInfo && <iconInfo.Icon className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
                 {children}
               </h2>
