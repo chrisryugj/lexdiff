@@ -112,6 +112,7 @@ describe('useSearchHandlers', () => {
       ragError: null,
       ragProgress: 0,
       ragAnswer: null,
+      aiQueryType: 'application',
     }
 
     // 액션 mock
@@ -147,6 +148,7 @@ describe('useSearchHandlers', () => {
       setRagError: vi.fn(),
       setRagProgress: vi.fn(),
       setRagAnswer: vi.fn(),
+      setAiQueryType: vi.fn(),
       resetSearchState: vi.fn(),
       resetToHome: vi.fn(),
     }

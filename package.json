@@ -2,6 +2,7 @@
   "name": "lexdiff",
   "version": "2.0.0",
   "private": true,
+  "packageManager": "pnpm@10.20.0",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
