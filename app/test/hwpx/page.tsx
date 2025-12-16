@@ -273,10 +273,10 @@ export default function HwpxTestPage() {
                         <table className="border-collapse border border-border w-full">{children}</table>
                       ),
                       th: ({ children }) => (
-                        <th className="border border-border bg-muted px-3 py-2 text-left font-semibold">{children}</th>
+                        <th className="border border-border bg-muted px-3 py-2 text-left font-semibold min-w-[100px]">{children}</th>
                       ),
                       td: ({ children }) => (
-                        <td className="border border-border px-3 py-2">{children}</td>
+                        <td className="border border-border px-3 py-2 min-w-[100px]">{children}</td>
                       ),
                       blockquote: ({ children }) => (
                         <blockquote className="border-l-4 border-primary bg-muted/50 pl-4 py-2 my-4">{children}</blockquote>

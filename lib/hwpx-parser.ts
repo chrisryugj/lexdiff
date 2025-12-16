@@ -6,6 +6,15 @@
  */
 
 import JSZip from "jszip"
+import { DOMParser as XMLDOMParser } from "xmldom"
+
+// 서버/브라우저 환경 호환 DOMParser
+function getDOMParser(): DOMParser | XMLDOMParser {
+  if (typeof window !== "undefined" && window.DOMParser) {
+    return new window.DOMParser()
+  }
+  return new XMLDOMParser()
+}
 
 export interface HwpxParseResult {
   success: boolean
@@ -46,15 +55,26 @@ export async function parseHwpxToMarkdown(
     )
 
     // 3. XML 파싱
-    const parser = new DOMParser()
+    const parser = getDOMParser()
     const doc = parser.parseFromString(xml, "text/xml")
 
-    // 파싱 에러 체크
-    const parseError = doc.querySelector("parsererror")
-    if (parseError) {
-      return {
-        success: false,
-        error: `XML 파싱 에러: ${parseError.textContent}`,
+    // 파싱 에러 체크 (서버/브라우저 호환)
+    if (typeof window === "undefined") {
+      // 서버: xmldom은 파싱 에러 시 parsererror 태그를 documentElement로 반환
+      if (doc.documentElement?.tagName === "parsererror") {
+        return {
+          success: false,
+          error: `XML 파싱 에러: ${doc.documentElement.textContent}`,
+        }
+      }
+    } else {
+      // 브라우저: querySelector 사용
+      const parseError = doc.querySelector("parsererror")
+      if (parseError) {
+        return {
+          success: false,
+          error: `XML 파싱 에러: ${parseError.textContent}`,
+        }
       }
     }
 
@@ -93,10 +113,16 @@ function parseDocumentStructure(doc: Document): { lines: string[] } {
   const lines: string[] = []
   const processedTexts = new Set<string>() // 중복 텍스트 방지
 
-  // 1. 먼저 모든 표 내부의 단락과 텍스트를 수집
+  // 1. 먼저 문서에 표가 있는지 확인
   const tablesInDoc = doc.getElementsByTagName("hp:tbl")
+  const hasTable = tablesInDoc.length > 0
+
+  // 2. 표가 있는 경우, 표 내부의 모든 단락 수집
   const paragraphsInTables = new Set<Element>()
   const tableTextsNormalized = new Set<string>() // 정규화된 텍스트 (공백 제거)
+
+  // 표 전체의 모든 텍스트를 하나의 문자열로 합치기
+  let allTableTextCombined = ""
 
   for (let t = 0; t < tablesInDoc.length; t++) {
     const tbl = tablesInDoc[t]
@@ -105,60 +131,81 @@ function parseDocumentStructure(doc: Document): { lines: string[] } {
       paragraphsInTables.add(parasInTbl[p])
       const text = extractParagraphText(parasInTbl[p])
       if (text) {
-        // 공백 완전 제거한 버전도 저장 (중복 감지용)
+        // 개별 단락 저장
         tableTextsNormalized.add(text.replace(/\s/g, ""))
+        // 전체 텍스트에도 추가
+        allTableTextCombined += text.replace(/\s/g, "")
       }
     }
 
-    // 셀 전체 텍스트도 수집 (여러 단락이 합쳐진 경우)
+    // 셀 전체 텍스트도 수집
     const cellsInTbl = tbl.getElementsByTagName("hp:tc")
     for (let c = 0; c < cellsInTbl.length; c++) {
       const cellText = extractCellText(cellsInTbl[c])
       if (cellText) {
-        tableTextsNormalized.add(cellText.replace(/\s/g, "").replace(/<br>/g, ""))
+        const normalized = cellText.replace(/\s/g, "").replace(/<br>/g, "")
+        tableTextsNormalized.add(normalized)
+        allTableTextCombined += normalized
       }
     }
   }
 
-  // 2. 문서 순서대로 처리 (TreeWalker 사용)
-  const walker = doc.createTreeWalker(
-    doc.documentElement,
-    NodeFilter.SHOW_ELEMENT,
-    {
-      acceptNode: (node) => {
-        const el = node as Element
-        if (el.tagName === "hp:p" || el.tagName === "hp:tbl") {
-          return NodeFilter.FILTER_ACCEPT
+  // 2. 문서 순서대로 처리 (재귀 순회)
+  // TreeWalker 대신 재귀로 순회 (서버 환경 호환)
+  function walkNodes(parent: Element | Document) {
+    const children = parent.childNodes
+    for (let i = 0; i < children.length; i++) {
+      const node = children[i]
+      if (node.nodeType !== 1) continue // ELEMENT_NODE만 처리
+
+      const el = node as Element
+
+      if (el.tagName === "hp:tbl") {
+        // 표 처리
+        const tableMarkdown = parseTable(el)
+        if (tableMarkdown) {
+          lines.push(tableMarkdown)
         }
-        return NodeFilter.FILTER_SKIP
+      } else if (el.tagName === "hp:p" && !paragraphsInTables.has(el)) {
+        // 표 외부의 단락 처리
+        const text = extractParagraphText(el)
+
+        if (text) {
+          const normalized = text.replace(/\s/g, "")
+
+          // 표가 있는 문서라면, 표 내용과 중복되는 텍스트는 무시
+          if (hasTable) {
+            // 1. 개별 단락으로 중복 체크
+            if (tableTextsNormalized.has(normalized)) {
+              // 중복이어도 자식 노드는 탐색
+              walkNodes(el)
+              continue
+            }
+            // 2. 전체 표 텍스트에 포함되어 있는지 체크 (긴 문자열 대응)
+            if (allTableTextCombined.includes(normalized)) {
+              // 중복이어도 자식 노드는 탐색
+              walkNodes(el)
+              continue
+            }
+          }
+
+          if (!processedTexts.has(normalized)) {
+            processedTexts.add(normalized)
+            lines.push(text)
+          }
+        }
+
+        // hp:p 안에 hp:tbl이 있을 수 있으므로 항상 자식 노드 재귀 탐색
+        walkNodes(el)
+      } else {
+        // hp:p도 hp:tbl도 아닌 경우, 자식 노드 재귀 탐색
+        walkNodes(el)
       }
-    }
-  )
-
-  let node: Node | null
-  while ((node = walker.nextNode())) {
-    const el = node as Element
-
-    if (el.tagName === "hp:tbl") {
-      // 표 처리
-      const tableMarkdown = parseTable(el)
-      if (tableMarkdown) {
-        lines.push(tableMarkdown)
-      }
-    } else if (el.tagName === "hp:p" && !paragraphsInTables.has(el)) {
-      // 표 외부의 단락만 처리
-      const text = extractParagraphText(el)
-      if (!text) continue
-
-      // 정규화된 텍스트로 중복 체크
-      const normalized = text.replace(/\s/g, "")
-      if (tableTextsNormalized.has(normalized)) continue
-      if (processedTexts.has(normalized)) continue
-
-      processedTexts.add(normalized)
-      lines.push(text)
     }
   }
+
+  // 재귀 순회 시작
+  walkNodes(doc.documentElement)
 
   return { lines }
 }
@@ -235,57 +282,128 @@ function createMarkdownTable(data: string[][]): string {
 
   // 열 개수 정규화 (최대 열 수에 맞춤)
   const maxCols = Math.max(...data.map(row => row.length))
-  const normalizedData = data.map(row => {
-    while (row.length < maxCols) {
-      row.push("")
+
+  // 첫 번째 열만 병합 셀 처리: 동일한 값이 연속되면 빈 셀로 변경
+  const processedData = data.map((row, rowIndex) => {
+    // 배열 복사 (원본 보호)
+    const newRow = [...row]
+
+    if (rowIndex === 0) return newRow // 헤더는 그대로
+
+    // 첫 번째 열만 이전 행과 비교하여 중복 제거 (병합 셀 표현)
+    if (rowIndex > 0) {
+      const prevRow = data[rowIndex - 1]
+      // 첫 번째 열만 체크
+      if (prevRow && prevRow[0] && newRow[0] === prevRow[0] && newRow[0].trim()) {
+        newRow[0] = "" // 병합된 셀로 표시
+      }
     }
-    return row
+    return newRow
   })
 
+  const normalizedData = processedData.map((row, rowIndex) => {
+    // 헤더 행(첫 번째 행)은 뒤에 빈 셀 추가
+    if (rowIndex === 0) {
+      const newRow = [...row]
+      while (newRow.length < maxCols) {
+        newRow.push("")
+      }
+      return newRow
+    }
+
+    // 데이터 행: 열이 부족하면 앞에 빈 셀 추가 (병합 셀 처리)
+    const deficit = maxCols - row.length
+    if (deficit > 0) {
+      // 필요한 개수만큼 빈 셀을 앞에 추가
+      const emptyCells = new Array(deficit).fill("")
+      return [...emptyCells, ...row]
+    }
+
+    return [...row]
+  })
+
+  // 중복 행 제거 (내용이 완전히 동일한 행)
+  const uniqueData: string[][] = []
+  const seenRows = new Set<string>()
+
+  for (const row of normalizedData) {
+    const rowKey = row.join("||") // 구분자로 연결
+    if (!seenRows.has(rowKey)) {
+      seenRows.add(rowKey)
+      uniqueData.push(row)
+    }
+  }
+
+  // 중복 제거 후 데이터가 없으면 반환
+  if (uniqueData.length === 0) return ""
+
   // 1행 1열 표는 구조화된 텍스트로 변환 (테두리용 표인 경우가 많음)
-  if (normalizedData.length === 1 && maxCols === 1) {
-    const cellContent = normalizedData[0][0]
-    const formattedLines: string[] = []
+  if (uniqueData.length === 1 && maxCols === 1) {
+    const cellContent = uniqueData[0][0]
+    const htmlLines: string[] = []
+    let prevWasNumbered = false // 이전 줄이 숫자. 패턴이었는지
+    let currentSection: string[] = [] // 현재 섹션 내용 (큰 제목 아래)
+
+    const flushSection = () => {
+      if (currentSection.length > 0) {
+        htmlLines.push(`<div class="hwpx-section">\n${currentSection.join("\n")}\n</div>`)
+        currentSection = []
+      }
+    }
 
     cellContent.split(/<br>/i).forEach((line) => {
       const trimmed = line.trim()
       if (!trimmed) return
 
-      // 숫자. 패턴 (1. 2. 3.)은 굵게
-      if (/^\d+\.\s/.test(trimmed)) {
-        formattedLines.push(`<div class="hwpx-num-item"><strong>${trimmed}</strong></div>`)
+      const isNumbered = /^\d+\.\s/.test(trimmed)
+      const isSubItem = /^[가-힣]\.\s/.test(trimmed)
+      // 번호 없는 제목: 짧은 한글 (띄어쓰기 포함, 10글자 이하, 숫자/특수문자 없음)
+      const isPlainTitle = /^[가-힣\s]{2,10}$/.test(trimmed) && trimmed.replace(/\s/g, '').length <= 5
+
+      // 숫자. 패턴: 큰 제목
+      if (isNumbered) {
+        flushSection() // 이전 섹션 마무리
+        if (prevWasNumbered) {
+          htmlLines.push("") // 숫자 항목 간 한 줄 띄우기
+        }
+        htmlLines.push(`<div class="hwpx-num-item"><strong>${trimmed}</strong></div>`)
+        prevWasNumbered = true
         return
       }
-      // 가. 나. 다. 패턴은 hanging indent 스타일
-      if (/^[가-힣]\.\s/.test(trimmed)) {
-        formattedLines.push(`<div class="hwpx-sub-item">${trimmed}</div>`)
+
+      // 번호 없는 제목: 굵게 표시하고 섹션 시작
+      if (isPlainTitle) {
+        flushSection() // 이전 섹션 마무리
+        htmlLines.push(`<div class="hwpx-num-item"><strong>${trimmed}</strong></div>`)
+        prevWasNumbered = false
         return
       }
-      // "선 서" 등 짧은 제목 패턴 (공백 포함된 한글) → 공백 제거 + 굵게
-      if (/^[가-힣\s]{2,10}$/.test(trimmed) && /[가-힣]\s+[가-힣]/.test(trimmed)) {
-        const cleanLine = trimmed.replace(/\s+/g, "")
-        formattedLines.push("")
-        formattedLines.push(`**${cleanLine}**`)
-        return
+
+      // 가. 나. 다. 패턴 또는 일반 텍스트: 현재 섹션에 추가
+      if (isSubItem) {
+        currentSection.push(`<div class="hwpx-sub-item">${trimmed}</div>`)
+      } else {
+        currentSection.push(`<div class="hwpx-content">${trimmed}</div>`)
       }
-      // 일반 텍스트
-      formattedLines.push(trimmed)
+      prevWasNumbered = false
     })
-    return formattedLines.join("\n")
+
+    flushSection() // 마지막 섹션 마무리
+    return htmlLines.join("\n")
   }
 
   const lines: string[] = []
 
   // 헤더 (첫 번째 행)
-  const header = normalizedData[0]
+  const header = uniqueData[0]
   lines.push("| " + header.join(" | ") + " |")
 
   // 구분선
   lines.push("| " + header.map(() => "---").join(" | ") + " |")
 
-  // 데이터 행
-  for (let i = 1; i < normalizedData.length; i++) {
-    lines.push("| " + normalizedData[i].join(" | ") + " |")
+  // 데이터 행 (빈 셀은 그대로 빈 셀로 표시)
+  for (let i = 1; i < uniqueData.length; i++) {
+    lines.push("| " + uniqueData[i].join(" | ") + " |")
   }
 
   return lines.join("\n")
@@ -311,21 +429,17 @@ function formatToMarkdown(lines: string[]): string {
     // [별표 N] 패턴 → 다음 줄(제N조 관련)과 합쳐서 ## 제목으로
     if (/^\[별표\s*\d+/.test(line)) {
       const nextLine = lines[i + 1]
+
+      // 이전 줄이 별표였다면 2줄 띄우기
+      if (result.length > 0 && /^##\s*\[별표\s*\d+/.test(result[result.length - 1])) {
+        result.push("")
+        result.push("")
+      }
+
       // 다음 줄이 (제N조 관련) 형태거나 제목이면 합치기
       if (nextLine && (/관련\)?$/.test(nextLine) || /^[가-힣\s]+\([^)]+관련\)$/.test(nextLine))) {
-        // 제목 부분과 (관련) 부분 분리
-        const match = nextLine.match(/^(.+?)(\([^)]+관련\))$/)
-        let cleanNextLine: string
-        if (match) {
-          // "선 서 문(제2조제2항 관련)" → "선서문 (제2조제2항 관련)"
-          const title = match[1].replace(/\s+/g, "")
-          const relation = match[2]
-          cleanNextLine = `${title} ${relation}`
-        } else {
-          cleanNextLine = nextLine.replace(/\s+/g, "")
-        }
         result.push("")
-        result.push(`## ${line} — ${cleanNextLine}`)
+        result.push(`## ${line} ${nextLine}`)
         result.push("")
         i++ // 다음 줄 스킵
       } else {
@@ -343,28 +457,7 @@ function formatToMarkdown(lines: string[]): string {
       continue
     }
 
-    // "선 서" 등 짧은 제목 패턴 (공백 포함된 한글) → 공백 제거 + 굵게
-    if (/^[가-힣\s]{2,10}$/.test(line) && /[가-힣]\s+[가-힣]/.test(line)) {
-      const cleanLine = line.replace(/\s+/g, "")
-      result.push("")
-      result.push(`**${cleanLine}**`)
-      continue
-    }
-
-    // 숫자. 로 시작하는 항목 (1. 2. 3.)
-    if (/^\d+\.\s/.test(line)) {
-      result.push("")
-      result.push(`### ${line}`)
-      continue
-    }
-
-    // 가. 나. 다. 등의 항목
-    if (/^[가-힣]\.\s/.test(line)) {
-      result.push(`- ${line}`)
-      continue
-    }
-
-    // 일반 텍스트
+    // 일반 텍스트 (표 외부 단락들은 그냥 추가)
     result.push(line)
   }
 
