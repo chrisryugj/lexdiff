@@ -200,8 +200,16 @@ export function useSearchHandlers({
           const existingCache = await getSearchResult(currentSearchId)
 
           if (existingCache) {
+            // ✅ 법령 선택 시 query 정보도 함께 업데이트 (새로고침 시 올바른 쿼리 복원)
+            const updatedQuery: SearchQuery = {
+              lawName: meta.lawTitle,
+              article: query.article,
+              jo: query.jo,
+            }
+
             await saveSearchResult({
               ...existingCache,
+              query: updatedQuery,  // ✅ query 정보 업데이트
               lawData: {
                 meta: {
                   lawId: selectedLaw.lawId || meta.lawId,
@@ -219,9 +227,10 @@ export function useSearchHandlers({
                 viewMode: viewMode,
               },
             })
-            debugLogger.success('💾 lawData를 IndexedDB에 저장 완료', {
+            debugLogger.success('💾 lawData + query를 IndexedDB에 저장 완료', {
               searchId: currentSearchId,
               lawTitle: meta.lawTitle,
+              query: updatedQuery,
             })
           }
         }
@@ -829,6 +838,53 @@ export function useSearchHandlers({
         isOrdinance: true,
         viewMode: "full",
       })
+
+      // ✅ 조례 선택 시 IndexedDB에 query + lawData 저장 (새로고침 시 복원용)
+      try {
+        const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+        const currentState = window.history.state
+        const currentSearchId = currentState?.searchId
+
+        if (currentSearchId) {
+          const existingCache = await getSearchResult(currentSearchId)
+
+          if (existingCache) {
+            const updatedQuery: SearchQuery = {
+              lawName: meta.lawTitle,
+              article: undefined,
+              jo: undefined,
+            }
+
+            await saveSearchResult({
+              ...existingCache,
+              query: updatedQuery,  // ✅ query 정보 업데이트
+              lawData: {
+                meta: {
+                  ordinSeq: ordinance.ordinSeq,
+                  ordinId: ordinance.ordinId,
+                  lawName: meta.lawTitle,
+                },
+                articles: articles.map(a => ({
+                  joNumber: a.jo,
+                  joLabel: a.joNum,
+                  content: a.content,
+                  isDeleted: false,
+                })),
+                selectedJo: null,
+                isOrdinance: true,
+                viewMode: "full",
+              },
+            })
+            debugLogger.success('💾 조례 lawData + query를 IndexedDB에 저장 완료', {
+              searchId: currentSearchId,
+              lawTitle: meta.lawTitle,
+              query: updatedQuery,
+            })
+          }
+        }
+      } catch (cacheError) {
+        debugLogger.error('⚠️ 조례 lawData 저장 실패', cacheError)
+      }
 
       actions.setOrdinanceSelectionState(null)
       actions.setMobileView("content")

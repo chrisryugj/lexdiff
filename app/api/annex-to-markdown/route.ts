@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
 import { debugLogger } from "@/lib/debug-logger"
+import { parseHwpxToMarkdown, isHwpxFile, isOldHwpFile } from "@/lib/hwpx-parser"
 
 /**
- * 별표 PDF → 마크다운 변환 API
- * Gemini Vision API를 사용하여 PDF를 마크다운으로 변환
+ * 별표 파일 → 마크다운 변환 API
+ * - HWPX (신 한글): 직접 파싱 (빠르고 정확)
+ * - 구 HWP (OLE2): 파싱 불가, 에러 반환
+ * - PDF: Gemini Vision API 사용
  *
  * POST /api/annex-to-markdown
  * Body: { pdfUrl, annexNumber, lawName }
@@ -17,6 +20,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "pdfUrl이 필요합니다" }, { status: 400 })
     }
 
+    debugLogger.info("별표 파일→마크다운 변환 시작", { annexNumber, lawName })
+
+    // 파일 다운로드 (내부 프록시 또는 외부 URL)
+    const fullPdfUrl = pdfUrl.startsWith("/")
+      ? `${getBaseUrl(request)}${pdfUrl}`
+      : pdfUrl
+
+    const fileResponse = await fetch(fullPdfUrl)
+    if (!fileResponse.ok) {
+      throw new Error(`파일 다운로드 실패: ${fileResponse.status}`)
+    }
+
+    const fileBuffer = await fileResponse.arrayBuffer()
+    debugLogger.info("파일 다운로드 완료", { size: fileBuffer.byteLength })
+
+    // 파일 타입 확인 (HWPX vs 구 HWP vs PDF)
+    const isHwpx = isHwpxFile(fileBuffer)
+    const isOldHwp = isOldHwpFile(fileBuffer)
+
+    if (isOldHwp) {
+      // 구 HWP 파일: 파싱 불가
+      debugLogger.warn("구 HWP 파일 감지 - 파싱 불가", { annexNumber })
+      return NextResponse.json(
+        {
+          error: "구 HWP 파일은 파싱할 수 없습니다. 다운로드하여 한컴오피스로 열어주세요.",
+          fileType: "old-hwp",
+        },
+        { status: 400 }
+      )
+    }
+
+    if (isHwpx) {
+      // HWPX 파일: 직접 파싱
+      debugLogger.info("HWPX 파일 감지, 직접 파싱 시작")
+
+      const parseResult = await parseHwpxToMarkdown(fileBuffer)
+
+      if (!parseResult.success || !parseResult.markdown) {
+        throw new Error(parseResult.error || "HWPX 파싱 실패")
+      }
+
+      debugLogger.success("HWPX→마크다운 변환 완료", {
+        annexNumber,
+        markdownLength: parseResult.markdown.length,
+        meta: parseResult.meta,
+      })
+
+      return NextResponse.json({
+        markdown: parseResult.markdown,
+        source: "hwpx-parser",
+        meta: parseResult.meta,
+      })
+    }
+
+    // PDF 파일: Gemini Vision API 사용
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       debugLogger.error("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다")
@@ -26,22 +84,9 @@ export async function POST(request: Request) {
       )
     }
 
-    debugLogger.info("별표 PDF→마크다운 변환 시작", { annexNumber, lawName })
+    debugLogger.info("PDF 파일 감지, Gemini Vision API 사용")
 
-    // PDF 다운로드 (내부 프록시 또는 외부 URL)
-    const fullPdfUrl = pdfUrl.startsWith("/")
-      ? `${getBaseUrl(request)}${pdfUrl}`
-      : pdfUrl
-
-    const pdfResponse = await fetch(fullPdfUrl)
-    if (!pdfResponse.ok) {
-      throw new Error(`PDF 다운로드 실패: ${pdfResponse.status}`)
-    }
-
-    const pdfBuffer = await pdfResponse.arrayBuffer()
-    const pdfBase64 = Buffer.from(pdfBuffer).toString("base64")
-
-    debugLogger.info("PDF 다운로드 완료", { size: pdfBuffer.byteLength })
+    const pdfBase64 = Buffer.from(fileBuffer).toString("base64")
 
     // Gemini Vision API로 PDF 분석
     const ai = new GoogleGenAI({ apiKey })
