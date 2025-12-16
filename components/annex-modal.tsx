@@ -16,6 +16,8 @@ import {
   FileImage,
   AlertCircle,
   RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import type { LawAnnex } from "@/lib/law-types"
@@ -86,6 +88,7 @@ export function AnnexModal({
   const [viewMode, setViewMode] = useState<ViewMode>("markdown")
   const [fileType, setFileType] = useState<"pdf" | "hwp" | "unknown">("unknown")
   const [fontSize, setFontSize] = useState(14)
+  const [copied, setCopied] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   // 조례 여부 판별 (자치법규)
@@ -100,6 +103,18 @@ export function AnnexModal({
   // 폰트 크기 조절
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 1, 28))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 1, 11))
+
+  // 복사 기능
+  const copyToClipboard = useCallback(() => {
+    if (!markdown) return
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch((err) => {
+      console.error("복사 실패:", err)
+    })
+  }, [markdown])
 
   // 파일 다운로드
   const handleDownload = useCallback(() => {
@@ -200,26 +215,19 @@ export function AnnexModal({
           setFileType(detectedFileType)
 
           console.log("[AnnexModal] 파일 타입 감지:", detectedFileType)
-
-          // HWP 파일인 경우 마크다운 변환 스킵
-          if (detectedFileType === "hwp") {
-            console.log("[AnnexModal] HWP 파일 - 다운로드만 제공")
-            setLoadingState("done")
-            return
-          }
         } catch {
           console.warn("[AnnexModal] 파일 타입 확인 실패, PDF로 가정")
           setFileType("pdf")
         }
 
-        // 4-2. PDF인 경우 마크다운 변환 시도
-        const pdfUrl = `/api/annex-pdf?flSeq=${flSeq}`
+        // 4-2. 마크다운 변환 시도 (HWPX와 PDF 모두 지원)
+        const fileUrl = `/api/annex-pdf?flSeq=${flSeq}`
 
         const mdRes = await fetch("/api/annex-to-markdown", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            pdfUrl,
+            pdfUrl: fileUrl,
             annexNumber: `별표 ${annexNumber}`,
             lawName,
           }),
@@ -227,6 +235,11 @@ export function AnnexModal({
 
         if (mdRes.ok) {
           const mdData = await mdRes.json()
+          console.log("[AnnexModal] 변환 성공:", {
+            hasMarkdown: !!mdData.markdown,
+            source: mdData.source,
+            length: mdData.markdown?.length
+          })
           if (mdData.markdown) {
             setMarkdown(mdData.markdown)
 
@@ -241,11 +254,23 @@ export function AnnexModal({
                 finalAnnex.annexName
               )
             }
+          } else {
+            console.warn("[AnnexModal] 응답은 성공했지만 markdown이 없음:", mdData)
           }
         } else {
-          // 마크다운 변환 실패 시 PDF 뷰로 전환
-          console.warn("마크다운 변환 실패, PDF 뷰로 전환")
-          setViewMode("pdf")
+          // 마크다운 변환 실패 시
+          const errorData = await mdRes.json().catch(() => ({ error: "응답 파싱 실패" }))
+          console.warn("[AnnexModal] 마크다운 변환 실패:", {
+            status: mdRes.status,
+            error: errorData
+          })
+          // 구 HWP 파일인 경우 다운로드만 제공
+          if (fileType === "hwp") {
+            console.log("[AnnexModal] 구 HWP 파일 - 다운로드만 제공")
+          } else {
+            // PDF는 원문 뷰로 전환
+            setViewMode("pdf")
+          }
         }
       }
 
@@ -298,7 +323,7 @@ export function AnnexModal({
         className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden"
         style={{ fontFamily: "Pretendard, sans-serif" }}
       >
-        <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30 flex-shrink-0">
+        <DialogHeader className="px-4 pt-3 pb-2 border-b border-border bg-muted/30 flex-shrink-0">
           <div className="flex items-center justify-between gap-2 flex-wrap pr-6">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {/* 뒤로가기 버튼 */}
@@ -354,6 +379,29 @@ export function AnnexModal({
                 </Button>
               </div>
 
+              {/* 복사 버튼 */}
+              {markdown && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyToClipboard}
+                  className="h-7 px-2 gap-1.5"
+                  title="텍스트 복사"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span className="text-xs hidden sm:inline">복사됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span className="text-xs hidden sm:inline">복사</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* 다운로드 버튼 */}
               <Button
                 variant="outline"
@@ -402,8 +450,8 @@ export function AnnexModal({
               </Button>
             </div>
           </div>
-        ) : fileType === "hwp" ? (
-          // HWP 파일인 경우: 컴팩트한 레이아웃
+        ) : fileType === "hwp" && !markdown ? (
+          // 구 HWP 파일인 경우 (파싱 불가): 컴팩트한 레이아웃
           <div className="flex flex-col items-center justify-center py-8 gap-4 px-4">
             {/* HWP 아이콘 */}
             <div className="relative">
@@ -420,7 +468,7 @@ export function AnnexModal({
                 {annexData?.annexName && ` (${annexData.annexName})`}
               </p>
               <p className="text-sm text-muted-foreground">
-                HWP 파일은 브라우저에서 직접 볼 수 없습니다.
+                구 HWP 파일은 브라우저에서 직접 볼 수 없습니다.
                 <br />
                 다운로드하여 한컴오피스로 열거나, 법제처에서 확인하세요.
               </p>
@@ -447,83 +495,50 @@ export function AnnexModal({
               💡 Windows에서는 한컴오피스 뷰어를 설치하면 브라우저에서 바로 볼 수 있습니다.
             </p>
           </div>
+        ) : markdown ? (
+          // 마크다운 뷰 (텍스트만 표시)
+          <ScrollArea className="h-[65vh]">
+            <div
+              ref={contentRef}
+              className="p-4 sm:p-6"
+              style={{ fontSize: `${fontSize}px`, lineHeight: "1.8" }}
+            >
+              <LegalMarkdownRenderer content={markdown} onLawClick={onLawClick} />
+            </div>
+          </ScrollArea>
         ) : (
-          <Tabs
-            value={viewMode}
-            onValueChange={(v) => setViewMode(v as ViewMode)}
-            className="flex-1 flex flex-col min-h-0"
-          >
-            <TabsList className="mx-4 mt-2 grid w-fit grid-cols-2">
-              <TabsTrigger value="markdown" className="gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                텍스트
-              </TabsTrigger>
-              <TabsTrigger value="pdf" className="gap-1.5">
-                <FileImage className="w-3.5 h-3.5" />
-                PDF 원문
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="markdown" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-              {markdown ? (
-                <ScrollArea className="h-[65vh]">
-                  <div
-                    ref={contentRef}
-                    className="p-4 sm:p-6"
-                    style={{ fontSize: `${fontSize}px`, lineHeight: "1.8" }}
-                  >
-                    <LegalMarkdownRenderer content={markdown} onLawClick={onLawClick} />
-                  </div>
-                </ScrollArea>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[50vh] gap-3 px-4">
-                  <FileText className="w-12 h-12 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    마크다운 변환 결과가 없습니다.
-                    <br />
-                    PDF 탭에서 원문을 확인하세요.
-                  </p>
-                </div>
+          // 마크다운 없으면 원문 안내
+          <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
+            <FileImage className="w-16 h-16 text-muted-foreground/60" />
+            <div className="text-center">
+              <p className="text-lg font-medium mb-1">
+                {annexData?.annexName || `별표 ${annexNumber}`}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {fileType === "hwp" ? "HWP" : "PDF"} 원문을 확인하세요.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {annexData?.pdfLink && (
+                <>
+                  <Button asChild className="gap-2">
+                    <a
+                      href={`/api/annex-pdf?flSeq=${extractFlSeq(annexData.pdfLink)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      새 탭에서 보기
+                    </a>
+                  </Button>
+                  <Button variant="outline" onClick={handleDownload} className="gap-2">
+                    <Download className="w-4 h-4" />
+                    다운로드
+                  </Button>
+                </>
               )}
-            </TabsContent>
-
-            <TabsContent value="pdf" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-              {annexData?.pdfLink ? (
-                <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
-                  <FileImage className="w-16 h-16 text-muted-foreground/60" />
-                  <div className="text-center">
-                    <p className="text-lg font-medium mb-1">
-                      {annexData?.annexName || `별표 ${annexNumber}`}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      PDF 원문을 확인하세요.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button asChild className="gap-2">
-                      <a
-                        href={`/api/annex-pdf?flSeq=${extractFlSeq(annexData.pdfLink)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        새 탭에서 보기
-                      </a>
-                    </Button>
-                    <Button variant="outline" onClick={handleDownload} className="gap-2">
-                      <Download className="w-4 h-4" />
-                      다운로드
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[50vh] gap-3 px-4">
-                  <FileImage className="w-12 h-12 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">PDF를 불러올 수 없습니다.</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>
