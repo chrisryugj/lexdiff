@@ -1,0 +1,17 @@
+{
+  "model": "opusplan",
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(git push:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "default"
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
+  }
+}
