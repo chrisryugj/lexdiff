@@ -36,6 +36,7 @@ import {
   Coins,
   ShieldAlert,
   FileSearch,
+  ListTodo,
   type LucideIcon
 } from 'lucide-react'
 
@@ -75,7 +76,7 @@ const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: LucideIcon }> = [
 
   // application (적용) 섹션
   { pattern: /^요건별\s*검토/, icon: FileSearch },
-  { pattern: /^다음\s*행동/, icon: ArrowRight },
+  { pattern: /^다음\s*행동/, icon: ListTodo },
 
   // consequence (효과) 섹션
   { pattern: /^법적\s*효과/, icon: Scale },
@@ -177,6 +178,13 @@ export function LegalMarkdownRenderer({
         .hwpx-content {
           margin: 0.15em 0;
           font-size: inherit;
+        }
+        /* h2 섹션 내용 들여쓰기 */
+        .legal-markdown-content h2 ~ p,
+        .legal-markdown-content h2 ~ ul,
+        .legal-markdown-content h2 ~ ol,
+        .legal-markdown-content h2 ~ blockquote {
+          padding-left: 0.5rem;
         }
       `}</style>
       <ReactMarkdown
