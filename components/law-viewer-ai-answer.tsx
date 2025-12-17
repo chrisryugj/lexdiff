@@ -498,7 +498,7 @@ export function AIAnswerContent({
             </div>
 
             {/* 본문 영역 */}
-            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-0 pb-4 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-2 pb-4 overflow-y-auto overflow-x-hidden">
                 {/* ✅ Phase 7: 신뢰도 경고 배너 (low일 때) */}
                 {aiConfidenceLevel === 'low' && !fileSearchFailed && (
                     <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
