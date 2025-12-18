@@ -74,6 +74,15 @@ const DEFINITIVE_ENDING_PATTERNS: Array<{
   confidence: number
 }> = [
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // [최우선] exemption (예외/면제/특례) - Phase 10 추가
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  { pattern: /(면제|면세|비과세)[은는이가]?\s*(대상|범위|요건)/, type: 'exemption', confidence: 0.99 },
+  { pattern: /(면제|면세|비과세)[받을될]\s*수\s*(있|없)/, type: 'exemption', confidence: 0.98 },
+  { pattern: /(특례|감면|예외)[은는이가]?\s*[?？]?\s*$/, type: 'exemption', confidence: 0.97 },
+  { pattern: /(면제|면세|감면)[되받][나을까요]*\s*[?？]?\s*$/, type: 'exemption', confidence: 0.96 },
+  { pattern: /(적용\s*제외|예외\s*규정)[은는이가]?/, type: 'exemption', confidence: 0.95 },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // [최우선] requirement (요건/조건) - "요건" 키워드가 있으면 다른 모든 것보다 우선
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   { pattern: /(요건|조건|자격)[은는이가]?\s*(무엇|뭐|뭔가)/, type: 'requirement', confidence: 0.99 },  // "요건은 무엇" 패턴 (위치 무관)
@@ -146,6 +155,7 @@ export type LegalQueryType =
   | 'application'   // 적용 판단
   | 'consequence'   // 효과/결과
   | 'scope'         // 범위/금액/산정
+  | 'exemption'     // 예외/면제/특례/감면 (Phase 10 추가)
 
 export interface LegalQueryAnalysis {
   type: LegalQueryType
@@ -326,6 +336,27 @@ const QUERY_PATTERNS: Record<LegalQueryType, {
       /(최대|최소|상한|하한)\s*(.+)(은|는|이)/,      // 최대 ~은
     ],
     weight: 0.12  // 12% - consequence보다 약간 높게
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // exemption: 예외/면제/특례/감면 질문 (Phase 10 추가)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  exemption: {
+    keywords: [
+      '면제', '면세', '비과세', '예외', '특례',
+      '감면', '감경', '제외', '적용제외', '배제',
+      '유예', '공제', '면책', '불처벌', '소급',
+      '경과규정', '경과조치', '한시적', '잠정'
+    ],
+    patterns: [
+      /(.+)(면제|면세|비과세)(되|받|대상|범위)/,     // ~면제되나요
+      /(.+)(특례|감면|예외)(는|은|이|가)/,           // ~특례는
+      /(.+)(적용\s*제외|배제)(되|대상|범위)/,        // ~적용제외 되나요
+      /(.+)(불처벌|면책)(되|사유|조건)/,             // ~불처벌 되나요
+      /(어떤|어느)\s*(경우|상황)[에서]?\s*(면제|제외|예외)/, // 어떤 경우 면제
+      /(.+)(에서|의)\s*(제외|예외|면제)/,            // ~에서 제외
+    ],
+    weight: 0.15  // 15% - 비교적 높은 가중치
   }
 }
 
@@ -659,7 +690,8 @@ export function getQueryTypeForPrompt(query: string): {
     comparison: 'comparison',   // 비교 → comparison
     application: 'general',     // 적용 → general
     consequence: 'general',     // 효과 → general
-    scope: 'general'            // 범위 → general
+    scope: 'general',           // 범위 → general
+    exemption: 'general'        // 예외/면제 → general (Phase 10)
   }
 
   return {

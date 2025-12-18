@@ -63,6 +63,36 @@ export interface RouterAnalysis {
 
   // 메타데이터
   reasoning: string            // AI의 분류 근거
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 검색 최적화 (RAG Citation 히트율 향상)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  searchOptimization: SearchOptimization
+}
+
+/** 검색 최적화 정보 (Citation 히트율 향상) */
+export interface SearchOptimization {
+  // 최적화된 검색 쿼리 (RAG에 전달)
+  optimizedQuery: string
+
+  // 핵심 검색 키워드 (우선순위 순)
+  searchKeywords: string[]
+
+  // 연관 법률 용어 (도메인 지식 기반 확장)
+  relatedTerms: string[]
+
+  // 동의어/유사어 (검색 범위 확장)
+  synonyms: string[]
+
+  // 검색 힌트 (조문 구조 관련)
+  searchHints: {
+    targetSection?: string      // "제1장", "부칙" 등
+    articleRange?: string       // "제30조~제40조"
+    keyProvisions?: string[]    // 핵심 조항 키워드
+  }
+
+  // 검색 전략
+  strategy: 'exact' | 'semantic' | 'hybrid'
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
