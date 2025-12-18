@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useEffect, useState } from 'react'
-import { HelpCircle, ExternalLink, Search, Keyboard, Star, GitCompare, Link2, MessageSquare, FileText, Quote, Zap } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -14,6 +14,7 @@ import Link from 'next/link'
 interface UsageGuidePopoverProps {
   type: 'law-search' | 'ai-search'
   showOnFirstVisit?: boolean
+  onDetailClick?: () => void // 자세히 보기 클릭 시 호출
 }
 
 const STORAGE_KEY_PREFIX = 'lexdiff-guide-seen-'
@@ -21,6 +22,7 @@ const STORAGE_KEY_PREFIX = 'lexdiff-guide-seen-'
 export function UsageGuidePopover({
   type,
   showOnFirstVisit = true,
+  onDetailClick,
 }: UsageGuidePopoverProps) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -52,7 +54,7 @@ export function UsageGuidePopover({
         className="h-8 w-8"
         aria-label="사용법 안내"
       >
-        <HelpCircle className="h-4 w-4 text-blue-500" />
+        <Icon name="help-circle" size={16} className="text-blue-500" />
       </Button>
     )
   }
@@ -66,7 +68,7 @@ export function UsageGuidePopover({
           className="h-8 w-8"
           aria-label="사용법 안내"
         >
-          <HelpCircle className="h-4 w-4 text-blue-500" />
+          <Icon name="help-circle" size={16} className="text-blue-500" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="end">
@@ -76,12 +78,27 @@ export function UsageGuidePopover({
           <AISearchGuide />
         )}
         <div className="mt-4 pt-3 border-t border-border">
-          <Link href={`/help#${type}`} onClick={() => setOpen(false)}>
-            <Button variant="outline" size="sm" className="w-full">
-              <ExternalLink className="h-3.5 w-3.5 mr-2" />
+          {onDetailClick ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                setOpen(false)
+                onDetailClick()
+              }}
+            >
+              <Icon name="book-open" size={14} className="mr-2" />
               자세히 보기
             </Button>
-          </Link>
+          ) : (
+            <Link href={`/help#${type}`} onClick={() => setOpen(false)}>
+              <Button variant="outline" size="sm" className="w-full">
+                <Icon name="external-link" size={14} className="mr-2" />
+                자세히 보기
+              </Button>
+            </Link>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -98,27 +115,27 @@ function LawSearchGuide() {
 
       <div className="space-y-2.5 text-sm">
         <GuideItem
-          icon={<Search className="h-3.5 w-3.5 text-blue-500" />}
+          icon={<Icon name="search" size={14} className="text-blue-500" />}
           title="검색"
           description={<>&quot;민법&quot;, &quot;관세법 38조&quot;</>}
         />
         <GuideItem
-          icon={<Keyboard className="h-3.5 w-3.5 text-green-500" />}
+          icon={<Icon name="keyboard" size={14} className="text-green-500" />}
           title="탐색"
           description="좌측 목록 클릭, Ctrl+K"
         />
         <GuideItem
-          icon={<Star className="h-3.5 w-3.5 text-yellow-500" />}
+          icon={<Icon name="star" size={14} className="text-yellow-500" />}
           title="즐겨찾기"
           description="별 아이콘 클릭"
         />
         <GuideItem
-          icon={<GitCompare className="h-3.5 w-3.5 text-purple-500" />}
+          icon={<Icon name="git-compare" size={14} className="text-purple-500" />}
           title="비교"
           description="개정 전후 변경 확인"
         />
         <GuideItem
-          icon={<Link2 className="h-3.5 w-3.5 text-cyan-500" />}
+          icon={<Icon name="link" size={14} className="text-cyan-500" />}
           title="링크"
           description="참조 법령 바로가기"
         />
@@ -137,7 +154,7 @@ function AISearchGuide() {
 
       <div className="space-y-2.5 text-sm">
         <GuideItem
-          icon={<MessageSquare className="h-3.5 w-3.5 text-violet-500" />}
+          icon={<Icon name="message-square" size={14} className="text-violet-500" />}
           title="질문"
           description="자연어로 물어보세요"
         />
@@ -145,17 +162,17 @@ function AISearchGuide() {
           예) &quot;수출통관 절차는?&quot;
         </div>
         <GuideItem
-          icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
+          icon={<Icon name="file-text" size={14} className="text-blue-500" />}
           title="답변"
           description="요약 → 조문 → 실무 적용"
         />
         <GuideItem
-          icon={<Quote className="h-3.5 w-3.5 text-green-500" />}
+          icon={<Icon name="quote" size={14} className="text-green-500" />}
           title="출처"
           description="파란 링크로 원문 확인"
         />
         <GuideItem
-          icon={<Zap className="h-3.5 w-3.5 text-yellow-500" />}
+          icon={<Icon name="zap" size={14} className="text-yellow-500" />}
           title="팁"
           description="법령명 포함 시 더 정확!"
         />

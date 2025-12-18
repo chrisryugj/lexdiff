@@ -14,7 +14,11 @@ const FavoritesDialog = dynamic(
   () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
   { ssr: false }
 )
-import { ChevronDown, Scale, Star, Settings } from "lucide-react"
+const HelpGuideSheet = dynamic(
+  () => import("@/components/help-guide-sheet").then(m => m.HelpGuideSheet),
+  { ssr: false }
+)
+import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { favoritesStore } from "@/lib/favorites-store"
 
@@ -34,6 +38,7 @@ export function SearchViewImproved({
   searchMode,
 }: SearchViewProps) {
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
+  const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
 
@@ -87,6 +92,10 @@ export function SearchViewImproved({
 
   const handleSettingsClick = () => {
     window.location.href = '/admin/settings'
+  }
+
+  const handleHelpClick = () => {
+    setHelpSheetOpen(true)
   }
 
   const handleScrollIndicatorClick = () => {
@@ -148,7 +157,7 @@ export function SearchViewImproved({
                 className="flex items-center gap-2 md:gap-3 group"
               >
                 <div className="relative flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
-                  <Scale className="h-4 w-4 text-white" />
+                  <Icon name="scale" size={16} className="text-white" />
                 </div>
                 <span className="text-base md:text-lg font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
                   LexDiff
@@ -168,7 +177,7 @@ export function SearchViewImproved({
                     onClick={handleFavoritesClick}
                     className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <Star className="h-4 w-4 mr-1.5 text-yellow-400" />
+                    <Icon name="star" size={16} className="mr-1.5 text-yellow-400" />
                     <span className="text-xs font-medium">{favoritesCount}</span>
                   </Button>
                 )}
@@ -176,10 +185,20 @@ export function SearchViewImproved({
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={handleHelpClick}
+                  className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 md:w-9 md:h-9"
+                  title="사용 가이드"
+                >
+                  <Icon name="help-circle" size={16} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleSettingsClick}
                   className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 md:w-9 md:h-9"
                 >
-                  <Settings className="h-4 w-4" />
+                  <Icon name="settings" size={16} />
                 </Button>
               </div>
             </div>
@@ -239,7 +258,7 @@ export function SearchViewImproved({
               onClick={handleScrollIndicatorClick}
               aria-label="스크롤하여 다음 섹션으로 이동"
             >
-              <ChevronDown className="w-5 h-5 text-muted-foreground/40" />
+              <Icon name="chevron-down" size={20} className="text-muted-foreground/40" />
             </motion.button>
           </motion.div>
         </div>
@@ -266,6 +285,10 @@ export function SearchViewImproved({
               © 2025 Chris ryu. All rights reserved.
             </p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground/60" style={{ fontFamily: "Pretendard, sans-serif" }}>
+              <button onClick={handleHelpClick} className="hover:text-foreground transition-colors">
+                사용 가이드
+              </button>
+              <span className="text-border">|</span>
               <a href="/admin/settings" className="hover:text-foreground transition-colors">
                 설정
               </a>
@@ -282,6 +305,10 @@ export function SearchViewImproved({
         isOpen={favoritesDialogOpen}
         onClose={() => setFavoritesDialogOpen(false)}
         onSelect={onFavoriteSelect}
+      />
+      <HelpGuideSheet
+        open={helpSheetOpen}
+        onOpenChange={setHelpSheetOpen}
       />
       <ErrorReportDialog />
     </div>

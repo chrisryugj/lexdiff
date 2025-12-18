@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
@@ -31,6 +31,10 @@ const AISummaryDialog = dynamic(
 )
 const FavoritesDialog = dynamic(
   () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
+  { ssr: false }
+)
+const HelpGuideSheet = dynamic(
+  () => import("@/components/help-guide-sheet").then(m => m.HelpGuideSheet),
   { ssr: false }
 )
 
@@ -59,6 +63,9 @@ export function SearchResultView({
     onProgressUpdate,
     onModeChange,
   })
+
+  // 도움말 Sheet 상태
+  const [helpSheetOpen, setHelpSheetOpen] = useState(false)
 
   // ============================================================
   // 핸들러 훅
@@ -253,6 +260,7 @@ export function SearchResultView({
         onSettingsClick={handlers.handleSettingsClick}
         onSearchClick={() => actions.setShowSearchModal(true)}
         onFocusModeToggle={() => actions.setIsFocusMode(!state.isFocusMode)}
+        onHelpClick={() => setHelpSheetOpen(true)}
         currentLawName={state.lawData?.meta?.lawTitle || state.searchQuery || undefined}
         showBackButton={true}
         isFocusMode={state.isFocusMode}
@@ -414,6 +422,12 @@ export function SearchResultView({
         isOpen={state.favoritesDialogOpen}
         onClose={() => actions.setFavoritesDialogOpen(false)}
         onSelect={handlers.handleFavoriteSelect}
+      />
+
+      <HelpGuideSheet
+        open={helpSheetOpen}
+        onOpenChange={setHelpSheetOpen}
+        defaultTab={state.aiAnswerContent ? 'ai' : 'law'}
       />
 
       <ErrorReportDialog onDismiss={onBack} />

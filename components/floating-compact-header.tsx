@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Scale, Star, Settings, ChevronLeft, Search, Maximize2 } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
@@ -15,6 +15,7 @@ interface FloatingCompactHeaderProps {
   onSettingsClick?: () => void
   onSearchClick?: () => void // 검색 모달 열기
   onFocusModeToggle?: () => void // 포커스 모드 토글
+  onHelpClick?: () => void // 도움말 Sheet 열기
   currentLawName?: string // 현재 법령명
   showBackButton?: boolean
   isFocusMode?: boolean
@@ -27,6 +28,7 @@ export function FloatingCompactHeader({
   onSettingsClick,
   onSearchClick,
   onFocusModeToggle,
+  onHelpClick,
   currentLawName,
   showBackButton = true,
   isFocusMode = false,
@@ -84,7 +86,7 @@ export function FloatingCompactHeader({
                       className="flex-shrink-0"
                       title="뒤로가기"
                     >
-                      <ChevronLeft className="h-5 w-5" />
+                      <Icon name="chevron-left" size={20} />
                     </Button>
                   )}
 
@@ -93,7 +95,7 @@ export function FloatingCompactHeader({
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
                   >
                     <div className="relative flex h-8 w-8 lg:h-10 lg:w-10 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
-                      <Scale className="h-4 w-4 lg:h-5 lg:w-5 text-white" />
+                      <Icon name="scale" size={20} className="text-white" />
                     </div>
                     <span
                       className="hidden md:block text-lg lg:text-xl font-bold text-foreground"
@@ -111,7 +113,7 @@ export function FloatingCompactHeader({
                       className="flex items-center gap-2 max-w-[140px] lg:max-w-md truncate bg-muted/50 hover:bg-muted border-primary/20 hover:border-primary/40 transition-all"
                       title="검색 (Cmd+K)"
                     >
-                      <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <Icon name="search" size={16} className="flex-shrink-0 text-muted-foreground" />
                       <span className="truncate text-sm font-medium">{currentLawName}</span>
                     </Button>
                   )}
@@ -123,7 +125,7 @@ export function FloatingCompactHeader({
                   <ThemeToggle />
 
                   {/* 사용법 안내 */}
-                  <UsageGuidePopover type={guideType} />
+                  <UsageGuidePopover type={guideType} onDetailClick={onHelpClick} />
 
                   {/* 즐겨찾기 */}
                   {favoritesCount > 0 && (
@@ -134,7 +136,7 @@ export function FloatingCompactHeader({
                       className="flex items-center gap-1.5 lg:gap-2"
                       title="즐겨찾기"
                     >
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                      <Icon name="star" size={16} className="text-yellow-400 fill-yellow-400" />
                       <Badge variant="secondary" className="text-xs px-1.5 py-0">
                         {favoritesCount}
                       </Badge>
@@ -160,7 +162,7 @@ export function FloatingCompactHeader({
                     onClick={onSettingsClick}
                     title="설정"
                   >
-                    <Settings className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <Icon name="settings" size={20} />
                   </Button>
                 </div>
               </div>
