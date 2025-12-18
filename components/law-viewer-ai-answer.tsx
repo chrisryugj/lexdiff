@@ -3,29 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-    Sparkles,
-    ShieldCheck,
-    Link2,
-    FileText,
-    Bookmark,
-    AlertCircle,
-    AlertTriangle,
-    MessageCircleQuestion,
-    ZoomOut,
-    RotateCcw,
-    ZoomIn,
-    ChevronDown,
-    BookOpen,
-    Scale,
-    ListChecks,
-    RefreshCw,
-    CircleHelp,
-    ClipboardCheck,
-    GitCompare,
-    Zap,
-    Ruler,
-} from "lucide-react"
+import { Icon, DynamicIcon, ICON_REGISTRY, type IconType } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
 import type { VerifiedCitation } from '@/lib/citation-verifier'
@@ -138,7 +116,7 @@ export function AIAnswerSidebar({
                 <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                            <Link2 className="h-5 w-5 text-primary" />
+                            <Icon name="link-2" size={20} className="text-primary" />
                             <h3 className="text-xl font-bold text-foreground">관련 법령</h3>
                         </div>
                         {onCollapseClick && (
@@ -149,7 +127,7 @@ export function AIAnswerSidebar({
                                 className="h-7 w-7"
                                 title="목록 접기"
                             >
-                                <ChevronDown className="h-4 w-4 rotate-90" />
+                                <Icon name="chevron-down" size={16} className="rotate-90" />
                             </Button>
                         )}
                     </div>
@@ -219,17 +197,17 @@ export function AIAnswerSidebar({
                                             <div className="absolute top-0 right-0 flex items-start gap-1">
                                                 {sources.has('excerpt') && (
                                                     <div className="p-1 rounded-md bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors" title="발췌 조문">
-                                                        <Bookmark className="h-3.5 w-3.5" />
+                                                        <Icon name="bookmark" size={14} />
                                                     </div>
                                                 )}
                                                 {sources.has('related') && (
                                                     <div className="p-1 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors" title="관련 법령">
-                                                        <Link2 className="h-3.5 w-3.5" />
+                                                        <Icon name="link-2" size={14} />
                                                     </div>
                                                 )}
                                                 {sources.has('citation') && (
                                                     <div className="p-1 rounded-md bg-emerald-600/20 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500 group-hover:bg-emerald-600/30 dark:group-hover:bg-emerald-500/20 transition-colors" title="AI 인용 출처">
-                                                        <Sparkles className="h-3.5 w-3.5" />
+                                                        <Icon name="sparkles" size={14} />
                                                     </div>
                                                 )}
                                             </div>
@@ -240,7 +218,7 @@ export function AIAnswerSidebar({
                         })()
                     ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
-                            <AlertCircle className="h-8 w-8 opacity-40 text-amber-500" />
+                            <Icon name="alert-circle" size={32} className="opacity-40 text-amber-500" />
                             <p className="text-sm font-medium text-amber-600">File Search 인용 없음</p>
                             <p className="text-xs text-center px-4">AI가 일반 지식으로 답변했습니다.<br />법령 데이터베이스에서 관련 조문을 찾지 못했습니다.</p>
                         </div>
@@ -276,27 +254,27 @@ function HeaderBadges({ relatedArticles }: { relatedArticles: ParsedRelatedLaw[]
         <div className="flex items-center gap-1.5 flex-wrap">
             {/* 총 개수 */}
             <Badge variant="secondary" className="text-xs whitespace-nowrap px-2 py-0.5">
-                <FileText className="h-3 w-3 mr-0.5" />
+                <Icon name="file-text" size={12} className="mr-0.5" />
                 {uniqueCount}
             </Badge>
             {/* 발췌 조문 (해당 source를 포함하는 모든 조문) */}
             {excerptCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-purple-900/30 text-purple-300 border-purple-700/50 whitespace-nowrap px-2 py-0.5">
-                    <Bookmark className="h-3 w-3 mr-0.5" />
+                    <Icon name="bookmark" size={12} className="mr-0.5" />
                     {excerptCount}
                 </Badge>
             )}
             {/* 관련 법령 (해당 source를 포함하는 모든 조문) */}
             {relatedCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-[var(--revision-tag-bg)] text-[var(--revision-tag-fg)] border-[var(--revision-tag-border)] whitespace-nowrap px-2 py-0.5 shadow-none">
-                    <Link2 className="h-3 w-3 mr-0.5" />
+                    <Icon name="link-2" size={12} className="mr-0.5" />
                     {relatedCount}
                 </Badge>
             )}
             {/* AI 인용 (해당 source를 포함하는 모든 조문) */}
             {citationCount > 0 && (
                 <Badge variant="outline" className="text-xs bg-emerald-200/40 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-300 border-emerald-600/50 dark:border-emerald-700/50 whitespace-nowrap px-2 py-0.5">
-                    <Sparkles className="h-3 w-3 mr-0.5" />
+                    <Icon name="sparkles" size={12} className="mr-0.5" />
                     {citationCount}
                 </Badge>
             )}
@@ -374,12 +352,12 @@ export function AIAnswerContent({
                     : `AI 참조 조문: ${totalUnique}개`
                 }
             >
-                <ShieldCheck className={`h-3.5 w-3.5 ${localConfidence === 'high'
+                <Icon name="shield-check" size={14} className={localConfidence === 'high'
                     ? 'text-blue-400 dark:text-blue-300'
                     : localConfidence === 'medium'
                         ? 'text-yellow-500 dark:text-yellow-400'
                         : 'text-red-500 dark:text-red-400'
-                    }`} />
+                    } />
                 <div className={`flex items-baseline gap-0.5 font-bold ${localConfidence === 'high'
                     ? 'text-blue-400 dark:text-blue-300'
                     : localConfidence === 'medium'
@@ -406,7 +384,7 @@ export function AIAnswerContent({
             <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도 */}
                 <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                    <Icon name="sparkles" size={20} className="text-primary flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
                         File Search RAG
@@ -418,27 +396,26 @@ export function AIAnswerContent({
                 {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}
                 {userQuery && (
                     <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium">
-                        <MessageCircleQuestion className="h-5 w-5 text-muted-foreground/60 flex-shrink-0 mt-0.5" />
+                        <Icon name="message-circle-question" size={20} className="text-muted-foreground/60 flex-shrink-0 mt-0.5" />
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                             <span className="break-words line-clamp-2">{userQuery}</span>
                             {/* 쿼리 타입 배지 (7가지 법률 질문 유형) */}
                             {(() => {
-                                const typeConfigs: Record<string, { icon: typeof BookOpen, label: string, bgColor: string, borderColor: string, textColor: string }> = {
-                                    definition: { icon: CircleHelp, label: '개념/정의', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', textColor: 'text-cyan-500' },
-                                    requirement: { icon: ClipboardCheck, label: '요건/조건', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30', textColor: 'text-orange-500' },
-                                    procedure: { icon: ListChecks, label: '절차/방법', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' },
-                                    comparison: { icon: GitCompare, label: '비교', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
-                                    application: { icon: Scale, label: '적용 판단', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
-                                    consequence: { icon: Zap, label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' },
-                                    scope: { icon: Ruler, label: '범위/금액', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', textColor: 'text-amber-500' }
+                                const typeConfigs: Record<string, { icon: IconType, label: string, bgColor: string, borderColor: string, textColor: string }> = {
+                                    definition: { icon: ICON_REGISTRY['circle-help'], label: '개념/정의', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', textColor: 'text-cyan-500' },
+                                    requirement: { icon: ICON_REGISTRY['clipboard-check'], label: '요건/조건', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30', textColor: 'text-orange-500' },
+                                    procedure: { icon: ICON_REGISTRY['list-checks'], label: '절차/방법', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', textColor: 'text-green-500' },
+                                    comparison: { icon: ICON_REGISTRY['git-compare'], label: '비교', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
+                                    application: { icon: ICON_REGISTRY['scale'], label: '적용 판단', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
+                                    consequence: { icon: ICON_REGISTRY['zap'], label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' },
+                                    scope: { icon: ICON_REGISTRY['ruler'], label: '범위/금액', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', textColor: 'text-amber-500' }
                                 }
                                 const config = typeConfigs[aiQueryType] || typeConfigs.application
-                                const TypeIcon = config.icon
 
                                 return (
                                     <Badge variant="outline" className={`flex-shrink-0 text-xs px-2 py-0.5 ${config.bgColor} ${config.borderColor} ${config.textColor}`}>
-                                        <TypeIcon className="h-3 w-3 mr-1" />
+                                        <DynamicIcon icon={config.icon} size={12} className="mr-1" />
                                         {config.label}
                                     </Badge>
                                 )
@@ -449,17 +426,17 @@ export function AIAnswerContent({
                             {/* ✅ 강제 새로고침 버튼 (개발용) */}
                             {onRefresh && (
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                                    <RefreshCw className="h-4 w-4" />
+                                    <Icon name="refresh-cw" size={16} />
                                 </Button>
                             )}
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
-                                <ZoomOut className="h-4 w-4" />
+                                <Icon name="zoom-out" size={16} />
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
-                                <RotateCcw className="h-3 w-3" />
+                                <Icon name="rotate-cw" size={12} />
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
-                                <ZoomIn className="h-4 w-4" />
+                                <Icon name="zoom-in" size={16} />
                             </Button>
                             <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
                             <CopyButton
@@ -476,17 +453,17 @@ export function AIAnswerContent({
                     {/* ✅ 강제 새로고침 버튼 (개발용) */}
                     {onRefresh && (
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                            <RefreshCw className="h-4 w-4" />
+                            <Icon name="refresh-cw" size={16} />
                         </Button>
                     )}
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.max(12, prev - 2))} title="글자 작게">
-                        <ZoomOut className="h-4 w-4" />
+                        <Icon name="zoom-out" size={16} />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
-                        <RotateCcw className="h-3 w-3" />
+                        <Icon name="rotate-cw" size={12} />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
-                        <ZoomIn className="h-4 w-4" />
+                        <Icon name="zoom-in" size={16} />
                     </Button>
                     <span className="text-xs text-muted-foreground mx-1 tabular-nums">{fontSize}px</span>
                     <CopyButton
@@ -503,7 +480,7 @@ export function AIAnswerContent({
                 {aiConfidenceLevel === 'low' && !fileSearchFailed && (
                     <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
                         <div className="flex items-center gap-2 text-red-500 text-sm">
-                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
                             <span>참조 조문 부족. 일반 지식 기반 답변</span>
                         </div>
                     </div>
@@ -513,7 +490,7 @@ export function AIAnswerContent({
                 {isTruncated && (
                     <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-md">
                         <div className="flex items-center gap-2 text-amber-500 text-sm">
-                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
                             <span>답변이 길어 일부 생략됨</span>
                         </div>
                     </div>
@@ -523,7 +500,7 @@ export function AIAnswerContent({
                 {fileSearchFailed && (
                     <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-md">
                         <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                            <Icon name="alert-circle" size={16} className="text-destructive shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-destructive">검색 결과 없음</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -540,7 +517,7 @@ export function AIAnswerContent({
                         {/* 신뢰도 낮음 배너 */}
                         <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
                             <div className="flex items-center gap-2 text-red-500 text-sm">
-                                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
                                 <span>File Search 인용 없음 - 법령 데이터베이스에서 결과를 찾지 못함</span>
                             </div>
                         </div>
@@ -548,7 +525,7 @@ export function AIAnswerContent({
                         {/* 오류 메시지 */}
                         <div className="flex flex-col items-center gap-4 max-w-md mx-auto text-center py-6">
                             <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                <AlertTriangle className="h-7 w-7 text-amber-500" />
+                                <Icon name="alert-triangle" size={28} className="text-amber-500" />
                             </div>
                             <div className="space-y-2">
                                 <h3 className="text-base font-medium text-foreground">검색 결과를 찾지 못했습니다</h3>
@@ -574,7 +551,7 @@ export function AIAnswerContent({
                 {/* AI 답변 주의사항 */}
                 {aiAnswerContent && (
                     <div className="mt-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/30 p-3 rounded-md text-amber-900 dark:text-amber-200/80">
-                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <Icon name="alert-circle" size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>
                 )}

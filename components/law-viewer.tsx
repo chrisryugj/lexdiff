@@ -10,34 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import {
-  BookOpen,
-  GitCompare,
-  Star,
-  Sparkles,
-  AlertCircle,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  ExternalLink,
-  Bookmark,
-  FileText,
-  Link2,
-  Eye,
-  Loader2,
-  RefreshCw,
-  ShieldCheck,
-  Copy,
-  AlertTriangle,
-  Check,
-  Calendar,
-  ListOrdered,
-  Building2,
-  GitMerge,
-  MessageCircleQuestion,
-  ChevronDown,
-  Landmark,
-} from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
 import { buildJO, formatJO, formatSimpleJo, type ParsedRelatedLaw } from "@/lib/law-parser"
@@ -711,7 +684,7 @@ export function LawViewer({
                   className="mx-auto mt-2 mb-2"
                   title="관련 법령 목록 펼치기"
                 >
-                  <Link2 className="h-5 w-5" />
+                  <Icon name="link" size={20} />
                 </Button>
                 <Separator />
                 <ScrollArea className="flex-1">
@@ -728,9 +701,9 @@ export function LawViewer({
                           title={`${article.lawName} ${article.article}`}
                         >
                           {isExcerpt ? (
-                            <Bookmark className="h-3.5 w-3.5 text-purple-400" />
+                            <Icon name="bookmark" size={14} className="text-purple-400" />
                           ) : (
-                            <Link2 className="h-3.5 w-3.5 text-blue-400" />
+                            <Icon name="link" size={14} className="text-blue-400" />
                           )}
                         </Button>
                       )
@@ -756,7 +729,7 @@ export function LawViewer({
                   className="mx-auto mt-2 mb-2"
                   title="조문 목록 펼치기"
                 >
-                  <ListOrdered className="h-5 w-5" />
+                  <Icon name="list-ordered" size={20} />
                 </Button>
                 <Separator />
                 <ScrollArea className="flex-1">
@@ -778,7 +751,7 @@ export function LawViewer({
                         >
                           <span className="font-bold">{joNum}</span>
                           {isArticleFavorite && (
-                            <Star className="h-2.5 w-2.5 absolute top-0.5 right-0.5 fill-yellow-400 text-yellow-400" />
+                            <Icon name="star" size={10} className="absolute top-0.5 right-0.5 fill-yellow-400 text-yellow-400" />
                           )}
                         </Button>
                       )
@@ -793,7 +766,7 @@ export function LawViewer({
                 <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                   <div className="flex items-center gap-2 mb-1 justify-between">
                     <div className="flex items-center gap-2">
-                      <ListOrdered className="h-5 w-5 text-primary" />
+                      <Icon name="list-ordered" size={20} className="text-primary" />
                       <h3 className="text-xl font-bold text-foreground">조문 목록</h3>
                     </div>
                     <Button
@@ -803,11 +776,11 @@ export function LawViewer({
                       className="h-7 w-7"
                       title="조문 목록 접기"
                     >
-                      <ChevronDown className="h-4 w-4 rotate-90" />
+                      <Icon name="chevron-down" size={16} className="rotate-90" />
                     </Button>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    <FileText className="h-3 w-3 mr-1" />
+                    <Icon name="file-text" size={12} className="mr-1" />
                     {actualArticles.length}개 조문
                   </Badge>
                 </div>
@@ -848,7 +821,7 @@ export function LawViewer({
               <>
                 <div className="mb-4">
                   <Badge variant="outline" className="text-xs">
-                    <FileText className="h-3 w-3 mr-1" />
+                    <Icon name="file-text" size={12} className="mr-1" />
                     {actualArticles.length}개 조문
                   </Badge>
                 </div>
@@ -875,7 +848,7 @@ export function LawViewer({
           {/* Floating Action Button (Mobile only) */}
           <FloatingActionButton
             onClick={() => setIsArticleListExpanded(true)}
-            icon={<ListOrdered className="h-5 w-5" />}
+            icon={<Icon name="list-ordered" size={20} />}
             count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
             label={aiAnswerMode ? "관련 법령 목록 열기" : "조문 목록 열기"}
           />
@@ -886,7 +859,7 @@ export function LawViewer({
             {!aiAnswerMode && (
               <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 sm:pb-3.5">
                 <div className="flex items-center gap-2 mb-1">
-                  <BookOpen className="h-5 w-5 text-primary" />
+                  <Icon name="book-open" size={20} className="text-primary" />
                   <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
                   {!isOrdinance && viewMode === "full" && (
                     <Badge variant="outline" className="text-xs">
@@ -897,18 +870,18 @@ export function LawViewer({
                 <div className="flex flex-wrap gap-1.5">
                   {meta.latestEffectiveDate && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                      <Calendar className="h-3 w-3 mr-1" />
+                      <Icon name="calendar" size={12} className="mr-1" />
                       {formatDate(meta.latestEffectiveDate)}
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                    <FileText className="h-3 w-3 mr-1" />
+                    <Icon name="file-text" size={12} className="mr-1" />
                     {articles.length}개
                   </Badge>
 
                   {isOrdinance && (
                     <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs px-1.5 py-0.5">
-                      <Building2 className="h-3 w-3 mr-1" />
+                      <Icon name="building-2" size={12} className="mr-1" />
                       자치법규
                     </Badge>
                   )}
@@ -925,7 +898,7 @@ export function LawViewer({
                       variant="outline"
                       className="text-xs px-1.5 py-0.5"
                     >
-                      <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-500" />
+                      <Icon name="star" size={12} className="mr-1 fill-yellow-400 text-yellow-500" />
                       {favoriteCount}
                     </Badge>
                   )}
@@ -944,17 +917,17 @@ export function LawViewer({
                 <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
                   <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
                     <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <GitCompare className="h-3.5 w-3.5 sm:mr-1" />
+                      <Icon name="git-compare" size={14} className="sm:mr-1" />
                       <span className="hidden sm:inline">신·구법 비교</span>
                       <span className="sm:hidden">비교</span>
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <Sparkles className="h-3.5 w-3.5 sm:mr-1" />
+                      <Icon name="sparkles" size={14} className="sm:mr-1" />
                       <span className="hidden sm:inline">AI 요약</span>
                       <span className="sm:hidden">요약</span>
                     </Button>
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
+                      <Icon name="external-link" size={14} className="sm:mr-1" />
                       <span className="hidden sm:inline">원문 보기</span>
                       <span className="sm:hidden">원문</span>
                     </Button>
@@ -982,9 +955,9 @@ export function LawViewer({
                         className="h-7 px-1.5 sm:px-2 shrink-0"
                       >
                         {isLoadingThreeTier ? (
-                          <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
+                          <Icon name="loader" size={14} className="sm:mr-1 animate-spin" />
                         ) : (
-                          <FileText className="h-3.5 w-3.5 sm:mr-1" />
+                          <Icon name="file-text" size={14} className="sm:mr-1" />
                         )}
                         <span className="hidden sm:inline">{tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}</span>
                         <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
@@ -1002,7 +975,7 @@ export function LawViewer({
                         : ''
                         }`}
                     >
-                      <Star className={`h-3.5 w-3.5 mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
+                      <Icon name="star" size={14} className={`mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
                       즐겨찾기
                     </Button>
                   </div>
@@ -1016,20 +989,20 @@ export function LawViewer({
                   <div className="flex items-center justify-between gap-1">
                     {/* 좌측: 원문 보기 */}
                     <Button variant="outline" size="sm" onClick={openLawCenter} className="bg-transparent h-7 px-2">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                      <Icon name="external-link" size={14} className="mr-1" />
                       원문 보기
                     </Button>
 
                     {/* 우측: 글자크기 + 복사 */}
                     <div className="flex items-center gap-0.5">
                       <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                        <ZoomOut className="h-3.5 w-3.5" />
+                        <Icon name="zoom-out" size={14} />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                        <RotateCcw className="h-3 w-3" />
+                        <Icon name="rotate-cw" size={12} />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                        <ZoomIn className="h-3.5 w-3.5" />
+                        <Icon name="zoom-in" size={14} />
                       </Button>
                       <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
                       <CopyButton
@@ -1160,7 +1133,7 @@ export function LawViewer({
                             </h2>
                             {meta.lawTitle === "대한민국헌법" ? (
                               <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50 hidden sm:flex">
-                                <Landmark className="h-3 w-3 mr-1" />
+                                <Icon name="landmark" size={12} className="mr-1" />
                                 헌법
                               </Badge>
                             ) : (
@@ -1181,17 +1154,17 @@ export function LawViewer({
                               className="h-7 w-7 p-0"
                               title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                             >
-                              <Star className={`h-4 w-4 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                              <Icon name="star" size={16} className={`transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
                             </Button>
                             {/* 글씨크기 버튼 */}
                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 w-7 p-0">
-                              <ZoomOut className="h-3.5 w-3.5" />
+                              <Icon name="zoom-out" size={14} />
                             </Button>
                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 w-7 p-0">
-                              <RotateCcw className="h-3 w-3" />
+                              <Icon name="rotate-cw" size={12} />
                             </Button>
                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 w-7 p-0">
-                              <ZoomIn className="h-3.5 w-3.5" />
+                              <Icon name="zoom-in" size={14} />
                             </Button>
                             {/* px 텍스트: PC에서만 표시 */}
                             <span className="hidden lg:inline text-xs text-muted-foreground ml-1 mr-1">{fontSize}px</span>

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo, memo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, ArrowLeftRight, Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, History, X, GitCompare } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { OldNewComparison } from "@/lib/law-types"
 import { parseOldNewXML, highlightDifferences } from "@/lib/oldnew-parser"
 import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
@@ -281,7 +281,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <DialogTitle className="flex items-center gap-2 text-lg sm:text-2xl font-bold text-foreground mb-2">
-                <GitCompare className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0" />
+                <Icon name="git-compare" size={24} className="text-primary flex-shrink-0" />
                 신·구법 대조표
               </DialogTitle>
               <DialogDescription className="text-sm sm:text-base font-semibold text-muted-foreground truncate pl-[5px]">
@@ -294,7 +294,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
             <div className="flex flex-wrap items-center gap-1 mt-1">
               {comparison.meta.promulgation?.date && (
                 <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
-                  <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                  <Icon name="calendar" size={12} className="mr-0.5 sm:mr-1" />
                   {formatDate(comparison.meta.promulgation.date)}
                 </Badge>
               )}
@@ -318,7 +318,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 disabled={!canGoToPrevious || isLoading}
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-r-none border-r border-border"
               >
-                <ChevronLeft className="h-3 w-3" />
+                <Icon name="chevron-left" size={12} />
                 <span className="hidden sm:inline ml-1">이전</span>
               </Button>
               <Button
@@ -329,7 +329,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-l-none"
               >
                 <span className="hidden sm:inline mr-1">다음</span>
-                <ChevronRight className="h-3 w-3" />
+                <Icon name="chevron-right" size={12} />
               </Button>
             </div>
 
@@ -341,7 +341,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 className="text-xs h-8"
                 disabled={articleHistory.length === 0}
               >
-                <History className="h-3 w-3 mr-1" />
+                <Icon name="history" size={12} className="mr-1" />
                 개정이력 ({articleHistory.length})
               </Button>
             </div>
@@ -383,7 +383,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
               onClick={() => setSyncScroll(!syncScroll)}
               className="text-[10px] sm:text-xs h-7 sm:h-8 px-2"
             >
-              <ArrowLeftRight className="h-3 w-3" />
+              <Icon name="arrow-left-right" size={12} />
               <span className="hidden sm:inline ml-1">{syncScroll ? "동기" : "비동기"}</span>
             </Button>
 
@@ -395,7 +395,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 disabled={fontSize <= 12}
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-r-none border-r border-border"
               >
-                <ZoomOut className="h-3 w-3" />
+                <Icon name="zoom-out" size={12} />
               </Button>
               <span className="text-xs text-muted-foreground px-2 min-w-[30px] text-center">{fontSize}</span>
               <Button
@@ -405,7 +405,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 disabled={fontSize >= 28}
                 className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 rounded-l-none border-l border-border"
               >
-                <ZoomIn className="h-3 w-3" />
+                <Icon name="zoom-in" size={12} />
               </Button>
             </div>
           </div>
@@ -420,7 +420,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                   <p className="text-xs text-muted-foreground">개정 버전을 선택하여 비교하세요</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowRevisionHistory(false)} className="h-6 w-6 p-0">
-                  <X className="h-4 w-4" />
+                  <Icon name="x" size={16} />
                 </Button>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -487,7 +487,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                  <Icon name="loader" size={32} className="animate-spin text-primary mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground">신·구법 대조표를 불러오는 중...</p>
                 </div>
               </div>
@@ -505,7 +505,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-rose-500/5 to-transparent">
                   <div className="bg-gradient-to-r from-rose-500/15 via-rose-500/10 to-rose-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-rose-500/20 shrink-0">
                     <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2 sm:gap-3">
-                      <span className="text-base sm:text-xl">📜</span>
+                      <Icon name="scroll-text" size={20} className="text-rose-500" />
                       <span className="tracking-tight">구법</span>
                       <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
                         {comparison.oldVersion.effectiveDate ? formatDate(comparison.oldVersion.effectiveDate) : "이전 버전"}
@@ -528,7 +528,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                 <div className="flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-emerald-500/5 to-transparent">
                   <div className="bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-emerald-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-emerald-500/20 shrink-0">
                     <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2 sm:gap-3">
-                      <span className="text-base sm:text-xl">✨</span>
+                      <Icon name="sparkles" size={20} className="text-emerald-500" />
                       <span className="tracking-tight">신법</span>
                       <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
                         {comparison.newVersion.effectiveDate ? formatDate(comparison.newVersion.effectiveDate) : "현행 버전"}
