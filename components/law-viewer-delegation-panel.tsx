@@ -7,16 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-    FileText,
-    Loader2,
-    AlertCircle,
-    ExternalLink,
-    ZoomIn,
-    ZoomOut,
-    RotateCcw,
-    Copy,
-} from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { LawArticle, LawMeta, DelegationItem } from "@/lib/law-types"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
 import { formatSimpleJo } from "@/lib/law-parser"
@@ -215,7 +206,7 @@ export function DelegationPanel({
                             <TabsTrigger value="admin" className="text-sm whitespace-nowrap h-9 px-1">
                                 {(loadingAdminRules || (showAdminRules && !hasEverLoaded)) ? (
                                     <>
-                                        행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
+                                        행정규칙 <Icon name="loader" size={12} className="ml-1 inline-block animate-spin" />
                                     </>
                                 ) : loadedAdminRulesCount > 0 ? (
                                     <>행정규칙 ({loadedAdminRulesCount})</>
@@ -231,7 +222,7 @@ export function DelegationPanel({
                             <div className="mb-3 pb-2 border-b border-border">
                                 {/* 조문 제목 (1줄로 표시) */}
                                 <div className="flex items-center gap-2 mb-2">
-                                    <FileText className="h-4 w-4 text-foreground shrink-0" />
+                                    <Icon name="file-text" size={16} className="text-foreground shrink-0" />
                                     <h3 className="text-base font-bold text-foreground truncate flex-1 min-w-0">
                                         {formatSimpleJo(activeArticle.jo, isOrdinance)}
                                         {activeArticle.title && <span className="text-muted-foreground font-normal ml-1">({activeArticle.title})</span>}
@@ -260,7 +251,7 @@ export function DelegationPanel({
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
                                     <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
-                                        <FileText className="h-4 w-4 text-foreground shrink-0" />
+                                        <Icon name="file-text" size={16} className="text-foreground shrink-0" />
                                         <span>시행령</span>
                                         <Badge variant="secondary" className="text-xs ml-1 shrink-0">
                                             {validDelegations.filter((d) => d.type === "시행령").length}개
@@ -326,7 +317,7 @@ export function DelegationPanel({
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
                                     <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
-                                        <FileText className="h-4 w-4 text-foreground shrink-0" />
+                                        <Icon name="file-text" size={16} className="text-foreground shrink-0" />
                                         <span>시행규칙</span>
                                         <Badge variant="secondary" className="text-xs ml-1 shrink-0">
                                             {validDelegations.filter((d) => d.type === "시행규칙" || d.type === "행정규칙").length}개
@@ -388,7 +379,7 @@ export function DelegationPanel({
                     <TabsContent value="admin" className="mt-0">
                         {!showAdminRules ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                <FileText className="h-12 w-12 mb-4 opacity-30" />
+                                <Icon name="file-text" size={48} className="mb-4 opacity-30" />
                                 <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
                                 <p className="text-xs mt-2 text-muted-foreground/70">
                                     클릭 시 자동으로 로드됩니다
@@ -396,7 +387,7 @@ export function DelegationPanel({
                             </div>
                         ) : (loadingAdminRules || !hasEverLoaded) ? (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                <Icon name="loader" size={48} className="mb-4 animate-spin text-primary" />
                                 <p className="text-sm font-medium">행정규칙 검색 중...</p>
                                 {adminRulesProgress ? (
                                     <p className="text-xs mt-2 text-primary font-medium">
@@ -412,7 +403,7 @@ export function DelegationPanel({
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
                                     <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
-                                        <FileText className="h-4 w-4 text-foreground shrink-0" />
+                                        <Icon name="file-text" size={16} className="text-foreground shrink-0" />
                                         <span className="truncate">{adminRuleTitle || "행정규칙"}</span>
                                     </h3>
                                     <Button
@@ -440,7 +431,7 @@ export function DelegationPanel({
                             <div className="p-4">
                                 <div className="mb-3 pb-2 border-b border-border flex items-center justify-between gap-2">
                                     <h3 className="text-base font-bold text-foreground leading-tight flex-1 min-w-0 flex items-center gap-1">
-                                        <FileText className="h-4 w-4 text-foreground shrink-0" />
+                                        <Icon name="file-text" size={16} className="text-foreground shrink-0" />
                                         <span>행정규칙</span>
                                         <Badge variant="secondary" className="text-xs ml-1 shrink-0">
                                             {adminRules.length}개
@@ -467,7 +458,7 @@ export function DelegationPanel({
                                                         관련 조문: {formatSimpleJo(activeArticle.jo, isOrdinance)}
                                                     </p>
                                                 </div>
-                                                <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                <Icon name="external-link" size={16} className="text-muted-foreground shrink-0" />
                                             </div>
                                         </button>
                                     ))}
@@ -475,7 +466,7 @@ export function DelegationPanel({
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
+                                <Icon name="alert-circle" size={48} className="mb-4 opacity-30" />
                                 <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
                             </div>
                         )}
@@ -504,7 +495,7 @@ export function DelegationPanel({
                                 <div className="prose prose-sm max-w-none dark:prose-invert">
                                     <div className="mb-4 pb-2 border-b border-border">
                                         <div className="flex items-center gap-2">
-                                            <FileText className="h-4 w-4 text-foreground" />
+                                            <Icon name="file-text" size={16} className="text-foreground" />
                                             <h3 className="text-base font-bold text-foreground">
                                                 {formatSimpleJo(activeArticle.jo, isOrdinance)}
                                                 {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
@@ -555,7 +546,7 @@ export function DelegationPanel({
                                         <TabsTrigger value="admin" className="text-sm">
                                             {loadingAdminRules ? (
                                                 <>
-                                                    행정규칙 <Loader2 className="h-3 w-3 ml-1 inline-block animate-spin" />
+                                                    행정규칙 <Icon name="loader" size={12} className="ml-1 inline-block animate-spin" />
                                                 </>
                                             ) : loadedAdminRulesCount > 0 ? (
                                                 `행정규칙 (${loadedAdminRulesCount})`
@@ -574,7 +565,7 @@ export function DelegationPanel({
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2">
-                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <Icon name="file-text" size={16} className="text-foreground" />
                                                             <h3 className="text-base font-bold text-foreground">시행령</h3>
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {validDelegations.filter((d) => d.type === "시행령").length}개
@@ -582,13 +573,13 @@ export function DelegationPanel({
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <RotateCcw className="h-3 w-3" />
+                                                                <Icon name="rotate-cw" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-in" size={14} />
                                                             </Button>
                                                             <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
                                                             <Button
@@ -612,7 +603,7 @@ export function DelegationPanel({
                                                                 title="복사"
                                                                 className="h-7 px-2"
                                                             >
-                                                                <Copy className="h-3.5 w-3.5" />
+                                                                <Icon name="copy" size={14} />
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -680,7 +671,7 @@ export function DelegationPanel({
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2">
-                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <Icon name="file-text" size={16} className="text-foreground" />
                                                             <h3 className="text-base font-bold text-foreground">시행규칙</h3>
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {validDelegations.filter((d) => d.type === "시행규칙").length}개
@@ -688,13 +679,13 @@ export function DelegationPanel({
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <RotateCcw className="h-3 w-3" />
+                                                                <Icon name="rotate-cw" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-in" size={14} />
                                                             </Button>
                                                             <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
                                                             <Button
@@ -718,7 +709,7 @@ export function DelegationPanel({
                                                                 title="복사"
                                                                 className="h-7 px-2"
                                                             >
-                                                                <Copy className="h-3.5 w-3.5" />
+                                                                <Icon name="copy" size={14} />
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -781,7 +772,7 @@ export function DelegationPanel({
                                     <TabsContent value="admin" className="mt-0">
                                         {!showAdminRules ? (
                                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                                <FileText className="h-12 w-12 mb-4 opacity-30" />
+                                                <Icon name="file-text" size={48} className="mb-4 opacity-30" />
                                                 <p className="text-sm">행정규칙을 불러오려면 이 탭을 선택하세요</p>
                                                 <p className="text-xs mt-2 text-muted-foreground/70">
                                                     클릭 시 자동으로 로드됩니다
@@ -789,7 +780,7 @@ export function DelegationPanel({
                                             </div>
                                         ) : (loadingAdminRules || !hasEverLoaded) ? (
                                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                                <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+                                                <Icon name="loader" size={48} className="mb-4 animate-spin text-primary" />
                                                 <p className="text-sm font-medium">행정규칙 검색 중...</p>
                                                 {adminRulesProgress ? (
                                                     <p className="text-xs mt-2 text-primary font-medium">
@@ -806,7 +797,7 @@ export function DelegationPanel({
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2">
-                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <Icon name="file-text" size={16} className="text-foreground" />
                                                             <h3 className="text-base font-bold text-foreground">{adminRuleTitle || "행정규칙"}</h3>
                                                         </div>
                                                         <div className="flex items-center gap-1">
@@ -819,13 +810,13 @@ export function DelegationPanel({
                                                                 ← 목록
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <RotateCcw className="h-3 w-3" />
+                                                                <Icon name="rotate-cw" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-in" size={14} />
                                                             </Button>
                                                             <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
                                                             <Button
@@ -839,7 +830,7 @@ export function DelegationPanel({
                                                                 title="복사"
                                                                 className="h-7 px-2"
                                                             >
-                                                                <Copy className="h-3.5 w-3.5" />
+                                                                <Icon name="copy" size={14} />
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -863,7 +854,7 @@ export function DelegationPanel({
                                                 <div className="mb-2 pb-2 border-b border-border flex-shrink-0">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2">
-                                                            <FileText className="h-4 w-4 text-foreground" />
+                                                            <Icon name="file-text" size={16} className="text-foreground" />
                                                             <h3 className="text-base font-bold text-foreground">행정규칙</h3>
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {adminRules.length}개
@@ -871,13 +862,13 @@ export function DelegationPanel({
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                                                                <ZoomOut className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <RotateCcw className="h-3 w-3" />
+                                                                <Icon name="rotate-cw" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                                                                <ZoomIn className="h-3.5 w-3.5" />
+                                                                <Icon name="zoom-in" size={14} />
                                                             </Button>
                                                             <span className="text-xs text-muted-foreground ml-1 mr-2">{fontSize}px</span>
                                                         </div>
@@ -904,7 +895,7 @@ export function DelegationPanel({
                                                                             관련: {formatSimpleJo(activeArticle.jo, isOrdinance)}
                                                                         </p>
                                                                     </div>
-                                                                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                                                                    <Icon name="external-link" size={14} className="text-muted-foreground shrink-0 mt-1" />
                                                                 </div>
                                                             </button>
                                                         ))}
@@ -913,7 +904,7 @@ export function DelegationPanel({
                                             </>
                                         ) : (
                                             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                                <AlertCircle className="h-12 w-12 mb-4 opacity-30" />
+                                                <Icon name="alert-circle" size={48} className="mb-4 opacity-30" />
                                                 <p className="text-sm">이 조문과 관련된 행정규칙이 없습니다</p>
                                             </div>
                                         )}
