@@ -87,10 +87,9 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   }
 
   const handleRecentClick = (query: string) => {
-    // ✅ 검색 실행 대신 검색창에 자동완성만
-    setSearchQuery(query)
-    inputRef.current?.focus()
-    debugLogger.info('CommandSearchModal 최근 검색 자동완성', { query })
+    // ✅ 최근 검색 클릭 시 즉시 검색 실행
+    handleSearch(query)
+    debugLogger.info('CommandSearchModal 최근 검색 실행', { query })
   }
 
   return (
@@ -104,8 +103,8 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           <DialogTitle>법령 검색</DialogTitle>
         </VisuallyHidden.Root>
 
-        {/* 검색 입력 영역 - 강조된 스타일 */}
-        <div className="flex items-center gap-3 px-4 py-4 border-b border-border bg-muted/30">
+        {/* 검색 입력 영역 - X 버튼 공간 확보 */}
+        <div className="flex items-center gap-3 pl-4 pr-12 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
             <Icon name="search" className="h-5 w-5 text-primary" />
           </div>

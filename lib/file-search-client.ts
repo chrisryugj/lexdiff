@@ -273,7 +273,7 @@ export async function* queryFileSearchStream(
       // AI Router 결과 사용
       effectiveQuery = routingResult.optimizedQuery
       systemInstruction = routingResult.specialistPrompt
-      queryType = routingResult.legacyType
+      queryType = routingResult.analysis.primaryType  // ✅ AI가 판단한 실제 질문 유형 사용
 
       console.log('[File Search] AI Router result:', {
         primaryType: routingResult.analysis.primaryType,

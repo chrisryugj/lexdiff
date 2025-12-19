@@ -16,6 +16,85 @@ import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
 import { Icon, type IconName } from '@/components/ui/icon'
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Simple Flowchart Renderer (Mini-Mermaid)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function SimpleFlowchartRenderer({ code }: { code: string }) {
+  // Parse format: A[Label] --> B[Label]
+  // or A --> B
+  const steps: { id: string, label: string }[] = []
+  const edges: { from: string, to: string }[] = []
+
+  // Very naive parser for simple linear flows (sufficient for most legal procedures)
+  const lines = code.split('\n')
+
+  // 1. Extract Nodes and Edges from lines
+  lines.forEach(line => {
+    // Match A[Label] --> B[Label]
+    // Regex to capture nodes: ([A-Za-z0-9_]+)(?:\[(.*?)\])?
+    const nodeRegex = /([A-Za-z0-9_]+)(?:\[(.*?)\])?/g
+
+    // Split by arrow
+    if (line.includes('-->')) {
+      const parts = line.split('-->')
+      let prevId: string | null = null
+
+      parts.forEach(part => {
+        const match = /([A-Za-z0-9_]+)(?:\[(.*?)\])?/.exec(part.trim())
+        if (match) {
+          const id = match[1]
+          const label = match[2] || id
+
+          // Add node if unique
+          if (!steps.find(s => s.id === id)) {
+            steps.push({ id, label })
+          }
+
+          if (prevId) {
+            edges.push({ from: prevId, to: id })
+          }
+          prevId = id
+        }
+      })
+    }
+  })
+
+  if (steps.length === 0) {
+    // Fallback: If parsing fails, just show text blocks if possible, or nothing
+    return (
+      <div className="bg-muted/30 p-4 rounded-md my-4 border border-border/50">
+        <p className="text-xs text-muted-foreground mb-2 font-mono">다이어그램 (텍스트 모드)</p>
+        <pre className="text-xs">{code}</pre>
+      </div>
+    )
+  }
+
+  // Render as a horizontal Flex row (Linear flow assumption)
+  return (
+    <div className="flex flex-wrap items-center gap-2 my-6 p-4 bg-muted/10 border border-border/50 rounded-lg overflow-x-auto justify-center">
+      {steps.map((step, idx) => (
+        <React.Fragment key={step.id}>
+          {/* Node */}
+          <div className="flex flex-col items-center gap-2 min-w-[100px]">
+            <div className="bg-white dark:bg-card border border-blue-200 dark:border-blue-900 shadow-sm px-4 py-3 rounded-xl flex items-center justify-center text-center">
+              <span className="text-sm font-semibold text-blue-900 dark:text-blue-100 break-keep leading-tight">
+                {step.label.replace(/["']/g, '')}
+              </span>
+            </div>
+          </div>
+
+          {/* Arrow (if not last) */}
+          {idx < steps.length - 1 && (
+            <div className="text-muted-foreground/40 flex-shrink-0">
+              <Icon name="arrow-right" className="w-5 h-5" />
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  )
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 섹션 헤더 아이콘 매핑
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -24,64 +103,73 @@ const SECTION_ICON_COLOR = 'text-foreground/70'
 
 const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: IconName }> = [
   // 공통 섹션
-  { pattern: /^정의/, icon: 'book-open' },
-  { pattern: /^법적\s*성질/, icon: 'scale' },
+  { pattern: /^(정의|쉬운\s*3줄\s*요약)/, icon: 'book-open' },
+  { pattern: /^(법적\s*성질|상세\s*해설)/, icon: 'scale' },
   { pattern: /^조문\s*원문/, icon: 'file-text' },
+  { pattern: /^조문\s*인용\s*원칙/, icon: 'book-open' },
   { pattern: /^핵심\s*해석/, icon: 'lightbulb' },
   { pattern: /^구성\s*요건/, icon: 'list-checks' },
-  { pattern: /^유사\s*개념\s*비교/, icon: 'git-compare' },
-  { pattern: /^예시/, icon: 'lightbulb' },
+  { pattern: /^(유사\s*개념|헷갈리는\s*개념)/, icon: 'git-compare' },
+  { pattern: /^(예시|이해를\s*돕는\s*예시)/, icon: 'lightbulb' },
   { pattern: /^관계\s*법령/, icon: 'book-open' },
 
   // requirement (요건) 섹션
-  { pattern: /^결론/, icon: 'check-circle-2' },
+  { pattern: /^(결론|핵심\s*결론)/, icon: 'check-circle-2' },
+  { pattern: /^요건\s*체크\s*순서/, icon: 'list-ordered' },
+  { pattern: /^0단계|결격사유\s*먼저/, icon: 'x-circle' },
+  { pattern: /^1단계|절대적\s*요건/, icon: 'check-circle' },
+  { pattern: /^2단계|상대적\s*요건/, icon: 'star' },
+  { pattern: /^[3-9]단계|\d{2,}단계/, icon: 'chevron-right' }, // 3단계 이상 범용 아이콘
   { pattern: /^적극적\s*요건/, icon: 'check-circle' },
   { pattern: /^소극적\s*요건/, icon: 'x-circle' },
-  { pattern: /^서류\s*\/\s*증빙|^서류/, icon: 'file-text' },
-  { pattern: /^예외\s*\/\s*특례|^특례/, icon: 'alert-triangle' },
-  { pattern: /^주의사항/, icon: 'alert-circle' },
+  { pattern: /^(서류|필수\s*요건\s*체크리스트)/, icon: 'list-checks' },
+  { pattern: /^(예외|특례|혹시\s*여기에\s*해당)/, icon: 'alert-triangle' },
+  { pattern: /^(주의사항|코디네이터의\s*팁)/, icon: 'alert-circle' },
 
   // procedure (절차) 섹션
-  { pattern: /^전체\s*흐름/, icon: 'arrow-right' },
-  { pattern: /^단계별\s*안내/, icon: 'list-ordered' },
+  { pattern: /^(전체\s*흐름|전체\s*로드맵)/, icon: 'list-ordered' },
+  { pattern: /^(단계별\s*안내|단계별\s*상세\s*가이드)/, icon: 'list-ordered' },
   { pattern: /^기한\s*요약표?/, icon: 'clock' },
-  { pattern: /^불복\s*\/\s*구제\s*절차|^불복/, icon: 'shield-check' },
+  { pattern: /^기한\s*계산\s*\(.*?\)/, icon: 'calendar' },
+  { pattern: /^기한\s*계산\s*체크리스트/, icon: 'list-checks' },
+  { pattern: /^(불복|구제|반려\s*주의사항)/, icon: 'shield-check' },
 
   // comparison (비교) 섹션
-  { pattern: /^핵심\s*차이/, icon: 'git-compare' },
-  { pattern: /^상세\s*비교표?/, icon: 'list-checks' },
-  { pattern: /^A의\s*특징|^B의\s*특징/, icon: 'star' },
+  { pattern: /^(핵심\s*차이|3줄\s*비교\s*요약)/, icon: 'git-compare' },
+  { pattern: /^(상세\s*비교|어떤\s*걸\s*선택)/, icon: 'help-circle' },
+  { pattern: /^(A의\s*특징|B의\s*특징|컨설턴트의\s*조언)/, icon: 'lightbulb' },
   { pattern: /^선택\s*가이드/, icon: 'check-circle-2' },
   { pattern: /^실무\s*팁/, icon: 'lightbulb' },
 
   // application (적용) 섹션
-  { pattern: /^요건별\s*검토/, icon: 'list-checks' },
+  { pattern: /^(요건별\s*검토|요건\s*정밀\s*검토)/, icon: 'clipboard-check' },
   { pattern: /^요건\s*충족\s*요약/, icon: 'clipboard-check' },
-  { pattern: /^추가\s*확인\s*필요/, icon: 'help-circle' },
-  { pattern: /^다음\s*행동/, icon: 'arrow-right' },
-  { pattern: /^유사\s*사례|^판례/, icon: 'gavel' },
+  { pattern: /^확신도\s*판단\s*기준표/, icon: 'list-checks' },
+  { pattern: /^(추가\s*확인|만약\s*세모)/, icon: 'help-circle' },
+  { pattern: /^(다음\s*행동|유사\s*판례)/, icon: 'gavel' },
+  { pattern: /^판정\s*결과/, icon: 'gavel' },
 
   // consequence (효과) 섹션
-  { pattern: /^행정적\s*효과/, icon: 'building' },
+  { pattern: /^(행정적|핵심\s*결과|예상되는\s*조치)/, icon: 'alert-triangle' },
   { pattern: /^민사적\s*효과/, icon: 'scale' },
   { pattern: /^형사적\s*효과/, icon: 'gavel' },
-  { pattern: /^효과\s*요약표?/, icon: 'list-checks' },
-  { pattern: /^구제\s*\/\s*치유\s*방법|^치유/, icon: 'shield-check' },
+  { pattern: /^(효과\s*요약|상세\s*불이익)/, icon: 'alert-triangle' },
+  { pattern: /^(구제|치유)/, icon: 'shield-check' },
 
   // scope (범위/금액) 섹션
-  { pattern: /^법정\s*기준/, icon: 'ruler' },
-  { pattern: /^산정\s*방법/, icon: 'calculator' },
-  { pattern: /^가산\s*\/\s*감경|^가산|^감경/, icon: 'trending-up' },
+  { pattern: /^(법정\s*기준|계산\s*결과)/, icon: 'calculator' },
+  { pattern: /^(산정\s*방법|시뮬레이션)/, icon: 'chart-line' },
+  { pattern: /^(가산|감경)/, icon: 'trending-up' },
   { pattern: /^계산\s*예시/, icon: 'list-ordered' },
   { pattern: /^기한\s*계산/, icon: 'calendar' },
   { pattern: /^실무\s*참고/, icon: 'bookmark' },
 
   // exemption (면제) 섹션
-  { pattern: /^원칙\s*vs\s*예외|^원칙/, icon: 'git-compare' },
-  { pattern: /^면제\s*\/\s*감면\s*요건/, icon: 'list-checks' },
+  { pattern: /^(원칙|혜택\s*적용\s*가능성)/, icon: 'award' },
+  { pattern: /^(면제|감면\s*요건\s*체크)/, icon: 'list-checks' },
   { pattern: /^면제\s*\/\s*감면\s*범위/, icon: 'coins' },
-  { pattern: /^신청\s*절차/, icon: 'file-text' },
-  { pattern: /^사후관리/, icon: 'clock' },
+  { pattern: /^(신청\s*절차|혜택\s*받는\s*방법)/, icon: 'file-text' },
+  { pattern: /^(사후관리|보호관의\s*조언)/, icon: 'shield-check' },
   { pattern: /^유사\s*면제제도/, icon: 'git-compare' },
 ]
 
@@ -148,12 +236,19 @@ export function LegalMarkdownRenderer({
     setVisitedLaws(getVisitedLaws())
   }, [])
 
-  // 1. 법령 링크 전처리 (「법령명」 제N조 → Markdown 링크)
+  // 1. Remove "Mermaid fallback" text pattern (clean up AI output)
+  const cleanedContent = useMemo(() => {
+    return content
+      .replace(/\(Mermaid 미지원 시 텍스트 화살표로 대체:.*?\)/g, '')
+      .replace(/\(Mermaid 미지원 시.*?\)/g, '')
+  }, [content])
+
+  // 2. Generate Linkified Content
   const linkedContent = useMemo(() => {
-    if (!content) return ''
-    if (disabledLink) return content
-    return linkifyMarkdownLegalRefs(content)
-  }, [content, disabledLink])
+    if (!cleanedContent) return ''
+    if (disabledLink) return cleanedContent
+    return linkifyMarkdownLegalRefs(cleanedContent)
+  }, [cleanedContent, disabledLink])
 
 
   return (
@@ -181,8 +276,16 @@ export function LegalMarkdownRenderer({
         .legal-markdown-content h2 ~ p,
         .legal-markdown-content h2 ~ ul,
         .legal-markdown-content h2 ~ ol,
-        .legal-markdown-content h2 ~ blockquote {
+        .legal-markdown-content h2 ~ blockquote,
+        .legal-markdown-content h2 ~ h3 {
           padding-left: 0.5rem;
+        }
+        /* h3 섹션 내용 들여쓰기 (h2 내용 + 추가 들여쓰기) */
+        .legal-markdown-content h3 ~ p,
+        .legal-markdown-content h3 ~ ul,
+        .legal-markdown-content h3 ~ ol,
+        .legal-markdown-content h3 ~ blockquote {
+          padding-left: 1rem;
         }
       `}</style>
       <ReactMarkdown
@@ -446,16 +549,18 @@ export function LegalMarkdownRenderer({
 
               const cleanTitleNodes = removeParentheses(titleNodes)
 
-              // [부분 인용] 감지
-              const isPartialQuote = fullText.includes('[부분 인용]') || fullText.includes('[부분인용]')
+              // [부분 인용] 감지 (띄어쓰기/괄호 유무 모두 허용)
+              const isPartialQuote = /\[?\s*부분\s*인용\s*\]?/i.test(fullText)
               // [...] 감지 (이하 생략)
               const isOmitted = fullText.includes('[...]') || fullText.includes('[…]')
 
-              // 제목에서 [부분 인용] 텍스트 제거 (배지로 대체)
+              // 제목에서 [부분 인용] 텍스트 제거 (배지로 대체) - 괄호/띄어쓰기 유무 모두 제거
               const removePartialQuoteText = (nodes: React.ReactNode[]): React.ReactNode[] => {
                 return nodes.map((node) => {
                   if (typeof node === 'string') {
-                    return node.replace(/\s*\[부분\s?인용\]\s*/g, ' ').trim()
+                    // 괄호 있음: [부분 인용], [부분인용]
+                    // 괄호 없음: 부분 인용, 부분인용
+                    return node.replace(/\s*\[?\s*부분\s*인용\s*\]?\s*/gi, ' ').trim()
                   }
                   if (React.isValidElement(node)) {
                     const props = node.props as { children?: React.ReactNode }
@@ -544,25 +649,60 @@ export function LegalMarkdownRenderer({
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 테이블 (반응형) - 부모 fontSize 상속
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // 테이블 (반응형) - 부모 fontSize 상속
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           table: ({ children }) => (
-            <div className="overflow-x-auto my-4 mx-3">
-              <table className="min-w-full border-collapse [&_td:first-child]:whitespace-nowrap [&_td]:break-keep" style={{ fontSize: 'inherit' }}>
+            <div className="overflow-x-auto my-4 mx-3 rounded-md border border-border/50 bg-card/50">
+              <table className="w-full border-collapse table-auto" style={{ fontSize: 'inherit' }}>
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-muted/50 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground">
               {children}
             </thead>
           ),
-          th: ({ children }) => (
-            <th className="px-3 py-2 text-left font-semibold text-foreground/80 whitespace-nowrap" style={{ fontSize: 'inherit' }}>
-              {children}
-            </th>
-          ),
+          // ✅ TH 커스텀: 짧은 컬럼(순번, 구분 등)은 최소 너비, 나머지는 균등 분할 효과
+          th: ({ children, ...props }) => {
+            // 짧은 컬럼으로 취급할 헤더 키워드
+            const SHORT_COLUMN_KEYWORDS = [
+              '순번', 'no', 'no.', '#', '번호',
+              '구분', '분류', '유형', '종류',
+              '단계', 'step',
+              '항목', '비고', '선택', '결과',
+              '날짜', '일시',
+              '✅', '❌'
+            ]
+
+            // 텍스트 내용 확인 (Children이 문자열인 경우)
+            const textContent = typeof children === 'string'
+              ? children.toLowerCase().trim()
+              : Array.isArray(children) && typeof children[0] === 'string'
+                ? children[0].toLowerCase().trim()
+                : ''
+
+            const isShortColumn = SHORT_COLUMN_KEYWORDS.some(k => textContent === k || textContent.includes(k))
+
+            return (
+              <th
+                className={`
+                        px-4 py-2.5 text-left font-semibold text-foreground/80 align-middle
+                        ${isShortColumn
+                    ? 'w-[1%] whitespace-nowrap text-center'
+                    : 'min-w-[120px]' // 나머지는 최소 너비 보장 -> 브라우저가 자동 분할
+                  }
+                    `}
+                style={{ fontSize: 'inherit' }}
+                {...props}
+              >
+                {children}
+              </th>
+            )
+          },
           td: ({ children }) => (
-            <td className="px-3 py-2 border-b border-border/50" style={{ fontSize: 'inherit' }}>
+            <td className="px-4 py-2.5 border-b border-border/50 text-foreground/90 align-top leading-relaxed break-keep" style={{ fontSize: 'inherit' }}>
               {children}
             </td>
           ),
@@ -642,11 +782,44 @@ export function LegalMarkdownRenderer({
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // 코드 (인라인)
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          code: ({ children }) => (
-            <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
-              {children}
-            </code>
-          ),
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // 코드 블록 및 인라인 코드
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          code: ({ node, inline, className, children, ...props }: any) => {
+            const match = /language-(\w+)/.exec(className || '')
+            const codeContent = String(children).replace(/\n$/, '')
+
+            // Auto-detect Mermaid even if language tag is missing or wrong
+            const isMermaid = (match && match[1] === 'mermaid') ||
+              codeContent.startsWith('graph ') ||
+              codeContent.startsWith('flowchart ')
+
+            if (!inline && isMermaid) {
+              return <SimpleFlowchartRenderer code={codeContent} />
+            }
+
+            if (!inline) {
+              return (
+                <div className="relative my-4 rounded-md bg-muted/50 border border-border overflow-hidden">
+                  <div className="px-3 py-1.5 bg-muted border-b border-border text-xs font-medium text-muted-foreground flex items-center justify-between">
+                    <span>{match ? match[1] : 'Code'}</span>
+                  </div>
+                  <pre className="p-3 overflow-x-auto text-xs font-mono leading-relaxed">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                </div>
+              )
+            }
+
+            return (
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-pink-600 dark:text-pink-400" {...props}>
+                {children}
+              </code>
+            )
+          },
+          pre: ({ children }) => <>{children}</>, // pre는 code에서 처리함
         }}
       >
         {linkedContent}

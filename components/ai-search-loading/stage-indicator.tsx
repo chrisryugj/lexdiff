@@ -5,10 +5,12 @@
  * - 단계별 아이콘 + 레이블
  * - 현재 단계 하이라이트
  * - 프로그레스 바
+ * - 단계별 타이머 (각 단계 진입 시 0초로 리셋)
  */
 
 "use client"
 
+import { useEffect, useState, useRef } from "react"
 import { Icon } from "@/components/ui/icon"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
@@ -41,6 +43,34 @@ export function StageIndicator({
   compact = false,
 }: StageIndicatorProps) {
   const currentStageIndex = AI_STAGES.findIndex((s) => s.key === currentStage)
+  const [stageElapsedTime, setStageElapsedTime] = useState(0)
+  const stageStartTimeRef = useRef<number | null>(null)
+  const prevStageRef = useRef<AISearchStage | null>(null)
+
+  // 단계별 타이머 - 각 단계 진입 시 0초로 리셋
+  useEffect(() => {
+    // 단계 변경 감지
+    if (currentStage !== prevStageRef.current) {
+      stageStartTimeRef.current = Date.now()
+      setStageElapsedTime(0)
+      prevStageRef.current = currentStage
+    }
+
+    // 완료 시 타이머 정지
+    if (currentStage === 'complete') {
+      return
+    }
+
+    // 타이머 업데이트
+    const interval = setInterval(() => {
+      if (stageStartTimeRef.current) {
+        const elapsed = (Date.now() - stageStartTimeRef.current) / 1000
+        setStageElapsedTime(elapsed)
+      }
+    }, 100)
+
+    return () => clearInterval(interval)
+  }, [currentStage])
 
   // 컴팩트 모드 (모바일)
   if (compact) {
@@ -61,88 +91,134 @@ export function StageIndicator({
             {current?.label || "처리 중"}
           </span>
           <span className="ml-auto font-medium">{Math.round(progress)}%</span>
+          {currentStage !== 'complete' && (
+            <span className="text-xs text-muted-foreground/70 tabular-nums">
+              {stageElapsedTime.toFixed(1)}초
+            </span>
+          )}
         </div>
         <Progress value={progress} className="h-2" />
       </div>
     )
   }
 
-  // 풀 모드 (데스크톱)
+  // 풀 모드 (데스크톱) - 모던 디자인
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* 단계 표시 */}
-      <div className="flex items-center justify-between gap-1 overflow-x-auto pb-2">
-        {AI_STAGES.slice(0, -1).map((stage, index) => {
-          const isCompleted = index < currentStageIndex
-          const isCurrent = index === currentStageIndex
-          const isPending = index > currentStageIndex
+    <div className={cn("space-y-6", className)}>
+      {/* 단계 표시 - 그라데이션 연결선 */}
+      <div className="relative">
+        {/* 배경 연결선 */}
+        <div className="absolute top-5 left-8 right-8 h-1 bg-gradient-to-r from-muted via-muted to-muted rounded-full" />
 
-          return (
-            <div key={stage.key} className="flex items-center flex-shrink-0">
-              {/* 단계 아이콘 + 레이블 */}
-              <div
-                className={cn(
-                  "flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-colors",
-                  isCurrent && "bg-primary/10"
+        {/* 진행된 연결선 */}
+        <div
+          className="absolute top-5 left-8 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out shadow-lg shadow-primary/20"
+          style={{
+            width: currentStageIndex > 0
+              ? `calc(${(currentStageIndex / (AI_STAGES.length - 2)) * 100}% - 4rem)`
+              : '0%'
+          }}
+        />
+
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
+          {AI_STAGES.slice(0, -1).map((stage, index) => {
+            const isCompleted = index < currentStageIndex
+            const isCurrent = index === currentStageIndex
+            const isPending = index > currentStageIndex
+
+            return (
+              <div key={stage.key} className="flex flex-col items-center gap-2 flex-shrink-0 relative z-10">
+                {/* 펄스 애니메이션 - 활성 단계만 */}
+                {isCurrent && (
+                  <>
+                    <div
+                      className="absolute top-0 w-10 h-10 rounded-full bg-gradient-to-br from-violet-500/30 to-purple-500/30"
+                      style={{ animation: 'pulse-wave 2s ease-out infinite' }}
+                    />
+                    <div
+                      className="absolute top-0 w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20"
+                      style={{ animation: 'pulse-wave 2s ease-out infinite 0.5s' }}
+                    />
+                  </>
                 )}
-              >
+
+                {/* 단계 아이콘 */}
                 <div
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-full transition-all",
-                    isCompleted && "bg-green-500/20 text-green-500",
-                    isCurrent && "bg-primary/20 text-primary",
-                    isPending && "bg-muted text-muted-foreground"
+                    "relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-500 border-2",
+                    isCompleted && "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white shadow-lg shadow-green-500/30",
+                    isCurrent && "bg-gradient-to-br from-violet-500 via-purple-500 to-blue-500 border-violet-400 text-white shadow-xl shadow-primary/40 scale-110",
+                    isPending && "bg-card border-muted-foreground/20 text-muted-foreground"
                   )}
                 >
                   {isCompleted ? (
-                    <Icon name="checkmark-circle-02" className="h-5 w-5" />
+                    <Icon name="checkmark-circle-02" className="h-5 w-5 drop-shadow-sm" />
                   ) : isCurrent ? (
-                    <Icon
-                      name={stage.icon}
-                      className="h-5 w-5 animate-pulse"
-                    />
+                    <Icon name={stage.icon} className="h-5 w-5 drop-shadow-sm" />
                   ) : (
                     <Icon name={stage.icon} className="h-4 w-4 opacity-50" />
                   )}
                 </div>
+
+                {/* 라벨 */}
                 <span
                   className={cn(
-                    "text-xs whitespace-nowrap",
-                    isCompleted && "text-green-500",
-                    isCurrent && "text-primary font-medium",
+                    "text-xs whitespace-nowrap font-semibold transition-all duration-500",
+                    isCompleted && "text-green-600 dark:text-green-400",
+                    isCurrent && "text-primary scale-105",
                     isPending && "text-muted-foreground"
                   )}
                 >
                   {stage.label}
                 </span>
-              </div>
 
-              {/* 연결선 */}
-              {index < AI_STAGES.length - 2 && (
-                <div
-                  className={cn(
-                    "w-4 h-0.5 mx-1 flex-shrink-0",
-                    isCompleted ? "bg-green-500" : "bg-muted"
-                  )}
-                />
-              )}
-            </div>
-          )
-        })}
+                {/* 타이머 - 활성 단계만 */}
+                {isCurrent && currentStage !== 'complete' && (
+                  <span className="text-xs text-muted-foreground/70 tabular-nums">
+                    {stageElapsedTime.toFixed(1)}초
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      {/* 프로그레스 바 */}
-      <div className="space-y-2">
+      {/* 프로그레스 바 - 개선된 디자인 */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground font-medium">
             {STAGE_MESSAGES[currentStage]}
           </span>
-          <span className="font-medium tabular-nums">
+          <span className="font-bold text-primary tabular-nums">
             {Math.round(progress)}%
           </span>
         </div>
-        <Progress value={progress} className="h-2.5" />
+        <div className="h-3 bg-muted/50 rounded-full overflow-hidden shadow-inner">
+          <div
+            className="h-full bg-gradient-to-r from-violet-500 via-purple-500 to-blue-500 rounded-full transition-all duration-500 ease-out shadow-sm"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       </div>
+
+      {/* CSS 애니메이션 */}
+      <style jsx>{`
+        @keyframes pulse-wave {
+          0% {
+            transform: scale(1);
+            opacity: 0.7;
+          }
+          50% {
+            transform: scale(1.8);
+            opacity: 0.3;
+          }
+          100% {
+            transform: scale(2.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }
