@@ -7,11 +7,16 @@
     ],
     "deny": [],
     "ask": [],
-    "defaultMode": "default"
+    "defaultMode": "bypassPermissions"
   },
   "enabledPlugins": {
-    "context7@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true
+    "frontend-design@claude-code-plugins": true,
+    "feature-dev@claude-code-plugins": true
+  },
+  "alwaysThinkingEnabled": false,
+  "statusLine": {
+    "type": "command",
+    "command": "bash /c/Users/Chris/.claude/statusline.sh",
+    "padding": 0
   }
 }
