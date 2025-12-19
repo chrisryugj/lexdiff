@@ -511,7 +511,7 @@ export function LegalMarkdownRenderer({
                 <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-2 rounded-r-md !ml-3 !mr-3 not-italic overflow-visible">
                   <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
                     {/* 조문 제목 Group */}
-                    <div className="text-[#a0a0a0] font-normal text-sm break-words flex items-center gap-1.5 flex-wrap">
+                    <div className="text-[#a0a0a0] font-normal text-sm break-words flex items-center gap-1.5 flex-wrap [&_strong]:font-normal [&_b]:font-normal">
                       {finalTitleNodes}
                       {isPartialQuote && (
                         <span

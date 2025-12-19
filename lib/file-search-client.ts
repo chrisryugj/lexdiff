@@ -9,11 +9,12 @@ import { GoogleGenAI } from '@google/genai'
 import type { FileSearchStore, FileMetadata } from '@google/genai'
 import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
 import { analyzeLegalQuery, type LegalQueryType } from './legal-query-analyzer'
-import { buildLegalPrompt } from './legal-prompt-builder'
+// import { buildLegalPrompt } from './legal-prompt-builder' // Legacy removal
 // ✅ 2-Tier AI 라우팅 시스템 (Phase 10)
 import { routeQuestion, summarizeRouting, type RoutingResult } from './ai-question-router'
 // ✅ Phase 11: complexity별 maxOutputTokens 설정
-import { MAX_TOKENS_BY_COMPLEXITY } from './ai-agents/specialist-agents'
+import { MAX_TOKENS_BY_COMPLEXITY, getSpecialistPrompt } from './ai-agents/specialist-agents'
+import type { QueryType } from './ai-agents/types'
 
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
@@ -315,8 +316,8 @@ export async function* queryFileSearchStream(
       articles: legalAnalysis.extractedArticles
     })
 
-    // 기존 프롬프트 빌더 사용
-    systemInstruction = buildLegalPrompt(legalAnalysis.type)
+    // 기존 프롬프트 빌더 대체 (Legacy Loop Removal)
+    systemInstruction = getSpecialistPrompt(legalAnalysis.type as QueryType)
     queryType = legalAnalysis.type
   }
 
