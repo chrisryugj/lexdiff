@@ -148,13 +148,23 @@ export function SearchViewImproved({
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="fixed top-3 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
       >
-        <div className="pointer-events-auto flex items-center justify-between gap-4 md:gap-6 px-3 md:px-5 py-1.5 md:py-2 rounded-full bg-background/80 backdrop-blur-xl border border-border/50 shadow-lg shadow-black/20">
+        <div className="pointer-events-auto flex items-center justify-between gap-4 md:gap-6 px-3 md:px-5 py-1.5 md:py-2 rounded-full bg-background/60 backdrop-blur-md border border-border/30 shadow-lg shadow-black/10">
           <button
             onClick={handleLogoClick}
             className="flex items-center gap-2 group"
           >
-            <div className="relative flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
-              <Icon name="scale" size={14} className="text-white" />
+            <div className="relative flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 animate-[glow_3s_ease-in-out_infinite] group-hover:animate-[glow-hover_1.5s_ease-in-out_infinite]">
+              <Icon name="scale" size={18} className="text-white" />
+              <style jsx>{`
+                @keyframes glow {
+                  0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
+                  50% { box-shadow: 0 0 25px rgba(168, 85, 247, 0.6); }
+                }
+                @keyframes glow-hover {
+                  0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
+                  50% { box-shadow: 0 0 35px rgba(168, 85, 247, 0.8); }
+                }
+              `}</style>
             </div>
             <span className="text-sm md:text-base font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
               LexDiff
