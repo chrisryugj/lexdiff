@@ -244,9 +244,11 @@ const DOMAIN_TO_AGENT: Record<LegalDomain, AgentType | null> = {
  * Gemini 2.5 Flash Lite 사용 (무료 티어)
  */
 export async function analyzeQuery(query: string): Promise<RouterAnalysis> {
-  const apiKey = process.env.GEMINI_API_KEY
+  // Router용 별도 API 키 사용 (Rate Limit 분산)
+  // 없으면 메인 API 키로 fallback
+  const apiKey = process.env.GEMINI_ROUTER_API_KEY || process.env.GEMINI_API_KEY
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is required')
+    throw new Error('GEMINI_ROUTER_API_KEY or GEMINI_API_KEY is required')
   }
 
   console.log('[Router Agent] Analyzing query:', query)

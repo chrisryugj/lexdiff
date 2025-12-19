@@ -178,7 +178,7 @@ export async function queryFileSearch(
   const genAI = new GoogleGenAI({ apiKey })
 
   const result = await genAI.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     contents: query,
     tools: [{
       fileSearch: {
@@ -368,7 +368,7 @@ export async function* queryFileSearchStream(
       }
 
       response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?alt=sse',
         {
           method: 'POST',
           headers: {
