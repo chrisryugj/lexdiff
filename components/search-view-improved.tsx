@@ -141,70 +141,65 @@ export function SearchViewImproved({
 
   return (
     <div className="min-h-screen page-bg">
-      {/* Floating Navigation - 스크롤 시 나타남 */}
-      <AnimatePresence>
-        {scrolled && (
-          <motion.header
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-4 md:top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+      {/* Floating Navigation - 항상 표시 */}
+      <motion.header
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed top-3 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+      >
+        <div className="pointer-events-auto flex items-center justify-between gap-4 md:gap-6 px-3 md:px-5 py-1.5 md:py-2 rounded-full bg-background/80 backdrop-blur-xl border border-border/50 shadow-lg shadow-black/20">
+          <button
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 group"
           >
-            <div className="pointer-events-auto flex items-center justify-between gap-6 md:gap-8 px-4 md:px-6 py-2.5 md:py-3 rounded-full bg-background/80 backdrop-blur-xl border border-border/50 shadow-lg shadow-black/20">
-              <button
-                onClick={handleLogoClick}
-                className="flex items-center gap-2 md:gap-3 group"
-              >
-                <div className="relative flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
-                  <Icon name="scale" size={16} className="text-white" />
-                </div>
-                <span className="text-base md:text-lg font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
-                  LexDiff
-                </span>
-              </button>
-
-              <div className="h-4 w-[1px] bg-border/50" />
-
-              <div className="flex items-center gap-1">
-                {/* 테마 토글 */}
-                <ThemeToggle />
-
-                {favoritesCount > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleFavoritesClick}
-                    className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Icon name="star" size={16} className="mr-1.5 text-yellow-400" />
-                    <span className="text-xs font-medium">{favoritesCount}</span>
-                  </Button>
-                )}
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleHelpClick}
-                  className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 md:w-9 md:h-9"
-                  title="사용 가이드"
-                >
-                  <Icon name="help-circle" size={16} />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleSettingsClick}
-                  className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-8 h-8 md:w-9 md:h-9"
-                >
-                  <Icon name="settings" size={16} />
-                </Button>
-              </div>
+            <div className="relative flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
+              <Icon name="scale" size={14} className="text-white" />
             </div>
-          </motion.header>
-        )}
-      </AnimatePresence>
+            <span className="text-sm md:text-base font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
+              LexDiff
+            </span>
+          </button>
+
+          <div className="h-4 w-[1px] bg-border/50" />
+
+          <div className="flex items-center gap-1">
+            {/* 테마 토글 */}
+            <ThemeToggle />
+
+            {favoritesCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFavoritesClick}
+                className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors h-7 px-2"
+              >
+                <Icon name="star" size={14} className="mr-1 text-yellow-400" />
+                <span className="text-xs font-medium">{favoritesCount}</span>
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleHelpClick}
+              className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-7 h-7 md:w-8 md:h-8"
+              title="사용 가이드"
+            >
+              <Icon name="help-circle" size={14} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSettingsClick}
+              className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-7 h-7 md:w-8 md:h-8"
+            >
+              <Icon name="settings" size={14} />
+            </Button>
+          </div>
+        </div>
+      </motion.header>
 
       {/* Hero Section - 스크롤 가능 */}
       <section className="hero-section-fixed pt-32 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">

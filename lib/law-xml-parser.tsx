@@ -586,11 +586,11 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
             styledItemContent = applyRevisionStyling(styledItemContent)
 
             if (startsWithNumber) {
-              text += "  " + styledItemContent + "\n"
+              text += "<br>" + styledItemContent
             } else if (itemNum) {
-              text += "  " + itemNum + ". " + styledItemContent + "\n"
+              text += "<br>" + itemNum + ". " + styledItemContent
             } else {
-              text += "  " + styledItemContent + "\n"
+              text += "<br>" + styledItemContent
             }
           })
         }
