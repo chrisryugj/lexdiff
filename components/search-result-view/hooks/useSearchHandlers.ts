@@ -358,13 +358,16 @@ export function useSearchHandlers({
         return
       }
 
-      // ✅ AI 검색 시작 - 6단계 프로그레스 UI용
+      // ✅ AI 검색 시작 - 4단계 프로그레스 UI용
       actions.setIsSearching(true)
       actions.setIsAiMode(true)
       actions.setSearchMode('rag')
-      actions.setAiAnswerContent('')  // 스트리밍 텍스트 초기화
+      actions.setAiAnswerContent('')  // ✅ 스트리밍 텍스트 초기화 (중복 방지)
+      actions.setAiRelatedLaws([])  // ✅ 관련 법령 초기화
+      actions.setAiCitations([])  // ✅ 인용 초기화
+      actions.setFileSearchFailed(false)  // ✅ 검색 실패 플래그 초기화
       actions.setUserQuery(fullQuery)  // 사용자 쿼리 설정
-      actions.updateProgress('analyzing', 5)  // 1단계: 질문 분석
+      actions.updateProgress('analyzing', 5)  // 1단계: 질문 분석 (0-25%)
 
       // ✅ AI 뷰를 즉시 표시하기 위해 빈 lawData 설정
       const aiLawData: LawDataState = {
@@ -384,168 +387,186 @@ export function useSearchHandlers({
       actions.setMobileView("content")
 
       try {
-        // ✅ Phase 11-B: ChatGPT 스타일 로딩 단계 (스택형 메시지)
-        actions.updateProgress('analyzing', 5)  // 1단계
-        await new Promise(resolve => setTimeout(resolve, 300))  // 깜빡임 효과
-
+        // ✅ 1단계: 질문 분석 (0-25%) - 1.5초 유지
+        actions.updateProgress('analyzing', 5)
         if (signal?.aborted) {
           debugLogger.info('🚫 AI 검색 취소됨')
           return
         }
-
-        actions.updateProgress('optimizing', 15)  // 2단계
-        await new Promise(resolve => setTimeout(resolve, 300))
-
+        await new Promise(resolve => setTimeout(resolve, 1500)) // 1.5초 대기
         if (signal?.aborted) return
 
-        actions.updateProgress('searching', 30)  // 3단계
-
-        // ✅ JSON 응답 받기 (SSE 제거)
-        const response = await fetch('/api/file-search-rag', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: fullQuery }),
-          signal
-        })
-
+        // ✅ 2단계: 법령 검색 (25-40%) - 1.5초 유지
+        actions.updateProgress('searching', 25)
+        if (signal?.aborted) return
+        await new Promise(resolve => setTimeout(resolve, 1500)) // 1.5초 대기
         if (signal?.aborted) return
 
-        if (!response.ok) {
-          throw new Error('File Search API 호출 실패')
-        }
-
-        actions.updateProgress('streaming', 50)  // 4단계: 답변 생성 중
-
-        // ✅ 전체 응답 파싱
-        const data = await response.json()
-
-        if (signal?.aborted) return
-
-        const fullContent = data.answer || ''
-        const receivedCitations = data.citations || []
-        const receivedConfidenceLevel = data.confidenceLevel || 'high'
-        const receivedQueryType = data.queryType || 'application'
-
-        // ✅ 타이핑 효과 (20ms/글자, 빠른 스트리밍 시뮬레이션)
-        actions.updateProgress('streaming', 70)
-        let currentIndex = 0
-        const typingSpeed = 15  // ms per character
-
-        const typeNextChunk = async () => {
+        try {
+          // ✅ 3단계: 답변 생성 시작 (40%)
+          actions.updateProgress('streaming', 40)
           if (signal?.aborted) return
 
-          const chunkSize = 5  // 한 번에 5글자씩
-          const nextIndex = Math.min(currentIndex + chunkSize, fullContent.length)
-          const displayText = fullContent.substring(0, nextIndex)
-
-          actions.setAiAnswerContent(displayText.replace(/\^/g, ' '))
-          currentIndex = nextIndex
-
-          // 진행률 업데이트 (70-94%)
-          const progress = 70 + Math.floor((currentIndex / fullContent.length) * 24)
-          actions.updateProgress('streaming', progress)
-
-          if (currentIndex < fullContent.length) {
-            await new Promise(resolve => setTimeout(resolve, typingSpeed))
-            await typeNextChunk()
-          }
-        }
-
-        await typeNextChunk()
-
-        if (signal?.aborted) return
-
-        // 5단계: Citation 추출
-        actions.updateProgress('extracting', 97)
-
-        const processedContent = fullContent.replace(/\^/g, ' ')
-        const searchFailed = detectSearchFailed(processedContent)
-        actions.setFileSearchFailed(searchFailed)
-
-        const relatedLaws = extractRelatedLaws(processedContent)
-
-        debugLogger.success('✅ AI 답변 완료', {
-          contentLength: processedContent.length,
-          relatedLaws: relatedLaws.length,
-          citationsReceived: receivedCitations.length,
-        })
-
-        actions.setAiAnswerContent(processedContent)
-        actions.setAiRelatedLaws(relatedLaws)
-        actions.setAiCitations(receivedCitations)
-        actions.setAiQueryType(receivedQueryType as any)
-
-        const aiLawData: LawDataState = {
-          meta: {
-            lawId: 'ai-answer',
-            lawTitle: 'AI 답변',
-            promulgationDate: new Date().toISOString().split('T')[0],
-            lawType: 'AI',
-            isOrdinance: false,
-            fetchedAt: new Date().toISOString()
-          },
-          articles: [],
-          selectedJo: undefined,
-          isOrdinance: false
-        }
-
-        actions.setLawData(aiLawData)
-        actions.setMobileView("content")
-
-        // IndexedDB 캐시 저장
-        try {
-          const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
-          const currentState = window.history.state
-          const currentSearchId = currentState?.searchId
-
-          if (currentSearchId) {
-            const existingCache = await getSearchResult(currentSearchId)
-            if (existingCache) {
-              await saveSearchResult({
-                ...existingCache,
-                aiMode: {
-                  aiAnswerContent: processedContent,
-                  aiRelatedLaws: relatedLaws,
-                  aiCitations: receivedCitations,
-                  userQuery: fullQuery,
-                  fileSearchFailed: searchFailed,
-                  aiQueryType: receivedQueryType  // ✅ aiQueryType 저장
-                }
-              })
+          // ✅ 3단계 진행 중 프로그레스 시뮬레이션 (40% → 70%, API 응답 대기 중)
+          let waitProgress = 40
+          const waitProgressInterval = setInterval(() => {
+            if (waitProgress < 70) {
+              waitProgress += 1
+              actions.updateProgress('streaming', waitProgress)
             }
+          }, 200) // 200ms마다 1%씩 증가 (천천히, 최대 6초)
+
+          try {
+            // ✅ JSON 응답 받기 (이 부분이 오래 걸림!)
+            const response = await fetch('/api/file-search-rag', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: fullQuery }),
+              signal
+            })
+
+            if (signal?.aborted) {
+              clearInterval(waitProgressInterval)
+              return
+            }
+
+            if (!response.ok) {
+              clearInterval(waitProgressInterval)
+              throw new Error('File Search API 호출 실패')
+            }
+
+            // ✅ 전체 응답 파싱
+            const data = await response.json()
+            clearInterval(waitProgressInterval) // API 응답 받으면 인터벌 정리
+            if (signal?.aborted) return
+
+            const fullContent = data.answer || ''
+            const receivedCitations = data.citations || []
+            const receivedConfidenceLevel = data.confidenceLevel || 'high'
+            const receivedQueryType = data.queryType || 'application'
+
+            // ✅ 프로그레스 70% → 95% 점진적 증가
+            let typingProgress = 70
+            const typingProgressInterval = setInterval(() => {
+              if (typingProgress < 95) {
+                typingProgress += 1
+                actions.updateProgress('streaming', typingProgress)
+              }
+            }, 100) // 100ms마다 1%씩 증가 (약 2.5초)
+
+            // ✅ 즉시 전체 내용 설정 (UI에서 어절 단위 타이핑 효과 적용)
+            const processedContent = fullContent.replace(/\^/g, ' ')
+            actions.setAiAnswerContent(processedContent)
+
+            // 프로그레스가 95%까지 도달할 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 2500))
+            clearInterval(typingProgressInterval)
+            if (signal?.aborted) return
+
+            // ✅ 4단계: 최종 검토 (95%)
+            actions.updateProgress('extracting', 95)
+
+            const searchFailed = detectSearchFailed(processedContent)
+            actions.setFileSearchFailed(searchFailed)
+
+            const relatedLaws = extractRelatedLaws(processedContent)
+
+            debugLogger.success('✅ AI 답변 완료', {
+              contentLength: processedContent.length,
+              relatedLaws: relatedLaws.length,
+              citationsReceived: receivedCitations.length,
+            })
+
+            actions.setAiAnswerContent(processedContent)
+            actions.setAiRelatedLaws(relatedLaws)
+            actions.setAiCitations(receivedCitations)
+            actions.setAiQueryType(receivedQueryType as any)
+
+            const aiLawData: LawDataState = {
+              meta: {
+                lawId: 'ai-answer',
+                lawTitle: 'AI 답변',
+                promulgationDate: new Date().toISOString().split('T')[0],
+                lawType: 'AI',
+                isOrdinance: false,
+                fetchedAt: new Date().toISOString()
+              },
+              articles: [],
+              selectedJo: undefined,
+              isOrdinance: false
+            }
+
+            actions.setLawData(aiLawData)
+            actions.setMobileView("content")
+
+            // IndexedDB 캐시 저장
+            try {
+              const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+              const currentState = window.history.state
+              const currentSearchId = currentState?.searchId
+
+              if (currentSearchId) {
+                const existingCache = await getSearchResult(currentSearchId)
+                if (existingCache) {
+                  await saveSearchResult({
+                    ...existingCache,
+                    aiMode: {
+                      aiAnswerContent: processedContent,
+                      aiRelatedLaws: relatedLaws,
+                      aiCitations: receivedCitations,
+                      userQuery: fullQuery,
+                      fileSearchFailed: searchFailed,
+                      aiQueryType: receivedQueryType  // ✅ aiQueryType 저장
+                    }
+                  })
+                }
+              }
+            } catch (cacheError) {
+              debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
+            }
+
+            // RAG 캐시에도 저장
+            try {
+              await cacheResponse(fullQuery, processedContent, receivedCitations, receivedConfidenceLevel, receivedQueryType)
+            } catch (ragCacheError) {
+              debugLogger.error('⚠️ RAG 캐시 저장 실패', ragCacheError)
+            }
+
+            // ✅ 완료 표시 (100%) → 1초 대기 → 로딩 UI 숨김
+            actions.updateProgress('complete', 100)
+            await new Promise(resolve => setTimeout(resolve, 1000))  // 완료 메시지 1초간 표시
+            actions.setIsSearching(false)
+
+          } catch (parseError) {
+            clearInterval(waitProgressInterval) // JSON 파싱 에러 시 인터벌 정리
+            throw parseError // 외부 catch로 전달
           }
-        } catch (cacheError) {
-          debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
-        }
 
-        // RAG 캐시에도 저장
-        try {
-          await cacheResponse(fullQuery, processedContent, receivedCitations, receivedConfidenceLevel, receivedQueryType)
-        } catch (ragCacheError) {
-          debugLogger.error('⚠️ RAG 캐시 저장 실패', ragCacheError)
-        }
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            debugLogger.info('🚫 AI 검색이 사용자에 의해 취소되었습니다')
+            actions.setIsSearching(false)
+            actions.updateProgress('complete', 0)
+            actions.setIsAiMode(false)
+            return
+          }
 
-        actions.updateProgress('complete', 100)
-        actions.setIsSearching(false)
-
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          debugLogger.info('🚫 AI 검색이 사용자에 의해 취소되었습니다')
+          debugLogger.error('❌ File Search API 오류', error)
           actions.setIsSearching(false)
           actions.updateProgress('complete', 0)
           actions.setIsAiMode(false)
-          return
+          toast({
+            title: "AI 검색 실패",
+            description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
+            variant: "destructive"
+          })
         }
-
-        debugLogger.error('❌ File Search API 오류', error)
+      } catch (outerError) {
+        // 외부 try-catch (최상위 에러 핸들링)
+        debugLogger.error('❌ AI 검색 최상위 오류', outerError)
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
         actions.setIsAiMode(false)
-        toast({
-          title: "AI 검색 실패",
-          description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
-          variant: "destructive"
-        })
       }
 
       return

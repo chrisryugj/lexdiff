@@ -278,15 +278,23 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setPendingQuery("")
   }
 
-  const handleSuggestionClick = (text: string) => {
+  const handleSuggestionClick = (text: string, isRecent: boolean = false) => {
     setQuery(text)
     setShowDropdown(false)
     setSelectedIndex(-1)
-    inputRef.current?.focus()
 
-    // AI 질문 패턴이면 바로 검색 실행
+    // ✅ 최근 검색은 무조건 즉시 실행
+    if (isRecent) {
+      executeSearch(text)
+      return
+    }
+
+    // 제안 목록은 기존 로직 유지 (AI 패턴 감지)
     if (text.endsWith('?') || text.includes('요건') || text.includes('절차') || text.includes('방법')) {
-      setTimeout(() => executeSearch(text), 100)
+      executeSearch(text)
+    } else {
+      // 일반 제안은 입력만 (기존 동작 유지)
+      inputRef.current?.focus()
     }
   }
 
@@ -377,7 +385,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                         <button
                           key={`recent-${index}`}
                           type="button"
-                          onClick={() => handleSuggestionClick(search)}
+                          onClick={() => handleSuggestionClick(search, true)}
                           className={cn(
                             "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
                             selectedIndex === index ? "bg-accent" : "hover:bg-secondary"

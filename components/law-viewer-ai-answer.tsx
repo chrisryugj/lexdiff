@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -11,15 +11,7 @@ import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 
-// 스트리밍 단계별 메시지
-const STAGE_MESSAGES: Record<string, string> = {
-    analyzing: '질문을 분석하고 있습니다...',
-    optimizing: '검색어를 최적화하고 있습니다...',
-    searching: '법령 데이터베이스를 검색하고 있습니다...',
-    streaming: '답변을 생성하고 있습니다...',
-    extracting: '관련 조문을 추출하고 있습니다...',
-    complete: '완료!',
-}
+import { AIAnswerLoading } from "@/components/ai-answer-loading"
 
 interface AIAnswerSidebarProps {
     relatedArticles: ParsedRelatedLaw[]
@@ -27,6 +19,7 @@ interface AIAnswerSidebarProps {
     onCloseSidebar?: () => void
     showHeader?: boolean
     onCollapseClick?: () => void
+    isStreaming?: boolean  // ✅ 로딩 중 여부
 }
 
 export function AIAnswerSidebar({
@@ -34,11 +27,14 @@ export function AIAnswerSidebar({
     onRelatedArticleClick,
     onCloseSidebar,
     showHeader = true,
-    onCollapseClick
+    onCollapseClick,
+    isStreaming = false
 }: AIAnswerSidebarProps) {
     const [hydratedTitles, setHydratedTitles] = useState<Record<string, string | null>>({})
 
     const groupedEntries = useMemo(() => {
+        // ✅ 로딩 중이면 빈 배열 반환
+        if (isStreaming) return []
         // 1. 필터링: "알 수 없음", 너무 긴 법령명(파싱 오류) 제외
         const validArticles = relatedArticles.filter(law =>
             law.lawName &&
@@ -70,18 +66,22 @@ export function AIAnswerSidebar({
         })
 
         return Array.from(grouped.entries()).map(([key, value]) => ({ key, ...value }))
-    }, [relatedArticles])
+    }, [relatedArticles, isStreaming])
 
     const missingTitleRequests = useMemo(() => {
+        // ✅ 로딩 중이면 빈 배열 반환
+        if (isStreaming) return []
         return groupedEntries
             .filter(({ key, law }) => {
                 const alreadyHydrated = Object.prototype.hasOwnProperty.call(hydratedTitles, key)
                 return !alreadyHydrated && !law.title && !!law.lawName && !!law.article
             })
             .map(({ key, law }) => ({ key, lawName: law.lawName, article: law.article }))
-    }, [groupedEntries, hydratedTitles])
+    }, [groupedEntries, hydratedTitles, isStreaming])
 
     useEffect(() => {
+        // ✅ 로딩 중이면 useEffect 스킵
+        if (isStreaming) return
         if (missingTitleRequests.length === 0) return
 
         let canceled = false
@@ -119,7 +119,12 @@ export function AIAnswerSidebar({
         return () => {
             canceled = true
         }
-    }, [missingTitleRequests])
+    }, [missingTitleRequests, isStreaming])
+
+    // ✅ 디버깅: isStreaming 상태 확인
+    useEffect(() => {
+        console.log('🔄 [AIAnswerSidebar] isStreaming:', isStreaming)
+    }, [isStreaming])
 
     return (
         <>
@@ -152,6 +157,12 @@ export function AIAnswerSidebar({
             )}
 
             <div className="flex-1 min-h-0 px-2 pt-3 pb-4 overflow-y-auto">
+                {/* ✅ 로딩 중이면 스피너만 표시 */}
+                {isStreaming ? (
+                    <div className="flex items-center justify-center h-full py-12">
+                        <Icon name="loader" className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : (
                 <div className="space-y-2">
                     {relatedArticles.length > 0 ? (
                         (() => {
@@ -235,6 +246,7 @@ export function AIAnswerSidebar({
                         </div>
                     )}
                 </div>
+                )}
             </div>
         </>
     )
@@ -308,9 +320,10 @@ interface AIAnswerContentProps {
 
     // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
     isStreaming?: boolean  // 스트리밍 중 여부
-    searchStage?: string   // 현재 검색 단계
     searchProgress?: number  // 진행률 (0-100)
 }
+
+
 
 export function AIAnswerContent({
     aiAnswerContent,
@@ -325,9 +338,38 @@ export function AIAnswerContent({
     isTruncated = false,
     onRefresh,
     isStreaming = false,
-    searchStage,
     searchProgress = 0,
 }: AIAnswerContentProps) {
+    // ✅ ChatGPT 스타일 어절 단위 타이핑 효과
+    const [displayedContent, setDisplayedContent] = useState('')
+    const [isTyping, setIsTyping] = useState(false)
+
+    useEffect(() => {
+        if (!isStreaming && aiAnswerContent) {
+            setIsTyping(true)
+            setDisplayedContent('') // 리셋
+
+            // 어절 단위로 나누기 (공백 기준)
+            const words = aiAnswerContent.split(' ')
+            let currentWordIndex = 0
+
+            const interval = setInterval(() => {
+                if (currentWordIndex < words.length) {
+                    const displayText = words
+                        .slice(0, currentWordIndex + 1)
+                        .join(' ')
+                    setDisplayedContent(displayText)
+                    currentWordIndex++
+                } else {
+                    setIsTyping(false)
+                    clearInterval(interval)
+                }
+            }, 3) // 3ms마다 1어절 (거의 즉시)
+
+            return () => clearInterval(interval)
+        }
+    }, [isStreaming, aiAnswerContent])
+
     // 신뢰도 배지 컴포넌트
     const ConfidenceBadge = () => {
         if (!aiCitations || aiCitations.length === 0) return null
@@ -530,74 +572,13 @@ export function AIAnswerContent({
                     </div>
                 )}
 
-                {/* ✅ Phase 11-B: ChatGPT 스타일 스택형 로딩 메시지 */}
-                {isStreaming && !aiAnswerContent && (
-                    <div className="py-8 space-y-3">
-                        <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                <Icon name="brain" className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="flex-1 space-y-2">
-                                <p className="font-medium text-sm">AI 법률 어시스턴트</p>
-
-                                {/* 스택형 단계 메시지 */}
-                                <div className="space-y-1.5 text-sm text-muted-foreground">
-                                    {/* 1단계: 분석 */}
-                                    <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 15 ? 'opacity-50' : 'opacity-100'}`}>
-                                        {searchProgress >= 15 ? (
-                                            <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                        ) : (
-                                            <Icon name="file-search" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
-                                        )}
-                                        <span>질문을 분석하고 있습니다...</span>
-                                    </div>
-
-                                    {/* 2단계: 최적화 */}
-                                    {searchProgress >= 5 && (
-                                        <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 30 ? 'opacity-50' : 'opacity-100'}`}>
-                                            {searchProgress >= 30 ? (
-                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                                <Icon name="filter" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
-                                            )}
-                                            <span>검색어를 최적화하고 있습니다...</span>
-                                        </div>
-                                    )}
-
-                                    {/* 3단계: 검색 */}
-                                    {searchProgress >= 15 && (
-                                        <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 50 ? 'opacity-50' : 'opacity-100'}`}>
-                                            {searchProgress >= 50 ? (
-                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                                <Icon name="database" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
-                                            )}
-                                            <span>법령 데이터베이스를 검색하고 있습니다...</span>
-                                        </div>
-                                    )}
-
-                                    {/* 4단계: 생성 */}
-                                    {searchProgress >= 30 && (
-                                        <div className="flex items-center gap-2">
-                                            {searchProgress >= 90 ? (
-                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                                <Icon name="message-square" className="h-4 w-4 animate-bounce text-primary flex-shrink-0" />
-                                            )}
-                                            <span className="animate-pulse">답변을 생성하고 있습니다...</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* 진행률 표시 */}
-                                <div className="mt-3 space-y-1.5">
-                                    <Progress value={searchProgress} className="h-1.5" />
-                                    <div className="flex justify-end">
-                                        <span className="text-xs text-muted-foreground tabular-nums">{searchProgress}%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                {/* ✅ 4단계 프로그레스 UI */}
+                {/* Slides down from top when starting, collapses upward when done. */}
+                {isStreaming && (
+                    <div
+                        className="overflow-hidden transition-all duration-700 ease-out mb-6 animate-in slide-in-from-top-4"
+                    >
+                        <AIAnswerLoading searchProgress={searchProgress} />
                     </div>
                 )}
 
@@ -628,19 +609,26 @@ export function AIAnswerContent({
                     </>
                 )}
 
-                {/* ✅ Phase 8: LegalMarkdownRenderer로 Markdown 직접 렌더링 */}
-                {aiAnswerContent && (
-                    <div style={{ fontSize: `${fontSize}px` }}>
+                {/* ✅ 답변 내용 렌더링 - Gemini 스타일 타이핑 효과 */}
+                {displayedContent && !isStreaming && (
+                    <div
+                        style={{ fontSize: `${fontSize}px` }}
+                        className="animate-in fade-in duration-200"
+                    >
                         <LegalMarkdownRenderer
-                            content={aiAnswerContent}
+                            content={displayedContent}
                             onLawClick={onLawClick}
                         />
+                        {/* 타이핑 중 커서 표시 */}
+                        {isTyping && (
+                            <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1" />
+                        )}
                     </div>
                 )}
 
                 {/* AI 답변 주의사항 */}
-                {aiAnswerContent && (
-                    <div className="mt-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/30 p-3 rounded-md text-amber-900 dark:text-amber-200/80">
+                {displayedContent && !isTyping && !isStreaming && (
+                    <div className="mt-6 flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/30 p-3 rounded-md text-amber-900 dark:text-amber-200/80 animate-in fade-in duration-500 delay-300">
                         <Icon name="alert-circle" size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>

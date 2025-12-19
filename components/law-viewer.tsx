@@ -74,7 +74,6 @@ interface LawViewerProps {
 
   // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
   isStreaming?: boolean  // 스트리밍 중 여부
-  searchStage?: string   // 현재 검색 단계 (analyzing, optimizing, searching, streaming, extracting, complete)
   searchProgress?: number  // 진행률 (0-100)
 }
 
@@ -100,7 +99,6 @@ export function LawViewer({
   aiIsTruncated = false,
   onAiRefresh,
   isStreaming = false,
-  searchStage,
   searchProgress = 0,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
@@ -726,6 +724,7 @@ export function LawViewer({
                 onRelatedArticleClick={openExternalLawArticleModal}
                 showHeader={true}
                 onCollapseClick={() => setIsArticleListCollapsed(true)}
+                isStreaming={isStreaming}
               />
             ) : isArticleListCollapsed ? (
               // ========== 슬림 모드 (접힌 상태) ==========
@@ -823,6 +822,7 @@ export function LawViewer({
                 onRelatedArticleClick={openExternalLawArticleModal}
                 onCloseSidebar={() => setIsArticleListExpanded(false)}
                 showHeader={false}
+                isStreaming={isStreaming}
               />
             ) : (
               // 일반 모드: 조문 목록
@@ -1043,7 +1043,6 @@ export function LawViewer({
                       isTruncated={aiIsTruncated}
                       onRefresh={onAiRefresh}
                       isStreaming={isStreaming}
-                      searchStage={searchStage}
                       searchProgress={searchProgress}
                     />
                   </div>
