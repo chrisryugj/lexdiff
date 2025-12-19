@@ -17,6 +17,7 @@ interface FloatingCompactHeaderProps {
   onFocusModeToggle?: () => void // 포커스 모드 토글
   onHelpClick?: () => void // 도움말 Sheet 열기
   currentLawName?: string // 현재 법령명
+  currentArticle?: string // 현재 조문 번호 (예: "제38조")
   showBackButton?: boolean
   isFocusMode?: boolean
   guideType?: 'law-search' | 'ai-search' // 사용법 안내 타입
@@ -30,6 +31,7 @@ export function FloatingCompactHeader({
   onFocusModeToggle,
   onHelpClick,
   currentLawName,
+  currentArticle,
   showBackButton = true,
   isFocusMode = false,
   guideType = 'law-search',
@@ -105,16 +107,19 @@ export function FloatingCompactHeader({
                     </span>
                   </button>
 
-                  {/* 법령명 Badge (클릭 시 검색 모달) - 모바일/PC 모두 표시 */}
+                  {/* 법령명 + 조문 Badge (클릭 시 검색 모달) - 모바일/PC 모두 표시 */}
                   {currentLawName && (
                     <Button
                       variant="outline"
                       onClick={onSearchClick}
-                      className="flex items-center gap-2 max-w-[140px] lg:max-w-md truncate bg-muted/50 hover:bg-muted border-primary/20 hover:border-primary/40 transition-all"
+                      className="flex items-center gap-2 max-w-[180px] lg:max-w-md truncate bg-muted/50 hover:bg-muted border-primary/20 hover:border-primary/40 transition-all"
                       title="검색 (Cmd+K)"
                     >
                       <Icon name="search" size={16} className="flex-shrink-0 text-muted-foreground" />
-                      <span className="truncate text-sm font-medium">{currentLawName}</span>
+                      <span className="truncate text-sm font-medium">
+                        {currentLawName}
+                        {currentArticle && ` ${currentArticle}`}
+                      </span>
                     </Button>
                   )}
                 </div>

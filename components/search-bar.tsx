@@ -30,7 +30,7 @@ interface Suggestion {
   category: string
 }
 
-const MAX_RECENT = 5
+const MAX_RECENT = 10 // 최대 10개 저장 (표시는 5개)
 
 // debounce 훅
 function useDebounce<T>(value: T, delay: number): T {
@@ -100,7 +100,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setIsNaturalQuery(false)
   }, [query])
 
-  // 최근 검색 로드
+  // 최근 검색 로드 (전체 10개 로드, 표시는 5개)
   useEffect(() => {
     const stored = localStorage.getItem("recentSearches")
     if (stored) {
@@ -113,7 +113,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     }
   }, [])
 
-  // 자동완성 API 호출
+  // 자동완성 API 호출 (최대 5개로 제한)
   const fetchSuggestions = useCallback(async (q: string) => {
     if (!q || q.length < 1) {
       setSuggestions([])
@@ -122,7 +122,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
     setIsLoadingSuggestions(true)
     try {
-      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=8`)
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
       if (res.ok) {
         const data = await res.json()
         setSuggestions(data.suggestions || [])
@@ -160,10 +160,9 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // 키보드 네비게이션
+  // 키보드 네비게이션 (실시간 추천 → 최근 검색 순서)
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 항상 최근 검색 + suggestions 합산
-    const totalItems = suggestions.length + recentSearches.length
+    const totalItems = suggestions.length + displayedRecentSearches.length
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -173,11 +172,12 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
       e.preventDefault()
-      // 항상 최근 검색이 먼저
-      const allItems = [...recentSearches, ...suggestions.map(s => s.text)]
+      // 실시간 추천이 먼저
+      const allItems = [...suggestions.map(s => s.text), ...displayedRecentSearches]
 
       if (allItems[selectedIndex]) {
-        handleSuggestionClick(allItems[selectedIndex])
+        const isRecent = selectedIndex >= suggestions.length
+        handleSuggestionClick(allItems[selectedIndex], isRecent)
       }
     } else if (e.key === 'Escape') {
       setShowDropdown(false)
@@ -298,10 +298,11 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     }
   }
 
-  // 드롭다운에 표시할 항목들 - 항상 최근 검색을 먼저 표시
+  // 드롭다운에 표시할 항목들 - 실시간 추천을 먼저 표시 (최대 5개)
+  const displayedRecentSearches = recentSearches.slice(0, 5) // 최근 검색 5개만 표시
   const dropdownItems = [
-    ...recentSearches.map(s => ({ text: s, type: 'recent' as const, category: '최근 검색' })),
-    ...suggestions
+    ...suggestions, // 실시간 추천 먼저
+    ...displayedRecentSearches.map(s => ({ text: s, type: 'recent' as const, category: '최근 검색' }))
   ]
 
   const hasDropdownItems = dropdownItems.length > 0
@@ -363,110 +364,116 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
             {showDropdown && hasDropdownItems && (
               <div
                 ref={dropdownRef}
-                className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto"
+                className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-xl z-[100] overflow-hidden"
               >
-                <div className="p-1.5">
-                  {/* 로딩 표시 */}
-                  {isLoadingSuggestions && query.trim() && (
-                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                      <Icon name="loader" className="h-3 w-3 animate-spin" />
-                      <span>검색 중...</span>
-                    </div>
-                  )}
+                {/* 로딩 표시 */}
+                {isLoadingSuggestions && query.trim() && (
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground border-b border-border">
+                    <Icon name="loader" className="h-3 w-3 animate-spin" />
+                    <span>검색 중...</span>
+                  </div>
+                )}
 
-                  {/* 최근 검색 - 항상 맨 위에 표시 */}
-                  {recentSearches.length > 0 && (
-                    <>
-                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                {/* 실시간 추천 (법령 + AI) - 독립 스크롤 영역 */}
+                {suggestions.length > 0 && (
+                  <div className="max-h-[200px] overflow-y-auto border-b border-border">
+                    <div className="p-1.5">
+                      {/* 법령 추천 */}
+                      {suggestions.filter(s => s.type === 'law').length > 0 && (
+                        <>
+                          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
+                            <Icon name="scale" className="h-3 w-3 text-amber-500" />
+                            <span>법령</span>
+                          </div>
+                          {suggestions
+                            .filter(s => s.type === 'law')
+                            .map((suggestion, index) => {
+                              const globalIndex = index
+
+                              return (
+                                <button
+                                  key={`law-${index}`}
+                                  type="button"
+                                  onClick={() => handleSuggestionClick(suggestion.text)}
+                                  className={cn(
+                                    "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
+                                    selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
+                                  )}
+                                >
+                                  <Icon name="scale" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                  <span className="truncate">{suggestion.text}</span>
+                                </button>
+                              )
+                            })}
+                        </>
+                      )}
+
+                      {/* AI 질문 추천 */}
+                      {suggestions.filter(s => s.type === 'ai').length > 0 && (
+                        <>
+                          {suggestions.filter(s => s.type === 'law').length > 0 && (
+                            <div className="border-t border-border my-1.5" />
+                          )}
+                          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
+                            <Icon name="sparkles" className="h-3 w-3 text-purple-500" />
+                            <span>AI 질문</span>
+                          </div>
+                          {suggestions
+                            .filter(s => s.type === 'ai')
+                            .map((suggestion, index) => {
+                              const lawCount = suggestions.filter(s => s.type === 'law').length
+                              const globalIndex = lawCount + index
+
+                              return (
+                                <button
+                                  key={`ai-${index}`}
+                                  type="button"
+                                  onClick={() => handleSuggestionClick(suggestion.text)}
+                                  className={cn(
+                                    "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2 group",
+                                    selectedIndex === globalIndex ? "bg-purple-50 dark:bg-purple-950/30" : "hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
+                                  )}
+                                >
+                                  <Icon name="brain" className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                                  <span className="truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
+                                </button>
+                              )
+                            })}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 최근 검색 - 독립 스크롤 영역 (5개만 표시) */}
+                {displayedRecentSearches.length > 0 && (
+                  <div className="max-h-[200px] overflow-y-auto">
+                    <div className="p-1.5">
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
                         <Icon name="clock" className="h-3 w-3" />
                         <span>최근 검색</span>
                       </div>
-                      {recentSearches.map((search, index) => (
-                        <button
-                          key={`recent-${index}`}
-                          type="button"
-                          onClick={() => handleSuggestionClick(search, true)}
-                          className={cn(
-                            "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
-                            selectedIndex === index ? "bg-accent" : "hover:bg-secondary"
-                          )}
-                        >
-                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <span className="truncate">{search}</span>
-                        </button>
-                      ))}
-                      {suggestions.length > 0 && (
-                        <div className="border-t border-border my-1.5" />
-                      )}
-                    </>
-                  )}
+                      {displayedRecentSearches.map((search, index) => {
+                        const globalIndex = suggestions.length + index
 
-                  {/* 법령 추천 */}
-                  {suggestions.filter(s => s.type === 'law').length > 0 && (
-                    <>
-                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <Icon name="scale" className="h-3 w-3 text-amber-500" />
-                        <span>법령</span>
-                      </div>
-                      {suggestions
-                        .filter(s => s.type === 'law')
-                        .map((suggestion, index) => {
-                          // 항상 최근 검색이 먼저이므로 recentSearches.length를 더함
-                          const globalIndex = recentSearches.length + index
-
-                          return (
-                            <button
-                              key={`law-${index}`}
-                              type="button"
-                              onClick={() => handleSuggestionClick(suggestion.text)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
-                                selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
-                              )}
-                            >
-                              <Icon name="scale" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                              <span className="truncate">{suggestion.text}</span>
-                            </button>
-                          )
-                        })}
-                    </>
-                  )}
-
-                  {/* AI 질문 추천 */}
-                  {suggestions.filter(s => s.type === 'ai').length > 0 && (
-                    <>
-                      {suggestions.filter(s => s.type === 'law').length > 0 && (
-                        <div className="border-t border-border my-1.5" />
-                      )}
-                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <Icon name="sparkles" className="h-3 w-3 text-purple-500" />
-                        <span>AI 질문</span>
-                      </div>
-                      {suggestions
-                        .filter(s => s.type === 'ai')
-                        .map((suggestion, index) => {
-                          const lawCount = suggestions.filter(s => s.type === 'law').length
-                          // 항상 최근 검색이 먼저이므로 recentSearches.length를 더함
-                          const globalIndex = recentSearches.length + lawCount + index
-
-                          return (
-                            <button
-                              key={`ai-${index}`}
-                              type="button"
-                              onClick={() => handleSuggestionClick(suggestion.text)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2 group",
-                                selectedIndex === globalIndex ? "bg-purple-50 dark:bg-purple-950/30" : "hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
-                              )}
-                            >
-                              <Icon name="brain" className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
-                              <span className="truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
-                            </button>
-                          )
-                        })}
-                    </>
-                  )}
-                </div>
+                        return (
+                          <button
+                            key={`recent-${index}`}
+                            type="button"
+                            onClick={() => handleSuggestionClick(search, true)}
+                            className={cn(
+                              "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
+                              selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
+                            )}
+                          >
+                            <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{search}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* 하단 팁 */}
                 <div className="border-t border-border px-3 py-2 bg-muted/30">

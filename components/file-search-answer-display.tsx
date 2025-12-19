@@ -14,6 +14,7 @@ import {
   detectSectionType,
   removeEmoji
 } from '@/lib/answer-section-icons'
+import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
 
 // 법령 조문 접기/펼치기 상태 관리 (전역)
 const lawArticleCollapseState = new Map<string, boolean>()
@@ -131,12 +132,14 @@ interface Citation {
 interface FileSearchAnswerDisplayProps {
   query: string
   onCitationClick?: (lawName: string, articleNumber: string) => void
+  onAnnexClick?: (annexNumber: string, lawName: string) => void
   onReset?: () => void
 }
 
 export function FileSearchAnswerDisplay({
   query,
   onCitationClick,
+  onAnnexClick,
   onReset
 }: FileSearchAnswerDisplayProps) {
   const [answer, setAnswer] = useState('')
@@ -184,6 +187,7 @@ export function FileSearchAnswerDisplay({
 
   // 관련법령 섹션 전처리: H3 제목을 CollapsibleBlockquote title로 전달
   // + blockquote 안의 "조건·예외" 섹션을 밖으로 분리
+  // + 법령 참조 링크 변환 (별표/별지 포함)
   const { processedAnswer, lawArticleTitles } = React.useMemo(() => {
     if (!answer) return { processedAnswer: '', lawArticleTitles: [] }
 
@@ -193,7 +197,10 @@ export function FileSearchAnswerDisplay({
     const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
     const match = processed.match(relatedLawsPattern)
 
-    if (!match) return { processedAnswer: processed, lawArticleTitles: [] }
+    if (!match) {
+      // 관련법령 섹션 없으면 링크만 변환하고 반환
+      return { processedAnswer: linkifyMarkdownLegalRefs(processed), lawArticleTitles: [] }
+    }
 
     const beforeSection = processed.substring(0, match.index!)
     let relatedLawsSection = match[0]
@@ -221,8 +228,11 @@ export function FileSearchAnswerDisplay({
     // H3 제목 제거 (CollapsibleBlockquote가 title로 렌더링)
     relatedLawsSection = relatedLawsSection.replace(/###\s+([^\n]+)\n/g, '')
 
+    // 법령 참조 링크 변환 (별표/별지 포함)
+    const linkedAnswer = linkifyMarkdownLegalRefs(beforeSection + relatedLawsSection)
+
     return {
-      processedAnswer: beforeSection + relatedLawsSection,
+      processedAnswer: linkedAnswer,
       lawArticleTitles: titles
     }
   }, [answer])
@@ -312,17 +322,72 @@ export function FileSearchAnswerDisplay({
           {children}
         </em>
       ),
-      // 링크 - 다크테마
-      a: ({ href, children }) => (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-cyan-400 hover:text-cyan-300 underline"
-        >
-          {children}
-        </a>
-      ),
+      // 링크 - 법령/별표 링크 처리
+      a: ({ href, children }) => {
+        // law:// 프로토콜: 법령 링크
+        if (href?.startsWith('law://')) {
+          const lawPath = href.replace('law://', '')
+          const parts = decodeURIComponent(lawPath).split('/')
+          const lawName = parts[0]
+          const article = parts[1]
+
+          return (
+            <a
+              href="javascript:void(0)"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (onCitationClick && article) {
+                  onCitationClick(lawName, article)
+                } else if (onCitationClick) {
+                  onCitationClick(lawName, '제1조')
+                }
+              }}
+              className="text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+            >
+              {children}
+            </a>
+          )
+        }
+
+        // annex:// 프로토콜: 별표/별지 링크
+        if (href?.startsWith('annex://')) {
+          const annexPath = href.replace('annex://', '')
+          const parts = decodeURIComponent(annexPath).split('/')
+          const lawName = parts[0]
+          const annexId = parts[1]
+
+          return (
+            <a
+              href="javascript:void(0)"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                // 별표 모달 열기
+                if (onAnnexClick) {
+                  onAnnexClick(annexId, lawName)
+                }
+              }}
+              className="text-purple-400 hover:text-purple-300 underline cursor-pointer"
+              title={`${lawName} ${annexId}`}
+            >
+              {children}
+            </a>
+          )
+        }
+
+        // 일반 링크
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-400 hover:text-cyan-300 underline"
+          >
+            {children}
+          </a>
+        )
+      },
       // 리스트 - 들여쓰기 개선
       ul: ({ children }) => (
         <ul className="ml-6 list-disc text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>

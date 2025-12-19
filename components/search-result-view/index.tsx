@@ -236,6 +236,11 @@ export function SearchResultView({
             ? (state.userQuery || state.searchQuery || "AI 답변")
             : (state.lawData?.meta?.lawTitle || state.searchQuery || undefined)
         }
+        currentArticle={
+          !state.isAiMode && state.lawData?.selectedJo
+            ? formatJO(state.lawData.selectedJo)
+            : undefined
+        }
         showBackButton={true}
         isFocusMode={state.isFocusMode}
         guideType={state.aiAnswerContent ? 'ai-search' : 'law-search'}
