@@ -47,126 +47,86 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Query is required' }, { status: 400 })
     }
 
-    // Server-Sent Events (SSE) 스트리밍
-    const encoder = new TextEncoder()
+    // ✅ Phase 11-B: 전체 응답을 모아서 한 번에 반환 (SSE 제거, ChatGPT 스타일 타이핑 효과용)
     let fullResponse = ''
     let citations: any[] = []
     let finishReason: string | null = null
-    let queryType: string = 'general'  // ✅ 쿼리 타입 기본값
+    let queryType: string = 'general'
+    const warnings: string[] = []
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // File Search 스트리밍 쿼리
-          for await (const chunk of queryFileSearchStream(query, { metadataFilter })) {
-            if (chunk.done) {
-              // 마지막 청크 - citation + finishReason + queryType 포함
-              citations = chunk.citations || []
-              finishReason = chunk.finishReason || null
-              queryType = chunk.queryType || 'general'  // ✅ 쿼리 타입 수집
+    try {
+      // File Search 스트리밍 쿼리 (백그라운드에서 전체 수집)
+      for await (const chunk of queryFileSearchStream(query, { metadataFilter })) {
+        if (chunk.done) {
+          // 마지막 청크
+          citations = chunk.citations || []
+          finishReason = chunk.finishReason || null
+          queryType = chunk.queryType || 'general'
 
-              // ✅ 신뢰도 계산 (groundingChunks 개수 + relevanceScore 기반, Phase 1 P1 최적화)
-              const avgScore = citations.length > 0
-                ? citations.reduce((sum, c) => sum + (c.relevanceScore || 0), 0) / citations.length
-                : 0
-
-              const confidenceLevel =
-                citations.length >= 3 && avgScore > 0.7 ? 'high' :
-                citations.length >= 1 && avgScore > 0.4 ? 'medium' : 'low'
-
-              // ⚠️ 신뢰도 낮음 경고
-              if (citations.length === 0) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({
-                    type: 'warning',
-                    message: '⚠️ File Search Store에서 관련 조문을 찾지 못했습니다. 답변이 일반 지식에 기반할 수 있습니다.'
-                  })}\n\n`)
-                )
-              }
-
-              // ⚠️ MAX_TOKENS 경고 전송
-              if (finishReason === 'MAX_TOKENS') {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({
-                    type: 'warning',
-                    message: '⚠️ 답변이 길어서 중간에 잘렸을 수 있습니다. 더 구체적인 질문을 해보세요.'
-                  })}\n\n`)
-                )
-              }
-
-              // Citation + Confidence + Query Type 전송
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({
-                  type: 'citations',
-                  citations,
-                  finishReason,
-                  confidenceLevel,
-                  queryType  // ✅ 쿼리 타입 포함
-                })}\n\n`)
-              )
-            } else {
-              // 경고 메시지가 있으면 전송
-              if (chunk.warning) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({
-                    type: 'warning',
-                    message: chunk.warning
-                  })}\n\n`)
-                )
-              }
-
-              // 텍스트 청크
-              if (chunk.text) {
-                fullResponse += chunk.text
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({
-                    type: 'text',
-                    text: chunk.text
-                  })}\n\n`)
-                )
-              }
-            }
+          // ⚠️ 신뢰도 낮음 경고
+          if (citations.length === 0) {
+            warnings.push('File Search Store에서 관련 조문을 찾지 못했습니다.')
           }
 
-          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          // 사용량 기록 (완료 시)
-          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          const usageStats = recordAIUsage(clientIP, fullResponse.length)
-          const warningMessage = getUsageWarningMessage(usageStats)
-
-          // 사용량 경고 전송 (80% 이상 사용 시)
-          if (warningMessage) {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({
-                type: 'usage_warning',
-                message: warningMessage,
-                usage: {
-                  daily: usageStats.dailyUsage,
-                  remaining: usageStats.remainingQuota,
-                  percentUsed: Math.round(usageStats.percentUsed * 100),
-                }
-              })}\n\n`)
-            )
+          // ⚠️ MAX_TOKENS 경고
+          if (finishReason === 'MAX_TOKENS') {
+            warnings.push('답변이 길어서 중간에 잘렸을 수 있습니다. 더 구체적인 질문을 해보세요.')
+          }
+        } else {
+          // 경고 메시지 수집
+          if (chunk.warning) {
+            warnings.push(chunk.warning)
           }
 
-          // 완료 시그널
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
-        } catch (error) {
-          console.error('File Search streaming error:', error)
-          controller.error(error)
+          // 텍스트 청크 수집
+          if (chunk.text) {
+            fullResponse += chunk.text
+          }
         }
-      },
-    })
+      }
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        ...getUsageHeaders(clientIP),  // 사용량 헤더 추가
-        Connection: 'keep-alive',
-      },
-    })
+      // ✅ 신뢰도 계산
+      const avgScore = citations.length > 0
+        ? citations.reduce((sum, c) => sum + (c.relevanceScore || 0), 0) / citations.length
+        : 0
+
+      const confidenceLevel =
+        citations.length >= 3 && avgScore > 0.7 ? 'high' :
+        citations.length >= 1 && avgScore > 0.4 ? 'medium' : 'low'
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // 사용량 기록
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      const usageStats = recordAIUsage(clientIP, fullResponse.length)
+      const warningMessage = getUsageWarningMessage(usageStats)
+
+      if (warningMessage) {
+        warnings.push(warningMessage)
+      }
+
+      // ✅ 전체 응답 반환 (JSON)
+      return Response.json(
+        {
+          answer: fullResponse,
+          citations,
+          finishReason,
+          confidenceLevel,
+          queryType,
+          warnings: warnings.length > 0 ? warnings : undefined,
+          usage: {
+            daily: usageStats.dailyUsage,
+            remaining: usageStats.remainingQuota,
+            percentUsed: Math.round(usageStats.percentUsed * 100),
+          }
+        },
+        {
+          headers: getUsageHeaders(clientIP),
+        }
+      )
+    } catch (error) {
+      console.error('File Search streaming error:', error)
+      throw error
+    }
   } catch (error) {
     console.error('File Search RAG error:', error)
     return Response.json(

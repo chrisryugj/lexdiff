@@ -68,9 +68,14 @@ interface LawViewerProps {
   aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
   userQuery?: string   // 사용자 질의
   aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
-  aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'  // ✅ 6가지 법률 질문 유형
+  aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'  // ✅ 8가지 법률 질문 유형
   aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
   onAiRefresh?: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
+
+  // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
+  isStreaming?: boolean  // 스트리밍 중 여부
+  searchStage?: string   // 현재 검색 단계 (analyzing, optimizing, searching, streaming, extracting, complete)
+  searchProgress?: number  // 진행률 (0-100)
 }
 
 export function LawViewer({
@@ -94,6 +99,9 @@ export function LawViewer({
   aiQueryType = 'application',
   aiIsTruncated = false,
   onAiRefresh,
+  isStreaming = false,
+  searchStage,
+  searchProgress = 0,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full"
   const { toast } = useToast()
@@ -1017,8 +1025,31 @@ export function LawViewer({
             }
 
             <div className="flex-1 min-h-0">
-              {/* 전문조회 모드: 자체 스크롤 관리 */}
-              {viewMode === "full" ? (
+              {/* ✅ Phase 11-B: AI 모드 우선 체크 (viewMode보다 우선) */}
+              {aiAnswerMode ? (
+                // ✅ Phase 8: AI 모드 - LegalMarkdownRenderer로 Markdown 직접 렌더링
+                <ScrollArea className="h-full" ref={contentRef}>
+                  <div className="pb-20">
+                    <AIAnswerContent
+                      aiAnswerContent={aiAnswerContent || ''}
+                      userQuery={userQuery}
+                      aiConfidenceLevel={aiConfidenceLevel}
+                      fileSearchFailed={fileSearchFailed}
+                      aiCitations={aiCitations}
+                      fontSize={fontSize}
+                      setFontSize={setFontSize}
+                      onLawClick={handleLawLinkClick}
+                      aiQueryType={aiQueryType}
+                      isTruncated={aiIsTruncated}
+                      onRefresh={onAiRefresh}
+                      isStreaming={isStreaming}
+                      searchStage={searchStage}
+                      searchProgress={searchProgress}
+                    />
+                  </div>
+                </ScrollArea>
+              ) : viewMode === "full" ? (
+                // 전문조회 모드: 자체 스크롤 관리
                 tierViewMode === "2-tier" && activeArticle ? (
                   <DelegationPanel
                     activeArticle={activeArticle}
@@ -1068,25 +1099,6 @@ export function LawViewer({
                     </div>
                   </ScrollArea>
                 )
-              ) : aiAnswerMode ? (
-                // ✅ Phase 8: AI 모드 - LegalMarkdownRenderer로 Markdown 직접 렌더링
-                <ScrollArea className="h-full" ref={contentRef}>
-                  <div className="pb-20">
-                    <AIAnswerContent
-                      aiAnswerContent={aiAnswerContent || ''}
-                      userQuery={userQuery}
-                      aiConfidenceLevel={aiConfidenceLevel}
-                      fileSearchFailed={fileSearchFailed}
-                      aiCitations={aiCitations}
-                      fontSize={fontSize}
-                      setFontSize={setFontSize}
-                      onLawClick={handleLawLinkClick}
-                      aiQueryType={aiQueryType}
-                      isTruncated={aiIsTruncated}
-                      onRefresh={onAiRefresh}
-                    />
-                  </div>
-                </ScrollArea>
               ) : activeArticle ? (
                 tierViewMode === "2-tier" ? (
                   <DelegationPanel

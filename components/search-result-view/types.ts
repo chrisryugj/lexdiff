@@ -36,7 +36,46 @@ export interface OrdinanceSearchResult {
 
 export type SearchMode = 'basic' | 'rag'
 
-export type SearchStage = 'searching' | 'parsing' | 'streaming' | 'complete'
+/** 법령 검색 단계 */
+export type LawSearchStage = 'searching' | 'parsing' | 'complete'
+
+/** AI 검색 단계 (6단계) */
+export type AISearchStage =
+  | 'analyzing'    // AI Router: 질문 분석 (0-15%)
+  | 'optimizing'   // AI Router: 검색 최적화 (15-25%)
+  | 'searching'    // RAG: File Search (25-40%)
+  | 'streaming'    // RAG: 답변 생성 (40-95%)
+  | 'extracting'   // RAG: Citation 추출 (95-99%)
+  | 'complete'     // 완료 (100%)
+
+/** 통합 검색 단계 (법령 + AI) */
+export type SearchStage = LawSearchStage | AISearchStage
+
+/** AI 검색 단계 메타정보 */
+export interface AIStageInfo {
+  key: AISearchStage
+  label: string
+  icon: string
+  range: [number, number]
+}
+
+/** AI 검색 단계 정의 */
+export const AI_STAGES: AIStageInfo[] = [
+  { key: 'analyzing', label: '분석 중', icon: 'brain', range: [0, 15] },
+  { key: 'optimizing', label: '최적화', icon: 'settings-02', range: [15, 25] },
+  { key: 'searching', label: '검색 중', icon: 'search-01', range: [25, 40] },
+  { key: 'streaming', label: '생성 중', icon: 'ai-brain-04', range: [40, 95] },
+  { key: 'extracting', label: '인용 추출', icon: 'file-01', range: [95, 99] },
+  { key: 'complete', label: '완료', icon: 'checkmark-circle-02', range: [100, 100] },
+]
+
+/** AI 검색 메타정보 */
+export interface AISearchMeta {
+  queryType?: string
+  domain?: string
+  keywords?: string[]
+  routingTimeMs?: number
+}
 
 // ============================================================
 // 컴포넌트 Props 타입

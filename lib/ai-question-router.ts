@@ -80,6 +80,8 @@ const QUERY_TYPE_TO_LEGACY: Record<QueryType, LegalQueryType> = {
  * 1. Gemini 2.5 Flash Lite로 질문 분석 (~0.5초)
  * 2. 분석 결과에 따라 전문 프롬프트 선택
  *
+ * Phase 11: complexity 기반 프롬프트 길이 제한 적용
+ *
  * @param query - 사용자 질문
  * @returns 라우팅 결과 (분석, 프롬프트, 검색 최적화)
  */
@@ -91,8 +93,8 @@ export async function routeQuestion(query: string): Promise<RoutingResult> {
   // 1. AI Router 호출 (Layer 1)
   const analysis = await analyzeQuery(query)
 
-  // 2. 전문 프롬프트 선택
-  const specialistPrompt = getSpecialistPrompt(analysis.primaryType)
+  // 2. 전문 프롬프트 선택 (Phase 11: complexity 파라미터 전달)
+  const specialistPrompt = getSpecialistPrompt(analysis.primaryType, analysis.complexity)
 
   // 3. 최적화된 검색 쿼리 구성
   const optimizedQuery = buildOptimizedSearchQuery(
@@ -109,6 +111,7 @@ export async function routeQuestion(query: string): Promise<RoutingResult> {
     primaryType: analysis.primaryType,
     legacyType,
     domain: analysis.domain,
+    complexity: analysis.complexity,  // Phase 11: complexity 로깅
     routingTimeMs,
     optimizedQuery: optimizedQuery.substring(0, 50) + '...'
   })

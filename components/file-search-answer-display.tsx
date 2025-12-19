@@ -4,18 +4,14 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Icon } from '@/components/ui/icon'
+import { Icon, DynamicIcon } from '@/components/ui/icon'
 import { CopyButton } from '@/components/ui/copy-button'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   SECTION_CONFIGS,
-  ALERT_CONFIGS,
-  CONFIDENCE_CONFIGS,
-  DETAIL_SUBSECTION_CONFIGS,
   detectSectionType,
-  detectDetailSubsectionType,
-  detectAlertType,
   removeEmoji
 } from '@/lib/answer-section-icons'
 
@@ -247,20 +243,22 @@ export function FileSearchAnswerDisplay({
         const sectionType = detectSectionType(text)
         const sectionConfig = sectionType ? SECTION_CONFIGS[sectionType] : null
 
+        // 디버그: 모든 H2 섹션 로깅
+        console.log('[H2]', { text, sectionType, hasConfig: !!sectionConfig })
+
         if (sectionConfig) {
-          const Icon = sectionConfig.icon
           const cleanText = removeEmoji(text)
 
           return (
-            <h2 className="text-white flex items-center gap-1.5 flex-nowrap" style={{ fontSize: `clamp(18px, 5vw, 24px)`, fontWeight: 900, marginTop: 'clamp(12px, 3vw, 20px)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
-              <Icon className={`flex-shrink-0 ${sectionConfig.iconColor}`} style={{ width: 'clamp(20px, 5vw, 24px)', height: 'clamp(20px, 5vw, 24px)' }} />
+            <h2 className="text-white flex items-center gap-1.5 flex-nowrap" style={{ fontSize: `clamp(18px, 5vw, 24px)`, fontWeight: 900, marginTop: 'clamp(24px, 5vw, 32px)', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              <DynamicIcon icon={sectionConfig.icon} size={22} className={`flex-shrink-0 ${sectionConfig.iconColor}`} />
               <span className="whitespace-nowrap">{cleanText}</span>
             </h2>
           )
         }
 
         return (
-          <h2 className="text-white" style={{ fontSize: '24px', fontWeight: 900, marginTop: '20px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+          <h2 className="text-white" style={{ fontSize: '24px', fontWeight: 900, marginTop: '32px', marginBottom: '8px', letterSpacing: '-0.02em' }}>
             {children}
           </h2>
         )
@@ -274,25 +272,13 @@ export function FileSearchAnswerDisplay({
         const childArray = React.Children.toArray(children)
         const text = childArray.join('')
 
-        // 하위 섹션 타입 감지
-        const subsectionType = detectDetailSubsectionType(text)
-        const subsectionConfig = subsectionType ? DETAIL_SUBSECTION_CONFIGS[subsectionType] : null
-
-        if (subsectionConfig) {
-          const Icon = subsectionConfig.icon
-          const cleanText = removeEmoji(text)
-
-          return (
-            <h3 className="text-gray-200 flex items-center gap-1.5 flex-nowrap" style={{ fontSize: 'clamp(14px, 4vw, 16px)', fontWeight: 700, marginTop: 'clamp(8px, 2vw, 12px)', marginBottom: '4px' }}>
-              <Icon className={`flex-shrink-0 ${subsectionConfig.iconColor}`} style={{ width: 'clamp(16px, 4vw, 20px)', height: 'clamp(16px, 4vw, 20px)' }} />
-              <span className="whitespace-nowrap">{cleanText}</span>
-            </h3>
-          )
-        }
+        // H3는 불릿 스타일로 통일
+        const cleanText = removeEmoji(text)
 
         return (
-          <h3 className="text-gray-200" style={{ fontSize: '16px', fontWeight: 700, marginTop: '12px', marginBottom: '4px' }}>
-            {children}
+          <h3 className="text-gray-200 flex items-center gap-2" style={{ fontSize: 'clamp(14px, 4vw, 16px)', fontWeight: 700, marginTop: 'clamp(16px, 3vw, 20px)', marginBottom: '4px' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+            <span>{cleanText}</span>
           </h3>
         )
       },
@@ -347,6 +333,39 @@ export function FileSearchAnswerDisplay({
         <ol className="ml-6 list-decimal text-gray-300" style={{ fontSize: `${fontSize}px`, marginTop: '2px', marginBottom: '2px', lineHeight: '1.4' }}>
           {children}
         </ol>
+      ),
+      // 표 - 들여쓰기 적용 (불릿 수준)
+      table: ({ children }) => (
+        <div className="ml-6 my-2 overflow-x-auto">
+          <table className="min-w-full border-collapse border border-gray-700 text-gray-300" style={{ fontSize: `${fontSize}px` }}>
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }) => (
+        <thead className="bg-gray-800">
+          {children}
+        </thead>
+      ),
+      tbody: ({ children }) => (
+        <tbody className="divide-y divide-gray-700">
+          {children}
+        </tbody>
+      ),
+      tr: ({ children }) => (
+        <tr className="hover:bg-gray-800/50">
+          {children}
+        </tr>
+      ),
+      th: ({ children }) => (
+        <th className="px-3 py-2 text-left font-semibold text-gray-200 border border-gray-700">
+          {children}
+        </th>
+      ),
+      td: ({ children }) => (
+        <td className="px-3 py-2 border border-gray-700">
+          {children}
+        </td>
       ),
       li: ({ children }) => (
         <li className="text-gray-300" style={{ marginBottom: '0px' }}>
@@ -490,6 +509,12 @@ export function FileSearchAnswerDisplay({
 
               try {
                 const parsed = JSON.parse(data)
+
+                // ⚠️ 경고 메시지 처리 (citation 없음, MAX_TOKENS 등)
+                if (parsed.type === 'warning') {
+                  console.warn('[File Search] Warning:', parsed.message)
+                  setError(parsed.message)
+                }
 
                 if (parsed.text) {
                   setAnswer(prev => prev + parsed.text)
@@ -650,7 +675,7 @@ export function FileSearchAnswerDisplay({
           </div>
 
           <div className="prose max-w-none overflow-x-hidden">
-            <ReactMarkdown components={markdownComponents}>{processedAnswer}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{processedAnswer}</ReactMarkdown>
           </div>
         </Card>
       )}

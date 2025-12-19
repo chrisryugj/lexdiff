@@ -14,9 +14,7 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
-import { Icon } from '@/components/ui/icon'
-
-type IconName = string
+import { Icon, type IconName } from '@/components/ui/icon'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 섹션 헤더 아이콘 매핑
@@ -29,46 +27,62 @@ const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: IconName }> = [
   { pattern: /^정의/, icon: 'book-open' },
   { pattern: /^법적\s*성질/, icon: 'scale' },
   { pattern: /^조문\s*원문/, icon: 'file-text' },
+  { pattern: /^핵심\s*해석/, icon: 'lightbulb' },
   { pattern: /^구성\s*요건/, icon: 'list-checks' },
-  { pattern: /^유사\s*개념/, icon: 'git-compare' },
+  { pattern: /^유사\s*개념\s*비교/, icon: 'git-compare' },
   { pattern: /^예시/, icon: 'lightbulb' },
   { pattern: /^관계\s*법령/, icon: 'book-open' },
 
   // requirement (요건) 섹션
   { pattern: /^결론/, icon: 'check-circle-2' },
-  { pattern: /^적극적\s*요건/, icon: 'check-circle-2' },
+  { pattern: /^적극적\s*요건/, icon: 'check-circle' },
   { pattern: /^소극적\s*요건/, icon: 'x-circle' },
-  { pattern: /^예외|특례/, icon: 'alert-triangle' },
-  { pattern: /^주의사항/, icon: 'alert-triangle' },
+  { pattern: /^서류\s*\/\s*증빙|^서류/, icon: 'file-text' },
+  { pattern: /^예외\s*\/\s*특례|^특례/, icon: 'alert-triangle' },
+  { pattern: /^주의사항/, icon: 'alert-circle' },
 
   // procedure (절차) 섹션
   { pattern: /^전체\s*흐름/, icon: 'arrow-right' },
-  { pattern: /^단계별\s*안내/, icon: 'list-checks' },
-  { pattern: /^기한\s*요약/, icon: 'clock' },
-  { pattern: /^불복\s*절차/, icon: 'gavel' },
+  { pattern: /^단계별\s*안내/, icon: 'list-ordered' },
+  { pattern: /^기한\s*요약표?/, icon: 'clock' },
+  { pattern: /^불복\s*\/\s*구제\s*절차|^불복/, icon: 'shield-check' },
 
   // comparison (비교) 섹션
   { pattern: /^핵심\s*차이/, icon: 'git-compare' },
-  { pattern: /^비교표/, icon: 'bar-chart-3' },
-  { pattern: /^선택\s*기준/, icon: 'check-circle-2' },
+  { pattern: /^상세\s*비교표?/, icon: 'list-checks' },
+  { pattern: /^A의\s*특징|^B의\s*특징/, icon: 'star' },
+  { pattern: /^선택\s*가이드/, icon: 'check-circle-2' },
+  { pattern: /^실무\s*팁/, icon: 'lightbulb' },
 
   // application (적용) 섹션
-  { pattern: /^요건별\s*검토/, icon: 'file-search' },
-  { pattern: /^다음\s*행동/, icon: 'list-todo' },
+  { pattern: /^요건별\s*검토/, icon: 'list-checks' },
+  { pattern: /^요건\s*충족\s*요약/, icon: 'clipboard-check' },
+  { pattern: /^추가\s*확인\s*필요/, icon: 'help-circle' },
+  { pattern: /^다음\s*행동/, icon: 'arrow-right' },
+  { pattern: /^유사\s*사례|^판례/, icon: 'gavel' },
 
   // consequence (효과) 섹션
-  { pattern: /^법적\s*효과/, icon: 'scale' },
   { pattern: /^행정적\s*효과/, icon: 'building' },
-  { pattern: /^민사적\s*효과/, icon: 'users' },
-  { pattern: /^형사적\s*효과/, icon: 'shield-alert' },
-  { pattern: /^구제\s*방법/, icon: 'gavel' },
+  { pattern: /^민사적\s*효과/, icon: 'scale' },
+  { pattern: /^형사적\s*효과/, icon: 'gavel' },
+  { pattern: /^효과\s*요약표?/, icon: 'list-checks' },
+  { pattern: /^구제\s*\/\s*치유\s*방법|^치유/, icon: 'shield-check' },
 
   // scope (범위/금액) 섹션
-  { pattern: /^산정\s*기준/, icon: 'calculator' },
-  { pattern: /^법정\s*기준/, icon: 'scale' },
-  { pattern: /^가산|감경/, icon: 'trending-up' },
-  { pattern: /^계산\s*예시/, icon: 'calculator' },
-  { pattern: /^실무\s*참고/, icon: 'lightbulb' },
+  { pattern: /^법정\s*기준/, icon: 'ruler' },
+  { pattern: /^산정\s*방법/, icon: 'calculator' },
+  { pattern: /^가산\s*\/\s*감경|^가산|^감경/, icon: 'trending-up' },
+  { pattern: /^계산\s*예시/, icon: 'list-ordered' },
+  { pattern: /^기한\s*계산/, icon: 'calendar' },
+  { pattern: /^실무\s*참고/, icon: 'bookmark' },
+
+  // exemption (면제) 섹션
+  { pattern: /^원칙\s*vs\s*예외|^원칙/, icon: 'git-compare' },
+  { pattern: /^면제\s*\/\s*감면\s*요건/, icon: 'list-checks' },
+  { pattern: /^면제\s*\/\s*감면\s*범위/, icon: 'coins' },
+  { pattern: /^신청\s*절차/, icon: 'file-text' },
+  { pattern: /^사후관리/, icon: 'clock' },
+  { pattern: /^유사\s*면제제도/, icon: 'git-compare' },
 ]
 
 function getSectionIcon(text: string): { iconName: IconName; color: string } | null {
@@ -487,7 +501,7 @@ export function LegalMarkdownRenderer({
               const finalContentNodes = isOmitted ? replaceOmittedWithBadge(processedContentNodes) : processedContentNodes
 
               return (
-                <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible">
+                <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-2 rounded-r-md !ml-3 !mr-3 not-italic overflow-visible">
                   <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
                     {/* 조문 제목 Group */}
                     <div className="text-muted-foreground font-medium text-sm break-words flex items-center gap-1.5 flex-wrap">

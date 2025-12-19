@@ -3,12 +3,23 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Icon, DynamicIcon, ICON_REGISTRY, type IconType } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
+
+// 스트리밍 단계별 메시지
+const STAGE_MESSAGES: Record<string, string> = {
+    analyzing: '질문을 분석하고 있습니다...',
+    optimizing: '검색어를 최적화하고 있습니다...',
+    searching: '법령 데이터베이스를 검색하고 있습니다...',
+    streaming: '답변을 생성하고 있습니다...',
+    extracting: '관련 조문을 추출하고 있습니다...',
+    complete: '완료!',
+}
 
 interface AIAnswerSidebarProps {
     relatedArticles: ParsedRelatedLaw[]
@@ -291,9 +302,14 @@ interface AIAnswerContentProps {
     fontSize: number
     setFontSize: (size: number | ((prev: number) => number)) => void
     onLawClick?: (lawName: string, article?: string) => void  // ✅ 법령 링크 클릭 핸들러
-    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope'  // ✅ 7가지 법률 질문 유형
+    aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'  // ✅ 8가지 법률 질문 유형
     isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
     onRefresh?: () => void  // ✅ 강제 새로고침 (캐시 무시)
+
+    // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
+    isStreaming?: boolean  // 스트리밍 중 여부
+    searchStage?: string   // 현재 검색 단계
+    searchProgress?: number  // 진행률 (0-100)
 }
 
 export function AIAnswerContent({
@@ -307,7 +323,10 @@ export function AIAnswerContent({
     onLawClick,
     aiQueryType = 'application',
     isTruncated = false,
-    onRefresh
+    onRefresh,
+    isStreaming = false,
+    searchStage,
+    searchProgress = 0,
 }: AIAnswerContentProps) {
     // 신뢰도 배지 컴포넌트
     const ConfidenceBadge = () => {
@@ -511,8 +530,75 @@ export function AIAnswerContent({
                     </div>
                 )}
 
-                {/* ✅ Phase 7: 답변 내용이 없을 때 (grounding metadata 없음) */}
-                {!aiAnswerContent && (
+                {/* ✅ Phase 11-B: ChatGPT 스타일 스택형 로딩 메시지 */}
+                {isStreaming && !aiAnswerContent && (
+                    <div className="py-8 space-y-3">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                                <Icon name="ai-brain-04" className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <p className="font-medium text-sm">AI 법률 어시스턴트</p>
+
+                                {/* 스택형 단계 메시지 */}
+                                <div className="space-y-1.5 text-sm text-muted-foreground">
+                                    {/* 1단계: 분석 */}
+                                    <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 15 ? 'opacity-50' : 'opacity-100'}`}>
+                                        {searchProgress >= 15 ? (
+                                            <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                        ) : (
+                                            <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                        )}
+                                        <span>질문을 분석하고 있습니다...</span>
+                                    </div>
+
+                                    {/* 2단계: 최적화 */}
+                                    {searchProgress >= 5 && (
+                                        <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 30 ? 'opacity-50' : 'opacity-100'}`}>
+                                            {searchProgress >= 30 ? (
+                                                <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                                <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                            )}
+                                            <span>검색어를 최적화하고 있습니다...</span>
+                                        </div>
+                                    )}
+
+                                    {/* 3단계: 검색 */}
+                                    {searchProgress >= 15 && (
+                                        <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 50 ? 'opacity-50' : 'opacity-100'}`}>
+                                            {searchProgress >= 50 ? (
+                                                <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                                <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                            )}
+                                            <span>법령 데이터베이스를 검색하고 있습니다...</span>
+                                        </div>
+                                    )}
+
+                                    {/* 4단계: 생성 */}
+                                    {searchProgress >= 30 && (
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                            <span className="animate-pulse">답변을 생성하고 있습니다...</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 진행률 표시 */}
+                                <div className="mt-3 space-y-1.5">
+                                    <Progress value={searchProgress} className="h-1.5" />
+                                    <div className="flex justify-end">
+                                        <span className="text-xs text-muted-foreground tabular-nums">{searchProgress}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ✅ Phase 7: 답변 내용이 없을 때 (스트리밍 완료 후에도 없을 때) */}
+                {!aiAnswerContent && !isStreaming && (
                     <>
                         {/* 신뢰도 낮음 배너 */}
                         <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
