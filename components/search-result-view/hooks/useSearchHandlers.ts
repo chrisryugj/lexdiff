@@ -358,19 +358,49 @@ export function useSearchHandlers({
         return
       }
 
+      // ✅ AI 검색 시작 - 6단계 프로그레스 UI용
       actions.setIsSearching(true)
       actions.setIsAiMode(true)
       actions.setSearchMode('rag')
-      actions.updateProgress('searching', 20)
+      actions.setAiAnswerContent('')  // 스트리밍 텍스트 초기화
+      actions.setUserQuery(fullQuery)  // 사용자 쿼리 설정
+      actions.updateProgress('analyzing', 5)  // 1단계: 질문 분석
+
+      // ✅ AI 뷰를 즉시 표시하기 위해 빈 lawData 설정
+      const aiLawData: LawDataState = {
+        meta: {
+          lawId: 'ai-answer',
+          lawTitle: 'AI 법률 어시스턴트',
+          promulgationDate: new Date().toISOString().split('T')[0],
+          lawType: 'AI',
+          isOrdinance: false,
+          fetchedAt: new Date().toISOString()
+        },
+        articles: [],
+        selectedJo: undefined,
+        isOrdinance: false
+      }
+      actions.setLawData(aiLawData)
+      actions.setMobileView("content")
 
       try {
-        actions.updateProgress('parsing', 40)
+        // ✅ Phase 11-B: ChatGPT 스타일 로딩 단계 (스택형 메시지)
+        actions.updateProgress('analyzing', 5)  // 1단계
+        await new Promise(resolve => setTimeout(resolve, 300))  // 깜빡임 효과
 
         if (signal?.aborted) {
           debugLogger.info('🚫 AI 검색 취소됨')
           return
         }
 
+        actions.updateProgress('optimizing', 15)  // 2단계
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        if (signal?.aborted) return
+
+        actions.updateProgress('searching', 30)  // 3단계
+
+        // ✅ JSON 응답 받기 (SSE 제거)
         const response = await fetch('/api/file-search-rag', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -384,60 +414,49 @@ export function useSearchHandlers({
           throw new Error('File Search API 호출 실패')
         }
 
-        actions.updateProgress('streaming', 60)
+        actions.updateProgress('streaming', 50)  // 4단계: 답변 생성 중
 
-        const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
-
-        if (!reader) {
-          throw new Error('Response body 읽기 실패')
-        }
-
-        let buffer = ''
-        let fullContent = ''
-        let receivedCitations: any[] = []
-        let receivedConfidenceLevel: 'high' | 'medium' | 'low' = 'high'
-        let receivedQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' = 'application'
-        let progressValue = 60
-
-        while (true) {
-          if (signal?.aborted) {
-            reader.cancel()
-            return
-          }
-
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6)
-
-              if (data === '[DONE]') continue
-
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.type === 'text') {
-                  fullContent += parsed.text
-                  progressValue = Math.min(progressValue + 1, 95)
-                  actions.updateProgress('streaming', progressValue)
-                } else if (parsed.type === 'citations') {
-                  receivedCitations = parsed.citations || []
-                  receivedConfidenceLevel = parsed.confidenceLevel || 'high'
-                  receivedQueryType = parsed.queryType || 'general'
-                }
-              } catch (e) {
-                // 파싱 에러 무시
-              }
-            }
-          }
-        }
+        // ✅ 전체 응답 파싱
+        const data = await response.json()
 
         if (signal?.aborted) return
+
+        const fullContent = data.answer || ''
+        const receivedCitations = data.citations || []
+        const receivedConfidenceLevel = data.confidenceLevel || 'high'
+        const receivedQueryType = data.queryType || 'application'
+
+        // ✅ 타이핑 효과 (20ms/글자, 빠른 스트리밍 시뮬레이션)
+        actions.updateProgress('streaming', 70)
+        let currentIndex = 0
+        const typingSpeed = 15  // ms per character
+
+        const typeNextChunk = async () => {
+          if (signal?.aborted) return
+
+          const chunkSize = 5  // 한 번에 5글자씩
+          const nextIndex = Math.min(currentIndex + chunkSize, fullContent.length)
+          const displayText = fullContent.substring(0, nextIndex)
+
+          actions.setAiAnswerContent(displayText.replace(/\^/g, ' '))
+          currentIndex = nextIndex
+
+          // 진행률 업데이트 (70-94%)
+          const progress = 70 + Math.floor((currentIndex / fullContent.length) * 24)
+          actions.updateProgress('streaming', progress)
+
+          if (currentIndex < fullContent.length) {
+            await new Promise(resolve => setTimeout(resolve, typingSpeed))
+            await typeNextChunk()
+          }
+        }
+
+        await typeNextChunk()
+
+        if (signal?.aborted) return
+
+        // 5단계: Citation 추출
+        actions.updateProgress('extracting', 97)
 
         const processedContent = fullContent.replace(/\^/g, ' ')
         const searchFailed = detectSearchFailed(processedContent)

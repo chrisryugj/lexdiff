@@ -9,6 +9,8 @@ import { favoritesStore } from "@/lib/favorites-store"
 import type {
   SearchMode,
   SearchStage,
+  AISearchStage,
+  AISearchMeta,
   LawDataState,
   LawSelectionState,
   OrdinanceSelectionState,
@@ -69,7 +71,8 @@ export interface SearchState {
   aiCitations: VerifiedCitation[]
   userQuery: string
   fileSearchFailed: boolean
-  aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope'
+  aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'
+  aiSearchMeta: AISearchMeta | null
 
   // RAG 상태
   ragLoading: boolean
@@ -115,7 +118,8 @@ export interface SearchStateActions {
   setAiCitations: (citations: VerifiedCitation[]) => void
   setUserQuery: (query: string) => void
   setFileSearchFailed: (value: boolean) => void
-  setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope') => void
+  setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption') => void
+  setAiSearchMeta: (meta: AISearchMeta | null) => void
 
   // RAG 상태 업데이트
   setRagLoading: (value: boolean) => void
@@ -181,7 +185,8 @@ export function useSearchState({
   const [aiCitations, setAiCitations] = useState<VerifiedCitation[]>([])
   const [userQuery, setUserQuery] = useState<string>('')
   const [fileSearchFailed, setFileSearchFailed] = useState(false)
-  const [aiQueryType, setAiQueryType] = useState<'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence'>('application')
+  const [aiQueryType, setAiQueryType] = useState<'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'>('application')
+  const [aiSearchMeta, setAiSearchMeta] = useState<AISearchMeta | null>(null)
 
   // ============================================================
   // RAG 상태
@@ -299,6 +304,7 @@ export function useSearchState({
     userQuery,
     fileSearchFailed,
     aiQueryType,
+    aiSearchMeta,
     ragLoading,
     ragError,
     ragProgress,
@@ -334,6 +340,7 @@ export function useSearchState({
     setUserQuery,
     setFileSearchFailed,
     setAiQueryType,
+    setAiSearchMeta,
     setRagLoading,
     setRagError,
     setRagProgress,

@@ -12,6 +12,8 @@ import { analyzeLegalQuery, type LegalQueryType } from './legal-query-analyzer'
 import { buildLegalPrompt } from './legal-prompt-builder'
 // ✅ 2-Tier AI 라우팅 시스템 (Phase 10)
 import { routeQuestion, summarizeRouting, type RoutingResult } from './ai-question-router'
+// ✅ Phase 11: complexity별 maxOutputTokens 설정
+import { MAX_TOKENS_BY_COMPLEXITY } from './ai-agents/specialist-agents'
 
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
@@ -326,6 +328,18 @@ export async function* queryFileSearchStream(
     console.log('[File Search] Metadata Filter applied:', effectiveMetadataFilter)
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Phase 11: complexity별 maxOutputTokens 동적 설정
+  // simple: 4096, moderate: 6144, complex: 8192
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const effectiveComplexity = routingResult?.analysis.complexity || 'moderate'
+  const maxOutputTokens = MAX_TOKENS_BY_COMPLEXITY[effectiveComplexity]
+
+  console.log('[File Search] Phase 11 - Token optimization:', {
+    complexity: effectiveComplexity,
+    maxOutputTokens
+  })
+
   // REST API 요청 본문 (Gemini REST API는 camelCase 필수!)
   const requestBody = {
     contents: [{
@@ -345,7 +359,7 @@ export async function* queryFileSearchStream(
       temperature: 0,  // 완전 결정적 출력
       topP: 0.8,  // 0.95 → 0.8 (토큰 효율성 개선)
       topK: 20,   // 40 → 20 (법령 검색에 최적화, 50% 감소)
-      maxOutputTokens: 8192  // 4096 → 8192 (답변 잘림 방지, Phase 1 P0 최적화)
+      maxOutputTokens  // Phase 11: complexity별 동적 설정
     }
   }
 
@@ -476,7 +490,7 @@ export async function* queryFileSearchStream(
 
             if (finishReason === 'MAX_TOKENS') {
               console.error('[File Search] ❌ 답변이 토큰 제한으로 중단되었습니다!')
-              console.error('[File Search] 현재 max_output_tokens:', 4096)
+              console.error('[File Search] 현재 maxOutputTokens:', maxOutputTokens, `(complexity: ${effectiveComplexity})`)
               console.error('[File Search] 실제 사용된 토큰:', usageMetadata?.candidatesTokenCount || 'unknown')
               console.error('[File Search] 해결: 질문을 더 구체적으로 작성하거나 답변이 필요한 범위를 좁혀주세요.')
 
@@ -734,11 +748,15 @@ export async function* queryFileSearchStream(
     routingInfo: routingResult ? {
       primaryType: routingResult.analysis.primaryType,
       domain: routingResult.analysis.domain,
+      complexity: routingResult.analysis.complexity,  // Phase 11: complexity 정보 추가
+      maxOutputTokens,  // Phase 11: 사용된 토큰 제한
       searchKeywords: routingResult.searchOptimization.searchKeywords,
       routingTimeMs: routingResult.routingTimeMs,
       useAIRouter: true
     } : {
-      useAIRouter: false
+      useAIRouter: false,
+      complexity: 'moderate',  // 기본값
+      maxOutputTokens: MAX_TOKENS_BY_COMPLEXITY['moderate']
     }
   }
 }

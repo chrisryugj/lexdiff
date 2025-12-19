@@ -16,7 +16,7 @@ import { SearchBar } from "@/components/search-bar"
 import { LawViewer } from "@/components/law-viewer"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
-import { ModernProgressBar } from "@/components/ui/modern-progress-bar"
+import { LawViewerSkeleton } from "@/components/law-viewer-skeleton"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 
@@ -222,37 +222,7 @@ export function SearchResultView({
         isAiMode={state.isAiMode}
       />
 
-      {/* 프로그레스 오버레이 */}
-      {state.isSearching && (
-        <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="w-full max-w-md px-6">
-            <ModernProgressBar
-              progress={state.searchProgress}
-              label={state.searchMode === 'rag' ? 'AI 검색' : '법령 검색'}
-              statusMessage={
-                state.searchStage === 'searching'
-                  ? (state.searchMode === 'rag' ? 'Gemini 2.5 Flash로 검색 중...' : '국가법령정보 API 검색중...')
-                  : state.searchStage === 'parsing' ? '법령 데이터 파싱 중...' :
-                    state.searchStage === 'streaming' ? 'AI 답변 생성 중...' :
-                      '검색 완료!'
-              }
-              variant={state.searchMode === 'rag' ? 'lavender' : 'ocean'}
-              size="lg"
-              animationDuration={800}
-            />
-            <div className="mt-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                {state.searchQuery && `"${state.searchQuery}" 검색 중...`}
-              </p>
-              {state.isCacheHit && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  캐시에서 불러오는 중...
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 풀스크린 오버레이 제거 - 인라인 로딩으로 대체 */}
 
       <FloatingCompactHeader
         onBack={handlers.handleReset}
@@ -295,8 +265,36 @@ export function SearchResultView({
                 actions.updateProgress('complete', 0)
               }}
             />
+          ) : state.isAiMode ? (
+            /* AI 모드: isSearching과 관계없이 LawViewer 표시 (ChatGPT 스타일 스트리밍) */
+            <LawViewer
+              meta={{ lawId: 'ai-answer', lawTitle: 'AI 법률 어시스턴트' }}
+              articles={[]}
+              selectedJo={undefined}
+              viewMode="full"
+              onCompare={() => {}}
+              onSummarize={async () => {}}
+              onToggleFavorite={() => {}}
+              favorites={state.favorites}
+              isOrdinance={false}
+              aiAnswerMode={true}
+              aiAnswerContent={state.aiAnswerContent}
+              relatedArticles={state.aiRelatedLaws}
+              onRelatedArticleClick={handlers.handleCitationClick}
+              fileSearchFailed={state.fileSearchFailed}
+              aiCitations={state.aiCitations}
+              userQuery={state.userQuery || state.searchQuery}
+              aiQueryType={state.aiQueryType}
+              onAiRefresh={handlers.handleAiRefresh}
+              isStreaming={state.isSearching}
+              searchStage={state.searchStage}
+              searchProgress={state.searchProgress}
+            />
+          ) : state.isSearching && !state.isAiMode ? (
+            /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */
+            <LawViewerSkeleton stage={state.searchStage} />
           ) : !state.lawData ? (
-            // 로딩 중 - ModernProgressBar만 표시
+            /* 데이터 없음 */
             null
           ) : (
             /* 법령 뷰어 */

@@ -5,9 +5,52 @@
  * - 전문 시스템 프롬프트
  * - 답변 구조 템플릿
  * - 최적화된 파라미터
+ *
+ * Phase 11: complexity별 프롬프트 분기 + 길이 제한 추가
+ * - simple: 1500자, 필수 섹션만, maxOutputTokens 4096
+ * - moderate: 2500자, 기본 + 예시, maxOutputTokens 6144
+ * - complex: 4000자, 전체 구조, maxOutputTokens 8192
  */
 
-import type { QueryType, AgentConfig, SpecialistAgentType } from './types'
+import type { QueryType, QueryComplexity, AgentConfig, SpecialistAgentType } from './types'
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Phase 11: Complexity별 설정
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** complexity별 maxOutputTokens 설정 */
+export const MAX_TOKENS_BY_COMPLEXITY: Record<QueryComplexity, number> = {
+  simple: 4096,
+  moderate: 6144,
+  complex: 8192
+}
+
+/** complexity별 길이 제한 지시 */
+const LENGTH_CONSTRAINTS: Record<QueryComplexity, string> = {
+  simple: `
+## ⚠️ 응답 길이 제한 (필수!)
+- 전체 응답: 최대 1500자 (한글 기준)
+- 각 섹션: 2-3줄 이내
+- 조문 인용: 핵심 1항만 (전문 인용 금지)
+- 예시: 1개만
+- 해당 없는 섹션은 완전히 생략
+- 관계 법령: 3개 이내`,
+
+  moderate: `
+## ⚠️ 응답 길이 제한 (필수!)
+- 전체 응답: 최대 2500자 (한글 기준)
+- 각 섹션: 3-5줄 이내
+- 조문 인용: 핵심 1-2항만 (전문 인용 금지)
+- 예시: 2개 이내
+- 해당 없는 섹션은 생략`,
+
+  complex: `
+## ⚠️ 응답 길이 제한 (필수!)
+- 전체 응답: 최대 4000자 (한글 기준)
+- 각 섹션: 5줄 이내
+- 조문 인용: 핵심 부분만 [부분 인용]
+- 예시: 2-3개`
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 시스템 프롬프트
@@ -667,9 +710,26 @@ export function getSpecialistConfig(queryType: QueryType): AgentConfig {
 
 /**
  * 전문 에이전트 시스템 프롬프트 반환
+ *
+ * Phase 11: complexity에 따른 길이 제한 지시 추가
+ * - simple: 1500자, 필수 섹션만
+ * - moderate: 2500자, 기본 + 예시
+ * - complex: 4000자, 전체 구조
+ *
+ * @param queryType - 질문 유형
+ * @param complexity - 질문 복잡도 (기본값: 'moderate')
  */
-export function getSpecialistPrompt(queryType: QueryType): string {
-  return SPECIALIST_PROMPTS[queryType]
+export function getSpecialistPrompt(
+  queryType: QueryType,
+  complexity: QueryComplexity = 'moderate'
+): string {
+  const basePrompt = SPECIALIST_PROMPTS[queryType]
+  const lengthConstraint = LENGTH_CONSTRAINTS[complexity]
+
+  // 길이 제한을 프롬프트 최상단에 삽입 (모델이 먼저 인식하도록)
+  return `${lengthConstraint}
+
+${basePrompt}`
 }
 
 /**
