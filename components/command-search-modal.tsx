@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -12,6 +12,7 @@ import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO, parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import { cn } from "@/lib/utils"
 
 interface CommandSearchModalProps {
   isOpen: boolean
@@ -20,11 +21,61 @@ interface CommandSearchModalProps {
   isAiMode?: boolean // AI 모드 여부
 }
 
+interface Suggestion {
+  text: string
+  type: 'law' | 'ai' | 'recent'
+  category: string
+}
+
+// debounce 훅
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false }: CommandSearchModalProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [favorites, setFavorites] = useState<Favorite[]>([])
   const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // debounce된 쿼리
+  const debouncedQuery = useDebounce(searchQuery, 200)
+
+  // 자동완성 API 호출 (최대 5개로 제한)
+  const fetchSuggestions = useCallback(async (q: string) => {
+    if (!q || q.length < 1) {
+      setSuggestions([])
+      return
+    }
+
+    setIsLoadingSuggestions(true)
+    try {
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
+      if (res.ok) {
+        const data = await res.json()
+        setSuggestions(data.suggestions || [])
+      }
+    } catch (error) {
+      console.error("[CommandSearchModal] Failed to fetch suggestions:", error)
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }, [])
 
   // 즐겨찾기 로드
   useEffect(() => {
@@ -35,7 +86,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       const recent = localStorage.getItem('recentSearches')
       if (recent) {
         try {
-          setRecentSearches(JSON.parse(recent).slice(0, 5))
+          setRecentSearches(JSON.parse(recent).slice(0, 10)) // 최대 10개 로드
         } catch (error) {
           console.error('Failed to parse recent searches:', error)
         }
@@ -43,28 +94,72 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
       // 입력창 포커스
       setTimeout(() => inputRef.current?.focus(), 100)
+    } else {
+      // 모달 닫힐 때 상태 초기화
+      setSearchQuery("")
+      setSuggestions([])
+      setSelectedIndex(-1)
     }
   }, [isOpen])
 
-  // ESC 키로 닫기
+  // debounced 쿼리 변경 시 자동완성 호출
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    if (isOpen && debouncedQuery.trim()) {
+      fetchSuggestions(debouncedQuery.trim())
+    } else {
+      setSuggestions([])
+    }
+  }, [debouncedQuery, isOpen, fetchSuggestions])
+
+  // 키보드 네비게이션
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const displayedRecentSearches = recentSearches.slice(0, 5)
+    const totalItems = suggestions.length + displayedRecentSearches.length + favorites.length
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev + 1) % totalItems)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
+    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+      e.preventDefault()
+
+      // 순서: 실시간 추천 → 최근 검색 → 즐겨찾기
+      if (selectedIndex < suggestions.length) {
+        // 실시간 추천
+        handleSearch(suggestions[selectedIndex].text)
+      } else if (selectedIndex < suggestions.length + displayedRecentSearches.length) {
+        // 최근 검색
+        const recentIndex = selectedIndex - suggestions.length
+        handleRecentClick(displayedRecentSearches[recentIndex])
+      } else {
+        // 즐겨찾기
+        const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
+        handleFavoriteClick(favorites[favIndex])
+      }
+    } else if (e.key === 'Escape') {
+      onClose()
+    }
+  }
+
+  // ESC 키로 닫기 (전역)
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
         onClose()
       }
     }
 
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown)
-      return () => window.removeEventListener('keydown', handleKeyDown)
-    }
+    window.addEventListener('keydown', handleEscapeKey)
+    return () => window.removeEventListener('keydown', handleEscapeKey)
   }, [isOpen, onClose])
 
   const handleSearch = (query: string) => {
     if (!query.trim()) return
 
-    // 최근 검색어 저장 - search-bar.tsx와 동일한 키 사용
-    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5)
+    // 최근 검색어 저장 - search-bar.tsx와 동일한 키 사용 (최대 10개)
+    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10)
     setRecentSearches(updated)
     localStorage.setItem('recentSearches', JSON.stringify(updated))
 
@@ -78,7 +173,6 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       onSearch({ lawName: query })
     }
     onClose()
-    setSearchQuery("")
   }
 
   const handleFavoriteClick = (fav: Favorite) => {
@@ -113,81 +207,203 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             type="text"
             placeholder="법령명 또는 조문 검색... (예: 민법, 형법 제38조)"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleSearch(searchQuery)
-              }
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setSelectedIndex(-1)
             }}
+            onKeyDown={handleKeyDown}
             className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-base text-foreground placeholder:text-muted-foreground shadow-none"
+            autoComplete="off"
           />
         </div>
 
         {/* 검색 제안 영역 */}
-        <ScrollArea className="max-h-[400px] bg-background">
-          <div className="p-4 space-y-6">
-            {/* 최근 검색 */}
-            {recentSearches.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon name="clock" className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-muted-foreground">최근 검색</h3>
+        <div className="bg-background">
+          {/* 로딩 표시 */}
+          {isLoadingSuggestions && searchQuery.trim() && (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground border-b border-border">
+              <Icon name="loader" className="h-3 w-3 animate-spin" />
+              <span>검색 중...</span>
+            </div>
+          )}
+
+          {/* 실시간 추천 (법령 + AI) - 독립 스크롤 영역 */}
+          {suggestions.length > 0 && (
+            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+              <div className="p-2">
+                {/* 법령 추천 */}
+                {suggestions.filter(s => s.type === 'law').length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                      <Icon name="scale" className="h-3.5 w-3.5 text-amber-500" />
+                      <span>법령</span>
+                    </div>
+                    {suggestions
+                      .filter(s => s.type === 'law')
+                      .map((suggestion, index) => {
+                        const globalIndex = index
+                        const isSelected = selectedIndex === globalIndex
+
+                        return (
+                          <button
+                            key={`law-${index}`}
+                            onClick={() => handleSearch(suggestion.text)}
+                            className={cn(
+                              "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                              isSelected
+                                ? "bg-accent border-primary/40"
+                                : "border-transparent hover:bg-muted hover:border-border"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Icon name="scale" className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                              <span className="text-sm font-medium truncate text-foreground">{suggestion.text}</span>
+                            </div>
+                            <Icon name="arrow-right" className={cn(
+                              "h-4 w-4 text-muted-foreground transition-all flex-shrink-0",
+                              isSelected ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 group-hover:text-primary"
+                            )} />
+                          </button>
+                        )
+                      })}
+                  </>
+                )}
+
+                {/* AI 질문 추천 */}
+                {suggestions.filter(s => s.type === 'ai').length > 0 && (
+                  <>
+                    {suggestions.filter(s => s.type === 'law').length > 0 && (
+                      <div className="border-t border-border my-2" />
+                    )}
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                      <Icon name="sparkles" className="h-3.5 w-3.5 text-purple-500" />
+                      <span>AI 질문</span>
+                    </div>
+                    {suggestions
+                      .filter(s => s.type === 'ai')
+                      .map((suggestion, index) => {
+                        const lawCount = suggestions.filter(s => s.type === 'law').length
+                        const globalIndex = lawCount + index
+                        const isSelected = selectedIndex === globalIndex
+
+                        return (
+                          <button
+                            key={`ai-${index}`}
+                            onClick={() => handleSearch(suggestion.text)}
+                            className={cn(
+                              "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                              isSelected
+                                ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500/40"
+                                : "border-transparent hover:bg-purple-50/50 dark:hover:bg-purple-950/20 hover:border-purple-500/20"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Icon name="brain" className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                              <span className="text-sm font-medium truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
+                            </div>
+                            <Icon name="arrow-right" className={cn(
+                              "h-4 w-4 transition-all flex-shrink-0",
+                              isSelected ? "opacity-100 text-purple-500" : "opacity-0 group-hover:opacity-100 text-muted-foreground group-hover:text-purple-500"
+                            )} />
+                          </button>
+                        )
+                      })}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 최근 검색 - 독립 스크롤 영역 (5개만 표시) */}
+          {recentSearches.length > 0 && (
+            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+              <div className="p-2">
+                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                  <Icon name="clock" className="h-3.5 w-3.5" />
+                  <span>최근 검색</span>
                 </div>
-                <div className="space-y-1">
-                  {recentSearches.map((query, idx) => (
+                {recentSearches.slice(0, 5).map((query, idx) => {
+                  const globalIndex = suggestions.length + idx
+                  const isSelected = selectedIndex === globalIndex
+
+                  return (
                     <button
                       key={idx}
                       onClick={() => handleRecentClick(query)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left group border border-transparent hover:border-border"
+                      className={cn(
+                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                        isSelected
+                          ? "bg-accent border-primary/40"
+                          : "border-transparent hover:bg-muted hover:border-border"
+                      )}
                     >
-                      <span className="text-sm text-foreground">{query}</span>
-                      <Icon name="arrow-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all" />
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Icon name="clock" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm truncate text-foreground">{query}</span>
+                      </div>
+                      <Icon name="arrow-right" className={cn(
+                        "h-4 w-4 text-muted-foreground transition-all flex-shrink-0",
+                        isSelected ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 group-hover:text-primary"
+                      )} />
                     </button>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 즐겨찾기 */}
-            {favorites.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon name="star" className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                  <h3 className="text-sm font-semibold text-muted-foreground">즐겨찾기</h3>
+          {/* 즐겨찾기 - 독립 스크롤 영역 */}
+          {favorites.length > 0 && (
+            <div className="max-h-[200px] overflow-y-auto">
+              <div className="p-2">
+                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                  <Icon name="star" className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                  <span>즐겨찾기</span>
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {favorites.length}
                   </Badge>
                 </div>
-                <div className="space-y-1">
-                  {favorites.slice(0, 5).map((fav) => (
+                {favorites.slice(0, 5).map((fav, idx) => {
+                  const globalIndex = suggestions.length + recentSearches.slice(0, 5).length + idx
+                  const isSelected = selectedIndex === globalIndex
+
+                  return (
                     <button
                       key={`${fav.lawTitle}-${fav.jo}`}
                       onClick={() => handleFavoriteClick(fav)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left group border border-transparent hover:border-border"
+                      className={cn(
+                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                        isSelected
+                          ? "bg-accent border-primary/40"
+                          : "border-transparent hover:bg-muted hover:border-border"
+                      )}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate text-foreground">{fav.lawTitle}</div>
                         <div className="text-xs text-muted-foreground">{formatJO(fav.jo)}</div>
                       </div>
-                      <Icon name="arrow-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0 ml-2" />
+                      <Icon name="arrow-right" className={cn(
+                        "h-4 w-4 text-muted-foreground transition-all flex-shrink-0 ml-2",
+                        isSelected ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 group-hover:text-primary"
+                      )} />
                     </button>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 안내 메시지 */}
-            {recentSearches.length === 0 && favorites.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                  <Icon name="search" className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-foreground font-medium">법령명을 입력하여 검색하세요</p>
-                <p className="text-xs mt-1 text-muted-foreground">예: 민법, 형법 제38조</p>
+          {/* 안내 메시지 */}
+          {!searchQuery.trim() && recentSearches.length === 0 && favorites.length === 0 && (
+            <div className="text-center py-12 px-4">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                <Icon name="search" className="h-8 w-8 text-muted-foreground" />
               </div>
-            )}
-          </div>
-        </ScrollArea>
+              <p className="text-sm text-foreground font-medium">법령명을 입력하여 검색하세요</p>
+              <p className="text-xs mt-1 text-muted-foreground">예: 민법, 형법 제38조</p>
+            </div>
+          )}
+        </div>
 
         {/* 하단 힌트 */}
         <div className="border-t border-border px-4 py-3 bg-muted/30">

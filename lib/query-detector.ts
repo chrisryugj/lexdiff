@@ -60,16 +60,14 @@ export function detectQueryType(query: string): QueryDetectionResult {
 
   // 1-1: "법령명 + 조번호"만 있는 경우 → 구조화 검색 (예: "관세법 38조")
   if (hasArticleNumber) {
-    // 순수한 법령 검색 패턴인지 확인 (네거티브 방식)
-    // 법령명 + 조문번호만 있고 다른 텍스트가 없는 경우만 구조화 검색으로 처리
-
+    // 순수한 법령 검색 패턴인지 확인
     // 조문 번호를 제거한 후 남은 텍스트 확인
     const textWithoutArticle = trimmedQuery.replace(articlePattern, '').trim()
 
-    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
+    // 순수 법령명 패턴 (법령 키워드로 끝나거나 법령명만 있는 경우)
     const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
 
-    // 법령명만 있고 추가 텍스트가 없는 경우 → 구조화 검색
+    // 법령명만 있는 경우 → 구조화 검색
     if (pureLawNamePattern.test(textWithoutArticle)) {
       return {
         type: 'structured',
@@ -78,11 +76,32 @@ export function detectQueryType(query: string): QueryDetectionResult {
       }
     }
 
-    // 그 외 모든 경우 → 자연어 검색 (뭔가 추가 단어가 있음)
+    // 조문 번호 뒤에 질문 키워드가 있으면 → 자연어 검색
+    // "관세법 38조 요건은?", "관세법 38조 내용", "관세법 38조에 대해" 등
+    const questionKeywordsAfterArticle = /(요건|내용|설명|의미|뜻|정의|무엇|어떻게|어떤|왜|언제|어디|누가|인가|될까|되나|습니까|니까|알려|설명|가르|말해|찾아|보여|궁금|에\s*대해)/
+    if (questionKeywordsAfterArticle.test(trimmedQuery)) {
+      return {
+        type: 'natural',
+        confidence: 0.95,
+        reason: '조문 번호 + 질문 키워드'
+      }
+    }
+
+    // 그 외의 경우 (조문번호 앞에 법령명이 아닌 다른 텍스트가 있는 경우)
+    // 예: "수출통관 시 관세법 제38조" → 자연어
+    if (textWithoutArticle && !pureLawNamePattern.test(textWithoutArticle)) {
+      return {
+        type: 'natural',
+        confidence: 0.85,
+        reason: '조문 번호 + 추가 설명'
+      }
+    }
+
+    // 법령명이 없고 조문 번호만 있는 경우 → 구조화 검색 (예: "제38조")
     return {
-      type: 'natural',
+      type: 'structured',
       confidence: 0.9,
-      reason: '조문 번호 + 추가 텍스트 (자연어)'
+      reason: '조문 번호만 있음'
     }
   }
 

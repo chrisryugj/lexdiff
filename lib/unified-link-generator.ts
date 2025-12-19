@@ -589,6 +589,8 @@ export function linkifyRefsAI(escapedText: string): string {
 /**
  * Markdown 텍스트 내의 법령 참조를 Markdown 링크로 변환
  * 「법령명」 제N조 → [「법령명」 제N조](law://법령명/제N조)
+ * 「법령명」 별표 1 → [별표 1](annex://법령명/1)
+ * 「법령명」 별지 제2호서식 → [별지 제2호서식](annex://법령명/별지제2호서식)
  *
  * react-markdown에서 사용하기 위한 전처리 함수
  */
@@ -623,10 +625,83 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     }
   )
 
-  // 패턴 2: 「법령명」 단독 (조문 없이 법령명만)
+  // 패턴 2: 「법령명」 별표/별지 (명시적 법령명)
+  // 예: 「도로법 시행령」 별표3 → [별표3](annex://도로법 시행령/3)
+  //     「조례」 별표 1 → [별표 1](annex://조례/1)
+  //     「규칙」 별지 제2호서식 → [별지 제2호서식](annex://규칙/별지제2호서식)
+  result = result.replace(
+    /(?<!\[)「([^」]+)」\s+(별표|별지)\s*(\d+)?(?:의(\d+))?\s*(?:제\s*(\d+)\s*호\s*서식)?/g,
+    (match, lawName, type, num1, num2, formNum) => {
+      const encodedLaw = encodeURIComponent(lawName.trim())
+
+      let annexId: string
+      let displayText: string
+
+      if (type === '별표') {
+        // 별표: "별표 1", "별표 2의3"
+        annexId = num2 ? `${num1}의${num2}` : num1
+        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+      } else {
+        // 별지: "별지 제2호서식"
+        if (formNum) {
+          annexId = `별지제${formNum}호서식`
+          displayText = `별지 제${formNum}호서식`
+        } else {
+          annexId = num2 ? `별지${num1}의${num2}` : `별지${num1}`
+          displayText = num2 ? `별지 ${num1}의${num2}` : `별지 ${num1}`
+        }
+      }
+
+      return `[${displayText}](annex://${encodedLaw}/${encodeURIComponent(annexId)})`
+    }
+  )
+
+  // 패턴 3: 별표/별지 단독 (문맥 추론)
+  // "조례 별표1", "별표 1에 따르며" → 가장 가까운 「법령명」 찾기
+  result = result.replace(
+    /(?<!\[)(별표|별지)\s*(\d+)(?:의(\d+))?\s*(?:제\s*(\d+)\s*호\s*서식)?(?:\s*(?:에|을|를|과|와|의|이|가)\s*(?:따르|정하는|같다|해당|따른))?/g,
+    (match, type, num1, num2, formNum, offset) => {
+      // 이미 링크로 변환된 부분 제외 (「법령명」 패턴)
+      const beforeText = result.substring(Math.max(0, offset - 100), offset)
+      if (beforeText.includes('](annex://')) return match
+
+      // 가장 가까운 「법령명」 찾기 (뒤에서부터 검색)
+      const lawNamePattern = /「([^」]+)」/g
+      let lawName: string | undefined
+      let lastMatch: RegExpExecArray | null = null
+
+      while ((lastMatch = lawNamePattern.exec(beforeText)) !== null) {
+        lawName = lastMatch[1]
+      }
+
+      if (!lawName) return match // 법령명을 찾을 수 없으면 링크 안 걸기
+
+      const encodedLaw = encodeURIComponent(lawName.trim())
+
+      let annexId: string
+      let displayText: string
+
+      if (type === '별표') {
+        annexId = num2 ? `${num1}의${num2}` : num1
+        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+      } else {
+        if (formNum) {
+          annexId = `별지제${formNum}호서식`
+          displayText = `별지 제${formNum}호서식`
+        } else {
+          annexId = num2 ? `별지${num1}의${num2}` : `별지${num1}`
+          displayText = num2 ? `별지 ${num1}의${num2}` : `별지 ${num1}`
+        }
+      }
+
+      return `[${displayText}](annex://${encodedLaw}/${encodeURIComponent(annexId)})`
+    }
+  )
+
+  // 패턴 4: 「법령명」 단독 (조문 없이 법령명만)
   // 이미 링크로 변환된 부분은 제외
   result = result.replace(
-    /(?<!\[)「([^」]+)」(?!\s*제\s*\d)(?!\])/g,
+    /(?<!\[)「([^」]+)」(?!\s*(?:제\s*\d|별표|별지))(?!\])/g,
     (match, lawName) => {
       const encodedLaw = encodeURIComponent(lawName.trim())
       return `[「${lawName}」](law://${encodedLaw})`
