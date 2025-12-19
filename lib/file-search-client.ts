@@ -10,6 +10,8 @@ import type { FileSearchStore, FileMetadata } from '@google/genai'
 import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
 import { analyzeLegalQuery, type LegalQueryType } from './legal-query-analyzer'
 import { buildLegalPrompt } from './legal-prompt-builder'
+// ✅ 2-Tier AI 라우팅 시스템 (Phase 10)
+import { routeQuestion, summarizeRouting, type RoutingResult } from './ai-question-router'
 
 // 환경변수에서 Store ID 관리 (.env.local)
 const STORE_ID = process.env.GEMINI_FILE_SEARCH_STORE_ID || ''
@@ -229,8 +231,9 @@ export async function* queryFileSearchStream(
   options?: {
     metadataFilter?: string
     isRetry?: boolean  // Phase 2 P2: 재시도 방지 플래그
+    useAIRouter?: boolean  // Phase 10: AI 라우터 사용 여부 (기본: true)
   }
-): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string; finishReason?: string }> {
+): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string; finishReason?: string; routingInfo?: any }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is required')
@@ -245,35 +248,79 @@ export async function* queryFileSearchStream(
     throw new Error(`Invalid STORE_ID format: ${STORE_ID}. Must start with 'fileSearchStores/'`)
   }
 
-  // ✅ Phase 4 B4: 쿼리 전처리
-  const processed = await preprocessQuery(query)
-  const effectiveQuery = processed.processedQuery
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Phase 10: 2-Tier AI 라우팅 시스템
+  // Layer 1: AI Router (Gemini 2.5 Flash Lite) - 질문 분석 및 검색 최적화
+  // Layer 2: RAG (Gemini 2.5 Flash + File Search) - 전문 프롬프트로 답변
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  console.log('[File Search] Query preprocessing:', {
-    original: query,
-    processed: effectiveQuery,
-    type: processed.queryType,
-    laws: processed.extractedLaws,
-    articles: processed.extractedArticles,
-    confidence: processed.confidence
-  })
+  const useAIRouter = options?.useAIRouter !== false  // 기본값: true
+  let routingResult: RoutingResult | null = null
+  let effectiveQuery: string
+  let systemInstruction: string
+  let queryType: LegalQueryType
 
-  // ✅ Phase 8: 새로운 법률 질문 분류 시스템 (6가지 유형)
-  const legalAnalysis = analyzeLegalQuery(query)
+  if (useAIRouter) {
+    try {
+      // ✅ AI Router 호출 (Layer 1)
+      routingResult = await routeQuestion(query)
 
-  console.log('[File Search] Legal query analysis:', {
-    type: legalAnalysis.type,
-    confidence: legalAnalysis.confidence,
-    keywords: legalAnalysis.keywords,
-    laws: legalAnalysis.extractedLaws,
-    articles: legalAnalysis.extractedArticles
-  })
+      console.log('[File Search] 🤖 AI Routing complete:', summarizeRouting(routingResult))
 
-  // 새 프롬프트 빌더 사용
-  const systemInstruction = buildLegalPrompt(legalAnalysis.type)
+      // AI Router 결과 사용
+      effectiveQuery = routingResult.optimizedQuery
+      systemInstruction = routingResult.specialistPrompt
+      queryType = routingResult.legacyType
 
-  // ✅ Phase 6 C7: Metadata Filter 적용 (options 또는 전처리 결과 사용)
-  const effectiveMetadataFilter = options?.metadataFilter || processed.metadataFilter
+      console.log('[File Search] AI Router result:', {
+        primaryType: routingResult.analysis.primaryType,
+        domain: routingResult.analysis.domain,
+        searchKeywords: routingResult.searchOptimization.searchKeywords,
+        relatedTerms: routingResult.searchOptimization.relatedTerms.slice(0, 5),
+        strategy: routingResult.searchOptimization.strategy,
+        routingTimeMs: routingResult.routingTimeMs
+      })
+
+    } catch (error) {
+      console.warn('[File Search] ⚠️ AI Router failed, falling back to rule-based:', error)
+      routingResult = null
+    }
+  }
+
+  // Fallback: 기존 규칙 기반 분석
+  if (!routingResult) {
+    // ✅ Phase 4 B4: 쿼리 전처리 (기존 방식)
+    const processed = await preprocessQuery(query)
+    effectiveQuery = processed.processedQuery
+
+    console.log('[File Search] Query preprocessing (rule-based):', {
+      original: query,
+      processed: effectiveQuery,
+      type: processed.queryType,
+      laws: processed.extractedLaws,
+      articles: processed.extractedArticles,
+      confidence: processed.confidence
+    })
+
+    // ✅ Phase 8: 규칙 기반 법률 질문 분류 (6가지 유형)
+    const legalAnalysis = analyzeLegalQuery(query)
+
+    console.log('[File Search] Legal query analysis (rule-based):', {
+      type: legalAnalysis.type,
+      confidence: legalAnalysis.confidence,
+      keywords: legalAnalysis.keywords,
+      laws: legalAnalysis.extractedLaws,
+      articles: legalAnalysis.extractedArticles
+    })
+
+    // 기존 프롬프트 빌더 사용
+    systemInstruction = buildLegalPrompt(legalAnalysis.type)
+    queryType = legalAnalysis.type
+  }
+
+  // ✅ Phase 6 C7: Metadata Filter 적용
+  // (AI Router 사용 시 메타데이터 필터는 options에서만 받음)
+  const effectiveMetadataFilter = options?.metadataFilter
 
   if (effectiveMetadataFilter) {
     console.log('[File Search] Metadata Filter applied:', effectiveMetadataFilter)
@@ -683,7 +730,16 @@ export async function* queryFileSearchStream(
     done: true,
     citations,
     finishReason: lastFinishReason,
-    queryType: legalAnalysis.type  // ✅ 새로운 6가지 질문 유형
+    queryType,  // ✅ 질문 유형 (AI Router 또는 규칙 기반)
+    routingInfo: routingResult ? {
+      primaryType: routingResult.analysis.primaryType,
+      domain: routingResult.analysis.domain,
+      searchKeywords: routingResult.searchOptimization.searchKeywords,
+      routingTimeMs: routingResult.routingTimeMs,
+      useAIRouter: true
+    } : {
+      useAIRouter: false
+    }
   }
 }
 
