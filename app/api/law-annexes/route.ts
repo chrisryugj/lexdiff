@@ -46,8 +46,8 @@ interface AdminRuleAnnexRow {
   발령일자?: string
 }
 
-// 통합 API 응답 (licBylSearch 구조로 통일)
-// 일반 법령: licbyl[], 조례: ordinbyl[], 행정규칙: admbyl[]
+// 통합 API 응답
+// 일반 법령/조례: licBylSearch, 행정규칙: admRulBylSearch
 interface LicBylSearchResponse {
   licBylSearch?: {
     resultMsg?: string
@@ -58,6 +58,13 @@ interface LicBylSearchResponse {
     section?: string
     licbyl?: LawApiAnnexRow[]      // 일반 법령 별표
     ordinbyl?: OrdinanceAnnexRow[] // 조례 별표
+  }
+  admRulBylSearch?: {
+    키워드?: string
+    page?: string
+    target?: string
+    totalCnt?: string
+    section?: string
     admbyl?: AdminRuleAnnexRow[]   // 행정규칙 별표
   }
 }
@@ -90,11 +97,18 @@ function detectLawType(lawName: string): 'law' | 'ordinance' | 'admin' {
   }
 
   // 행정규칙 판별 (훈령, 예규, 고시, 지침 등)
-  if (/훈령|예규|고시|지침|규정|내규/.test(lawName)) {
+  // ⚠️ "규정"은 대통령령/총리령/부령일 수 있으므로 신중하게 판별
+  // "시행령", "시행규칙", "령"이 포함되면 일반 법령으로 처리
+  if (/(시행령|시행규칙|령)/.test(lawName)) {
+    return 'law'
+  }
+
+  // 행정규칙: 훈령, 예규, 고시, 지침, 내규만
+  if (/훈령|예규|고시|지침|내규/.test(lawName)) {
     return 'admin'
   }
 
-  // 일반 법령
+  // 일반 법령 (법, 령, 규칙, 규정 등)
   return 'law'
 }
 
@@ -179,9 +193,16 @@ export async function GET(request: Request) {
       throw new Error("JSON 파싱 실패")
     }
 
-    const searchResult = rawData.licBylSearch
+    // 행정규칙과 일반 법령/조례는 응답 구조가 다름
+    const searchResult = lawType === 'admin' ? rawData.admRulBylSearch : rawData.licBylSearch
+
     if (!searchResult) {
-      debugLogger.warn("별표 목록 응답에 licBylSearch가 없습니다", { text: text.substring(0, 500) })
+      debugLogger.warning("별표 목록 응답에 검색 결과가 없습니다", {
+        lawType,
+        hasLicBylSearch: !!rawData.licBylSearch,
+        hasAdmRulBylSearch: !!rawData.admRulBylSearch,
+        text: text.substring(0, 500)
+      })
       return NextResponse.json({
         success: true,
         totalCount: 0,
@@ -193,75 +214,93 @@ export async function GET(request: Request) {
     // HTML 태그 제거 함수
     const stripHtml = (str: string) => str?.replace(/<[^>]*>/g, '') || ''
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 법령 타입별 검색 결과 추출
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let annexes: LawAnnex[]
 
-    if (lawType === 'ordinance') {
-      // 조례/규칙 응답 처리 (licBylSearch.ordinbyl 배열)
-      const rows: OrdinanceAnnexRow[] = searchResult.ordinbyl || []
+    switch (lawType) {
+      case 'ordinance': {
+        // 🏛️ 조례/규칙 (자치법규)
+        // - API 응답: licBylSearch.ordinbyl[]
+        // - 특징: 지자체기관명 포함, PDF 링크 단일
+        const rows: OrdinanceAnnexRow[] = searchResult.ordinbyl || []
 
-      annexes = rows.map((row) => ({
-        annexId: row.별표일련번호 || "",
-        annexNumber: row.별표번호 || "",
-        annexName: row.별표명 || "",
-        annexKind: mapAnnexKind(row.별표종류),
-        lawName: stripHtml(row.관련자치법규명 || ""),
-        lawId: row.관련자치법규일련번호 || "",
-        fileLink: row.별표서식파일링크,
-        pdfLink: row.별표서식파일링크, // 조례는 PDF 링크가 동일
-        detailLink: row.별표자치법규상세링크,
-        promulgationDate: row.공포일자,
-        localGovernment: row.지자체기관명,
-      }))
+        annexes = rows.map((row) => ({
+          annexId: row.별표일련번호 || "",
+          annexNumber: row.별표번호 || "",
+          annexName: row.별표명 || "",
+          annexKind: mapAnnexKind(row.별표종류),
+          lawName: stripHtml(row.관련자치법규명 || ""),
+          lawId: row.관련자치법규일련번호 || "",
+          fileLink: row.별표서식파일링크,
+          pdfLink: row.별표서식파일링크,
+          detailLink: row.별표자치법규상세링크,
+          promulgationDate: row.공포일자,
+          localGovernment: row.지자체기관명,
+        }))
 
-      debugLogger.success("조례 별표 목록 조회 완료", {
-        query,
-        count: annexes.length,
-        total: searchResult.totalCnt,
-      })
-    } else if (lawType === 'admin') {
-      // 행정규칙 응답 처리 (licBylSearch.admbyl 배열)
-      const rows: AdminRuleAnnexRow[] = searchResult.admbyl || []
+        debugLogger.success("조례 별표 목록 조회 완료", {
+          query,
+          count: annexes.length,
+          total: searchResult.totalCnt,
+        })
+        break
+      }
 
-      annexes = rows.map((row) => ({
-        annexId: row.별표일련번호 || "",
-        annexNumber: row.별표번호 || "",
-        annexName: row.별표명 || "",
-        annexKind: mapAnnexKind(row.별표종류),
-        lawName: row.관련행정규칙명 || "",
-        lawId: row.관련행정규칙일련번호 || "",
-        fileLink: row.별표서식파일링크,
-        pdfLink: row.별표서식파일링크,
-        detailLink: row.별표행정규칙상세링크,
-        promulgationDate: row.발령일자,
-      }))
+      case 'admin': {
+        // 📋 행정규칙 (훈령, 예규, 고시, 지침, 내규)
+        // - API 응답: admRulBylSearch.admbyl[]
+        // - 특징: 소관부처 포함, 발령일자
+        const rows: AdminRuleAnnexRow[] = searchResult.admbyl || []
 
-      debugLogger.success("행정규칙 별표 목록 조회 완료", {
-        query,
-        count: annexes.length,
-        total: searchResult.totalCnt,
-      })
-    } else {
-      // 일반 법령 응답 처리 (licBylSearch.licbyl 배열)
-      const rows: LawApiAnnexRow[] = searchResult.licbyl || []
+        annexes = rows.map((row) => ({
+          annexId: row.별표일련번호 || "",
+          annexNumber: row.별표번호 || "",
+          annexName: row.별표명 || "",
+          annexKind: mapAnnexKind(row.별표종류),
+          lawName: row.관련행정규칙명 || "",
+          lawId: row.관련행정규칙일련번호 || "",
+          fileLink: row.별표서식파일링크,
+          pdfLink: row.별표서식파일링크,
+          detailLink: row.별표행정규칙상세링크,
+          promulgationDate: row.발령일자,
+        }))
 
-      annexes = rows.map((row) => ({
-        annexId: row.별표일련번호 || "",
-        annexNumber: row.별표번호 || "",
-        annexName: row.별표명 || "",
-        annexKind: mapAnnexKind(row.별표종류),
-        lawName: row.관련법령명 || "",
-        lawId: row.관련법령ID || "",
-        fileLink: row.별표서식파일링크,
-        pdfLink: row.별표서식PDF파일링크,
-        detailLink: row.별표법령상세링크,
-        promulgationDate: row.공포일자,
-      }))
+        debugLogger.success("행정규칙 별표 목록 조회 완료", {
+          query,
+          count: annexes.length,
+          total: searchResult.totalCnt,
+        })
+        break
+      }
 
-      debugLogger.success("별표 목록 조회 완료", {
-        query,
-        count: annexes.length,
-        total: searchResult.totalCnt,
-      })
+      default: {
+        // ⚖️ 일반 법령 (법률, 대통령령, 총리령, 부령 등)
+        // - API 응답: licBylSearch.licbyl[]
+        // - 특징: PDF 링크 별도, 공포일자
+        const rows: LawApiAnnexRow[] = searchResult.licbyl || []
+
+        annexes = rows.map((row) => ({
+          annexId: row.별표일련번호 || "",
+          annexNumber: row.별표번호 || "",
+          annexName: row.별표명 || "",
+          annexKind: mapAnnexKind(row.별표종류),
+          lawName: row.관련법령명 || "",
+          lawId: row.관련법령ID || "",
+          fileLink: row.별표서식파일링크,
+          pdfLink: row.별표서식PDF파일링크,
+          detailLink: row.별표법령상세링크,
+          promulgationDate: row.공포일자,
+        }))
+
+        debugLogger.success("일반 법령 별표 목록 조회 완료", {
+          query,
+          count: annexes.length,
+          total: searchResult.totalCnt,
+        })
+        break
+      }
     }
 
     return NextResponse.json({

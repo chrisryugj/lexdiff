@@ -660,9 +660,9 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
   // "조례 별표1", "별표 1에 따르며" → 가장 가까운 「법령명」 찾기
   result = result.replace(
     /(?<!\[)(별표|별지)\s*(\d+)(?:의(\d+))?\s*(?:제\s*(\d+)\s*호\s*서식)?(?:\s*(?:에|을|를|과|와|의|이|가)\s*(?:따르|정하는|같다|해당|따른))?/g,
-    (match, type, num1, num2, formNum, offset) => {
+    (match, type, num1, num2, formNum, offset, fullString) => {
       // 이미 링크로 변환된 부분 제외 (「법령명」 패턴)
-      const beforeText = result.substring(Math.max(0, offset - 100), offset)
+      const beforeText = fullString.substring(Math.max(0, offset - 150), offset)
       if (beforeText.includes('](annex://')) return match
 
       // 가장 가까운 「법령명」 찾기 (뒤에서부터 검색)

@@ -307,114 +307,101 @@ export function AnnexModal({
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-4xl max-w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:hidden">
-        {/* 헤더 */}
-        <div className="flex flex-row items-start justify-between p-4 sm:p-6 pb-2 sm:pb-4 border-b border-border bg-background shrink-0 gap-4">
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 pr-8">
-              {/* 뒤로가기 버튼 */}
-              {hasHistory && onBack && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 -ml-1 text-muted-foreground hover:text-foreground shrink-0"
-                  onClick={onBack}
-                  title="이전 별표로 돌아가기"
-                >
-                  <Icon name="arrow-left" className="w-4 h-4" />
-                </Button>
-              )}
-              <DialogTitle className="text-base font-bold text-primary flex items-center flex-wrap gap-1 break-keep leading-snug">
-                <span className="mr-1">{lawName} 별표 {annexNumber}</span>
-                {annexData?.annexName && (
-                  <span className="text-muted-foreground font-normal">
-                    ({annexData.annexName})
-                  </span>
-                )}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                {lawName} 별표 {annexNumber} 내용
-              </DialogDescription>
-            </div>
-
-            {/* 컨트롤 바 */}
-            <div className="flex items-center gap-2 flex-wrap mt-2 justify-end">
-              {/* 폰트 크기 조절 */}
-              <div className="flex items-center gap-1 bg-background/50 rounded-md border border-border/50 px-1 py-0.5 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={decreaseFontSize}
-                  title="글자 작게"
-                >
-                  <Icon name="minus" className="h-3 w-3" />
-                </Button>
-                <span className="text-xs w-8 text-center tabular-nums text-muted-foreground select-none">
-                  {fontSize}px
+        {/* 헤더 - 1줄 레이아웃 */}
+        <div className="flex items-center justify-between p-4 sm:p-6 pb-3 border-b border-border bg-background shrink-0 gap-3">
+          {/* 왼쪽: 뒤로가기 + 제목 */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {hasHistory && onBack && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 -ml-1 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={onBack}
+                title="이전 별표로 돌아가기"
+              >
+                <Icon name="arrow-left" className="w-4 h-4" />
+              </Button>
+            )}
+            <DialogTitle className="text-sm sm:text-base font-bold text-primary truncate">
+              {lawName} 별표 {annexNumber}
+              {annexData?.annexName && (
+                <span className="text-muted-foreground font-normal ml-1 hidden sm:inline">
+                  ({annexData.annexName})
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={increaseFontSize}
-                  title="글자 크게"
-                >
-                  <Icon name="plus" className="h-3 w-3" />
-                </Button>
-              </div>
-
-              {/* 기능 버튼들 */}
-              <div className="flex items-center gap-1 shrink-0">
-                {markdown && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs gap-1.5"
-                    onClick={copyToClipboard}
-                  >
-                    {copied ? (
-                      <>
-                        <Icon name="check" className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">복사됨</span>
-                      </>
-                    ) : (
-                      <>
-                        <Icon name="copy" className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">복사</span>
-                      </>
-                    )}
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownload}
-                  disabled={!annexData?.pdfLink}
-                  className="h-7 px-2 text-xs gap-1.5"
-                  title={fileType === "hwp" ? "HWP 다운로드" : "PDF 다운로드"}
-                >
-                  <Icon name="download" className="w-3 h-3" />
-                  <span className="hidden sm:inline">
-                    {fileType === "hwp" ? "HWP" : "PDF"}
-                  </span>
-                </Button>
-
-                {/* 법제처 원문 링크 */}
-                <Button variant="outline" size="sm" asChild className="h-7 gap-1 px-2">
-                  <a href={molegUrl} target="_blank" rel="noopener noreferrer">
-                    <Icon name="external-link" className="w-3 h-3" />
-                    <span className="hidden sm:inline">원문</span>
-                  </a>
-                </Button>
-              </div>
-            </div>
+              )}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {lawName} 별표 {annexNumber} 내용
+            </DialogDescription>
           </div>
 
-          {/* 닫기 버튼 (우측 상단 고정) */}
+          {/* 중앙: 컨트롤 버튼들 */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* 폰트 크기 조절 */}
+            <div className="hidden sm:flex items-center gap-1 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={decreaseFontSize}
+                title="글자 작게"
+              >
+                <Icon name="minus" className="h-3 w-3" />
+              </Button>
+              <span className="text-xs w-8 text-center tabular-nums text-muted-foreground select-none">
+                {fontSize}px
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={increaseFontSize}
+                title="글자 크게"
+              >
+                <Icon name="plus" className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {/* 기능 버튼들 */}
+            {markdown && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hidden sm:flex"
+                onClick={copyToClipboard}
+                title={copied ? "복사됨" : "복사"}
+              >
+                <Icon name={copied ? "check" : "copy"} className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDownload}
+              disabled={!annexData?.pdfLink}
+              className="h-7 w-7 hidden sm:flex"
+              title={fileType === "hwp" ? "HWP 다운로드" : "PDF 다운로드"}
+            >
+              <Icon name="download" className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="h-7 w-7 hidden sm:flex"
+              title="법제처 원문"
+            >
+              <a href={molegUrl} target="_blank" rel="noopener noreferrer">
+                <Icon name="external-link" className="w-3.5 h-3.5" />
+              </a>
+            </Button>
+          </div>
+
+          {/* 우측: 닫기 버튼 */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 -mt-1 -mr-2 text-muted-foreground hover:text-foreground shrink-0"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
             onClick={onClose}
           >
             <Icon name="x" className="h-5 w-5" />
