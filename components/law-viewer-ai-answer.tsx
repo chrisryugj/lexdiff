@@ -376,7 +376,7 @@ export function AIAnswerContent({
                     : localConfidence === 'medium'
                         ? 'text-yellow-500 dark:text-yellow-400'
                         : 'text-red-500 dark:text-red-400'
-                    } />
+                } />
                 <div className={`flex items-baseline gap-0.5 font-bold ${localConfidence === 'high'
                     ? 'text-blue-400 dark:text-blue-300'
                     : localConfidence === 'medium'
@@ -465,7 +465,7 @@ export function AIAnswerContent({
                             />
                         </div>
                     </div>
-                )}
+                )} { /* userQuery end */}
 
                 {/* 3줄: 모바일 전용 컨트롤 버튼들 (우측 정렬) */}
                 <div className="flex lg:hidden items-center justify-end gap-1">
@@ -535,7 +535,7 @@ export function AIAnswerContent({
                     <div className="py-8 space-y-3">
                         <div className="flex items-start gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                <Icon name="ai-brain-04" className="h-5 w-5 text-white" />
+                                <Icon name="brain" className="h-5 w-5 text-white" />
                             </div>
                             <div className="flex-1 space-y-2">
                                 <p className="font-medium text-sm">AI 법률 어시스턴트</p>
@@ -545,9 +545,9 @@ export function AIAnswerContent({
                                     {/* 1단계: 분석 */}
                                     <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 15 ? 'opacity-50' : 'opacity-100'}`}>
                                         {searchProgress >= 15 ? (
-                                            <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
                                         ) : (
-                                            <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                            <Icon name="file-search" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
                                         )}
                                         <span>질문을 분석하고 있습니다...</span>
                                     </div>
@@ -556,9 +556,9 @@ export function AIAnswerContent({
                                     {searchProgress >= 5 && (
                                         <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 30 ? 'opacity-50' : 'opacity-100'}`}>
                                             {searchProgress >= 30 ? (
-                                                <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
                                             ) : (
-                                                <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                                <Icon name="filter" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
                                             )}
                                             <span>검색어를 최적화하고 있습니다...</span>
                                         </div>
@@ -568,9 +568,9 @@ export function AIAnswerContent({
                                     {searchProgress >= 15 && (
                                         <div className={`flex items-center gap-2 transition-opacity ${searchProgress >= 50 ? 'opacity-50' : 'opacity-100'}`}>
                                             {searchProgress >= 50 ? (
-                                                <Icon name="checkmark-circle-02" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
                                             ) : (
-                                                <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                                <Icon name="database" className="h-4 w-4 animate-pulse text-primary flex-shrink-0" />
                                             )}
                                             <span>법령 데이터베이스를 검색하고 있습니다...</span>
                                         </div>
@@ -579,7 +579,11 @@ export function AIAnswerContent({
                                     {/* 4단계: 생성 */}
                                     {searchProgress >= 30 && (
                                         <div className="flex items-center gap-2">
-                                            <Icon name="loading-03" className="h-4 w-4 animate-spin flex-shrink-0" />
+                                            {searchProgress >= 90 ? (
+                                                <Icon name="check-circle" className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                                <Icon name="message-square" className="h-4 w-4 animate-bounce text-primary flex-shrink-0" />
+                                            )}
                                             <span className="animate-pulse">답변을 생성하고 있습니다...</span>
                                         </div>
                                     )}

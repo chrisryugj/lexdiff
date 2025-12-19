@@ -125,8 +125,10 @@ function markLawVisited(lawKey: string) {
 interface LegalMarkdownRendererProps {
   content: string
   onLawClick?: (lawName: string, article?: string) => void
+  disabledLink?: boolean
   className?: string
 }
+
 
 /**
  * 메인 렌더러 컴포넌트
@@ -134,8 +136,10 @@ interface LegalMarkdownRendererProps {
 export function LegalMarkdownRenderer({
   content,
   onLawClick,
+  disabledLink = false,
   className = ''
 }: LegalMarkdownRendererProps) {
+
   // 방문한 링크 상태 (클라이언트에서만)
   const [visitedLaws, setVisitedLaws] = useState<Set<string>>(new Set())
 
@@ -147,8 +151,10 @@ export function LegalMarkdownRenderer({
   // 1. 법령 링크 전처리 (「법령명」 제N조 → Markdown 링크)
   const linkedContent = useMemo(() => {
     if (!content) return ''
+    if (disabledLink) return content
     return linkifyMarkdownLegalRefs(content)
-  }, [content])
+  }, [content, disabledLink])
+
 
   return (
     <div className={`legal-markdown-content prose dark:prose-invert max-w-none ${className}`}>
@@ -208,6 +214,7 @@ export function LegalMarkdownRenderer({
 
               // 1. law:// 프로토콜
               if (href?.startsWith('law://')) {
+                if (disabledLink) return <>{children}</>
                 const path = href.replace('law://', '')
                 const parts = path.split('/')
                 lawName = decodeURIComponent(parts[0])
@@ -504,7 +511,7 @@ export function LegalMarkdownRenderer({
                 <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-2 rounded-r-md !ml-3 !mr-3 not-italic overflow-visible">
                   <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
                     {/* 조문 제목 Group */}
-                    <div className="text-muted-foreground font-medium text-sm break-words flex items-center gap-1.5 flex-wrap">
+                    <div className="text-[#a0a0a0] font-normal text-sm break-words flex items-center gap-1.5 flex-wrap">
                       {finalTitleNodes}
                       {isPartialQuote && (
                         <span
@@ -538,8 +545,8 @@ export function LegalMarkdownRenderer({
           // 테이블 (반응형) - 부모 fontSize 상속
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           table: ({ children }) => (
-            <div className="overflow-x-auto my-4 -mx-1">
-              <table className="min-w-full border-collapse" style={{ fontSize: 'inherit' }}>
+            <div className="overflow-x-auto my-4 mx-3">
+              <table className="min-w-full border-collapse [&_td:first-child]:whitespace-nowrap [&_td]:break-keep" style={{ fontSize: 'inherit' }}>
                 {children}
               </table>
             </div>
@@ -569,7 +576,7 @@ export function LegalMarkdownRenderer({
             const iconInfo = getSectionIcon(text)
 
             return (
-              <h2 className="text-base font-bold mt-0 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2">
+              <h2 className="text-base font-bold mt-3 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2">
                 {iconInfo && <Icon name={iconInfo.iconName} className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
                 {children}
               </h2>

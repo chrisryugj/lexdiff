@@ -600,7 +600,7 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
   // 패턴 1: 「법령명」 제N조, 제M조 (쉼표로 연결된 복수 조문)
   // 예: 「민법」 제390조, 제393조 → 각각 개별 링크
   result = result.replace(
-    /「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)((?:\s*,\s*제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)*)/g,
+    /(?<!\[)「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)((?:\s*,\s*제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)*)/g,
     (match, lawName, firstArticle, restArticles) => {
       const encodedLaw = encodeURIComponent(lawName.trim())
 

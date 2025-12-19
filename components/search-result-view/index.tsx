@@ -206,7 +206,7 @@ export function SearchResultView({
         abortController.abort()
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchId])
 
   // ============================================================
@@ -231,7 +231,11 @@ export function SearchResultView({
         onSearchClick={() => actions.setShowSearchModal(true)}
         onFocusModeToggle={() => actions.setIsFocusMode(!state.isFocusMode)}
         onHelpClick={() => setHelpSheetOpen(true)}
-        currentLawName={state.lawData?.meta?.lawTitle || state.searchQuery || undefined}
+        currentLawName={
+          state.isAiMode
+            ? (state.userQuery || state.searchQuery || "AI 답변")
+            : (state.lawData?.meta?.lawTitle || state.searchQuery || undefined)
+        }
         showBackButton={true}
         isFocusMode={state.isFocusMode}
         guideType={state.aiAnswerContent ? 'ai-search' : 'law-search'}
@@ -272,9 +276,9 @@ export function SearchResultView({
               articles={[]}
               selectedJo={undefined}
               viewMode="full"
-              onCompare={() => {}}
-              onSummarize={async () => {}}
-              onToggleFavorite={() => {}}
+              onCompare={() => { }}
+              onSummarize={async () => { }}
+              onToggleFavorite={() => { }}
               favorites={state.favorites}
               isOrdinance={false}
               aiAnswerMode={true}
