@@ -213,6 +213,7 @@ function markLawVisited(lawKey: string) {
 interface LegalMarkdownRendererProps {
   content: string
   onLawClick?: (lawName: string, article?: string) => void
+  onAnnexClick?: (annexNumber: string, lawName: string) => void
   disabledLink?: boolean
   className?: string
 }
@@ -224,6 +225,7 @@ interface LegalMarkdownRendererProps {
 export function LegalMarkdownRenderer({
   content,
   onLawClick,
+  onAnnexClick,
   disabledLink = false,
   className = ''
 }: LegalMarkdownRendererProps) {
@@ -304,26 +306,44 @@ export function LegalMarkdownRenderer({
           a: ({ href, children, node }) => {
             // 모든 링크 클릭 → onLawClick이 있으면 무조건 모달로 처리
             const handleAnyLinkClick = (e: React.MouseEvent) => {
-              if (!onLawClick) return // onLawClick 없으면 기본 동작
+              if (!onLawClick && !onAnnexClick) return // 핸들러 없으면 기본 동작
 
               e.preventDefault()
               e.stopPropagation()
 
               console.log('[LegalMarkdown] Link click:', { href })
 
+              // 1. annex:// 프로토콜 (별표)
+              if (href?.startsWith('annex://')) {
+                if (disabledLink) return
+                const path = href.replace('annex://', '')
+                const parts = decodeURIComponent(path).split('/')
+                const lawName = parts[0]
+                const annexNumber = parts[1]
+
+                console.log('[LegalMarkdown] Annex link click:', { lawName, annexNumber })
+
+                if (onAnnexClick && lawName && annexNumber) {
+                  onAnnexClick(annexNumber, lawName)
+                } else {
+                  console.warn('[LegalMarkdown] onAnnexClick not provided or invalid data')
+                }
+                return
+              }
+
               // href에서 법령 정보 추출 시도
               let lawName: string | undefined
               let article: string | undefined
 
-              // 1. law:// 프로토콜
+              // 2. law:// 프로토콜
               if (href?.startsWith('law://')) {
-                if (disabledLink) return <>{children}</>
+                if (disabledLink) return
                 const path = href.replace('law://', '')
                 const parts = path.split('/')
                 lawName = decodeURIComponent(parts[0])
                 article = parts[1] ? decodeURIComponent(parts[1]) : undefined
               }
-              // 2. law.go.kr URL
+              // 3. law.go.kr URL
               else if (href?.includes('law.go.kr')) {
                 const match = href.match(/law\.go\.kr\/(?:법령|lsSc|자치법규)\/([^/\s?#]+)(?:\/([^/\s?#]+))?/)
                 if (match) {
@@ -332,7 +352,7 @@ export function LegalMarkdownRenderer({
                 }
               }
 
-              // 3. 링크 텍스트에서 법령 패턴 추출 (href가 없거나 실패했을 때 보완)
+              // 4. 링크 텍스트에서 법령 패턴 추출 (href가 없거나 실패했을 때 보완)
               if (!lawName) {
                 // React children을 텍스트로 변환
                 const getTextFromChildren = (c: React.ReactNode): string => {
@@ -357,7 +377,7 @@ export function LegalMarkdownRenderer({
                 }
               }
 
-              if (lawName) {
+              if (lawName && onLawClick) {
                 // 방문 기록 저장
                 const lawKey = `${lawName}|${article || ''}`
                 markLawVisited(lawKey)
@@ -836,6 +856,7 @@ export function StreamingLegalMarkdownRenderer({
   content,
   isStreaming = false,
   onLawClick,
+  onAnnexClick,
   className = ''
 }: LegalMarkdownRendererProps & { isStreaming?: boolean }) {
   return (
@@ -843,6 +864,7 @@ export function StreamingLegalMarkdownRenderer({
       <LegalMarkdownRenderer
         content={content}
         onLawClick={onLawClick}
+        onAnnexClick={onAnnexClick}
         className={className}
       />
 

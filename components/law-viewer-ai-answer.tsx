@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
+import dynamic from 'next/dynamic'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -12,6 +13,12 @@ import { debugLogger } from '@/lib/debug-logger'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 
 import { AIAnswerLoading } from "@/components/ai-answer-loading"
+
+// Dynamic import for AnnexModal (별표 모달)
+const AnnexModal = dynamic(
+  () => import("@/components/annex-modal").then(m => m.AnnexModal),
+  { ssr: false }
+)
 
 interface AIAnswerSidebarProps {
     relatedArticles: ParsedRelatedLaw[]
@@ -321,6 +328,9 @@ interface AIAnswerContentProps {
     // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
     isStreaming?: boolean  // 스트리밍 중 여부
     searchProgress?: number  // 진행률 (0-100)
+
+    // ✅ 별표 모달 (신규)
+    currentLawName?: string  // 현재 법령명 (AI 답변의 컨텍스트)
 }
 
 
@@ -339,10 +349,41 @@ export function AIAnswerContent({
     onRefresh,
     isStreaming = false,
     searchProgress = 0,
+    currentLawName,
 }: AIAnswerContentProps) {
     // ✅ ChatGPT 스타일 어절 단위 타이핑 효과
     const [displayedContent, setDisplayedContent] = useState('')
     const [isTyping, setIsTyping] = useState(false)
+
+    // ✅ 별표 모달 상태
+    const [annexModal, setAnnexModal] = useState<{
+        open: boolean
+        annexNumber: string
+        lawName: string
+    }>({
+        open: false,
+        annexNumber: '',
+        lawName: '',
+    })
+
+    // ✅ 별표 모달 열기 핸들러
+    const handleAnnexClick = (annexNumber: string, lawName: string) => {
+        debugLogger.info('🔗 [AI답변] 별표 링크 클릭', { annexNumber, lawName })
+        setAnnexModal({
+            open: true,
+            annexNumber,
+            lawName,
+        })
+    }
+
+    // ✅ 별표 모달 닫기
+    const closeAnnexModal = () => {
+        setAnnexModal({
+            open: false,
+            annexNumber: '',
+            lawName: '',
+        })
+    }
 
     useEffect(() => {
         if (!isStreaming && aiAnswerContent) {
@@ -618,6 +659,7 @@ export function AIAnswerContent({
                         <LegalMarkdownRenderer
                             content={displayedContent}
                             onLawClick={onLawClick}
+                            onAnnexClick={handleAnnexClick}
                         />
                         {/* 타이핑 중 커서 표시 */}
                         {isTyping && (
@@ -634,6 +676,21 @@ export function AIAnswerContent({
                     </div>
                 )}
             </div>
+
+            {/* ✅ 별표 모달 */}
+            <AnnexModal
+                isOpen={annexModal.open}
+                onClose={closeAnnexModal}
+                annexNumber={annexModal.annexNumber}
+                lawName={annexModal.lawName}
+                onLawClick={(lawName, article) => {
+                    // 별표 모달 내에서 법령 링크 클릭 시
+                    closeAnnexModal()
+                    if (article && onLawClick) {
+                        onLawClick(lawName, article)
+                    }
+                }}
+            />
         </>
     )
 }
