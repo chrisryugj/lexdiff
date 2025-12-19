@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Loader2 } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface RagSearchInputProps {
   onSearch: (query: string) => void
@@ -34,12 +34,12 @@ export function RagSearchInput({ onSearch, isLoading }: RagSearchInputProps) {
         <Button type="submit" disabled={isLoading || !query.trim()}>
           {isLoading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Icon name="loader" className="w-4 h-4 mr-2 animate-spin" />
               검색 중
             </>
           ) : (
             <>
-              <Search className="w-4 h-4 mr-2" />
+              <Icon name="search" className="w-4 h-4 mr-2" />
               검색
             </>
           )}

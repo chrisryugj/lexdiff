@@ -149,6 +149,51 @@ async function searchLawNames(query: string): Promise<Array<{ name: string; cate
   }
 }
 
+// 자치법규(조례/규칙) 검색
+async function searchOrdinances(query: string): Promise<Array<{ name: string; category: string }>> {
+  if (!OC || query.length < 2) return []
+
+  try {
+    // 자치법규 API: target=ordin
+    const url = `${LAW_API_BASE}?OC=${OC}&target=ordin&type=XML&query=${encodeURIComponent(query)}&display=10`
+    const response = await fetch(url, {
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(3000)
+    })
+
+    if (!response.ok) return []
+
+    const xml = await response.text()
+    const results: Array<{ name: string; category: string }> = []
+
+    // 자치법규 XML 구조: <자치법규명>...</자치법규명>
+    const nameRegex = /<자치법규명>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/자치법규명>/g
+    const typeRegex = /<자치법규분류>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/자치법규분류>/g
+
+    const names: string[] = []
+    const types: string[] = []
+
+    let match
+    while ((match = nameRegex.exec(xml)) !== null) {
+      names.push(match[1].trim())
+    }
+    while ((match = typeRegex.exec(xml)) !== null) {
+      types.push(match[1].trim())
+    }
+
+    for (let i = 0; i < names.length; i++) {
+      results.push({
+        name: names[i],
+        category: types[i] || '조례'
+      })
+    }
+
+    return results
+  } catch {
+    return []
+  }
+}
+
 // 일반적인 질문 패턴 생성
 function generateAiQuestions(keyword: string): string[] {
   const postposition = getPostposition(keyword)
@@ -180,11 +225,19 @@ export async function GET(request: NextRequest) {
 
   const suggestions: Suggestion[] = []
 
-  // 1. 법제처 API에서 법령명 검색 (2글자 이상)
+  // 1. 법제처 API에서 법령명 + 조례 검색 (2글자 이상, 병렬 호출)
   if (query.length >= 2) {
-    const lawResults = await searchLawNames(query)
+    // 조례 키워드 감지
+    const isOrdinanceQuery = /조례|규칙|자치법규|시|군|구/.test(query)
+
+    // 병렬 검색: 법령 + 조례 (조례 키워드 있으면 조례도 검색)
+    const [lawResults, ordinanceResults] = await Promise.all([
+      searchLawNames(query),
+      isOrdinanceQuery ? searchOrdinances(query) : Promise.resolve([])
+    ])
+
+    // 법령 결과 추가
     for (const law of lawResults) {
-      // 시작 위치에 따른 점수 (앞에서 매칭될수록 높은 점수)
       const matchIndex = law.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
       const score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
@@ -193,6 +246,20 @@ export async function GET(request: NextRequest) {
         text: law.name,
         type: 'law',
         category: law.category,
+        score
+      })
+    }
+
+    // 조례 결과 추가
+    for (const ordin of ordinanceResults) {
+      const matchIndex = ordin.name.toLowerCase().indexOf(queryLower)
+      const startsWithQuery = ordin.name.toLowerCase().startsWith(queryLower)
+      const score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수
+
+      suggestions.push({
+        text: ordin.name,
+        type: 'law',  // UI에서는 법령과 동일하게 표시
+        category: ordin.category,
         score
       })
     }

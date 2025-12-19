@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertCircle, ChevronRight } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
 import type { LawArticle } from "@/lib/law-types"
@@ -34,7 +34,7 @@ export function ArticleNotFoundBanner({
   return (
     <Card className="p-4 border-orange-500/50 bg-muted/80 mb-4">
       <div className="flex items-start gap-3">
-        <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+        <Icon name="alert-circle" className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
         <div className="flex-1 space-y-3">
           <div>
             <h3 className="font-semibold text-foreground">
@@ -67,7 +67,7 @@ export function ArticleNotFoundBanner({
                         ({article.title.substring(0, 15)}{article.title.length > 15 ? '...' : ''})
                       </span>
                     )}
-                    <ChevronRight className="h-3 w-3 ml-1" />
+                    <Icon name="chevron-right" className="h-3 w-3 ml-1" />
                   </Button>
                 ))}
               </div>
@@ -94,7 +94,7 @@ export function ArticleNotFoundBanner({
                     <div className="flex-1">
                       <div className="font-medium text-foreground">{suggestion.lawTitle} {requestedDisplay}</div>
                     </div>
-                    <ChevronRight className="h-4 w-4 ml-2 flex-shrink-0" />
+                    <Icon name="chevron-right" className="h-4 w-4 ml-2 flex-shrink-0" />
                   </Button>
                 ))}
               </div>

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Settings, Star, RotateCcw } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import Link from 'next/link'
 import {
   ChatContainer,
@@ -309,7 +309,7 @@ export default function TestChatPage() {
         <div className="flex items-center gap-3">
           <Link href="/">
             <Button variant="ghost" size="icon" className="rounded-full">
-              <ArrowLeft className="w-5 h-5" />
+              <Icon name="arrow-left" className="w-5 h-5" />
             </Button>
           </Link>
           <div>
@@ -328,14 +328,14 @@ export default function TestChatPage() {
             className="rounded-full"
             title="대화 초기화"
           >
-            <RotateCcw className="w-4 h-4" />
+            <Icon name="rotate-ccw" className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="icon" className="rounded-full">
-            <Star className="w-4 h-4" />
+            <Icon name="star" className="w-4 h-4" />
           </Button>
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="rounded-full">
-            <Settings className="w-4 h-4" />
+            <Icon name="settings" className="w-4 h-4" />
           </Button>
         </div>
       </header>

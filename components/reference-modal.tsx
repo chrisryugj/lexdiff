@@ -5,7 +5,7 @@ import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, ExternalLink, ArrowLeft, Loader2 } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 
 interface ReferenceModalProps {
@@ -132,7 +132,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   className="p-1 h-7 w-7 flex-shrink-0"
                   title="이전 법령으로"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <Icon name="arrow-left" className="w-4 h-4" />
                 </Button>
               )}
               <DialogTitle className="text-base font-bold truncate text-primary">
@@ -164,7 +164,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   className="p-1 h-6 w-6"
                   title="글자 작게"
                 >
-                  <ZoomOut className="w-3.5 h-3.5" />
+                  <Icon name="zoom-out" className="w-3.5 h-3.5" />
                 </Button>
                 <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums hidden sm:inline">{fontSize}</span>
                 <Button
@@ -175,7 +175,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   className="p-1 h-6 w-6"
                   title="글자 크게"
                 >
-                  <ZoomIn className="w-3.5 h-3.5" />
+                  <Icon name="zoom-in" className="w-3.5 h-3.5" />
                 </Button>
               </div>
 
@@ -195,7 +195,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   className="h-7 gap-1 px-2"
                 >
                   <a href={molegUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-3 h-3" />
+                    <Icon name="external-link" className="w-3 h-3" />
                     <span className="text-xs hidden sm:inline">원문</span>
                   </a>
                 </Button>
@@ -212,7 +212,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         </DialogHeader>
         {loading ? (
           <div className="flex flex-col items-center justify-center h-[40vh] gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Icon name="loader" className="w-8 h-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">법령 조문을 불러오는 중...</p>
           </div>
         ) : showOriginal && canShowOriginal ? (

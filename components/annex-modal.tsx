@@ -5,20 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  ZoomIn,
-  ZoomOut,
-  ExternalLink,
-  ArrowLeft,
-  Loader2,
-  Download,
-  FileText,
-  FileImage,
-  AlertCircle,
-  RefreshCw,
-  Copy,
-  Check,
-} from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import type { LawAnnex } from "@/lib/law-types"
 import { getAnnexCache, setAnnexCache } from "@/lib/annex-cache"
@@ -335,7 +322,7 @@ export function AnnexModal({
                   className="p-1 h-7 w-7 flex-shrink-0"
                   title="이전으로"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <Icon name="arrow-left" className="w-4 h-4" />
                 </Button>
               )}
               <DialogTitle className="text-base font-bold truncate text-primary">
@@ -362,7 +349,7 @@ export function AnnexModal({
                   className="p-1 h-6 w-6"
                   title="글자 작게"
                 >
-                  <ZoomOut className="w-3.5 h-3.5" />
+                  <Icon name="zoom-out" className="w-3.5 h-3.5" />
                 </Button>
                 <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums hidden sm:inline">
                   {fontSize}
@@ -375,7 +362,7 @@ export function AnnexModal({
                   className="p-1 h-6 w-6"
                   title="글자 크게"
                 >
-                  <ZoomIn className="w-3.5 h-3.5" />
+                  <Icon name="zoom-in" className="w-3.5 h-3.5" />
                 </Button>
               </div>
 
@@ -390,12 +377,12 @@ export function AnnexModal({
                 >
                   {copied ? (
                     <>
-                      <Check className="w-3.5 h-3.5" />
+                      <Icon name="check" className="w-3.5 h-3.5" />
                       <span className="text-xs hidden sm:inline">복사됨</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5" />
+                      <Icon name="copy" className="w-3.5 h-3.5" />
                       <span className="text-xs hidden sm:inline">복사</span>
                     </>
                   )}
@@ -411,7 +398,7 @@ export function AnnexModal({
                 className="h-7 gap-1 px-2"
                 title={fileType === "hwp" ? "HWP 다운로드" : "PDF 다운로드"}
               >
-                <Download className="w-3 h-3" />
+                <Icon name="download" className="w-3 h-3" />
                 <span className="text-xs hidden sm:inline">
                   {fileType === "hwp" ? "HWP" : "PDF"}
                 </span>
@@ -420,7 +407,7 @@ export function AnnexModal({
               {/* 법제처 원문 링크 */}
               <Button variant="outline" size="sm" asChild className="h-7 gap-1 px-2">
                 <a href={molegUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-3 h-3" />
+                  <Icon name="external-link" className="w-3 h-3" />
                   <span className="text-xs hidden sm:inline">원문</span>
                 </a>
               </Button>
@@ -430,21 +417,21 @@ export function AnnexModal({
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-[50vh] gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Icon name="loader" className="w-8 h-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">{getLoadingMessage()}</p>
           </div>
         ) : loadingState === "error" ? (
           <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
-            <AlertCircle className="w-12 h-12 text-destructive/60" />
+            <Icon name="alert-circle" className="w-12 h-12 text-destructive/60" />
             <p className="text-sm text-destructive text-center whitespace-pre-line">{error}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={fetchAnnexData}>
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <Icon name="refresh-cw" className="w-4 h-4 mr-2" />
                 다시 시도
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <a href={molegUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
+                  <Icon name="external-link" className="w-4 h-4 mr-2" />
                   법제처에서 보기
                 </a>
               </Button>
@@ -455,7 +442,7 @@ export function AnnexModal({
           <div className="flex flex-col items-center justify-center py-8 gap-4 px-4">
             {/* HWP 아이콘 */}
             <div className="relative">
-              <FileText className="w-16 h-16 text-blue-500/70" strokeWidth={1.5} />
+              <Icon name="file-text" className="w-16 h-16 text-blue-500/70" strokeWidth={1.5} />
               <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                 HWP
               </span>
@@ -478,13 +465,13 @@ export function AnnexModal({
             <div className="flex gap-3 flex-wrap justify-center">
               <Button asChild className="gap-2">
                 <a href={`https://www.law.go.kr/LSW/flDownload.do?flSeq=${extractFlSeq(annexData?.pdfLink || "")}`} target="_blank" rel="noopener noreferrer">
-                  <Download className="w-4 h-4" />
+                  <Icon name="download" className="w-4 h-4" />
                   다운로드
                 </a>
               </Button>
               <Button variant="outline" asChild className="gap-2">
                 <a href={molegUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4" />
+                  <Icon name="external-link" className="w-4 h-4" />
                   법제처에서 보기
                 </a>
               </Button>
@@ -509,7 +496,7 @@ export function AnnexModal({
         ) : (
           // 마크다운 없으면 원문 안내
           <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
-            <FileImage className="w-16 h-16 text-muted-foreground/60" />
+            <Icon name="file-image" className="w-16 h-16 text-muted-foreground/60" />
             <div className="text-center">
               <p className="text-lg font-medium mb-1">
                 {annexData?.annexName || `별표 ${annexNumber}`}
@@ -527,12 +514,12 @@ export function AnnexModal({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <Icon name="external-link" className="w-4 h-4" />
                       새 탭에서 보기
                     </a>
                   </Button>
                   <Button variant="outline" onClick={handleDownload} className="gap-2">
-                    <Download className="w-4 h-4" />
+                    <Icon name="download" className="w-4 h-4" />
                     다운로드
                   </Button>
                 </>

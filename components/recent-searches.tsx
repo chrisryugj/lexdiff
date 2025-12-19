@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, X } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -95,7 +95,7 @@ export function RecentSearches({
     <Card className="p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
+          <Icon name="clock" className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">최근 검색</h3>
           <Badge variant="secondary" className="text-xs">
             {searches.length}
@@ -119,7 +119,7 @@ export function RecentSearches({
               {search.article && <span className="ml-2 text-muted-foreground">{search.article}</span>}
             </button>
             <Button variant="ghost" size="sm" onClick={() => removeSearch(search.id)} className="h-6 w-6 p-0">
-              <X className="h-3 w-3" />
+              <Icon name="x" className="h-3 w-3" />
             </Button>
           </div>
         ))}

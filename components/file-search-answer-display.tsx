@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, BookOpen, ExternalLink, Scale, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import { CopyButton } from '@/components/ui/copy-button'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
@@ -90,7 +90,7 @@ function CollapsibleBlockquote({
           onClick={toggleExpanded}
           className="!text-sm !font-semibold !mt-2 !mb-0.5 text-cyan-300 cursor-pointer hover:text-cyan-200 transition-colors flex items-center gap-1"
         >
-          {isExpanded ? <ChevronUp className="w-4 h-4 inline" /> : <ChevronDown className="w-4 h-4 inline" />}
+          {isExpanded ? <Icon name="chevron-up" className="w-4 h-4 inline" /> : <Icon name="chevron-down" className="w-4 h-4 inline" />}
           {title}
         </h3>
         {isExpanded && (
@@ -411,9 +411,9 @@ export function FileSearchAnswerDisplay({
                 📜 관련 조문 (원문)
               </span>
               {isExpanded ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <Icon name="chevron-up" className="h-4 w-4 text-gray-400" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <Icon name="chevron-down" className="h-4 w-4 text-gray-400" />
               )}
             </div>
             {isExpanded && (
@@ -568,7 +568,7 @@ export function FileSearchAnswerDisplay({
       {/* 질문 표시 - 다크테마 */}
       <Card className="p-3 sm:p-4 bg-gray-950 border-gray-800">
         <div className="flex items-start gap-3">
-          <BookOpen className="w-5 h-5 text-cyan-400 mt-0.5" />
+          <Icon name="book-open" className="w-5 h-5 text-cyan-400 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-400 mb-1">질문</p>
             <p className="text-base text-white">{query}</p>
@@ -587,7 +587,7 @@ export function FileSearchAnswerDisplay({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm text-gray-300">
               <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Icon name="loader" className="w-4 h-4 animate-spin" />
                 AI 법령 검색 중...
               </span>
               <span className="text-cyan-400 font-medium">{Math.round(progress)}%</span>
@@ -614,7 +614,7 @@ export function FileSearchAnswerDisplay({
               {/* 신뢰도 표시 - 실제 인용이 있을 때만 표시 */}
               {citations.length > 0 && (
                 <div className="flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-700 rounded">
-                  <Scale className="w-3 h-3 text-green-400" />
+                  <Icon name="scale" className="w-3 h-3 text-green-400" />
                   <span className="text-xs text-green-400">법령 기반</span>
                 </div>
               )}
@@ -627,7 +627,7 @@ export function FileSearchAnswerDisplay({
                 className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="글자 작게"
               >
-                <ZoomOut className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Icon name="zoom-out" className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
               <span className="text-xs text-gray-400 min-w-[24px] sm:min-w-[30px] text-center">{fontSize}</span>
               <Button
@@ -638,7 +638,7 @@ export function FileSearchAnswerDisplay({
                 className="p-1 h-6 w-6 sm:h-7 sm:w-7"
                 title="글자 크게"
               >
-                <ZoomIn className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Icon name="zoom-in" className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
               {/* 복사 버튼 */}
               <CopyButton

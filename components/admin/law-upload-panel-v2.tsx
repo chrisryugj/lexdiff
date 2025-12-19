@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Upload, Pause, Play, XCircle, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface ParsedLawFile {
   fileName: string
@@ -378,9 +378,9 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 shadow-sm">
                 {paused ? (
-                  <Pause className="h-5 w-5 text-warning" />
+                  <Icon name="pause" className="h-5 w-5 text-warning" />
                 ) : (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  <Icon name="loader" className="h-5 w-5 text-primary animate-spin" />
                 )}
               </div>
               <div>
@@ -503,25 +503,25 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
           {/* Upload Control Buttons */}
           {uploading && !paused && (
             <Button onClick={pauseUpload} variant="outline" size="default" className="gap-2 border-warning/30 text-warning hover:bg-warning/10">
-              <Pause className="w-4 h-4" />
+              <Icon name="pause" className="w-4 h-4" />
               일시중지
             </Button>
           )}
           {uploading && paused && (
             <Button onClick={resumeUpload} size="default" className="gap-2 shadow-lg shadow-accent/20 bg-accent hover:bg-accent/90">
-              <Play className="w-4 h-4" />
+              <Icon name="play" className="w-4 h-4" />
               재개
             </Button>
           )}
           {uploading && (
             <Button onClick={cancelUpload} variant="outline" size="default" className="gap-2 border-warning/30 text-warning hover:bg-warning/10">
-              <XCircle className="w-4 h-4" />
+              <Icon name="x-circle" className="w-4 h-4" />
               강제중지
             </Button>
           )}
           {!uploading && (
             <Button onClick={startUpload} disabled={selectedCount === 0} className="gap-2 shadow-lg shadow-primary/20" size="default">
-              <Upload className="w-4 h-4" />
+              <Icon name="upload" className="w-4 h-4" />
               업로드
             </Button>
           )}
@@ -571,17 +571,17 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
                   {result && (
                     <div className="ml-3">
                       {result.status === 'success' ? (
-                        <CheckCircle2 className="w-4 h-4 text-accent" />
+                        <Icon name="check-circle-2" className="w-4 h-4 text-accent" />
                       ) : (
                         <div className="flex items-center gap-2">
-                          <XCircle className="w-4 h-4 text-warning" />
+                          <Icon name="x-circle" className="w-4 h-4 text-warning" />
                           <span className="text-xs text-warning">{result.error}</span>
                         </div>
                       )}
                     </div>
                   )}
                   {uploading && currentIndex > 0 && parsedLaws.indexOf(law) === currentIndex - 1 && (
-                    <Loader2 className="w-4 h-4 ml-3 text-primary animate-spin" />
+                    <Icon name="loader" className="w-4 h-4 ml-3 text-primary animate-spin" />
                   )}
                 </label>
               )
@@ -594,7 +594,7 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
           <div className="space-y-2 max-h-[600px] overflow-y-auto">
             {uploadedLaws.map((law) => (
               <div key={law.fileName} className="flex items-center p-3 rounded-xl bg-accent/10 border border-accent/20 opacity-75">
-                <CheckCircle2 className="w-4 h-4 text-accent mr-3" />
+                <Icon name="check-circle-2" className="w-4 h-4 text-accent mr-3" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-foreground truncate">{law.lawName}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
@@ -609,7 +609,7 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
 
       {parsedLaws.length === 0 && !loading && (
         <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <Icon name="alert-circle" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">저장된 법령이 없습니다</p>
           <p className="text-sm text-muted-foreground/70 mt-1">먼저 &quot;파싱&quot; 탭에서 법령을 다운로드하세요</p>
         </div>

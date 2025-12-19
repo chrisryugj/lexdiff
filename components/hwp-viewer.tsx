@@ -1,7 +1,7 @@
 "use client"
 
-import { Download, ExternalLink, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 
 interface HwpViewerProps {
   /** HWP 파일 URL (프록시 경로, 예: /api/annex-pdf?flSeq=xxx) */
@@ -44,7 +44,7 @@ export function HwpViewer({
     <div className="flex flex-col items-center justify-center w-full h-[50vh] gap-5 px-4">
       {/* HWP 아이콘 */}
       <div className="relative">
-        <FileText className="w-20 h-20 text-blue-500/70" strokeWidth={1.5} />
+        <Icon name="file-text" className="w-20 h-20 text-blue-500/70" strokeWidth={1.5} />
         <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
           HWP
         </span>
@@ -67,7 +67,7 @@ export function HwpViewer({
         {lawGoKrUrl && (
           <Button asChild className="gap-2">
             <a href={lawGoKrUrl} target="_blank" rel="noopener noreferrer">
-              <Download className="w-4 h-4" />
+              <Icon name="download" className="w-4 h-4" />
               다운로드
             </a>
           </Button>
@@ -75,7 +75,7 @@ export function HwpViewer({
         {externalUrl && (
           <Button variant="outline" asChild className="gap-2">
             <a href={externalUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="w-4 h-4" />
+              <Icon name="external-link" className="w-4 h-4" />
               법제처에서 보기
             </a>
           </Button>

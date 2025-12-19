@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Search, Loader2, Clock, Scale, Building2, Brain, HelpCircle, Sparkles } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -314,18 +314,18 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
             )}
             title={forceAiMode ? "기본 검색으로 전환" : "AI 검색으로 전환"}
           >
-            <Brain className={cn("h-5 w-5", forceAiMode && "animate-pulse")} />
+            <Icon name="brain" className={cn("h-5 w-5", forceAiMode && "animate-pulse")} />
           </Button>
 
           <div className="relative flex-1">
             {isAiMode ? (
-              <Brain className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
+              <Icon name="brain" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
             ) : searchType === "ordinance" ? (
-              <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+              <Icon name="building-2" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
             ) : searchType === "law" ? (
-              <Scale className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
+              <Icon name="scale" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
             ) : (
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Icon name="search" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             )}
             <Input
               ref={inputRef}
@@ -361,7 +361,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                   {/* 로딩 표시 */}
                   {isLoadingSuggestions && query.trim() && (
                     <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Icon name="loader" className="h-3 w-3 animate-spin" />
                       <span>검색 중...</span>
                     </div>
                   )}
@@ -370,7 +370,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                   {recentSearches.length > 0 && (
                     <>
                       <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <Clock className="h-3 w-3" />
+                        <Icon name="clock" className="h-3 w-3" />
                         <span>최근 검색</span>
                       </div>
                       {recentSearches.map((search, index) => (
@@ -383,7 +383,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                             selectedIndex === index ? "bg-accent" : "hover:bg-secondary"
                           )}
                         >
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                           <span className="truncate">{search}</span>
                         </button>
                       ))}
@@ -397,7 +397,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                   {suggestions.filter(s => s.type === 'law').length > 0 && (
                     <>
                       <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <Scale className="h-3 w-3 text-amber-500" />
+                        <Icon name="scale" className="h-3 w-3 text-amber-500" />
                         <span>법령</span>
                       </div>
                       {suggestions
@@ -416,7 +416,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                                 selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
                               )}
                             >
-                              <Scale className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                              <Icon name="scale" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
                               <span className="truncate">{suggestion.text}</span>
                             </button>
                           )
@@ -431,7 +431,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                         <div className="border-t border-border my-1.5" />
                       )}
                       <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <Sparkles className="h-3 w-3 text-purple-500" />
+                        <Icon name="sparkles" className="h-3 w-3 text-purple-500" />
                         <span>AI 질문</span>
                       </div>
                       {suggestions
@@ -451,7 +451,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                                 selectedIndex === globalIndex ? "bg-purple-50 dark:bg-purple-950/30" : "hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
                               )}
                             >
-                              <Brain className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                              <Icon name="brain" className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
                               <span className="truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
                             </button>
                           )
@@ -497,13 +497,13 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
           >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Icon name="loader" className="mr-2 h-4 w-4 animate-spin" />
                 <span className="hidden sm:inline">{isAiMode ? 'AI 검색 중' : '검색 중'}</span>
                 <span className="sm:hidden">검색</span>
               </>
             ) : (
               <>
-                {isAiMode && <Brain className="mr-2 h-4 w-4" />}
+                {isAiMode && <Icon name="brain" className="mr-2 h-4 w-4" />}
                 <span className="hidden sm:inline">{isAiMode ? 'AI 검색' : '검색'}</span>
                 <span className="sm:hidden">검색</span>
               </>
@@ -517,7 +517,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-blue-500" />
+              <Icon name="help-circle" className="h-5 w-5 text-blue-500" />
               검색 방법을 선택하세요
             </DialogTitle>
             <DialogDescription className="pt-2">
@@ -532,7 +532,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
               variant="outline"
               className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/20"
             >
-              <Scale className="h-8 w-8 text-amber-500" />
+              <Icon name="scale" className="h-8 w-8 text-amber-500" />
               <div className="text-center">
                 <div className="font-semibold">법령 검색</div>
                 <div className="text-xs text-muted-foreground mt-1">
@@ -545,7 +545,7 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
               variant="outline"
               className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20"
             >
-              <Brain className="h-8 w-8 text-purple-500" />
+              <Icon name="brain" className="h-8 w-8 text-purple-500" />
               <div className="text-center">
                 <div className="font-semibold">AI 검색</div>
                 <div className="text-xs text-muted-foreground mt-1">

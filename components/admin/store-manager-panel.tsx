@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, CheckCircle2, XCircle, AlertCircle, FileText, DollarSign, Database, Eye, EyeOff, Filter, Search, Trash2 } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface StoreDocument {
   id: string
@@ -460,11 +460,11 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
         <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-primary" />
+              <Icon name="database" className="h-5 w-5 text-primary" />
               <h3 className="font-medium text-foreground">현재 Store</h3>
             </div>
             <Button onClick={() => setShowStoreId(!showStoreId)} size="sm" variant="outline">
-              {showStoreId ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showStoreId ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -498,7 +498,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
       <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-muted-foreground" />
+            <Icon name="file-text" className="h-5 w-5 text-muted-foreground" />
             <h3 className="font-medium text-foreground">모든 Stores</h3>
           </div>
           <div className="flex gap-2">
@@ -510,7 +510,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
               {showStoreList ? '숨기기' : '보기'}
             </Button>
             <Button onClick={loadAllStores} disabled={loadingStores} size="sm" variant="outline">
-              {loadingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : '새로고침'}
+              {loadingStores ? <Icon name="loader" className="h-4 w-4 animate-spin" /> : '새로고침'}
             </Button>
           </div>
         </div>
@@ -519,14 +519,14 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
           <div className="space-y-2">
             {loadingStores && (
               <div className="p-8 text-center">
-                <Loader2 className="h-8 w-8 text-muted-foreground mx-auto mb-3 animate-spin" />
+                <Icon name="loader" className="h-8 w-8 text-muted-foreground mx-auto mb-3 animate-spin" />
                 <p className="text-muted-foreground">로딩 중...</p>
               </div>
             )}
 
             {!loadingStores && allStores.length === 0 && (
               <div className="p-8 text-center">
-                <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <Icon name="alert-circle" className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">Store가 없습니다</p>
               </div>
             )}
@@ -596,7 +596,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                   >
                     {switchingStore ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Icon name="loader" className="h-4 w-4 mr-2 animate-spin" />
                         전환 중...
                       </>
                     ) : (
@@ -614,7 +614,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
       {costEstimate && (
         <div className="p-4 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent border border-accent/20 rounded-xl backdrop-blur-sm shadow-sm">
           <div className="flex items-center gap-2 mb-3">
-            <DollarSign className="h-5 w-5 text-accent" />
+            <Icon name="dollar-sign" className="h-5 w-5 text-accent" />
             <h3 className="font-medium text-foreground">비용 추정</h3>
           </div>
 
@@ -669,7 +669,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
           >
             {creatingStore ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Icon name="loader" className="h-4 w-4 mr-2 animate-spin" />
                 생성 중...
               </>
             ) : (
@@ -704,7 +704,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
             >
               {isLoadingDocuments ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Icon name="loader" className="h-4 w-4 mr-2 animate-spin" />
                   조회 중...
                 </>
               ) : (
@@ -719,7 +719,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
           <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1">
-                <AlertCircle className="h-4 w-4 text-warning" />
+                <Icon name="alert-circle" className="h-4 w-4 text-warning" />
                 <div className="text-xs text-warning">
                   <strong>조회 진행 중</strong> - 다른 탭으로 이동하면 자동으로 취소됩니다
                 </div>
@@ -730,7 +730,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                 variant="outline"
                 className="border-warning/50 text-warning hover:bg-warning/20 ml-3"
               >
-                <XCircle className="h-3 w-3 mr-1" />
+                <Icon name="x-circle" className="h-3 w-3 mr-1" />
                 조회 취소
               </Button>
             </div>
@@ -751,7 +751,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
           {/* Filter Controls */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Icon name="filter" className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">필터:</span>
             </div>
             <div className="flex gap-2">
@@ -784,7 +784,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
 
           {/* Search */}
           <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
+            <Icon name="search" className="h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="문서명으로 검색..."
@@ -823,12 +823,12 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
             >
               {isDeletingBatch ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Icon name="loader" className="h-4 w-4 mr-2 animate-spin" />
                   삭제 중...
                 </>
               ) : (
                 <>
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Icon name="trash" className="h-4 w-4 mr-2" />
                   선택 항목 삭제 ({selectedDocIds.size})
                 </>
               )}
@@ -840,7 +840,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
       {error && (
         <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
+            <Icon name="alert-circle" className="h-5 w-5 text-warning mt-0.5" />
             <div className="flex-1">
               <p className="text-warning">{error}</p>
               <p className="text-xs text-muted-foreground mt-2">
@@ -855,14 +855,14 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
       <div className="space-y-2">
         {loading && (
           <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
+            <Icon name="loader" className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
             <p className="text-muted-foreground">로딩 중...</p>
           </div>
         )}
 
         {!loading && documents.length === 0 && !error && (
           <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <Icon name="alert-circle" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">File Search Store에 문서가 없습니다</p>
             <p className="text-sm text-muted-foreground/70 mt-1">법령을 업로드하면 여기에 표시됩니다</p>
           </div>
@@ -923,7 +923,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
                     >
                       {doc.state === 'STATE_ACTIVE' ? (
                         <span className="flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
+                          <Icon name="check-circle-2" className="h-3 w-3" />
                           활성
                         </span>
                       ) : (
@@ -947,7 +947,7 @@ export function StoreManagerPanel({ onRefresh, onTabLeave }: StoreManagerPanelPr
 
         {!loading && documents.length > 0 && filteredDocuments.length === 0 && (
           <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <Icon name="alert-circle" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">필터 조건에 맞는 문서가 없습니다</p>
             <p className="text-sm text-muted-foreground/70 mt-1">다른 필터를 선택하거나 검색어를 변경해보세요</p>
           </div>

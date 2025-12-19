@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Upload, CheckCircle, XCircle } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface ParsedLawFile {
   fileName: string
@@ -342,12 +342,12 @@ export function BatchLawUploadPanel({ onUploadComplete }: BatchLawUploadPanelPro
           >
             {uploading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Icon name="loader" className="w-4 h-4 animate-spin" />
                 업로드 중... ({currentBatch}/{totalBatches})
               </>
             ) : (
               <>
-                <Upload className="w-4 h-4" />
+                <Icon name="upload" className="w-4 h-4" />
                 배치 업로드
               </>
             )}
@@ -374,11 +374,11 @@ export function BatchLawUploadPanel({ onUploadComplete }: BatchLawUploadPanelPro
           <h3 className="font-medium text-white mb-2">업로드 결과</h3>
           <div className="flex gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400" />
+              <Icon name="check-circle" className="w-4 h-4 text-green-400" />
               <span className="text-green-400">성공: {successCount}</span>
             </div>
             <div className="flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-red-400" />
+              <Icon name="x-circle" className="w-4 h-4 text-red-400" />
               <span className="text-red-400">실패: {errorCount}</span>
             </div>
           </div>
@@ -421,10 +421,10 @@ export function BatchLawUploadPanel({ onUploadComplete }: BatchLawUploadPanelPro
                     {result && (
                       <div className="ml-3">
                         {result.status === 'success' ? (
-                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          <Icon name="check-circle" className="w-4 h-4 text-green-400" />
                         ) : (
                           <div className="flex items-center gap-2">
-                            <XCircle className="w-4 h-4 text-red-400" />
+                            <Icon name="x-circle" className="w-4 h-4 text-red-400" />
                             <span className="text-xs text-red-400">{result.error}</span>
                           </div>
                         )}
@@ -447,7 +447,7 @@ export function BatchLawUploadPanel({ onUploadComplete }: BatchLawUploadPanelPro
                   key={law.fileName}
                   className="flex items-center p-3 rounded-lg bg-green-900/20 border border-green-700"
                 >
-                  <CheckCircle className="w-4 h-4 text-green-400 mr-3" />
+                  <Icon name="check-circle" className="w-4 h-4 text-green-400 mr-3" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white truncate">{law.lawName}</div>
                     <div className="text-xs text-gray-500 mt-0.5">

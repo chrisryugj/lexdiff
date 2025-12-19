@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ChevronDown, ChevronUp, History } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { RevisionHistoryItem } from "@/lib/law-types"
 
 interface RevisionHistoryProps {
@@ -85,17 +85,13 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <Icon name="history" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="font-medium text-sm leading-none">개정 이력</span>
             <span className="text-sm font-medium px-2.5 py-1 rounded-md bg-muted text-muted-foreground leading-none inline-flex items-center">
               {history.length}건
             </span>
           </div>
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
+          <Icon name={isExpanded ? "chevron-up" : "chevron-down"} className="h-4 w-4 text-muted-foreground" />
         </button>
 
         {/* 트리형 이력 목록 */}
@@ -159,7 +155,7 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
                   onClick={() => setShowAllHistory(true)}
                   className="mt-2 ml-3 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <ChevronDown className="h-3 w-3 mr-1" />
+                  <Icon name="chevron-down" className="h-3 w-3 mr-1" />
                   {sortedHistory.length - 10}건 더보기
                 </Button>
               )}
@@ -170,7 +166,7 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
                   onClick={() => setShowAllHistory(false)}
                   className="mt-2 ml-3 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <ChevronUp className="h-3 w-3 mr-1" />
+                  <Icon name="chevron-up" className="h-3 w-3 mr-1" />
                   접기
                 </Button>
               )}

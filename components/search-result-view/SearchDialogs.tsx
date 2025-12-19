@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { HelpCircle, Scale, Brain, AlertCircle, X } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { SearchQuery } from "./types"
 
 // ============================================================
@@ -40,7 +40,7 @@ export const SearchChoiceDialog = memo(function SearchChoiceDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-blue-500" />
+            <Icon name="help-circle" className="h-5 w-5 text-blue-500" />
             검색 방법을 선택하세요
           </DialogTitle>
           <DialogDescription className="pt-2">
@@ -55,7 +55,7 @@ export const SearchChoiceDialog = memo(function SearchChoiceDialog({
             variant="outline"
             className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all"
           >
-            <Scale className="h-8 w-8 text-amber-500" />
+            <Icon name="scale" className="h-8 w-8 text-amber-500" />
             <div className="text-center">
               <div className="font-semibold text-foreground">법령 검색</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -68,7 +68,7 @@ export const SearchChoiceDialog = memo(function SearchChoiceDialog({
             variant="outline"
             className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
           >
-            <Brain className="h-8 w-8 text-purple-500" />
+            <Icon name="brain" className="h-8 w-8 text-purple-500" />
             <div className="text-center">
               <div className="font-semibold text-foreground">AI 검색</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -107,7 +107,7 @@ export const NoResultDialog = memo(function NoResultDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <Icon name="alert-circle" className="h-5 w-5 text-amber-500" />
             법령을 찾을 수 없습니다
           </DialogTitle>
           <DialogDescription className="pt-2">
@@ -126,7 +126,7 @@ export const NoResultDialog = memo(function NoResultDialog({
             variant="outline"
             className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-gray-500/10 hover:border-gray-500/50 transition-all"
           >
-            <X className="h-8 w-8 text-gray-500" />
+            <Icon name="x" className="h-8 w-8 text-gray-500" />
             <div className="text-center">
               <div className="font-semibold text-foreground">취소</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -139,7 +139,7 @@ export const NoResultDialog = memo(function NoResultDialog({
             variant="outline"
             className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
           >
-            <Brain className="h-8 w-8 text-purple-500" />
+            <Icon name="brain" className="h-8 w-8 text-purple-500" />
             <div className="text-center">
               <div className="font-semibold text-foreground">AI 검색</div>
               <div className="text-xs text-muted-foreground mt-1">

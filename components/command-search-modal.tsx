@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Clock, Star, X, ArrowRight } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import { Input } from "@/components/ui/input"
@@ -107,7 +107,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         {/* 검색 입력 영역 - 강조된 스타일 */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-            <Search className="h-5 w-5 text-primary" />
+            <Icon name="search" className="h-5 w-5 text-primary" />
           </div>
           <Input
             ref={inputRef}
@@ -131,7 +131,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             {recentSearches.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="clock" className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-muted-foreground">최근 검색</h3>
                 </div>
                 <div className="space-y-1">
@@ -142,7 +142,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                       className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left group border border-transparent hover:border-border"
                     >
                       <span className="text-sm text-foreground">{query}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all" />
+                      <Icon name="arrow-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all" />
                     </button>
                   ))}
                 </div>
@@ -153,7 +153,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             {favorites.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                  <Icon name="star" className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                   <h3 className="text-sm font-semibold text-muted-foreground">즐겨찾기</h3>
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {favorites.length}
@@ -170,7 +170,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                         <div className="text-sm font-medium truncate text-foreground">{fav.lawTitle}</div>
                         <div className="text-xs text-muted-foreground">{formatJO(fav.jo)}</div>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0 ml-2" />
+                      <Icon name="arrow-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0 ml-2" />
                     </button>
                   ))}
                 </div>
@@ -181,7 +181,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             {recentSearches.length === 0 && favorites.length === 0 && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                  <Search className="h-8 w-8 text-muted-foreground" />
+                  <Icon name="search" className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <p className="text-sm text-foreground font-medium">법령명을 입력하여 검색하세요</p>
                 <p className="text-xs mt-1 text-muted-foreground">예: 민법, 형법 제38조</p>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Star, Trash2, AlertCircle, Calendar } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
@@ -92,7 +92,7 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
           title="즐겨찾기 펼치기"
           onClick={() => setIsExpanded(true)}
         >
-          <Star className="h-4 w-4 text-[var(--color-warning)] fill-[var(--color-warning)]" />
+          <Icon name="star" className="h-4 w-4 text-[var(--color-warning)] fill-[var(--color-warning)]" />
           <h3 className="text-sm font-semibold text-foreground">즐겨찾기</h3>
           <Badge variant="secondary" className="text-xs">
             {favorites.length}
@@ -136,14 +136,14 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
                       )}
                       {favorite.hasChanges && (
                         <Badge variant="destructive" className="text-xs">
-                          <AlertCircle className="h-3 w-3 mr-1" />
+                          <Icon name="alert-circle" className="h-3 w-3 mr-1" />
                           변경됨
                         </Badge>
                       )}
                     </div>
                     {favorite.notes && <p className="text-xs text-muted-foreground truncate">{favorite.notes}</p>}
                     <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
+                      <Icon name="calendar" className="h-3 w-3" />
                       <span>추가: {formatDateTime(favorite.createdAt)}</span>
                     </div>
                   </div>
@@ -153,7 +153,7 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
                     onClick={(e) => handleRemove(favorite.id, e)}
                     className="h-6 w-6 p-0 shrink-0"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Icon name="trash" className="h-3 w-3" />
                   </Button>
                 </div>
               ))}

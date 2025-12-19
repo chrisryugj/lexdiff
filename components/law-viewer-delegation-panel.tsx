@@ -576,7 +576,7 @@ export function DelegationPanel({
                                                                 <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <Icon name="rotate-cw" size={12} />
+                                                                <Icon name="rotate-clockwise" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
                                                                 <Icon name="zoom-in" size={14} />
@@ -682,7 +682,7 @@ export function DelegationPanel({
                                                                 <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <Icon name="rotate-cw" size={12} />
+                                                                <Icon name="rotate-clockwise" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
                                                                 <Icon name="zoom-in" size={14} />
@@ -813,7 +813,7 @@ export function DelegationPanel({
                                                                 <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <Icon name="rotate-cw" size={12} />
+                                                                <Icon name="rotate-clockwise" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
                                                                 <Icon name="zoom-in" size={14} />
@@ -865,7 +865,7 @@ export function DelegationPanel({
                                                                 <Icon name="zoom-out" size={14} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                                                                <Icon name="rotate-cw" size={12} />
+                                                                <Icon name="rotate-clockwise" size={12} />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
                                                                 <Icon name="zoom-in" size={14} />

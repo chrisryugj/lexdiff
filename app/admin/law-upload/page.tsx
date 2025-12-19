@@ -6,8 +6,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Scale, Database, Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Home, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Icon } from '@/components/ui/icon'
 import Link from 'next/link'
 import { LawParserPanel } from '@/components/admin/law-parser-panel'
 import { BatchLawParserPanel } from '@/components/admin/batch-law-parser-panel'
@@ -111,7 +111,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/20">
-                <Scale className="h-7 w-7 text-primary-foreground" />
+                <Icon name="scale" className="h-7 w-7 text-primary-foreground" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: 'GiantsInline, sans-serif' }}>
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
               <div className="h-12 w-px bg-border" />
               <Link href="/">
                 <Button variant="ghost" size="sm" className="gap-2">
-                  <Home className="h-4 w-4" />
+                  <Icon name="home" className="h-4 w-4" />
                   홈으로
                 </Button>
               </Link>
@@ -144,10 +144,10 @@ export default function AdminDashboard() {
         <div className="mb-8">
           <nav className="flex gap-2 p-1.5 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-xl">
             {[
-              { id: 'collection' as Tab, label: '데이터 수집', icon: Download },
-              { id: 'processing' as Tab, label: '데이터 처리', icon: Upload },
-              { id: 'management' as Tab, label: '관리', icon: Database },
-              { id: 'statistics' as Tab, label: '통계', icon: BarChart3 }
+              { id: 'collection' as Tab, label: '데이터 수집', icon: 'download' },
+              { id: 'processing' as Tab, label: '데이터 처리', icon: 'upload' },
+              { id: 'management' as Tab, label: '관리', icon: 'database' },
+              { id: 'statistics' as Tab, label: '통계', icon: 'bar-chart' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
-                <tab.icon className="h-5 w-5" />
+                <Icon name={tab.icon} className="h-5 w-5" />
                 {tab.label}
               </button>
             ))}
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
           <aside className="col-span-3 space-y-3">
             <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-lg">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                <FileText className="h-4 w-4" />
+                <Icon name="file-text" className="h-4 w-4" />
                 {activeTab === 'collection' && '다운로드 소스'}
                 {activeTab === 'processing' && '처리 작업'}
                 {activeTab === 'management' && '관리 도구'}

@@ -35,6 +35,7 @@ import {
   RefreshIcon,
   RotateLeft01Icon,
   RotateRight01Icon,
+  RotateClockwiseIcon,
   ZoomInAreaIcon,
   ZoomOutAreaIcon,
   Maximize01Icon,
@@ -148,6 +149,18 @@ import {
 
   // Home
   Home01Icon,
+
+  // Users & Bots
+  UserIcon,
+  BotIcon,
+  ChatBotIcon,
+
+  // Shapes
+  SquareIcon,
+  CircleIcon,
+
+  // Additional Edit
+  Edit02Icon,
 } from '@hugeicons/core-free-icons'
 
 /**
@@ -189,6 +202,7 @@ export const ICON_REGISTRY = {
   'refresh-cw': RefreshIcon,
   'rotate-ccw': RotateLeft01Icon,
   'rotate-cw': RotateRight01Icon,
+  'rotate-clockwise': RotateClockwiseIcon,
   'zoom-in': ZoomInAreaIcon,
   'zoom-out': ZoomOutAreaIcon,
   'maximize': Maximize01Icon,
@@ -310,6 +324,18 @@ export const ICON_REGISTRY = {
 
   // Home
   'home': Home01Icon,
+
+  // Users & Bots
+  'user': UserIcon,
+  'bot': BotIcon,
+  'chat-bot': ChatBotIcon,
+
+  // Shapes
+  'square': SquareIcon,
+  'circle': CircleIcon,
+
+  // Additional Edit variants
+  'edit-3': Edit02Icon,
 } as const
 
 export type IconName = keyof typeof ICON_REGISTRY
@@ -424,4 +450,19 @@ export const LUCIDE_TO_ICON_NAME: Record<string, IconName> = {
   'CircleHelp': 'circle-help',
   'RefreshCcw': 'refresh',
   'RotateCw': 'refresh',
+  // Users & Bots
+  'User': 'user',
+  'Bot': 'bot',
+  // Shapes
+  'Square': 'square',
+  'Circle': 'circle',
+  // Edit variants
+  'Edit3': 'edit-3',
+  // Icons with Icon suffix
+  'CheckIcon': 'check',
+  'ChevronDownIcon': 'chevron-down',
+  'ChevronUpIcon': 'chevron-up',
+  // Arrow variants
+  'ArrowUp': 'arrow-up',
+  'ArrowDown': 'arrow-down',
 }

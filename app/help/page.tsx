@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, Keyboard, Star, GitCompare, Link2, Smartphone, MessageSquare, FileText, Quote, Zap, Lightbulb, CheckCircle, XCircle, BookOpen, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Icon } from '@/components/ui/icon'
 import { cn } from '@/lib/utils'
 
 type TabType = 'law-search' | 'ai-search'
@@ -44,10 +44,10 @@ export default function HelpPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="shrink-0" onClick={handleBack}>
-              <ArrowLeft className="h-5 w-5" />
+              <Icon name="arrow-left" className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <HelpCircle className="h-6 w-6 text-blue-500" />
+              <Icon name="help-circle" className="h-6 w-6 text-blue-500" />
               <h1 className="text-xl font-bold">LexDiff 사용 가이드</h1>
             </div>
           </div>
@@ -61,14 +61,14 @@ export default function HelpPage() {
             <TabButton
               active={activeTab === 'law-search'}
               onClick={() => handleTabChange('law-search')}
-              icon={<BookOpen className="h-4 w-4" />}
+              icon={<Icon name="book-open" className="h-4 w-4" />}
             >
               법령 검색
             </TabButton>
             <TabButton
               active={activeTab === 'ai-search'}
               onClick={() => handleTabChange('ai-search')}
-              icon={<MessageSquare className="h-4 w-4" />}
+              icon={<Icon name="message-square" className="h-4 w-4" />}
             >
               AI 검색
             </TabButton>
@@ -131,7 +131,7 @@ function LawSearchGuide() {
 
       {/* 검색 방법 */}
       <Section
-        icon={<Search className="h-5 w-5 text-blue-500" />}
+        icon={<Icon name="search" className="h-5 w-5 text-blue-500" />}
         title="검색 방법"
       >
         <div className="space-y-6">
@@ -179,7 +179,7 @@ function LawSearchGuide() {
 
       {/* 조문 탐색 */}
       <Section
-        icon={<Keyboard className="h-5 w-5 text-green-500" />}
+        icon={<Icon name="keyboard" className="h-5 w-5 text-green-500" />}
         title="조문 탐색"
       >
         <div className="space-y-6">
@@ -189,7 +189,7 @@ function LawSearchGuide() {
             </p>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Icon name="star" className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 <span className="text-muted-foreground">즐겨찾기된 조문</span>
               </div>
             </div>
@@ -208,7 +208,7 @@ function LawSearchGuide() {
 
           <SubSection title="스와이프 (모바일)">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Smartphone className="h-4 w-4" />
+              <Icon name="smartphone" className="h-4 w-4" />
               <p>모바일에서는 좌우로 스와이프하여 이전/다음 조문으로 이동할 수 있습니다.</p>
             </div>
           </SubSection>
@@ -217,14 +217,14 @@ function LawSearchGuide() {
 
       {/* 즐겨찾기 */}
       <Section
-        icon={<Star className="h-5 w-5 text-yellow-500" />}
+        icon={<Icon name="star" className="h-5 w-5 text-yellow-500" />}
         title="즐겨찾기"
       >
         <p className="text-muted-foreground mb-4">
           자주 찾는 조문을 저장해두세요.
         </p>
         <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-          <li>조문 보기 화면에서 <Star className="h-4 w-4 inline text-yellow-500" /> 아이콘 클릭</li>
+          <li>조문 보기 화면에서 <Icon name="star" className="h-4 w-4 inline text-yellow-500" /> 아이콘 클릭</li>
           <li>홈 화면 또는 검색 모달(<kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Ctrl+K</kbd>)에서 빠르게 접근</li>
           <li>즐겨찾기 관리: 우측 상단 별 아이콘</li>
         </ol>
@@ -232,7 +232,7 @@ function LawSearchGuide() {
 
       {/* 비교 기능 */}
       <Section
-        icon={<GitCompare className="h-5 w-5 text-purple-500" />}
+        icon={<Icon name="git-compare" className="h-5 w-5 text-purple-500" />}
         title="비교 기능"
       >
         <div className="space-y-6">
@@ -258,7 +258,7 @@ function LawSearchGuide() {
 
       {/* 3단 비교 */}
       <Section
-        icon={<FileText className="h-5 w-5 text-cyan-500" />}
+        icon={<Icon name="file-text" className="h-5 w-5 text-cyan-500" />}
         title="3단 비교"
       >
         <p className="text-muted-foreground mb-4">
@@ -276,7 +276,7 @@ function LawSearchGuide() {
 
       {/* 참조 법령 */}
       <Section
-        icon={<Link2 className="h-5 w-5 text-cyan-500" />}
+        icon={<Icon name="link" className="h-5 w-5 text-cyan-500" />}
         title="참조 법령"
       >
         <p className="text-muted-foreground mb-3">
@@ -291,7 +291,7 @@ function LawSearchGuide() {
 
       {/* 단축키 */}
       <Section
-        icon={<Keyboard className="h-5 w-5 text-gray-500" />}
+        icon={<Icon name="keyboard" className="h-5 w-5 text-gray-500" />}
         title="단축키"
       >
         <div className="overflow-x-auto">
@@ -345,7 +345,7 @@ function AISearchGuide() {
 
       {/* 질문 방법 */}
       <Section
-        icon={<MessageSquare className="h-5 w-5 text-violet-500" />}
+        icon={<Icon name="message-square" className="h-5 w-5 text-violet-500" />}
         title="질문 방법"
       >
         <div className="space-y-6">
@@ -357,7 +357,7 @@ function AISearchGuide() {
             <div className="space-y-4">
               <div>
                 <h5 className="text-sm font-medium mb-2 text-green-500 flex items-center gap-1">
-                  <CheckCircle className="h-4 w-4" />
+                  <Icon name="check-circle" className="h-4 w-4" />
                   좋은 질문 예시
                 </h5>
                 <ExampleBox>
@@ -375,7 +375,7 @@ function AISearchGuide() {
 
               <div>
                 <h5 className="text-sm font-medium mb-2 text-blue-500 flex items-center gap-1">
-                  <Lightbulb className="h-4 w-4" />
+                  <Icon name="lightbulb" className="h-4 w-4" />
                   더 좋은 질문 (법령명 포함)
                 </h5>
                 <ExampleBox>
@@ -397,7 +397,7 @@ function AISearchGuide() {
 
       {/* 답변 이해하기 */}
       <Section
-        icon={<FileText className="h-5 w-5 text-blue-500" />}
+        icon={<Icon name="file-text" className="h-5 w-5 text-blue-500" />}
         title="답변 이해하기"
       >
         <p className="text-muted-foreground mb-4">
@@ -431,7 +431,7 @@ function AISearchGuide() {
 
       {/* 인용 출처 확인 */}
       <Section
-        icon={<Quote className="h-5 w-5 text-green-500" />}
+        icon={<Icon name="quote" className="h-5 w-5 text-green-500" />}
         title="인용 출처 확인"
       >
         <div className="space-y-6">
@@ -452,29 +452,29 @@ function AISearchGuide() {
 
       {/* 검색 팁 */}
       <Section
-        icon={<Zap className="h-5 w-5 text-yellow-500" />}
+        icon={<Icon name="zap" className="h-5 w-5 text-yellow-500" />}
         title="검색 팁"
       >
         <SubSection title="더 정확한 답변을 받으려면">
           <div className="space-y-4">
             <TipItem number={1} title="법령명을 포함하세요">
               <div className="flex items-center gap-2 text-sm">
-                <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                <Icon name="x-circle" className="h-4 w-4 text-red-500 shrink-0" />
                 <span className="text-muted-foreground">&quot;연차휴가 요건&quot;</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                <Icon name="check-circle" className="h-4 w-4 text-green-500 shrink-0" />
                 <span className="text-muted-foreground">&quot;근로기준법에서 연차휴가 요건&quot;</span>
               </div>
             </TipItem>
 
             <TipItem number={2} title="구체적으로 질문하세요">
               <div className="flex items-center gap-2 text-sm">
-                <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                <Icon name="x-circle" className="h-4 w-4 text-red-500 shrink-0" />
                 <span className="text-muted-foreground">&quot;세금 관련&quot;</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                <Icon name="check-circle" className="h-4 w-4 text-green-500 shrink-0" />
                 <span className="text-muted-foreground">&quot;법인세법에서 과세표준 계산 방법&quot;</span>
               </div>
             </TipItem>
@@ -493,7 +493,7 @@ function AISearchGuide() {
 
       {/* 질문 예시 */}
       <Section
-        icon={<Lightbulb className="h-5 w-5 text-amber-500" />}
+        icon={<Icon name="lightbulb" className="h-5 w-5 text-amber-500" />}
         title="질문 예시"
       >
         <div className="grid gap-6 sm:grid-cols-2">

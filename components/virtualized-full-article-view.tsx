@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { BookmarkCheck, AlertCircle, Star, Copy, Check } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { LawArticle } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
 import { formatJO } from "@/lib/law-parser"
@@ -332,7 +332,8 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                           <span className="text-muted-foreground truncate">({item.article.title})</span>
                         )}
                         {activeJo === item.article.jo && (
-                          <BookmarkCheck
+                          <Icon
+                            name="bookmark-check"
                             className="h-4 w-4 lg:h-5 lg:w-5 text-primary flex-shrink-0"
                             title="현재 선택된 조문"
                           />
@@ -350,7 +351,8 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                           }}
                           title={favorites.has(item.article.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                         >
-                          <Star
+                          <Icon
+                            name="star"
                             className={`h-4 w-4 ${
                               favorites.has(item.article.jo)
                                 ? "fill-yellow-400 text-yellow-400"
@@ -370,9 +372,9 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                           title="조문 복사"
                         >
                           {copiedJo === item.article.jo ? (
-                            <Check className="h-4 w-4 text-green-500" />
+                            <Icon name="check" className="h-4 w-4 text-green-500" />
                           ) : (
-                            <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            <Icon name="copy" className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                           )}
                         </Button>
                       </div>
@@ -395,7 +397,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   {item.article.hasChanges && (
                     <div className="mt-6 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
+                        <Icon name="alert-circle" className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
                         <div>
                           <p className="font-semibold text-foreground">변경된 조문</p>
                           <p className="text-sm text-muted-foreground mt-1">

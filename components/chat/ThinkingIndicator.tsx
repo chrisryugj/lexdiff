@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Brain, Sparkles, Search, Edit3, Check, Circle, Loader2 } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import type { AIStage } from './types'
 
 interface ThinkingIndicatorProps {
@@ -10,10 +10,10 @@ interface ThinkingIndicatorProps {
 }
 
 const STAGES = [
-  { key: 'analyzing', label: '질문 분석', icon: Brain },
-  { key: 'optimizing', label: '검색 최적화', icon: Sparkles },
-  { key: 'searching', label: '법령 검색', icon: Search },
-  { key: 'streaming', label: '답변 생성', icon: Edit3 },
+  { key: 'analyzing', label: '질문 분석', icon: 'brain' },
+  { key: 'optimizing', label: '검색 최적화', icon: 'sparkles' },
+  { key: 'searching', label: '법령 검색', icon: 'search' },
+  { key: 'streaming', label: '답변 생성', icon: 'edit-3' },
 ] as const
 
 export function ThinkingIndicator({ stage, className }: ThinkingIndicatorProps) {
@@ -21,11 +21,10 @@ export function ThinkingIndicator({ stage, className }: ThinkingIndicatorProps) 
 
   return (
     <div className={cn("flex items-center gap-4", className)}>
-      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+      <Icon name="loader" className="w-4 h-4 animate-spin text-primary" />
 
       <div className="flex items-center gap-3">
         {STAGES.map((s, i) => {
-          const Icon = s.icon
           const isComplete = i < currentIndex
           const isCurrent = i === currentIndex
           const isPending = i > currentIndex
@@ -41,11 +40,11 @@ export function ThinkingIndicator({ stage, className }: ThinkingIndicatorProps) 
               )}
             >
               {isComplete ? (
-                <Check className="w-3.5 h-3.5" />
+                <Icon name="check" className="w-3.5 h-3.5" />
               ) : isCurrent ? (
-                <Icon className="w-3.5 h-3.5 animate-pulse" />
+                <Icon name={s.icon} className="w-3.5 h-3.5 animate-pulse" />
               ) : (
-                <Circle className="w-3 h-3" />
+                <Icon name="circle" className="w-3 h-3" />
               )}
               <span className="hidden sm:inline">{s.label}</span>
             </div>

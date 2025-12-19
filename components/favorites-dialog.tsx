@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Trash2, AlertCircle, Calendar, FileText } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
@@ -64,7 +64,7 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+            <Icon name="file-text" className="h-5 w-5" />
             즐겨찾기
             <Badge variant="secondary" className="ml-2">
               {favorites.length}
@@ -76,7 +76,7 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
 
         {favorites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <Icon name="file-text" className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">즐겨찾기한 법령이 없습니다.</p>
           </div>
         ) : (
@@ -99,14 +99,14 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
                       )}
                       {favorite.hasChanges && (
                         <Badge variant="destructive" className="text-xs">
-                          <AlertCircle className="h-3 w-3 mr-1" />
+                          <Icon name="alert-circle" className="h-3 w-3 mr-1" />
                           변경됨
                         </Badge>
                       )}
                     </div>
                     {favorite.notes && <p className="text-sm text-muted-foreground mb-2">{favorite.notes}</p>}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
+                      <Icon name="calendar" className="h-3 w-3" />
                       <span>추가: {formatDateTime(favorite.createdAt)}</span>
                     </div>
                   </div>
@@ -116,7 +116,7 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
                     onClick={(e) => handleRemove(favorite.id, e)}
                     className="h-8 w-8 p-0 shrink-0"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Icon name="trash" className="h-4 w-4" />
                   </Button>
                 </div>
               ))}

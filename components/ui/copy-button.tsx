@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { Copy, Check } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Button, buttonVariants } from "./button"
 import { cn } from "@/lib/utils"
 import type { VariantProps } from "class-variance-authority"
@@ -110,9 +110,9 @@ export function CopyButton({
         {...props}
       >
         {showFeedback ? (
-          <Check className="w-4 h-4 text-green-500" />
+          <Icon name="check" className="w-4 h-4 text-green-500" />
         ) : (
-          <Copy className="w-4 h-4" />
+          <Icon name="copy" className="w-4 h-4" />
         )}
         {!iconOnly && <span className="ml-1">{label}</span>}
       </Button>

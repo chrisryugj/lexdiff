@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { X, GripHorizontal } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -205,7 +205,7 @@ export function ArticleBottomSheet({
                 onClick={onClose}
                 className="shrink-0"
               >
-                <X className="h-4 w-4" />
+                <Icon name="x" className="h-4 w-4" />
               </Button>
             </div>
           )}

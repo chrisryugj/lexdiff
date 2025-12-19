@@ -9,7 +9,7 @@
 import React, { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, Sparkles } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { formatDate } from "@/lib/revision-parser"
 import { getLawTypeBadgeClass } from "./utils"
 import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery } from "./types"
@@ -56,7 +56,7 @@ export const LawSearchResultList = memo(function LawSearchResultList({
             onClick={onCancel}
             className="hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <ChevronLeft className="w-4 h-4 mr-2" />
+            <Icon name="chevron-left" className="w-4 h-4 mr-2" />
             취소
           </Button>
         </div>
@@ -147,7 +147,7 @@ const LawResultCard = memo(function LawResultCard({
 
         {/* 화살표 아이콘 */}
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
-          <ChevronLeft className="w-5 h-5 rotate-180 text-primary group-hover:text-primary-foreground transition-colors" />
+          <Icon name="chevron-left" className="w-5 h-5 rotate-180 text-primary group-hover:text-primary-foreground transition-colors" />
         </div>
       </div>
 
@@ -173,7 +173,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
   return (
     <div className="max-w-6xl mx-auto mt-8 p-4 md:p-6 bg-card/30 backdrop-blur-sm border border-border/50 rounded-2xl">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-amber-500" />
+        <Icon name="sparkles" className="w-5 h-5 text-amber-500" />
         <h3 className="text-lg font-semibold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
           관련 검색어
         </h3>
@@ -204,7 +204,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
                         {String(law.lawType)}
                       </Badge>
                     </div>
-                    <ChevronLeft className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-amber-500 transition-colors flex-shrink-0" />
+                    <Icon name="chevron-left" className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-amber-500 transition-colors flex-shrink-0" />
                   </div>
                 </button>
               ))}
@@ -261,7 +261,7 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
             onClick={onCancel}
             className="hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <ChevronLeft className="w-4 h-4 mr-2" />
+            <Icon name="chevron-left" className="w-4 h-4 mr-2" />
             취소
           </Button>
         </div>
@@ -346,7 +346,7 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
 
         {/* 화살표 아이콘 */}
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 group-hover:scale-110 transition-all duration-300">
-          <ChevronLeft className="w-5 h-5 rotate-180 text-blue-600 group-hover:text-white transition-colors" />
+          <Icon name="chevron-left" className="w-5 h-5 rotate-180 text-blue-600 group-hover:text-white transition-colors" />
         </div>
       </div>
 

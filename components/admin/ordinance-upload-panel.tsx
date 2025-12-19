@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Upload, Pause, Play, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import LogImport from '@/admin/components/log-import'
 
 interface ParsedOrdinanceFile {
@@ -558,9 +558,9 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 shadow-sm">
                 {paused ? (
-                  <Pause className="h-5 w-5 text-warning" />
+                  <Icon name="pause" className="h-5 w-5 text-warning" />
                 ) : (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  <Icon name="loader" className="h-5 w-5 text-primary animate-spin" />
                 )}
               </div>
               <div>
@@ -742,12 +742,12 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
           </Button>
           {uploading && !paused ? (
             <Button onClick={pauseUpload} variant="outline" size="default" className="border-warning/30 text-warning hover:bg-warning/10 gap-2">
-              <Pause className="w-4 h-4" />
+              <Icon name="pause" className="w-4 h-4" />
               일시중지
             </Button>
           ) : uploading && paused ? (
             <Button onClick={resumeUpload} size="default" className="shadow-lg shadow-accent/20 bg-accent hover:bg-accent/90 gap-2">
-              <Play className="w-4 h-4" />
+              <Icon name="play" className="w-4 h-4" />
               재개
             </Button>
           ) : (
@@ -757,7 +757,7 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
               className="shadow-lg shadow-primary/20 gap-2"
               size="default"
             >
-              <Upload className="w-4 h-4" />
+              <Icon name="upload" className="w-4 h-4" />
               업로드
             </Button>
           )}
@@ -769,11 +769,11 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
         <div className="p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
           <div className="space-y-1 text-sm mb-3">
             <p className="flex items-center gap-2 text-accent">
-              <CheckCircle2 className="w-4 h-4" />
+              <Icon name="check-circle-2" className="w-4 h-4" />
               성공: {successCount}개
             </p>
             <p className="flex items-center gap-2 text-warning">
-              <XCircle className="w-4 h-4" />
+              <Icon name="x-circle" className="w-4 h-4" />
               실패: {errorCount}개
             </p>
           </div>
@@ -799,12 +799,12 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
       <div className="space-y-2">
         {loading ? (
           <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
+            <Icon name="loader" className="h-12 w-12 text-muted-foreground mx-auto mb-3 animate-spin" />
             <p className="text-muted-foreground">로딩 중...</p>
           </div>
         ) : pendingOrdinances.length === 0 ? (
           <div className="p-8 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50 text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <Icon name="alert-circle" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">
               {selectedDistricts.size === 0
                 ? '업로드 대기 중인 파일이 없습니다'
@@ -858,10 +858,10 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
                         </span>
                       )}
                       {uploadResult?.status === 'success' && (
-                        <CheckCircle2 className="w-5 h-5 text-accent" />
+                        <Icon name="check-circle-2" className="w-5 h-5 text-accent" />
                       )}
                       {uploadResult?.status === 'error' && (
-                        <XCircle className="w-5 h-5 text-warning" />
+                        <Icon name="x-circle" className="w-5 h-5 text-warning" />
                       )}
                     </div>
                   </div>
@@ -889,7 +889,7 @@ export function OrdinanceUploadPanel({ onUploadComplete, refreshTrigger, onRende
                       다운로드: {formatDate(ordinance.lastModified)}
                     </div>
                   </div>
-                  <CheckCircle2 className="w-5 h-5 text-accent" />
+                  <Icon name="check-circle-2" className="w-5 h-5 text-accent" />
                 </div>
               </div>
             )

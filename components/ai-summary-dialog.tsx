@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Sparkles, Type, Calendar } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { debugLogger } from "@/lib/debug-logger"
 import { CopyButton } from "@/components/ui/copy-button"
 import { formatDate } from "@/lib/revision-parser"
@@ -83,14 +83,14 @@ export function AISummaryDialog({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
+                <Icon name="sparkles" className="h-5 w-5 text-primary" />
                 AI 변경 요약
               </DialogTitle>
               <DialogDescription className="mt-2 flex items-center gap-2 flex-wrap">
                 <span>{lawTitle} {joNum}</span>
                 {effectiveDate && (
                   <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                    <Calendar className="h-3 w-3 mr-1" />
+                    <Icon name="calendar" className="h-3 w-3 mr-1" />
                     {formatDate(effectiveDate)}
                   </Badge>
                 )}
@@ -102,7 +102,7 @@ export function AISummaryDialog({
         <div className="flex-1 min-h-0 flex flex-col">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <Icon name="loader" className="h-8 w-8 animate-spin text-primary mb-4" />
               <p className="text-sm text-muted-foreground">AI가 변경 내용을 분석하고 있습니다...</p>
               <p className="text-xs text-muted-foreground mt-2">최대 30초 정도 소요될 수 있습니다</p>
             </div>
@@ -117,7 +117,7 @@ export function AISummaryDialog({
             <>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-border flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  <Type className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="type" className="h-4 w-4 text-muted-foreground" />
                   <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
                     <Button
                       variant={fontSize === "small" ? "default" : "ghost"}
@@ -173,7 +173,7 @@ export function AISummaryDialog({
           ) : (
             <div className="text-center py-12">
               <Button onClick={generateSummary} variant="default">
-                <Sparkles className="h-4 w-4 mr-2" />
+                <Icon name="sparkles" className="h-4 w-4 mr-2" />
                 요약 생성
               </Button>
             </div>

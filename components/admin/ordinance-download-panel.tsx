@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Download, CheckCircle2, XCircle, StopCircle } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 // Parallel processing configuration
 const PARALLEL_LIMIT = 8 // Number of concurrent downloads
@@ -374,7 +374,7 @@ export function OrdinanceDownloadPanel() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 shadow-sm">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                <Icon name="loader" className="h-5 w-5 text-primary animate-spin" />
               </div>
               <div>
                 <div className="font-medium text-foreground">
@@ -401,7 +401,7 @@ export function OrdinanceDownloadPanel() {
                 size="sm"
                 className="gap-2"
               >
-                <StopCircle className="h-4 w-4" />
+                <Icon name="stop-circle" className="h-4 w-4" />
                 중지
               </Button>
             </div>
@@ -466,12 +466,12 @@ export function OrdinanceDownloadPanel() {
         >
           {isDownloading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Icon name="loader" className="w-4 h-4 animate-spin" />
               처리 중
             </>
           ) : (
             <>
-              <Download className="w-4 h-4" />
+              <Icon name="download" className="w-4 h-4" />
               다운로드 ({selectedDistricts.size})
             </>
           )}
@@ -517,13 +517,13 @@ export function OrdinanceDownloadPanel() {
                 {status && (
                   <div>
                     {status.status === 'downloading' && (
-                      <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      <Icon name="loader" className="h-4 w-4 text-primary animate-spin" />
                     )}
                     {status.status === 'success' && (
-                      <CheckCircle2 className="h-4 w-4 text-accent" />
+                      <Icon name="check-circle-2" className="h-4 w-4 text-accent" />
                     )}
                     {status.status === 'error' && (
-                      <XCircle className="h-4 w-4 text-warning" />
+                      <Icon name="x-circle" className="h-4 w-4 text-warning" />
                     )}
                   </div>
                 )}

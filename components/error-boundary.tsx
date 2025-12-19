@@ -1,7 +1,7 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -71,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
           <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-            <AlertTriangle className="w-8 h-8 text-destructive" />
+            <Icon name="alert-triangle" className="w-8 h-8 text-destructive" />
           </div>
 
           <h2 className="text-xl font-semibold mb-2">
@@ -102,14 +102,14 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={this.handleGoHome}
               className="gap-2"
             >
-              <Home className="w-4 h-4" />
+              <Icon name="home" className="w-4 h-4" />
               홈으로 이동
             </Button>
             <Button
               onClick={this.handleRetry}
               className="gap-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <Icon name="refresh" className="w-4 h-4" />
               다시 시도
             </Button>
           </div>
@@ -174,7 +174,7 @@ export class AISearchErrorBoundary extends Component<
 
       return (
         <div className="flex flex-col items-center justify-center p-6 text-center border rounded-lg bg-muted/30">
-          <AlertTriangle className="w-10 h-10 text-amber-500 mb-3" />
+          <Icon name="alert-triangle" className="w-10 h-10 text-amber-500 mb-3" />
 
           <h3 className="font-semibold mb-2">
             {isRateLimitError
@@ -207,7 +207,7 @@ export class AISearchErrorBoundary extends Component<
               onClick={this.handleRetry}
               className="gap-1"
             >
-              <RefreshCw className="w-3 h-3" />
+              <Icon name="refresh" className="w-3 h-3" />
               다시 시도
             </Button>
           </div>

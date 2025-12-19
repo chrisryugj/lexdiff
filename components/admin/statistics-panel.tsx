@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Download, Upload, RefreshCw, Calendar, BarChart3, TrendingUp } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface ActivityLog {
   id: string
@@ -173,15 +173,15 @@ export function StatisticsPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button onClick={loadStatistics} variant="outline" size="sm" className="gap-2">
-            <RefreshCw className="h-4 w-4" />
+            <Icon name="refresh" className="h-4 w-4" />
             새로고침
           </Button>
           <Button onClick={exportStatistics} variant="outline" size="sm" className="gap-2">
-            <Download className="h-4 w-4" />
+            <Icon name="download" className="h-4 w-4" />
             내보내기
           </Button>
           <Button onClick={importStatistics} variant="outline" size="sm" className="gap-2">
-            <Upload className="h-4 w-4" />
+            <Icon name="upload" className="h-4 w-4" />
             가져오기
           </Button>
         </div>
@@ -193,9 +193,9 @@ export function StatisticsPanel() {
       {/* Period Selector */}
       <div className="flex gap-2 p-1.5 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm w-fit">
         {[
-          { id: 'today' as const, label: '오늘', icon: Calendar },
-          { id: 'week' as const, label: '7일', icon: BarChart3 },
-          { id: 'month' as const, label: '30일', icon: TrendingUp }
+          { id: 'today' as const, label: '오늘', icon: 'calendar' as const },
+          { id: 'week' as const, label: '7일', icon: 'bar-chart' as const },
+          { id: 'month' as const, label: '30일', icon: 'trending-up' as const }
         ].map((period) => (
           <button
             key={period.id}
@@ -206,7 +206,7 @@ export function StatisticsPanel() {
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <period.icon className="h-4 w-4" />
+            <Icon name={period.icon} className="h-4 w-4" />
             {period.label}
           </button>
         ))}
@@ -217,7 +217,7 @@ export function StatisticsPanel() {
         <div className="p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent backdrop-blur-sm rounded-xl border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/20">
-              <Download className="h-5 w-5 text-primary" />
+              <Icon name="download" className="h-5 w-5 text-primary" />
             </div>
             <div className="text-sm text-primary font-medium">다운로드</div>
           </div>
@@ -230,7 +230,7 @@ export function StatisticsPanel() {
         <div className="p-6 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent backdrop-blur-sm rounded-xl border border-accent/20 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-accent/20">
-              <Upload className="h-5 w-5 text-accent" />
+              <Icon name="upload" className="h-5 w-5 text-accent" />
             </div>
             <div className="text-sm text-accent font-medium">업로드</div>
           </div>
@@ -243,7 +243,7 @@ export function StatisticsPanel() {
         <div className="p-6 bg-gradient-to-br from-warning/10 via-warning/5 to-transparent backdrop-blur-sm rounded-xl border border-warning/20 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-warning/20">
-              <TrendingUp className="h-5 w-5 text-warning" />
+              <Icon name="trending-up" className="h-5 w-5 text-warning" />
             </div>
             <div className="text-sm text-warning font-medium">오류</div>
           </div>
@@ -302,11 +302,11 @@ export function StatisticsPanel() {
                     }`}
                   >
                     {log.type === 'download' ? (
-                      <Download className="h-3.5 w-3.5" />
+                      <Icon name="download" className="h-3.5 w-3.5" />
                     ) : log.type === 'upload' ? (
-                      <Upload className="h-3.5 w-3.5" />
+                      <Icon name="upload" className="h-3.5 w-3.5" />
                     ) : (
-                      <BarChart3 className="h-3.5 w-3.5" />
+                      <Icon name="bar-chart" className="h-3.5 w-3.5" />
                     )}
                   </div>
                   <div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { User, Bot, Scale, ExternalLink } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import { StreamingText } from './StreamingText'
 import { ThinkingIndicator, ThinkingDots } from './ThinkingIndicator'
 import type { ChatMessage as ChatMessageType } from './types'
@@ -37,9 +37,9 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
           : "bg-gradient-to-br from-purple-500 to-pink-500"
       )}>
         {isUser ? (
-          <User className="w-4 h-4 text-white" />
+          <Icon name="user" className="w-4 h-4 text-white" />
         ) : (
-          <Bot className="w-4 h-4 text-white" />
+          <Icon name="bot" className="w-4 h-4 text-white" />
         )}
       </div>
 
@@ -131,7 +131,7 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
             {isComplete && message.citations && message.citations.length > 0 && (
               <div className="mt-4 pt-4 border-t border-border/50">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <Scale className="w-4 h-4" />
+                  <Icon name="scale" className="w-4 h-4" />
                   <span>참조 법령</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -143,7 +143,7 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
                                 border border-border/50 hover:border-primary/50"
                     >
                       <span>「{citation.lawName}」 {citation.articleNumber}</span>
-                      <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      <Icon name="external-link" className="w-3 h-3 text-muted-foreground" />
                     </button>
                   ))}
                 </div>

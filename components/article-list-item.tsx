@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Star, AlertCircle } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import type { LawArticle } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
 
@@ -85,10 +85,11 @@ export const ArticleListItem = React.memo(function ArticleListItem({
 
         <div className="flex items-center gap-1 shrink-0">
           {isFavorite && (
-            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+            <Icon name="star" className="h-3 w-3 fill-yellow-400 text-yellow-400" />
           )}
           {article.hasChanges && (
-            <AlertCircle
+            <Icon
+              name="alert-circle"
               className="h-3 w-3 text-[var(--color-warning)]"
               title="변경된 조문"
             />

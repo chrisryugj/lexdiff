@@ -14,31 +14,9 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
-import {
-  BookOpen,
-  Scale,
-  FileText,
-  ListChecks,
-  GitCompare,
-  AlertTriangle,
-  Lightbulb,
-  CheckCircle2,
-  XCircle,
-  ArrowRight,
-  Clock,
-  Gavel,
-  Calculator,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Users,
-  Building,
-  Coins,
-  ShieldAlert,
-  FileSearch,
-  ListTodo,
-  type LucideIcon
-} from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
+
+type IconName = string
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 섹션 헤더 아이콘 매핑
@@ -46,58 +24,58 @@ import {
 // 단색으로 통일 - 다크/라이트 테마 모두 대응
 const SECTION_ICON_COLOR = 'text-foreground/70'
 
-const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: LucideIcon }> = [
+const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: IconName }> = [
   // 공통 섹션
-  { pattern: /^정의/, icon: BookOpen },
-  { pattern: /^법적\s*성질/, icon: Scale },
-  { pattern: /^조문\s*원문/, icon: FileText },
-  { pattern: /^구성\s*요건/, icon: ListChecks },
-  { pattern: /^유사\s*개념/, icon: GitCompare },
-  { pattern: /^예시/, icon: Lightbulb },
-  { pattern: /^관계\s*법령/, icon: BookOpen },
+  { pattern: /^정의/, icon: 'book-open' },
+  { pattern: /^법적\s*성질/, icon: 'scale' },
+  { pattern: /^조문\s*원문/, icon: 'file-text' },
+  { pattern: /^구성\s*요건/, icon: 'list-checks' },
+  { pattern: /^유사\s*개념/, icon: 'git-compare' },
+  { pattern: /^예시/, icon: 'lightbulb' },
+  { pattern: /^관계\s*법령/, icon: 'book-open' },
 
   // requirement (요건) 섹션
-  { pattern: /^결론/, icon: CheckCircle2 },
-  { pattern: /^적극적\s*요건/, icon: CheckCircle2 },
-  { pattern: /^소극적\s*요건/, icon: XCircle },
-  { pattern: /^예외|특례/, icon: AlertTriangle },
-  { pattern: /^주의사항/, icon: AlertTriangle },
+  { pattern: /^결론/, icon: 'check-circle-2' },
+  { pattern: /^적극적\s*요건/, icon: 'check-circle-2' },
+  { pattern: /^소극적\s*요건/, icon: 'x-circle' },
+  { pattern: /^예외|특례/, icon: 'alert-triangle' },
+  { pattern: /^주의사항/, icon: 'alert-triangle' },
 
   // procedure (절차) 섹션
-  { pattern: /^전체\s*흐름/, icon: ArrowRight },
-  { pattern: /^단계별\s*안내/, icon: ListChecks },
-  { pattern: /^기한\s*요약/, icon: Clock },
-  { pattern: /^불복\s*절차/, icon: Gavel },
+  { pattern: /^전체\s*흐름/, icon: 'arrow-right' },
+  { pattern: /^단계별\s*안내/, icon: 'list-checks' },
+  { pattern: /^기한\s*요약/, icon: 'clock' },
+  { pattern: /^불복\s*절차/, icon: 'gavel' },
 
   // comparison (비교) 섹션
-  { pattern: /^핵심\s*차이/, icon: GitCompare },
-  { pattern: /^비교표/, icon: BarChart3 },
-  { pattern: /^선택\s*기준/, icon: CheckCircle2 },
+  { pattern: /^핵심\s*차이/, icon: 'git-compare' },
+  { pattern: /^비교표/, icon: 'bar-chart-3' },
+  { pattern: /^선택\s*기준/, icon: 'check-circle-2' },
 
   // application (적용) 섹션
-  { pattern: /^요건별\s*검토/, icon: FileSearch },
-  { pattern: /^다음\s*행동/, icon: ListTodo },
+  { pattern: /^요건별\s*검토/, icon: 'file-search' },
+  { pattern: /^다음\s*행동/, icon: 'list-todo' },
 
   // consequence (효과) 섹션
-  { pattern: /^법적\s*효과/, icon: Scale },
-  { pattern: /^행정적\s*효과/, icon: Building },
-  { pattern: /^민사적\s*효과/, icon: Users },
-  { pattern: /^형사적\s*효과/, icon: ShieldAlert },
-  { pattern: /^구제\s*방법/, icon: Gavel },
+  { pattern: /^법적\s*효과/, icon: 'scale' },
+  { pattern: /^행정적\s*효과/, icon: 'building' },
+  { pattern: /^민사적\s*효과/, icon: 'users' },
+  { pattern: /^형사적\s*효과/, icon: 'shield-alert' },
+  { pattern: /^구제\s*방법/, icon: 'gavel' },
 
   // scope (범위/금액) 섹션
-  { pattern: /^산정\s*기준/, icon: Calculator },
-  { pattern: /^법정\s*기준/, icon: Scale },
-  { pattern: /^가산|감경/, icon: TrendingUp },
-  { pattern: /^계산\s*예시/, icon: Calculator },
-  { pattern: /^실무\s*참고/, icon: Lightbulb },
+  { pattern: /^산정\s*기준/, icon: 'calculator' },
+  { pattern: /^법정\s*기준/, icon: 'scale' },
+  { pattern: /^가산|감경/, icon: 'trending-up' },
+  { pattern: /^계산\s*예시/, icon: 'calculator' },
+  { pattern: /^실무\s*참고/, icon: 'lightbulb' },
 ]
 
-function getSectionIcon(text: string): { Icon: LucideIcon; color: string } | null {
+function getSectionIcon(text: string): { iconName: IconName; color: string } | null {
   const trimmed = text.trim()
   for (const { pattern, icon } of SECTION_ICON_MAP) {
     if (pattern.test(trimmed)) {
-      return { Icon: icon, color: SECTION_ICON_COLOR }
+      return { iconName: icon, color: SECTION_ICON_COLOR }
     }
   }
   return null
@@ -578,7 +556,7 @@ export function LegalMarkdownRenderer({
 
             return (
               <h2 className="text-base font-bold mt-0 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2">
-                {iconInfo && <iconInfo.Icon className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
+                {iconInfo && <Icon name={iconInfo.iconName} className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
                 {children}
               </h2>
             )
@@ -590,7 +568,7 @@ export function LegalMarkdownRenderer({
 
             return (
               <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 flex items-center gap-1.5">
-                {iconInfo && <iconInfo.Icon className={`h-3.5 w-3.5 ${iconInfo.color} shrink-0`} />}
+                {iconInfo && <Icon name={iconInfo.iconName} className={`h-3.5 w-3.5 ${iconInfo.color} shrink-0`} />}
                 {children}
               </h3>
             )

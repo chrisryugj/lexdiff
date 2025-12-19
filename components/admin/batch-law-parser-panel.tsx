@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, CheckCircle2, XCircle, AlertCircle, Download, RotateCcw } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface ParseResult {
   lawName: string
@@ -208,17 +208,17 @@ export function BatchLawParserPanel() {
   function getStatusIcon(status: ParseResult['status']) {
     switch (status) {
       case 'pending':
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />
+        return <Icon name="alert-circle" className="w-4 h-4 text-muted-foreground" />
       case 'searching':
       case 'parsing':
       case 'saving':
-        return <Loader2 className="w-4 h-4 text-primary animate-spin" />
+        return <Icon name="loader" className="w-4 h-4 text-primary animate-spin" />
       case 'selecting':
-        return <AlertCircle className="w-4 h-4 text-warning" />
+        return <Icon name="alert-circle" className="w-4 h-4 text-warning" />
       case 'success':
-        return <CheckCircle2 className="w-4 h-4 text-accent" />
+        return <Icon name="check-circle-2" className="w-4 h-4 text-accent" />
       case 'error':
-        return <XCircle className="w-4 h-4 text-destructive" />
+        return <Icon name="x-circle" className="w-4 h-4 text-destructive" />
     }
   }
 
@@ -285,7 +285,7 @@ export function BatchLawParserPanel() {
               size="default"
               className="gap-2 h-10"
             >
-              <RotateCcw className="w-4 h-4" />
+              <Icon name="rotate-ccw" className="w-4 h-4" />
               초기화
             </Button>
             <Button
@@ -296,12 +296,12 @@ export function BatchLawParserPanel() {
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Icon name="loader" className="w-4 h-4 animate-spin" />
                   처리 중
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4" />
+                  <Icon name="download" className="w-4 h-4" />
                   다운로드
                 </>
               )}

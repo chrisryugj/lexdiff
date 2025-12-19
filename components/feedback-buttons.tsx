@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { ThumbsUp, ThumbsDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import { debugLogger } from "@/lib/debug-logger"
 
 interface FeedbackButtonsProps {
@@ -76,7 +76,7 @@ export function FeedbackButtons({
           disabled={isSubmitting || userFeedback === "positive"}
           className="gap-1"
         >
-          <ThumbsUp className={`h-4 w-4 ${userFeedback === "positive" ? "fill-current" : ""}`} />
+          <Icon name="thumbs-up" className={`h-4 w-4 ${userFeedback === "positive" ? "fill-current" : ""}`} />
           <span className="hidden xs:inline">도움됨</span>
         </Button>
         <Button
@@ -86,7 +86,7 @@ export function FeedbackButtons({
           disabled={isSubmitting || userFeedback === "negative"}
           className="gap-1"
         >
-          <ThumbsDown className={`h-4 w-4 ${userFeedback === "negative" ? "fill-current" : ""}`} />
+          <Icon name="thumbs-down" className={`h-4 w-4 ${userFeedback === "negative" ? "fill-current" : ""}`} />
           <span className="hidden xs:inline">도움 안됨</span>
         </Button>
       </div>

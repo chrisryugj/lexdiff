@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { cn } from '@/lib/utils'
-import { ArrowUp, Square, Search, Bot } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import type { SearchMode } from './types'
 
 interface ChatInputProps {
@@ -71,7 +71,7 @@ export function ChatInput({
               isStreaming && "opacity-50 cursor-not-allowed"
             )}
           >
-            <Search className="w-4 h-4" />
+            <Icon name="search" className="w-4 h-4" />
             법령 검색
           </button>
           <button
@@ -85,7 +85,7 @@ export function ChatInput({
               isStreaming && "opacity-50 cursor-not-allowed"
             )}
           >
-            <Bot className="w-4 h-4" />
+            <Icon name="bot" className="w-4 h-4" />
             AI 질문
           </button>
         </div>
@@ -134,9 +134,9 @@ export function ChatInput({
             )}
           >
             {isStreaming ? (
-              <Square className="w-5 h-5" />
+              <Icon name="square" className="w-5 h-5" />
             ) : (
-              <ArrowUp className="w-5 h-5" />
+              <Icon name="arrow-up" className="w-5 h-5" />
             )}
           </button>
         </div>

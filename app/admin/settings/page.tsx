@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Lock, ArrowLeft } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 import { debugLogger } from '@/lib/debug-logger'
 
 const ADMIN_PASSWORD = '1234'
@@ -32,7 +32,7 @@ export default function SettingsPage() {
       <div className="w-full max-w-md space-y-8 p-8">
         {/* 헤더 */}
         <div className="text-center">
-          <Lock className="mx-auto h-12 w-12 text-muted-foreground" />
+          <Icon name="lock" className="mx-auto h-12 w-12 text-muted-foreground" />
           <h2 className="mt-6 text-3xl font-bold">관리자 설정</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             RAG 관리 페이지 접근을 위해 비밀번호를 입력하세요
@@ -72,7 +72,7 @@ export default function SettingsPage() {
               className="w-full"
               onClick={() => router.push('/')}
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <Icon name="arrow-left" className="mr-2 h-4 w-4" />
               취소
             </Button>
           </div>

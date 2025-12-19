@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Download, CheckCircle2, XCircle, AlertCircle, RefreshCw, Filter, MinusCircle } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface SavedLaw {
   lawId: string
@@ -276,17 +276,17 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   function getStatusIcon(status: DownloadStatus['status']) {
     switch (status) {
       case 'pending':
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />
+        return <Icon name="alert-circle" className="w-4 h-4 text-muted-foreground" />
       case 'downloading':
-        return <Loader2 className="w-4 h-4 text-primary animate-spin" />
+        return <Icon name="loader" className="w-4 h-4 text-primary animate-spin" />
       case 'success':
-        return <CheckCircle2 className="w-4 h-4 text-accent" />
+        return <Icon name="check-circle-2" className="w-4 h-4 text-accent" />
       case 'not_found':
-        return <XCircle className="w-4 h-4 text-warning" />
+        return <Icon name="x-circle" className="w-4 h-4 text-warning" />
       case 'confirmed_none':
-        return <MinusCircle className="w-4 h-4 text-muted-foreground" />
+        return <Icon name="minus-circle" className="w-4 h-4 text-muted-foreground" />
       case 'error':
-        return <XCircle className="w-4 h-4 text-destructive" />
+        return <Icon name="x-circle" className="w-4 h-4 text-destructive" />
     }
   }
 
@@ -348,7 +348,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <Icon name="loader" className="w-8 h-8 text-primary animate-spin" />
       </div>
     )
   }
@@ -384,7 +384,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         <div className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-xl backdrop-blur-sm">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <Icon name="loader" className="h-5 w-5 text-primary animate-spin" />
               <div>
                 <div className="font-medium text-foreground">
                   일괄 다운로드 중... ({batchProgress.current} / {batchProgress.total})
@@ -412,7 +412,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
       {/* Action Bar with Filter */}
       <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm">
         <div className="flex items-center gap-3">
-          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Icon name="filter" className="w-4 h-4 text-muted-foreground" />
           <div className="flex gap-1">
             <Button
               variant={filter === 'all' ? 'default' : 'ghost'}
@@ -450,7 +450,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={loadLaws} disabled={loading || isDownloading} variant="outline" size="default" className="gap-2">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Icon name="refresh" className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </Button>
           <Button
@@ -464,12 +464,12 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
           >
             {isDownloading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Icon name="loader" className="h-4 w-4 animate-spin" />
                 처리 중
               </>
             ) : (
               <>
-                <Download className="h-4 w-4" />
+                <Icon name="download" className="h-4 w-4" />
                 {filter === 'incomplete' ? '미완료 다운로드' : '전체 다운로드'}
               </>
             )}
@@ -548,7 +548,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                   if (allDone && !isCurrentlyDownloading) {
                     return (
                       <div className="flex items-center gap-1.5 text-sm text-accent">
-                        <CheckCircle2 className="w-4 h-4" />
+                        <Icon name="check-circle-2" className="w-4 h-4" />
                         완료
                       </div>
                     )
@@ -557,7 +557,7 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                   if (!hasPendingOrError && !isCurrentlyDownloading) {
                     return (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <MinusCircle className="w-4 h-4" />
+                        <Icon name="minus-circle" className="w-4 h-4" />
                         확인됨
                       </div>
                     )
@@ -572,9 +572,9 @@ export function EnforcementDownloadPanel({ refreshTrigger }: EnforcementDownload
                       className="gap-2"
                     >
                       {isCurrentlyDownloading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Icon name="loader" className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Download className="w-4 h-4" />
+                        <Icon name="download" className="w-4 h-4" />
                       )}
                       다운로드
                     </Button>

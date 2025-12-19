@@ -1,25 +1,11 @@
 /**
  * Answer Section Icons
  *
- * AI 답변의 구조화된 섹션에 사용할 lucide 아이콘 매핑
+ * AI 답변의 구조화된 섹션에 사용할 아이콘 매핑
  * 이모지 대신 일관된 아이콘 시스템 제공
  */
 
-import {
-  FileText,
-  ScrollText,
-  Lightbulb,
-  BookOpen,
-  AlertCircle,
-  AlertTriangle,
-  AlertOctagon,
-  CheckCircle2,
-  Info,
-  Scale,
-  Sparkles,
-  Brain,
-  type LucideIcon
-} from 'lucide-react'
+import { ICON_REGISTRY, type IconType } from '@/lib/icons'
 
 /**
  * AI 답변 섹션 타입
@@ -57,42 +43,42 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low'
  * 섹션별 아이콘 및 스타일 정의
  */
 export const SECTION_CONFIGS: Record<AnswerSectionType, {
-  icon: LucideIcon
+  icon: IconType
   label: string
   iconColor: string
   bgColor: string
   borderColor: string
 }> = {
   summary: {
-    icon: FileText,
+    icon: ICON_REGISTRY['file-text'],
     label: '핵심 요약',
     iconColor: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-50 dark:bg-blue-950/20',
     borderColor: 'border-blue-200 dark:border-blue-800'
   },
   detail: {
-    icon: ScrollText,
+    icon: ICON_REGISTRY['scroll-text'],
     label: '상세 내용',
     iconColor: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-50 dark:bg-purple-950/20',
     borderColor: 'border-purple-200 dark:border-purple-800'
   },
   tip: {
-    icon: Lightbulb,
+    icon: ICON_REGISTRY['lightbulb'],
     label: '추가 참고',
     iconColor: 'text-amber-500 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/20',
     borderColor: 'border-amber-200 dark:border-amber-800'
   },
   related_laws: {
-    icon: BookOpen,
+    icon: ICON_REGISTRY['book-open'],
     label: '관련 법령',
     iconColor: 'text-cyan-500 dark:text-cyan-400',
     bgColor: 'bg-cyan-50 dark:bg-cyan-950/20',
     borderColor: 'border-cyan-200 dark:border-cyan-800'
   },
   conditions: {
-    icon: AlertTriangle,
+    icon: ICON_REGISTRY['alert-triangle'],
     label: '조건·예외',
     iconColor: 'text-amber-500 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/20',
@@ -104,22 +90,22 @@ export const SECTION_CONFIGS: Record<AnswerSectionType, {
  * 상세 내용 하위 섹션 아이콘 정의
  */
 export const DETAIL_SUBSECTION_CONFIGS: Record<DetailSubsectionType, {
-  icon: LucideIcon
+  icon: IconType
   label: string
   iconColor: string
 }> = {
   article_quote: {
-    icon: FileText,
+    icon: ICON_REGISTRY['file-text'],
     label: '조문 발췌',
     iconColor: 'text-gray-600 dark:text-gray-400'
   },
   interpretation: {
-    icon: Lightbulb,
+    icon: ICON_REGISTRY['lightbulb'],
     label: '핵심 해석',
     iconColor: 'text-blue-600 dark:text-blue-400'
   },
   practice: {
-    icon: CheckCircle2,
+    icon: ICON_REGISTRY['check-circle-2'],
     label: '실무 적용',
     iconColor: 'text-green-600 dark:text-green-400'
   }
@@ -129,35 +115,35 @@ export const DETAIL_SUBSECTION_CONFIGS: Record<DetailSubsectionType, {
  * 경고/알림 타입별 아이콘 및 스타일
  */
 export const ALERT_CONFIGS: Record<AlertType, {
-  icon: LucideIcon
+  icon: IconType
   iconColor: string
   bgColor: string
   borderColor: string
   textColor: string
 }> = {
   info: {
-    icon: Info,
+    icon: ICON_REGISTRY['info'],
     iconColor: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-50 dark:bg-blue-950/20',
     borderColor: 'border-blue-200 dark:border-blue-800',
     textColor: 'text-blue-700 dark:text-blue-300'
   },
   warning: {
-    icon: AlertTriangle,
+    icon: ICON_REGISTRY['alert-triangle'],
     iconColor: 'text-yellow-500 dark:text-yellow-400',
     bgColor: 'bg-yellow-50 dark:bg-yellow-950/20',
     borderColor: 'border-yellow-200 dark:border-yellow-800',
     textColor: 'text-yellow-800 dark:text-yellow-200'
   },
   error: {
-    icon: AlertOctagon,
+    icon: ICON_REGISTRY['alert-octagon'],
     iconColor: 'text-red-500 dark:text-red-400',
     bgColor: 'bg-red-50 dark:bg-red-950/20',
     borderColor: 'border-red-200 dark:border-red-800',
     textColor: 'text-red-700 dark:text-red-300'
   },
   success: {
-    icon: CheckCircle2,
+    icon: ICON_REGISTRY['check-circle-2'],
     iconColor: 'text-green-500 dark:text-green-400',
     bgColor: 'bg-green-50 dark:bg-green-950/20',
     borderColor: 'border-green-200 dark:border-green-800',
@@ -169,7 +155,7 @@ export const ALERT_CONFIGS: Record<AlertType, {
  * 신뢰도 레벨별 아이콘 및 스타일
  */
 export const CONFIDENCE_CONFIGS: Record<ConfidenceLevel, {
-  icon: LucideIcon
+  icon: IconType
   label: string
   iconColor: string
   bgColor: string
@@ -177,7 +163,7 @@ export const CONFIDENCE_CONFIGS: Record<ConfidenceLevel, {
   textColor: string
 }> = {
   high: {
-    icon: CheckCircle2,
+    icon: ICON_REGISTRY['check-circle-2'],
     label: '신뢰도 높음',
     iconColor: 'text-green-600 dark:text-green-400',
     bgColor: 'bg-green-50 dark:bg-green-900/20',
@@ -185,7 +171,7 @@ export const CONFIDENCE_CONFIGS: Record<ConfidenceLevel, {
     textColor: 'text-green-700 dark:text-green-300'
   },
   medium: {
-    icon: AlertCircle,
+    icon: ICON_REGISTRY['alert-circle'],
     label: '신뢰도 보통',
     iconColor: 'text-yellow-600 dark:text-yellow-500',
     bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
@@ -193,7 +179,7 @@ export const CONFIDENCE_CONFIGS: Record<ConfidenceLevel, {
     textColor: 'text-yellow-700 dark:text-yellow-300'
   },
   low: {
-    icon: AlertOctagon,
+    icon: ICON_REGISTRY['alert-octagon'],
     label: '신뢰도 낮음',
     iconColor: 'text-red-600 dark:text-red-500',
     bgColor: 'bg-red-50 dark:bg-red-900/20',
@@ -206,10 +192,10 @@ export const CONFIDENCE_CONFIGS: Record<ConfidenceLevel, {
  * 법령 타입별 아이콘
  */
 export const LAW_TYPE_ICONS = {
-  law: Scale,        // 법률
-  ordinance: BookOpen, // 조례
-  ai: Brain,         // AI 검색
-  sparkles: Sparkles // AI 특수 효과
+  law: ICON_REGISTRY['scale'],        // 법률
+  ordinance: ICON_REGISTRY['book-open'], // 조례
+  ai: ICON_REGISTRY['brain'],         // AI 검색
+  sparkles: ICON_REGISTRY['sparkles'] // AI 특수 효과
 } as const
 
 /**

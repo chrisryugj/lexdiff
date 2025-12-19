@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { debugLogger, type LogEntry, type LogLevel } from "@/lib/debug-logger"
-import { Terminal, Trash2, ChevronDown, ChevronUp, Filter, Copy, Check, Minimize2 } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { useToast } from "@/hooks/use-toast"
 
 export function DebugConsole() {
@@ -98,7 +98,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
         size="icon"
         title="디버그 콘솔 열기"
       >
-        <Terminal className="h-5 w-5" />
+        <Icon name="terminal" className="h-5 w-5" />
         {logs.length > 0 && (
           <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
             {logs.length}
@@ -112,7 +112,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
     <Card className="fixed bottom-0 left-0 right-0 z-50 rounded-none border-t-2 border-[var(--color-debug-border)] bg-[var(--color-debug-bg)]">
       <div className="flex items-center justify-between border-b border-[var(--color-debug-border)] px-4 py-2">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-primary" />
+          <Icon name="terminal" className="h-4 w-4 text-primary" />
           <span className="font-mono text-sm font-semibold text-foreground">디버그 콘솔</span>
           <Badge variant="outline" className="font-mono text-xs">
             {filteredLogs.length} logs
@@ -120,7 +120,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <Filter className="h-3 w-3 text-muted-foreground" />
+            <Icon name="filter" className="h-3 w-3 text-muted-foreground" />
             <select
               value={filterLevel}
               onChange={(e) => setFilterLevel(e.target.value as LogLevel | "all")}
@@ -135,7 +135,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
             </select>
           </div>
           <Button variant="ghost" size="sm" onClick={() => debugLogger.clear()} className="h-7 px-2">
-            <Trash2 className="h-3 w-3" />
+            <Icon name="trash" className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"
@@ -144,7 +144,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
             className="h-7 px-2"
             title="좌측 하단으로 축소"
           >
-            <Minimize2 className="h-4 w-4" />
+            <Icon name="maximize" className="h-4 w-4" />
           </Button>
           {isExpanded && (
             <Button
@@ -154,7 +154,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
               className="h-7 px-2"
               title={isMinimized ? "확장" : "최소화"}
             >
-              {isMinimized ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <Icon name={isMinimized ? "chevron-up" : "chevron-down"} className="h-4 w-4" />
             </Button>
           )}
           <Button
@@ -164,7 +164,7 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
             className="h-7 px-2"
             title={isExpanded ? "접기" : "펼치기"}
           >
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            <Icon name={isExpanded ? "chevron-down" : "chevron-up"} className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -207,14 +207,14 @@ ${log.message}${log.details ? `\n\n상세 정보:\n${JSON.stringify(log.details,
                           title="로그 복사"
                         >
                           {copiedId === log.id ? (
-                            <Check className="h-3 w-3 text-green-500" />
+                            <Icon name="check" className="h-3 w-3 text-green-500" />
                           ) : (
-                            <Copy className="h-3 w-3" />
+                            <Icon name="copy" className="h-3 w-3" />
                           )}
                         </Button>
                         {hasDetails && (
                           <div className="text-muted-foreground">
-                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            <Icon name={isExpanded ? "chevron-up" : "chevron-down"} className="h-3 w-3" />
                           </div>
                         )}
                       </div>

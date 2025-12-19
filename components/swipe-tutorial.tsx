@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, X } from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -49,7 +49,7 @@ export function SwipeTutorial({ onComplete }: SwipeTutorialProps) {
           onClick={() => handleDismiss(false)}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
         >
-          <X className="h-5 w-5" />
+          <Icon name="x" className="h-5 w-5" />
         </button>
 
         {/* Title */}
@@ -61,12 +61,12 @@ export function SwipeTutorial({ onComplete }: SwipeTutorialProps) {
         <div className="relative h-32 bg-secondary/30 rounded-lg mb-6 overflow-hidden">
           {/* Left arrow animation */}
           <div className="absolute inset-y-0 left-0 flex items-center animate-swipe-left">
-            <ChevronLeft className="h-12 w-12 text-primary" strokeWidth={3} />
+            <Icon name="chevron-left" className="h-12 w-12 text-primary" strokeWidth={3} />
           </div>
 
           {/* Right arrow animation */}
           <div className="absolute inset-y-0 right-0 flex items-center animate-swipe-right">
-            <ChevronRight className="h-12 w-12 text-primary" strokeWidth={3} />
+            <Icon name="chevron-right" className="h-12 w-12 text-primary" strokeWidth={3} />
           </div>
 
           {/* Center text */}
@@ -81,11 +81,11 @@ export function SwipeTutorial({ onComplete }: SwipeTutorialProps) {
         {/* Instructions */}
         <div className="space-y-2 mb-6">
           <div className="flex items-center gap-2 text-sm">
-            <ChevronLeft className="h-4 w-4 text-primary flex-shrink-0" />
+            <Icon name="chevron-left" className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-foreground">왼쪽 스와이프: 다음 조문</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <ChevronRight className="h-4 w-4 text-primary flex-shrink-0" />
+            <Icon name="chevron-right" className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-foreground">오른쪽 스와이프: 이전 조문</span>
           </div>
         </div>
@@ -141,12 +141,12 @@ export function SwipeHint({ direction, onDismiss }: SwipeHintProps) {
       >
         {direction === "right" ? (
           <>
-            <ChevronRight className="h-4 w-4" />
+            <Icon name="chevron-right" className="h-4 w-4" />
             <span className="text-sm font-medium">이전 조문</span>
           </>
         ) : (
           <>
-            <ChevronLeft className="h-4 w-4" />
+            <Icon name="chevron-left" className="h-4 w-4" />
             <span className="text-sm font-medium">다음 조문</span>
           </>
         )}
@@ -185,16 +185,16 @@ export function SwipeFeedback({ direction, progress }: SwipeFeedbackProps) {
         }}
       >
         {isLeft ? (
-          <ChevronLeft
+          <Icon
+            name="chevron-left"
             className="h-8 w-8 text-primary"
             strokeWidth={3}
-            style={{ transform: `translateX(-${(1 - progress) * 20}px)` }}
           />
         ) : (
-          <ChevronRight
+          <Icon
+            name="chevron-right"
             className="h-8 w-8 text-primary"
             strokeWidth={3}
-            style={{ transform: `translateX(${(1 - progress) * 20}px)` }}
           />
         )}
       </div>

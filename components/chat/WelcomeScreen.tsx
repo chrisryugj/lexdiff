@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Scale, FileText, GitCompare, HelpCircle, Sparkles } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface WelcomeScreenProps {
   onExampleClick: (query: string, mode: 'law' | 'ai') => void
@@ -9,28 +9,28 @@ interface WelcomeScreenProps {
 
 const EXAMPLES = [
   {
-    icon: FileText,
+    icon: 'file-text',
     text: '관세법 제38조',
     description: '특정 조문 바로가기',
     mode: 'law' as const,
     color: 'blue'
   },
   {
-    icon: HelpCircle,
+    icon: 'help-circle',
     text: '관세법 신고납부 요건이 뭐야?',
     description: '요건/조건 질문',
     mode: 'ai' as const,
     color: 'purple'
   },
   {
-    icon: GitCompare,
+    icon: 'git-compare',
     text: '징계처분과 해임의 차이',
     description: '비교 질문',
     mode: 'ai' as const,
     color: 'purple'
   },
   {
-    icon: Sparkles,
+    icon: 'sparkles',
     text: '지방세 감면 특례 대상은?',
     description: '면제/특례 질문',
     mode: 'ai' as const,
@@ -73,10 +73,10 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-4">
         <div className="relative">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-xl shadow-purple-500/20">
-            <Scale className="w-8 h-8 text-white" />
+            <Icon name="scale" className="w-8 h-8 text-white" />
           </div>
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center border-2 border-background">
-            <Sparkles className="w-3 h-3 text-white" />
+            <Icon name="sparkles" className="w-3 h-3 text-white" />
           </div>
         </div>
       </motion.div>
@@ -110,7 +110,6 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
         className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl"
       >
         {EXAMPLES.map((example) => {
-          const Icon = example.icon
           return (
             <button
               key={example.text}
@@ -132,7 +131,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
                   : 'bg-purple-500/10 text-purple-500'
                 }
               `}>
-                <Icon className="w-5 h-5" />
+                <Icon name={example.icon} className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">

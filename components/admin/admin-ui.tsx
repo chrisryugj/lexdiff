@@ -4,16 +4,17 @@
  */
 
 import { ReactNode } from 'react'
-import { LucideIcon } from 'lucide-react'
+import { IconType } from '@/lib/icons'
+import { Icon } from '@/components/ui/icon'
 
 interface StatCardProps {
   label: string
   value: number | string
-  icon?: LucideIcon
+  icon?: IconType
   variant?: 'default' | 'primary' | 'accent' | 'warning'
 }
 
-export function StatCard({ label, value, icon: Icon, variant = 'default' }: StatCardProps) {
+export function StatCard({ label, value, icon: iconName, variant = 'default' }: StatCardProps) {
   const variants = {
     default: 'from-card/50 to-card/30 border-border/50',
     primary: 'from-primary/10 via-primary/5 to-transparent border-primary/20',
@@ -32,15 +33,15 @@ export function StatCard({ label, value, icon: Icon, variant = 'default' }: Stat
     <div
       className={`p-4 bg-gradient-to-br ${variants[variant]} backdrop-blur-sm rounded-xl border shadow-sm hover:shadow-md transition-shadow`}
     >
-      {Icon && (
+      {iconName && (
         <div className="flex items-center gap-2 mb-2">
           <div className={`p-1.5 rounded-lg ${variant === 'default' ? 'bg-muted' : `bg-${variant}/20`}`}>
-            <Icon className={`h-4 w-4 ${textColors[variant]}`} />
+            <Icon name={iconName} className={`h-4 w-4 ${textColors[variant]}`} />
           </div>
           <div className={`text-sm font-medium ${textColors[variant]}`}>{label}</div>
         </div>
       )}
-      {!Icon && <div className={`text-sm ${textColors[variant]} mb-1`}>{label}</div>}
+      {!iconName && <div className={`text-sm ${textColors[variant]} mb-1`}>{label}</div>}
       <div className={`text-3xl font-bold ${textColors[variant]}`}>{value}</div>
     </div>
   )

@@ -433,7 +433,7 @@ export function AIAnswerContent({
                                 <Icon name="zoom-out" size={16} />
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
-                                <Icon name="rotate-cw" size={12} />
+                                <Icon name="rotate-clockwise" size={12} />
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
                                 <Icon name="zoom-in" size={16} />
@@ -460,7 +460,7 @@ export function AIAnswerContent({
                         <Icon name="zoom-out" size={16} />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize(15)} title="기본 크기">
-                        <Icon name="rotate-cw" size={12} />
+                        <Icon name="rotate-clockwise" size={12} />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setFontSize((prev) => Math.min(20, prev + 2))} title="글자 크게">
                         <Icon name="zoom-in" size={16} />

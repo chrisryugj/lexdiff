@@ -8,7 +8,7 @@
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Upload } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface UploadResult {
   success: boolean
@@ -319,12 +319,12 @@ export function DocumentUploadPanel({ onUploadComplete }: DocumentUploadPanelPro
         >
           {uploading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Icon name="loader" className="w-4 h-4 animate-spin" />
               업로드 중
             </>
           ) : (
             <>
-              <Upload className="w-4 h-4" />
+              <Icon name="upload" className="w-4 h-4" />
               업로드 ({selectedFiles.length})
             </>
           )}

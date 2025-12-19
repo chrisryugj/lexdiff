@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Search } from 'lucide-react'
+import { Icon } from '@/components/ui/icon'
 
 interface ParsedLaw {
   lawId: string
@@ -155,12 +155,12 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Icon name="loader" className="h-4 w-4 animate-spin" />
               검색 중...
             </>
           ) : (
             <>
-              <Search className="h-4 w-4" />
+              <Icon name="search" className="h-4 w-4" />
               검색
             </>
           )}
@@ -213,7 +213,7 @@ export function LawParserPanel({ onParsed }: LawParserPanelProps) {
                         {candidate.revisionType && ` · ${candidate.revisionType}`}
                       </div>
                     </div>
-                    {isLoading && <Loader2 className="h-5 w-5 text-primary animate-spin ml-3" />}
+                    {isLoading && <Icon name="loader" className="h-5 w-5 text-primary animate-spin ml-3" />}
                   </div>
                 </button>
               )
