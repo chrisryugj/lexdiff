@@ -4,6 +4,44 @@
 
 ---
 
+## 2025-12-20: 법률 데이터 API 시스템 추가
+
+korean-law-mcp 프로젝트 기능을 lexdiff에 도입
+
+### 추가된 API (9개)
+
+| API | target | 용도 |
+|-----|--------|------|
+| `/api/precedent-search` | prec | 판례 검색 |
+| `/api/precedent-text` | prec | 판례 전문 |
+| `/api/interpretation-search` | expc | 해석례 검색 |
+| `/api/interpretation-text` | expc | 해석례 전문 |
+| `/api/search-all` | law,admrul,ordin | 통합 검색 |
+| `/api/tax-tribunal-search` | ttSpecialDecc | 조세심판원 검색 |
+| `/api/tax-tribunal-text` | ttSpecialDecc | 조세심판원 전문 |
+| `/api/customs-search` | kcsCgmExpc | 관세청 검색 |
+| `/api/customs-text` | kcsCgmExpc | 관세청 전문 |
+
+### 추가된 lib/hooks/components
+
+| 파일 | 역할 |
+|------|------|
+| `lib/precedent-parser.ts` | XML/JSON 파서 |
+| `lib/precedent-cache.ts` | IndexedDB 캐시 |
+| `hooks/use-precedents.ts` | 판례 데이터 훅 |
+| `hooks/use-law-viewer-precedents.ts` | law-viewer 통합 훅 |
+| `components/precedent-section.tsx` | 판례 UI |
+
+### 수정된 파일
+
+- `components/law-viewer.tsx`: 판례 섹션 연동
+
+### 문서
+
+- `important-docs/07-LEGAL_DATA_API_GUIDE.md` 추가
+
+---
+
 ## 2025-11-30: CLAUDE.md 전역/프로젝트 설정 다이어트
 
 ### 전역 설정 (v2.4 → v2.5)
