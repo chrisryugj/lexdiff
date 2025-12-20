@@ -1,15 +1,16 @@
 # LexDiff - 한국 법령 비교 및 AI 검색 시스템
 
-검색어만 입력하면 현행 조문 원문과 신·구법 대조를 한 화면에서 확인하고, **AI 자연어 검색**(Google File Search RAG)과 **3단 비교**(법률-시행령-시행규칙), **행정규칙 조회**까지 가능한 전문가용 법령 분석 도구입니다.
+검색어만 입력하면 현행 조문 원문과 신·구법 대조를 한 화면에서 확인하고, **AI 자연어 검색**(Google File Search RAG + Gemini 3.0 Flash)과 **3단 비교**(법률-시행령-시행규칙), **행정규칙 조회**, **판례/해석례 검색**까지 가능한 전문가용 법령 분석 도구입니다.
 
 ## 주요 기능
 
 ### 1. AI 자연어 검색 (Google File Search RAG)
 - **자연어 질문으로 법령 검색**: "수출통관 시 필요한 서류는?", "청년 창업 지원 내용은?"
-- **실시간 스트리밍 답변**: Google Gemini 2.5 Flash 기반 SSE 스트리밍
+- **실시간 스트리밍 답변**: Google Gemini 3.0 Flash 기반 SSE 스트리밍
+- **2-Tier AI 라우팅**: 질문 유형별 최적화된 프롬프트 선택
 - **인용 출처 표시**: 답변 근거가 된 법령 조문 자동 링크 (클릭 시 모달)
 - **통합 링크 시스템**: 모든 법령 참조를 클릭 가능한 링크로 변환
-- **진행 상태 시각화**: 검색 → 분석 → 답변 생성 과정 실시간 표시
+- **4단계 진행 시각화**: 검색 → 분석 → 답변생성 → 완료 (타이핑 효과)
 
 ### 2. 법령 검색 및 조회
 - 자유 텍스트 검색 (예: "관세법 38조", "관세법 제10조의2")
@@ -47,12 +48,19 @@
 - 메타데이터 표시 (시행일, 공포일/번호, 제개정구분)
 
 ### 7. AI 변경 요약
-- Google Gemini 2.5 Flash 기반 자동 요약
+- Google Gemini 3.0 Flash 기반 자동 요약
 - 핵심 변경점 3-5개 불릿 포인트
 - 용어 변경 vs 실질 내용 변경 구분
 - 요약 복사 기능
 
-### 8. 즐겨찾기 & 디버그 콘솔
+### 8. 판례/해석례 검색 (NEW)
+- **판례 검색**: 대법원/하급심 판례 검색 및 전문 조회
+- **해석례 검색**: 법령해석 사례 검색
+- **조세심판원 재결례**: 조세 관련 재결례 검색
+- **관세청 법령해석**: 관세청 해석 사례 검색
+- **통합 검색**: 법령+행정규칙+자치법규 병렬 검색
+
+### 9. 즐겨찾기 & 디버그 콘솔
 - 조문별 즐겨찾기 저장 (로컬 스토리지)
 - 실시간 디버그 콘솔 (모든 API 호출, 파싱 과정, 오류 로깅)
 - 기본 축소 상태
@@ -62,8 +70,8 @@
 | Category | Technology |
 |----------|------------|
 | **Frontend** | Next.js 16, React 19, TypeScript 5 |
-| **UI** | Tailwind CSS v4, shadcn/ui, Radix UI |
-| **AI** | Gemini 2.5 Flash (File Search RAG, 요약) |
+| **UI** | Tailwind CSS v4, shadcn/ui, Radix UI, hugeicons |
+| **AI** | Gemini 3.0 Flash (File Search RAG, 요약, 2-Tier 라우팅) |
 | **API** | 법제처 법령 API (law.go.kr) - 49개 엔드포인트 |
 | **State** | React Hooks + localStorage + IndexedDB |
 | **Database** | Turso/LibSQL (학습 데이터) |
@@ -279,6 +287,18 @@ MIT
 - 접속: `http://localhost:3000`
 
 ## 최근 주요 업데이트
+
+### 2025-12-20: 판례/해석례 API 시스템 + 12월 종합 개선
+1. **판례/해석례 검색 API 9개 추가** (korean-law-mcp 기능 도입)
+   - 판례 검색/조회 (precedent-search, precedent-text)
+   - 해석례 검색/조회 (interpretation-search, interpretation-text)
+   - 조세심판원 재결례 (tax-tribunal-search, tax-tribunal-text)
+   - 관세청 법령해석 (customs-search, customs-text)
+   - 통합 검색 (search-all) - 법령+행정규칙+자치법규 병렬 검색
+2. **Gemini 3.0 Flash 업그레이드**: 2-Tier AI 라우팅 시스템
+3. **아이콘 시스템 마이그레이션**: lucide-react → hugeicons
+4. **별표/별지 모달 개선**: AI 답변 뷰에서 별표 지원
+5. **4단계 로딩 UX**: 타이핑 효과 애니메이션
 
 ### 2025-12-13: 테스트 인프라 대폭 강화, 보안 강화, CI/CD 구축
 1. **Vitest 테스트 프레임워크 도입**: **314개 테스트 케이스** (153개 → 314개, +105%)
