@@ -33,12 +33,14 @@ import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { DelegationPanel } from "@/components/law-viewer-delegation-panel"
+import { PrecedentSection, PrecedentDetailPanel } from "@/components/precedent-section"
 import { CopyButton } from "@/components/ui/copy-button"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
 import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
+import { useLawViewerPrecedents } from "@/hooks/use-law-viewer-precedents"
 import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
 import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
@@ -210,6 +212,25 @@ export function LawViewer({
     handleViewAdminRuleFullContent,
     getLawGoKrLink,
   } = useLawViewerAdminRules(activeArticleNumber || "", meta)
+
+  // Precedents Hook (판례 데이터)
+  const {
+    showPrecedents,
+    setShowPrecedents,
+    precedentViewMode,
+    setPrecedentViewMode,
+    selectedPrecedent,
+    precedentPanelSize,
+    setPrecedentPanelSize,
+    loadingDetail: loadingPrecedentDetail,
+    precedents,
+    totalCount: precedentTotalCount,
+    loadingPrecedents,
+    precedentsError,
+    handleViewPrecedentDetail,
+    expandToSidePanel: expandPrecedentPanel,
+    collapseToBottom: collapsePrecedentPanel,
+  } = useLawViewerPrecedents(activeArticleNumber || "", meta)
 
   // Update loadedArticles when props.articles changes
   useEffect(() => {
@@ -971,6 +992,20 @@ export function LawViewer({
                         <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
                       </Button>
                     )}
+                    {/* 판례 보기 버튼 */}
+                    {!aiAnswerMode && (
+                      <Button
+                        variant={showPrecedents ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowPrecedents(!showPrecedents)}
+                        title="관련 판례 보기"
+                        className="h-7 px-1.5 sm:px-2 shrink-0"
+                      >
+                        <Icon name="scale" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
+                        <span className="sm:hidden">{showPrecedents ? "닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
+                      </Button>
+                    )}
                     {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
                     <Button
                       key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
@@ -1206,6 +1241,24 @@ export function LawViewer({
                           <RevisionHistory
                             history={revisionHistory}
                             articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
+                          />
+                        </div>
+                      )}
+
+                      {/* 판례 섹션 - 하단 모드 */}
+                      {showPrecedents && precedentViewMode === "bottom" && (
+                        <div className="mt-8">
+                          <PrecedentSection
+                            precedents={precedents}
+                            totalCount={precedentTotalCount}
+                            loading={loadingPrecedents}
+                            error={precedentsError}
+                            selectedPrecedent={selectedPrecedent}
+                            loadingDetail={loadingPrecedentDetail}
+                            viewMode={precedentViewMode}
+                            onViewDetail={handleViewPrecedentDetail}
+                            onExpand={expandPrecedentPanel}
+                            onCollapse={collapsePrecedentPanel}
                           />
                         </div>
                       )}
