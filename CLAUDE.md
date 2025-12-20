@@ -8,6 +8,7 @@
 |----------|------|------|
 | 🔴 | [JSON→HTML 파싱](important-docs/03-JSON_TO_HTML_FLOW.md) | API→HTML 파이프라인, extractArticleText() |
 | 🔴 | [RAG Architecture](important-docs/05-RAG_ARCHITECTURE.md) | SSE 버퍼, XML/JSON 파싱 |
+| 🔴 | [Legal Data API](important-docs/07-LEGAL_DATA_API_GUIDE.md) | 판례/해석례/재결례 API |
 | 🟡 | [Debugging Guide](important-docs/02-DEBUGGING_GUIDE.md) | 에러 패턴, Debug Console |
 | 🟢 | [Change Log](important-docs/01-CHANGELOG.md) | 변경 이력 |
 
@@ -58,9 +59,9 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 
 한국 법령 비교 시스템 + Google File Search RAG AI 검색
 - 법제처 API (law.go.kr) 연동
-- AI: Gemini 2.5 Flash (RAG, 요약)
+- AI: Gemini 3.0 Flash (RAG, 요약, 2-Tier 라우팅)
 
-**핵심**: AI 검색, 3단 비교, 행정규칙 조회, 통합 링크 시스템
+**핵심**: AI 검색, 3단 비교, 행정규칙 조회, 판례/해석례 연동, 통합 링크 시스템
 
 ---
 
@@ -115,8 +116,8 @@ LAW_OC=ryuseungin curl "https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=
 | 분류 | 기술 |
 |------|------|
 | Framework | Next.js 16, React 19, TypeScript 5 |
-| Styling | Tailwind CSS v4, shadcn/ui |
-| AI | Gemini 2.5 Flash, `@google/genai` |
+| Styling | Tailwind CSS v4, shadcn/ui, hugeicons |
+| AI | Gemini 3.0 Flash, `@google/genai`, 2-Tier 라우팅 |
 | State | React Hooks + IndexedDB |
 | DB | Turso/LibSQL |
 
@@ -128,10 +129,13 @@ LAW_OC=ryuseungin curl "https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=
 |------|------|
 | `lib/unified-link-generator.ts` | 통합 링크 시스템 (핵심) |
 | `lib/law-parser.ts` | JO 코드 파서 |
-| `components/search-result-view.tsx` | 검색 결과 ⚠️ 2,340줄 |
+| `lib/precedent-parser.ts` | 판례 XML/JSON 파서 |
+| `components/search-result-view.tsx` | 검색 결과 |
 | `components/law-viewer.tsx` | 법령 뷰어 |
+| `components/precedent-section.tsx` | 판례 섹션 |
 | `app/api/file-search-rag/` | RAG SSE API |
+| `app/api/precedent-*` | 판례 검색/조회 API |
 
 ---
 
-**버전**: 2.5 | **업데이트**: 2025-11-30
+**버전**: 2.6 | **업데이트**: 2025-12-20
