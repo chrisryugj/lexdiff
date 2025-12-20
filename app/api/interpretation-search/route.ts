@@ -1,0 +1,117 @@
+/**
+ * 법령해석례 검색 API
+ * 법제처 Open API (target=expc) 사용
+ */
+
+import { NextRequest, NextResponse } from "next/server"
+
+export interface InterpretationSearchResult {
+  id: string           // 법령해석례일련번호
+  name: string         // 안건명
+  number: string       // 안건번호
+  date: string         // 회신일자
+  agency: string       // 해석기관명
+  link: string         // 상세링크
+}
+
+function parseInterpretationSearchXML(xml: string): {
+  totalCount: number
+  interpretations: InterpretationSearchResult[]
+} {
+  const interpretations: InterpretationSearchResult[] = []
+
+  const totalCntMatch = xml.match(/<totalCnt>([^<]*)<\/totalCnt>/)
+  const totalCount = totalCntMatch ? parseInt(totalCntMatch[1], 10) : 0
+
+  const expcMatches = xml.matchAll(/<expc[^>]*>([\s\S]*?)<\/expc>/g)
+
+  for (const match of expcMatches) {
+    const expcContent = match[1]
+
+    const extractTag = (tag: string): string => {
+      const cdataRegex = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`)
+      const cdataMatch = expcContent.match(cdataRegex)
+      if (cdataMatch) return cdataMatch[1].trim()
+
+      const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`)
+      const tagMatch = expcContent.match(regex)
+      return tagMatch ? tagMatch[1].trim() : ""
+    }
+
+    interpretations.push({
+      id: extractTag("법령해석례일련번호"),
+      name: extractTag("안건명"),
+      number: extractTag("안건번호"),
+      date: extractTag("회신일자"),
+      agency: extractTag("회신기관명"),
+      link: extractTag("법령해석례상세링크")
+    })
+  }
+
+  return { totalCount, interpretations }
+}
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const query = searchParams.get("query")
+  const display = searchParams.get("display") || "20"
+  const page = searchParams.get("page") || "1"
+  const sort = searchParams.get("sort")
+
+  if (!query) {
+    return NextResponse.json(
+      { error: "query 파라미터가 필요합니다" },
+      { status: 400 }
+    )
+  }
+
+  const apiKey = process.env.LAW_OC
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "LAW_OC 환경변수가 설정되지 않았습니다" },
+      { status: 500 }
+    )
+  }
+
+  try {
+    const params = new URLSearchParams({
+      OC: apiKey,
+      target: "expc",
+      type: "XML",
+      query,
+      display,
+      page,
+    })
+
+    if (sort) params.append("sort", sort)
+
+    const url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`API 오류: ${response.status}`)
+    }
+
+    const xmlText = await response.text()
+
+    if (xmlText.includes("<!DOCTYPE html") || xmlText.includes("<html>")) {
+      throw new Error("법제처 API가 에러 페이지를 반환했습니다")
+    }
+
+    const { totalCount, interpretations } = parseInterpretationSearchXML(xmlText)
+
+    return NextResponse.json({
+      totalCount,
+      interpretations,
+      page: parseInt(page, 10),
+      display: parseInt(display, 10)
+    })
+
+  } catch (error) {
+    console.error("[interpretation-search] Error:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "해석례 검색 중 오류 발생" },
+      { status: 500 }
+    )
+  }
+}
