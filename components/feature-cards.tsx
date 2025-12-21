@@ -113,10 +113,8 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
             법률 인텔리전스
           </AuroraText>
         </h3>
-        <p className="text-lg max-w-xl">
-          <AnimatedShinyText className="text-muted-foreground/70">
-            LexDiff가 제공하는 강력한 법령 검색 도구
-          </AnimatedShinyText>
+        <p className="text-lg max-w-xl text-muted-foreground/70">
+          LexDiff가 제공하는 강력한 법령 검색 도구
         </p>
       </div>
 
