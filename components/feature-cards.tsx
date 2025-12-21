@@ -4,6 +4,8 @@ import { useRef, useState, useEffect } from "react"
 import { Icon } from "@/components/ui/icon"
 import { AuroraText } from "@/components/ui/aurora-text"
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
+import { MagicCard } from "@/components/ui/magic-card"
+import { cn } from "@/lib/utils"
 
 // 행별로 그룹화된 features
 const rows = [
@@ -14,7 +16,6 @@ const rows = [
       description: "일상 언어로 질문하면 AI가 관련 법령을 찾아 실시간으로 답변합니다.",
       icon: "search",
       colSpan: "col-span-1 md:col-span-2",
-      gradient: "from-blue-500/15 to-purple-500/15",
       iconColor: "text-blue-400",
     },
     {
@@ -22,7 +23,6 @@ const rows = [
       description: "법률 문맥을 이해하는 고성능 AI가 핵심 내용을 요약합니다.",
       icon: "brain",
       colSpan: "col-span-1",
-      gradient: "",
       iconColor: "text-purple-400",
     },
   ],
@@ -33,7 +33,6 @@ const rows = [
       description: "개정 전후의 법령 변화를 시각적으로 비교하고 분석합니다.",
       icon: "git-compare",
       colSpan: "col-span-1",
-      gradient: "",
       iconColor: "text-emerald-400",
     },
     {
@@ -41,7 +40,6 @@ const rows = [
       description: "법률-시행령-시행규칙을 한눈에 비교하고 위임관계를 파악합니다.",
       icon: "scale",
       colSpan: "col-span-1 md:col-span-2",
-      gradient: "from-purple-500/15 to-blue-500/15",
       iconColor: "text-amber-400",
     },
   ],
@@ -52,7 +50,6 @@ const rows = [
       description: "법제처 API와 실시간 연동하여 항상 최신 법령 정보를 제공합니다.",
       icon: "zap",
       colSpan: "col-span-1",
-      gradient: "",
       iconColor: "text-orange-400",
     },
     {
@@ -60,7 +57,6 @@ const rows = [
       description: "법률과 연관된 시행령, 시행규칙, 행정규칙(고시, 훈령, 예규)을 자동으로 찾아드립니다.",
       icon: "shield-check",
       colSpan: "col-span-1 md:col-span-2",
-      gradient: "from-cyan-500/15 to-blue-500/15",
       iconColor: "text-cyan-400",
     },
   ],
@@ -133,31 +129,48 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
             style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
           >
             {row.map((feature, cardIndex) => {
-              const hasBg = feature.gradient !== ""
               return (
-                <div
+                <MagicCard
                   key={cardIndex}
-                  className={`${feature.colSpan} group bento-card relative overflow-hidden ${hasBg ? `bg-gradient-to-br ${feature.gradient}` : ''}`}
+                  className={cn(
+                    feature.colSpan,
+                    "cursor-pointer rounded-xl"
+                  )}
+                  gradientSize={200}
+                  gradientColor="#262626"
+                  gradientOpacity={0.8}
+                  gradientFrom="#9E7AFF"
+                  gradientTo="#FE8BBB"
                 >
-              {/* Background Icon */}
-              <div className="absolute top-0 right-0 p-6 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500">
-                <Icon name={feature.icon} className="w-20 h-20 md:w-24 md:h-24 text-foreground transform group-hover:scale-110 transition-transform duration-500" />
-              </div>
+                  <div className="group relative flex flex-col justify-between p-5 h-full overflow-hidden">
+                    {/* Background Icon */}
+                    <div className="absolute top-0 right-0 p-4 opacity-[0.05] transition-opacity duration-500 group-hover:opacity-[0.1]">
+                      <Icon
+                        name={feature.icon}
+                        className="h-16 w-16 md:h-20 md:w-20 text-foreground"
+                      />
+                    </div>
 
-              {/* Content */}
-              <div className="relative z-10">
-                {/* Icon */}
-                <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-4 backdrop-blur-sm group-hover:bg-foreground/10 transition-colors duration-300">
-                  <Icon name={feature.icon} className={`w-5 h-5 ${feature.iconColor}`} />
-                </div>
-                <h4 className="text-lg font-bold text-foreground mb-1.5">
-                  {feature.title}
-                </h4>
-                <p className="text-sm text-muted-foreground/70 leading-relaxed break-keep">
-                  {feature.description}
-                </p>
-              </div>
-            </div>
+                    {/* Content */}
+                    <div className="relative z-10">
+                      <div className="pointer-events-none flex transform-gpu flex-col gap-3 transition-all duration-300">
+                        <Icon
+                          name={feature.icon}
+                          className={cn(
+                            "h-12 w-12 origin-left transform-gpu transition-all duration-300 ease-in-out",
+                            feature.iconColor
+                          )}
+                        />
+                        <h4 className="text-lg font-bold text-foreground">
+                          {feature.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground/70 leading-relaxed break-keep">
+                          {feature.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </MagicCard>
               )
             })}
           </div>
