@@ -40,7 +40,12 @@ export function usePrecedents(
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    if (!enabled || !lawName || !articleNumber) {
+    // enabled가 false일 때는 데이터 유지 (UI만 숨김)
+    if (!enabled) {
+      return
+    }
+
+    if (!lawName || !articleNumber) {
       setPrecedents([])
       setTotalCount(0)
       setLoading(false)

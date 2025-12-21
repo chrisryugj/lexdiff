@@ -171,15 +171,15 @@ function PrecedentListItem({
       )}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate">{precedent.name}</div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          <div className="font-medium text-sm line-clamp-2">{precedent.name}</div>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
             <span>{precedent.court}</span>
             <span>·</span>
-            <span>{precedent.caseNumber}</span>
+            <span className="truncate">{precedent.caseNumber}</span>
           </div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
             <span>선고일: {formatPrecedentDate(precedent.date)}</span>
             {precedent.type && (
               <>
@@ -194,7 +194,7 @@ function PrecedentListItem({
             href={precedent.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-primary"
+            className="shrink-0 text-muted-foreground hover:text-primary mt-0.5"
             onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink className="h-4 w-4" />
@@ -251,9 +251,10 @@ export function PrecedentDetailPanel({
         {detail.holdings && (
           <div>
             <h4 className="font-semibold text-sm mb-2 text-primary">판시사항</h4>
-            <div className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
-              {detail.holdings}
-            </div>
+            <div
+              className="text-sm leading-relaxed bg-muted/30 p-3 rounded-lg"
+              dangerouslySetInnerHTML={{ __html: detail.holdings }}
+            />
           </div>
         )}
 
@@ -261,9 +262,10 @@ export function PrecedentDetailPanel({
         {detail.summary && (
           <div>
             <h4 className="font-semibold text-sm mb-2 text-primary">판결요지</h4>
-            <div className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
-              {detail.summary}
-            </div>
+            <div
+              className="text-sm leading-relaxed bg-muted/30 p-3 rounded-lg"
+              dangerouslySetInnerHTML={{ __html: detail.summary }}
+            />
           </div>
         )}
 
@@ -271,9 +273,10 @@ export function PrecedentDetailPanel({
         {detail.refStatutes && (
           <div>
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">참조조문</h4>
-            <div className="text-sm whitespace-pre-wrap">
-              {detail.refStatutes}
-            </div>
+            <div
+              className="text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: detail.refStatutes }}
+            />
           </div>
         )}
 
@@ -281,9 +284,10 @@ export function PrecedentDetailPanel({
         {detail.refPrecedents && (
           <div>
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">참조판례</h4>
-            <div className="text-sm whitespace-pre-wrap">
-              {detail.refPrecedents}
-            </div>
+            <div
+              className="text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: detail.refPrecedents }}
+            />
           </div>
         )}
 
@@ -291,9 +295,10 @@ export function PrecedentDetailPanel({
         {detail.fullText && (
           <div>
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">판결 전문</h4>
-            <div className="text-sm whitespace-pre-wrap bg-muted/20 p-3 rounded-lg max-h-[400px] overflow-y-auto">
-              {detail.fullText}
-            </div>
+            <div
+              className="text-sm leading-relaxed bg-muted/20 p-3 rounded-lg max-h-[400px] overflow-y-auto"
+              dangerouslySetInnerHTML={{ __html: detail.fullText }}
+            />
           </div>
         )}
       </div>
