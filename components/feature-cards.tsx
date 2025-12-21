@@ -2,6 +2,8 @@
 
 import { useRef, useState, useEffect } from "react"
 import { Icon } from "@/components/ui/icon"
+import { AuroraText } from "@/components/ui/aurora-text"
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
 
 // 행별로 그룹화된 features
 const rows = [
@@ -107,12 +109,17 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
            style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
         <h3 className="text-3xl md:text-5xl font-bold text-foreground mb-4 leading-tight">
           압도적인 <br className="md:hidden" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+          <AuroraText
+            colors={["#c084fc", "#60a5fa", "#a78bfa", "#38bdf8"]}
+            speed={0.8}
+          >
             법률 인텔리전스
-          </span>
+          </AuroraText>
         </h3>
-        <p className="text-muted-foreground/70 text-lg max-w-xl">
-          LexDiff가 제공하는 강력한 법령 검색 도구
+        <p className="text-lg max-w-xl">
+          <AnimatedShinyText className="text-muted-foreground/70">
+            LexDiff가 제공하는 강력한 법령 검색 도구
+          </AnimatedShinyText>
         </p>
       </div>
 

@@ -4,6 +4,7 @@ import { SearchBar } from "@/components/search-bar"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeatureCards } from "@/components/feature-cards"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
@@ -239,11 +240,15 @@ export function SearchViewImproved({
               </motion.p>
               <motion.p
                 variants={itemVariants}
-                className="text-lg md:text-base text-muted-foreground/70 max-w-full md:max-w-2xl mx-auto leading-relaxed"
+                className="text-lg md:text-base max-w-full md:max-w-2xl mx-auto leading-relaxed"
                 style={{ fontFamily: "Pretendard, sans-serif" }}
               >
-                <span className="md:hidden">법령 검색부터 AI 분석까지,<br />대한민국 법률 정보를 가장 쉽고 빠르게</span>
-                <span className="hidden md:inline">법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게</span>
+                <AnimatedShinyText className="md:hidden text-muted-foreground/70">
+                  법령 검색부터 AI 분석까지,<br />대한민국 법률 정보를 가장 쉽고 빠르게
+                </AnimatedShinyText>
+                <AnimatedShinyText className="hidden md:inline text-muted-foreground/70">
+                  법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
+                </AnimatedShinyText>
               </motion.p>
             </div>
 
