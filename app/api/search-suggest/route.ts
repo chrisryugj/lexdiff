@@ -249,14 +249,21 @@ export async function GET(request: NextRequest) {
       const matchIndex = law.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
       let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
+      let suggestionText = law.name
 
-      // 조문 패턴 감지 시 법령 점수 대폭 상승 (AI 질문보다 우선)
+      // 조문 패턴 감지 시: "법령명 + 제X조" 형태로 제안
       if (articleMatch) {
         score += 100
+        // 원본 쿼리에서 조문 번호 추출 (예: "38조" → "제38조")
+        const articlePart = query.substring(articleMatch[1].length).trim()
+        const normalized = articlePart.replace(/^제?\s*(\d+)\s*조(의\s*\d+)?/, (_, num, sub) =>
+          `제${num}조${sub ? sub.replace(/\s+/g, '') : ''}`
+        )
+        suggestionText = `${law.name} ${normalized}`
       }
 
       suggestions.push({
-        text: law.name,
+        text: suggestionText,
         type: 'law',
         category: law.category,
         score
@@ -268,14 +275,20 @@ export async function GET(request: NextRequest) {
       const matchIndex = ordin.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = ordin.name.toLowerCase().startsWith(queryLower)
       let score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수
+      let suggestionText = ordin.name
 
-      // 조문 패턴 감지 시 조례 점수도 상승
+      // 조문 패턴 감지 시: "조례명 + 제X조" 형태로 제안
       if (articleMatch) {
         score += 100
+        const articlePart = query.substring(articleMatch[1].length).trim()
+        const normalized = articlePart.replace(/^제?\s*(\d+)\s*조(의\s*\d+)?/, (_, num, sub) =>
+          `제${num}조${sub ? sub.replace(/\s+/g, '') : ''}`
+        )
+        suggestionText = `${ordin.name} ${normalized}`
       }
 
       suggestions.push({
-        text: ordin.name,
+        text: suggestionText,
         type: 'law',  // UI에서는 법령과 동일하게 표시
         category: ordin.category,
         score
