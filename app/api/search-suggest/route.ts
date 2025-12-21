@@ -227,20 +227,33 @@ export async function GET(request: NextRequest) {
 
   // 1. 법제처 API에서 법령명 + 조례 검색 (2글자 이상, 병렬 호출)
   if (query.length >= 2) {
+    // 조문 패턴 감지 및 법령명 추출 (예: "관세법 38조" → "관세법")
+    let searchQuery = query
+    const articlePattern = /^(.+?)\s+(?:제?\s*\d+\s*조(?:의\s*\d+)?)/
+    const articleMatch = query.match(articlePattern)
+    if (articleMatch) {
+      searchQuery = articleMatch[1].trim()  // 법령명만 추출
+    }
+
     // 조례 키워드 감지
     const isOrdinanceQuery = /조례|규칙|자치법규|시|군|구/.test(query)
 
     // 병렬 검색: 법령 + 조례 (조례 키워드 있으면 조례도 검색)
     const [lawResults, ordinanceResults] = await Promise.all([
-      searchLawNames(query),
-      isOrdinanceQuery ? searchOrdinances(query) : Promise.resolve([])
+      searchLawNames(searchQuery),  // 추출된 법령명으로 검색
+      isOrdinanceQuery ? searchOrdinances(searchQuery) : Promise.resolve([])
     ])
 
     // 법령 결과 추가
     for (const law of lawResults) {
       const matchIndex = law.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
-      const score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
+      let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
+
+      // 조문 패턴 감지 시 법령 점수 대폭 상승 (AI 질문보다 우선)
+      if (articleMatch) {
+        score += 100
+      }
 
       suggestions.push({
         text: law.name,
@@ -254,7 +267,12 @@ export async function GET(request: NextRequest) {
     for (const ordin of ordinanceResults) {
       const matchIndex = ordin.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = ordin.name.toLowerCase().startsWith(queryLower)
-      const score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수
+      let score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수
+
+      // 조문 패턴 감지 시 조례 점수도 상승
+      if (articleMatch) {
+        score += 100
+      }
 
       suggestions.push({
         text: ordin.name,
