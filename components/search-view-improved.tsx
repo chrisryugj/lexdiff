@@ -174,7 +174,7 @@ export function SearchViewImproved({
                 }
               `}</style>
             </div>
-            <span className="text-sm md:text-base font-bold text-foreground whitespace-nowrap" style={{ fontFamily: "GiantsInline, sans-serif" }}>
+            <span className="text-sm md:text-base font-bold bg-gradient-to-l text-transparent bg-clip-text animate-text-gradient bg-[length:300%] from-zinc-500 via-zinc-950 to-zinc-600 dark:from-zinc-600 dark:via-zinc-100 dark:to-zinc-600 whitespace-nowrap" style={{ fontFamily: "GiantsInline, sans-serif" }}>
               LexDiff
             </span>
           </div>
@@ -222,7 +222,7 @@ export function SearchViewImproved({
             <div className="space-y-2 md:space-y-3 mb-6 md:mb-8 w-full">
               <motion.h1
                 variants={itemVariants}
-                className="text-6xl md:text-6xl font-bold text-foreground tracking-tight cursor-pointer hover:opacity-80 transition-opacity logo-glow"
+                className="text-6xl md:text-6xl font-bold bg-gradient-to-l text-transparent bg-clip-text animate-text-gradient bg-[length:300%] from-zinc-500 via-zinc-950 to-zinc-600 dark:from-zinc-600 dark:via-zinc-100 dark:to-zinc-600 tracking-tight cursor-pointer hover:opacity-80 transition-opacity logo-glow"
                 style={{ fontFamily: "GiantsInline, sans-serif" }}
                 onClick={handleLogoClick}
               >

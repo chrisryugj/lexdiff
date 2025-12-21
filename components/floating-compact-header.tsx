@@ -100,7 +100,7 @@ export function FloatingCompactHeader({
                       <Icon name="scale" size={20} className="text-white" />
                     </div>
                     <span
-                      className="hidden md:block text-lg lg:text-xl font-bold text-foreground"
+                      className="hidden md:block text-lg lg:text-xl font-bold bg-gradient-to-l text-transparent bg-clip-text animate-text-gradient bg-[length:300%] from-zinc-500 via-zinc-950 to-zinc-600 dark:from-zinc-600 dark:via-zinc-100 dark:to-zinc-600"
                       style={{ fontFamily: "GiantsInline, sans-serif" }}
                     >
                       LexDiff
