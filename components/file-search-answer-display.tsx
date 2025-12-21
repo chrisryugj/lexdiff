@@ -193,6 +193,10 @@ export function FileSearchAnswerDisplay({
 
     let processed = answer
 
+    // 🔧 마크다운 볼드 파싱 버그 수정: **텍스트**은 → **텍스트** 은 (제로폭 공백 삽입)
+    // remark-gfm이 **텍스트**바로조사 패턴을 파싱 못하는 문제 해결
+    processed = processed.replace(/\*\*([^*]+)\*\*([은는이가를을에의와과])/g, '**$1**\u200B$2')
+
     // 📖 관련 법령 섹션 처리
     const relatedLawsPattern = /## 📖 관련 법령[\s\S]*$/
     const match = processed.match(relatedLawsPattern)
