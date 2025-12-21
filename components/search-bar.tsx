@@ -170,15 +170,19 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
-    } else if (e.key === 'Enter' && selectedIndex >= 0) {
-      e.preventDefault()
-      // 실시간 추천이 먼저
-      const allItems = [...suggestions.map(s => s.text), ...displayedRecentSearches]
+    } else if (e.key === 'Enter') {
+      // 드롭다운 항목을 화살표로 선택한 경우에만 해당 항목 실행
+      if (selectedIndex >= 0 && totalItems > 0) {
+        e.preventDefault()
+        const allItems = [...suggestions.map(s => s.text), ...displayedRecentSearches]
 
-      if (allItems[selectedIndex]) {
-        const isRecent = selectedIndex >= suggestions.length
-        handleSuggestionClick(allItems[selectedIndex], isRecent)
+        if (allItems[selectedIndex]) {
+          const isRecent = selectedIndex >= suggestions.length
+          handleSuggestionClick(allItems[selectedIndex], isRecent)
+        }
       }
+      // selectedIndex === -1 (선택 안 함) → 현재 입력값으로 검색 (폼 submit)
+      // 이 경우 e.preventDefault() 호출 안 함 → handleSubmit이 실행됨
     } else if (e.key === 'Escape') {
       setShowDropdown(false)
       setSelectedIndex(-1)

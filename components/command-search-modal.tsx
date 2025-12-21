@@ -122,21 +122,27 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
-    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+    } else if (e.key === 'Enter') {
       e.preventDefault()
 
-      // 순서: 실시간 추천 → 최근 검색 → 즐겨찾기
-      if (selectedIndex < suggestions.length) {
-        // 실시간 추천
-        handleSearch(suggestions[selectedIndex].text)
-      } else if (selectedIndex < suggestions.length + displayedRecentSearches.length) {
-        // 최근 검색
-        const recentIndex = selectedIndex - suggestions.length
-        handleRecentClick(displayedRecentSearches[recentIndex])
+      // 항목 선택 중이면 해당 항목 실행
+      if (selectedIndex >= 0 && totalItems > 0) {
+        // 순서: 실시간 추천 → 최근 검색 → 즐겨찾기
+        if (selectedIndex < suggestions.length) {
+          // 실시간 추천
+          handleSearch(suggestions[selectedIndex].text)
+        } else if (selectedIndex < suggestions.length + displayedRecentSearches.length) {
+          // 최근 검색
+          const recentIndex = selectedIndex - suggestions.length
+          handleRecentClick(displayedRecentSearches[recentIndex])
+        } else {
+          // 즐겨찾기
+          const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
+          handleFavoriteClick(favorites[favIndex])
+        }
       } else {
-        // 즐겨찾기
-        const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
-        handleFavoriteClick(favorites[favIndex])
+        // 선택 안 했으면 현재 입력값으로 검색
+        handleSearch(searchQuery)
       }
     } else if (e.key === 'Escape') {
       onClose()
