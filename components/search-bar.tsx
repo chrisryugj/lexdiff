@@ -332,37 +332,93 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
           <div className="relative flex-1">
             {isAiMode ? (
-              <Icon name="brain" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse" />
+              <Icon name="brain" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse z-10" />
             ) : searchType === "ordinance" ? (
-              <Icon name="building-2" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
+              <Icon name="building-2" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500 z-10" />
             ) : searchType === "law" ? (
-              <Icon name="scale" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500" />
+              <Icon name="scale" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500 z-10" />
             ) : (
-              <Icon name="search" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Icon name="search" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground z-10" />
             )}
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setSelectedIndex(-1)
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onKeyDown={handleKeyDown}
-              className={cn(
-                "pl-11 h-12 text-base transition-all duration-300",
-                isAiMode && [
-                  "ring-1 ring-purple-500/30 border-purple-500/50",
-                  "shadow-[0_0_15px_rgba(139,92,246,0.15)]",
-                  "bg-purple-50 dark:bg-gradient-to-r dark:from-purple-950/50 dark:to-blue-950/50",
-                  "text-foreground placeholder:text-muted-foreground"
-                ]
-              )}
-              disabled={isLoading}
-              autoComplete="off"
-            />
+            <div className="relative">
+              <style>{`
+                @keyframes border-beam-ai {
+                  0% {
+                    background-position: 0% 50%;
+                  }
+                  100% {
+                    background-position: 200% 50%;
+                  }
+                }
+                @keyframes border-beam-normal {
+                  0% {
+                    background-position: 0% 50%;
+                  }
+                  100% {
+                    background-position: 200% 50%;
+                  }
+                }
+                .input-beam-wrapper-ai {
+                  position: relative;
+                  padding: 2px;
+                  border-radius: 0.5rem;
+                  background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    transparent 30%,
+                    #a78bfa 45%,
+                    #ec4899 55%,
+                    transparent 70%,
+                    transparent 100%
+                  );
+                  background-size: 200% 100%;
+                  animation: border-beam-ai 3s linear infinite;
+                }
+                .input-beam-wrapper-normal {
+                  position: relative;
+                  padding: 2px;
+                  border-radius: 0.5rem;
+                  background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    transparent 30%,
+                    #3b82f6 45%,
+                    #06b6d4 55%,
+                    transparent 70%,
+                    transparent 100%
+                  );
+                  background-size: 200% 100%;
+                  animation: border-beam-normal 4s linear infinite;
+                }
+              `}</style>
+              <div className={cn(
+                showDropdown && (isAiMode ? "input-beam-wrapper-ai" : "input-beam-wrapper-normal")
+              )}>
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                    setSelectedIndex(-1)
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  onKeyDown={handleKeyDown}
+                  className={cn(
+                    "pl-11 h-12 text-base relative",
+                    "focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none",
+                    showDropdown && "border-transparent",
+                    isAiMode && [
+                      "bg-purple-50/50 dark:bg-gradient-to-r dark:from-purple-950/30 dark:to-blue-950/30",
+                      "text-foreground placeholder:text-muted-foreground"
+                    ]
+                  )}
+                  disabled={isLoading}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
 
             {/* 자동완성 드롭다운 */}
             {showDropdown && hasDropdownItems && (
