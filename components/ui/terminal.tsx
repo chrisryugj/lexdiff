@@ -228,23 +228,12 @@ export const Terminal = ({
     <div
       ref={containerRef}
       className={cn(
-        "border-border bg-gray-900/50 z-0 h-full max-h-[400px] w-full max-w-lg rounded-xl border",
+        "z-0 h-full max-h-[300px] w-full max-w-xs",
         className
       )}
     >
-      <div className="border-border flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="text-sm font-semibold text-gray-200">File Search RAG</span>
-          <span className="text-[10px] font-medium text-gray-400 bg-gray-800/60 px-2 py-0.5 rounded-full">
-            Powered by Google AI
-          </span>
-        </div>
-      </div>
-      <pre className="p-4">
-        <code className="grid gap-y-1 overflow-auto">{wrappedChildren}</code>
+      <pre className="opacity-50 font-pretendard overflow-hidden">
+        <code className="grid gap-y-0.5 text-[11px]">{wrappedChildren}</code>
       </pre>
     </div>
   )
