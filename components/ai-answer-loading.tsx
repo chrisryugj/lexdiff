@@ -1,19 +1,20 @@
 /**
  * ai-answer-loading.tsx
  *
- * AI 검색 4단계 프로그레스 UI (전면 개편)
- * - 스크린샷 디자인 기반 구현
- * - 전체 프로세스 타이머 (0초부터 시작)
- * - 각 단계별 이름 + 설명
- * - 진행 중 펄스 애니메이션
- * - 완료 시 위로 접히는 전환 효과
+ * AI 검색 프로그레스 UI (터미널 스타일)
+ * - 왼쪽: 터미널 스타일 단계 로그
+ * - 중앙: 원형 프로그레스 스피너
+ * - 타이머 유지 (0초부터 시작)
+ * - 단계별 진행률 증가 로직 유지
  */
 
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
+import { Terminal, TypingAnimation, AnimatedSpan } from "@/components/ui/terminal"
+import { AnimatedCircularProgressBar } from "@/components/ui/animated-circular-progress-bar"
+import { TypingAnimationSingle } from "@/components/ui/typing-animation-single"
 
 interface AIAnswerLoadingProps {
   /** 진행률 (0-100) */
@@ -22,42 +23,23 @@ interface AIAnswerLoadingProps {
   className?: string
 }
 
-// 4단계 정의 (실제 API 단계와 매칭)
-const STAGES = [
-  {
-    id: 1,
-    name: "질문 분석",
-    description: "사용자 질의를 분석하고 검색 전략을 수립합니다",
-    range: [0, 25] as const, // analyzing + optimizing 통합
-  },
-  {
-    id: 2,
-    name: "법령 검색",
-    description: "법령 데이터베이스에서 관련 조문을 찾습니다",
-    range: [25, 40] as const, // searching
-  },
-  {
-    id: 3,
-    name: "답변 생성",
-    description: "AI가 검색 결과를 바탕으로 답변을 작성합니다",
-    range: [40, 95] as const, // streaming
-  },
-  {
-    id: 4,
-    name: "최종 검토",
-    description: "답변 품질을 확인하고 인용 출처를 정리합니다",
-    range: [95, 100] as const, // extracting + complete
-  },
-]
+// 실제 단계 (API 기반) - 진행률 범위 매핑
+const REAL_STAGES = [
+  { range: [0, 10], key: "init", terminal: "$ initializing AI search..." },
+  { range: [10, 25], key: "analyzing", terminal: "✓ analyzing user query" },
+  { range: [25, 35], key: "optimizing", terminal: "✓ optimizing search parameters" },
+  { range: [35, 50], key: "searching", terminal: "✓ searching law database" },
+  { range: [50, 90], key: "streaming", terminal: "✓ generating AI response" },
+  { range: [90, 100], key: "extracting", terminal: "✓ extracting relevant articles" },
+] as const
 
 export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef<number | null>(null)
   const [hasStarted, setHasStarted] = useState(false)
 
-  // 전체 프로세스 타이머 (0초부터 시작)
+  // 전체 프로세스 타이머 (0초부터 시작) - 기존 로직 유지
   useEffect(() => {
-    // 진행률이 0보다 크면 타이머 시작
     if (searchProgress > 0 && !hasStarted) {
       setHasStarted(true)
       startTimeRef.current = Date.now()
@@ -73,7 +55,6 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
       return () => clearInterval(interval)
     }
 
-    // 진행률이 0으로 돌아오면 리셋
     if (searchProgress === 0 && hasStarted) {
       setHasStarted(false)
       startTimeRef.current = null
@@ -81,138 +62,151 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
     }
   }, [searchProgress, hasStarted])
 
-  // 현재 단계 계산
-  const currentStageIndex = STAGES.findIndex(
+  // 현재 실제 단계 계산
+  const currentRealStage = REAL_STAGES.find(
     (stage) => searchProgress >= stage.range[0] && searchProgress < stage.range[1]
-  )
-  const activeStage = currentStageIndex >= 0 ? currentStageIndex : STAGES.length - 1
+  ) || REAL_STAGES[REAL_STAGES.length - 1]
+
+  // 완료 여부 (100% 도달 시)
+  const isComplete = searchProgress >= 100
+
+  // 단계별 메시지
+  const getStageMessage = () => {
+    switch (currentRealStage.key) {
+      case "init": return "검색 시스템을 준비하고 있습니다"
+      case "analyzing": return "사용자 질문을 분석하고 있습니다"
+      case "optimizing": return "검색어를 최적화하고 있습니다"
+      case "searching": return "법령 데이터베이스를 검색하고 있습니다"
+      case "streaming": return "AI가 답변을 생성하고 있습니다"
+      case "extracting": return "관련 조문을 추출하고 있습니다"
+      default: return "처리 중입니다"
+    }
+  }
 
   return (
-    <div className={cn("w-full space-y-6 px-8", className)}>
-      {/* 타이머 */}
-      <div className="flex items-center gap-2 text-lg">
-        <span className="text-muted-foreground font-medium">AI 검색 진행 중</span>
-        <span className="font-mono text-muted-foreground/70 tabular-nums text-sm">{elapsedTime.toFixed(1)}초</span>
+    <div
+      className={cn(
+        "w-full relative px-4 py-8 transition-all duration-500 min-h-[450px]",
+        isComplete && "opacity-0 -translate-y-8 pointer-events-none",
+        className
+      )}
+    >
+      {/* 왼쪽: 터미널 로그 */}
+      <div className="relative w-full lg:w-[280px]">
+        <Terminal className="h-auto w-full" sequence={false} startOnView={false}>
+          <TypingAnimation duration={20} className="text-green-400">
+            LexDiff AI Search Engine v2.0
+          </TypingAnimation>
+          <AnimatedSpan className="text-gray-500">
+            ────────────────────────────────
+          </AnimatedSpan>
+
+          {/* 1-3단계: 초고속 */}
+          {searchProgress >= 0 && (
+            <TypingAnimation duration={8} delay={0} className="text-sky-400">
+              $ initializing search system...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 2 && (
+            <TypingAnimation duration={8} delay={250} className="text-yellow-400/70">
+              → loading legal embeddings...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 4 && (
+            <TypingAnimation duration={8} delay={500} className="text-sky-400">
+              ✓ user query analysis complete
+            </TypingAnimation>
+          )}
+
+          {/* 4-5단계: 고속 */}
+          {searchProgress >= 25 && (
+            <TypingAnimation duration={10} delay={750} className="text-yellow-400/70">
+              → generating search tokens...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 28 && (
+            <TypingAnimation duration={10} delay={1000} className="text-sky-400">
+              ✓ search params optimized
+            </TypingAnimation>
+          )}
+
+          {/* 나머지: 고속 */}
+          {searchProgress >= 35 && (
+            <TypingAnimation duration={10} delay={1250} className="text-yellow-400/70">
+              → expanding query terms...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 38 && (
+            <TypingAnimation duration={10} delay={1500} className="text-sky-400">
+              ✓ law database search complete
+            </TypingAnimation>
+          )}
+          {searchProgress >= 50 && (
+            <TypingAnimation duration={10} delay={1750} className="text-yellow-400/70">
+              → calculating relevance scores...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 53 && (
+            <TypingAnimation duration={10} delay={2000} className="text-sky-400">
+              ✓ AI response generated
+            </TypingAnimation>
+          )}
+          {searchProgress >= 90 && (
+            <TypingAnimation duration={10} delay={2250} className="text-yellow-400/70">
+              → formatting citations...
+            </TypingAnimation>
+          )}
+          {searchProgress >= 93 && (
+            <TypingAnimation duration={10} delay={2500} className="text-sky-400">
+              ✓ relevant articles extracted
+            </TypingAnimation>
+          )}
+
+          <AnimatedSpan className="text-gray-500">
+            ────────────────────────────────
+          </AnimatedSpan>
+        </Terminal>
+
+        {/* 터미널 좌측 하단 배지 */}
+        <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 bg-muted rounded-full">
+          <span className="text-xs font-mono font-medium tabular-nums">
+            {elapsedTime.toFixed(1)}s
+          </span>
+        </div>
       </div>
 
-      {/* 4단계 프로그레스 바 */}
-      <div className="relative">
-        {/* 배경 연결선 */}
-        <div className="absolute top-6 left-8 right-8 h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full" />
-
-        {/* 진행된 연결선 */}
-        <div
-          className="absolute top-6 left-8 h-[3px] bg-[#2196F3] rounded-full transition-all duration-500 ease-out"
-          style={{
-            width: activeStage > 0
-              ? `calc(${(activeStage / (STAGES.length - 1)) * 100}% - 4rem)`
-              : "0%",
-          }}
+      {/* 중앙: 원형 프로그레스 스피너 (화면 중앙 고정) - 항상 표시 */}
+      <div className="absolute left-1/2 -translate-x-1/2 top-[105px] flex flex-col items-center gap-3 min-w-[220px]">
+        <AnimatedCircularProgressBar
+          value={searchProgress}
+          min={0}
+          max={100}
+          gaugePrimaryColor="#2563eb"
+          gaugeSecondaryColor="#e5e7eb"
+          className="size-32"
         />
-
-        {/* 단계 아이콘들 */}
-        <div className="flex items-center justify-between gap-2">
-          {STAGES.map((stage, index) => {
-            const isCompleted = index < activeStage
-            const isCurrent = index === activeStage
-            const isPending = index > activeStage
-
-            return (
-              <div key={stage.id} className="relative z-10 flex flex-col items-center gap-2.5 flex-1">
-                {/* 펄스 애니메이션 (진행 중 단계만) */}
-                {isCurrent && (
-                  <>
-                    <div
-                      className="absolute top-0 w-14 h-14 rounded-full bg-[#2196F3]/30"
-                      style={{ animation: "pulse-wave 1.5s ease-out infinite" }}
-                    />
-                    <div
-                      className="absolute top-0 w-14 h-14 rounded-full bg-[#2196F3]/15"
-                      style={{ animation: "pulse-wave 1.5s ease-out infinite 0.4s" }}
-                    />
-                  </>
-                )}
-
-                {/* 단계 번호 원 */}
-                <div
-                  className={cn(
-                    "relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500 border-[3px]",
-                    isCompleted && "bg-[#2196F3] border-[#2196F3] text-white",
-                    isCurrent && "bg-white dark:bg-gray-900 border-[#2196F3] text-[#2196F3] scale-110 shadow-lg shadow-[#2196F3]/30",
-                    isPending && "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500"
-                  )}
-                >
-                  {isCompleted ? (
-                    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : isCurrent ? (
-                    <div className="animate-spin">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    </div>
-                  ) : (
-                    <span className="text-base font-bold">{stage.id}</span>
-                  )}
-                </div>
-
-                {/* 단계 이름 */}
-                <div
-                  className={cn(
-                    "text-base font-medium text-center transition-all duration-500 whitespace-nowrap",
-                    isCompleted && "text-gray-600 dark:text-gray-400",
-                    isCurrent && "text-[#2196F3] font-semibold",
-                    isPending && "text-gray-400 dark:text-gray-500"
-                  )}
-                >
-                  {stage.name}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 현재 단계 설명 */}
-      <div className="space-y-3">
-        <div className="text-base text-muted-foreground text-center">
-          {STAGES[activeStage]?.description || "처리 중..."}
-        </div>
-
-        {/* 프로그레스 바 */}
-        <div className="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[#2196F3] rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2.5"
-            style={{ width: `${searchProgress}%` }}
-          >
-            {searchProgress > 5 && (
-              <span className="text-xs font-bold text-white tabular-nums drop-shadow-sm">
-                {Math.round(searchProgress)}%
-              </span>
-            )}
+        <div className="text-center space-y-1.5 w-full min-h-[60px]">
+          <div className="text-sm font-medium text-white min-h-[40px] flex items-center justify-center">
+            <TypingAnimationSingle
+              words={[getStageMessage()]}
+              duration={30}
+              loop={false}
+              showCursor={false}
+              startOnView={false}
+              className="inline-block animate-shimmer bg-gradient-to-r from-white via-gray-200 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
+              key={currentRealStage.key}
+            />
+          </div>
+          <div className="text-xs text-muted-foreground min-h-[20px] animate-shimmer bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-[length:200%_100%] bg-clip-text text-transparent">
+            {currentRealStage.key === "init" && "잠시만 기다려 주세요"}
+            {currentRealStage.key === "analyzing" && "질문 의도를 파악 중입니다"}
+            {currentRealStage.key === "optimizing" && "더 나은 검색을 위해 준비 중"}
+            {currentRealStage.key === "searching" && "관련 법령을 찾고 있습니다"}
+            {currentRealStage.key === "streaming" && "곧 답변이 준비됩니다"}
+            {currentRealStage.key === "extracting" && "최종 정리 중입니다"}
           </div>
         </div>
       </div>
-
-      {/* CSS 애니메이션 */}
-      <style jsx>{`
-        @keyframes pulse-wave {
-          0% {
-            transform: scale(1);
-            opacity: 0.5;
-          }
-          50% {
-            transform: scale(1.4);
-            opacity: 0.2;
-          }
-          100% {
-            transform: scale(1.8);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </div>
   )
 }
