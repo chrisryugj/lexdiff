@@ -45,7 +45,7 @@ export function useLawViewerPrecedents(articleNumber: string, meta: LawMeta) {
     }
   }, [precedentPanelSize])
 
-  // 패널 닫힐 때 상태 초기화
+  // 패널 닫힐 때 뷰 모드만 리셋 (데이터는 유지)
   useEffect(() => {
     if (!showPrecedents) {
       setPrecedentViewMode("bottom")

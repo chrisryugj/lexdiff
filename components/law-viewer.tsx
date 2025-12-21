@@ -1163,6 +1163,152 @@ export function LawViewer({
                     handleContentClick={handleContentClick}
                     isOrdinance={isOrdinance}
                   />
+                ) : showPrecedents && precedentViewMode === "side" ? (
+                  // 판례 사이드 패널 모드
+                  <PanelGroup direction="horizontal" className="h-full">
+                    {/* 좌측: 조문 본문 */}
+                    <Panel defaultSize={100 - precedentPanelSize} minSize={30}>
+                      <ScrollArea className="h-full" ref={contentRef}>
+                        <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
+                          <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
+                            {/* 모바일/PC 모두 1줄: 제목 + 배지 + 버튼들 */}
+                            <div className="flex items-center justify-between gap-1 lg:gap-2">
+                              {/* 제목 + 배지 */}
+                              <div className="flex items-center gap-1 lg:gap-2 min-w-0 flex-1">
+                                <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
+                                  {formatSimpleJo(activeArticle.jo, isOrdinance)}
+                                  {activeArticle.title && (
+                                    <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
+                                  )}
+                                </h2>
+                                {meta.lawTitle === "대한민국헌법" ? (
+                                  <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50 hidden sm:flex">
+                                    <Icon name="landmark" size={12} className="mr-1" />
+                                    헌법
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs shrink-0 hidden sm:flex">
+                                    {isOrdinance ? "자치법규" : "법률"}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* 버튼 그룹: 즐겨찾기 + 글씨크기 + 복사 (컴팩트하게 1줄) */}
+                              <div className="flex items-center gap-0 shrink-0">
+                                {/* 즐겨찾기 버튼 */}
+                                <Button
+                                  key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                                  className="h-7 w-7 p-0"
+                                  title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                                >
+                                  <Icon name="star" size={16} className={`transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                                </Button>
+                                {/* 글씨크기 버튼 */}
+                                <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 w-7 p-0">
+                                  <Icon name="zoom-out" size={14} />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 w-7 p-0">
+                                  <Icon name="rotate-clockwise" size={12} />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 w-7 p-0">
+                                  <Icon name="zoom-in" size={14} />
+                                </Button>
+                                {/* px 텍스트: PC에서만 표시 */}
+                                <span className="hidden lg:inline text-xs text-muted-foreground ml-1 mr-1">{fontSize}px</span>
+                                {/* 복사 버튼 */}
+                                <CopyButton
+                                  getText={() => `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
+                                  message="복사됨"
+                                  className="h-7 w-7 p-0"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              lineHeight: "1.8",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}
+                            onClick={handleContentClick}
+                            dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
+                          />
+
+                          {!isOrdinance && revisionHistory.length > 0 && (
+                            <div className="mt-12">
+                              <RevisionHistory
+                                history={revisionHistory}
+                                articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
+                              />
+                            </div>
+                          )}
+
+                          {/* 판례 하단 섹션 - 사이드 모드일 때는 목록만 표시 */}
+                          <div className="mt-8">
+                            <PrecedentSection
+                              precedents={precedents}
+                              totalCount={precedentTotalCount}
+                              loading={loadingPrecedents}
+                              error={precedentsError}
+                              selectedPrecedent={selectedPrecedent}
+                              loadingDetail={loadingPrecedentDetail}
+                              viewMode={precedentViewMode}
+                              onViewDetail={handleViewPrecedentDetail}
+                              onExpand={expandPrecedentPanel}
+                              onCollapse={collapsePrecedentPanel}
+                            />
+                          </div>
+                        </div>
+                      </ScrollArea>
+                    </Panel>
+
+                    {/* 리사이즈 핸들 */}
+                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
+
+                    {/* 우측: 판례 상세 패널 */}
+                    <Panel
+                      defaultSize={precedentPanelSize}
+                      minSize={25}
+                      maxSize={60}
+                      onResize={(size) => setPrecedentPanelSize(size)}
+                    >
+                      <div className="h-full border-l border-border bg-muted/10">
+                        <div className="h-full flex flex-col">
+                          {/* 패널 헤더 */}
+                          <div className="flex items-center justify-between p-3 border-b border-border">
+                            <div className="flex items-center gap-2">
+                              <Icon name="scale" size={16} className="text-primary" />
+                              <h3 className="font-semibold text-sm">판례 상세</h3>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={collapsePrecedentPanel}
+                              className="h-7 px-2"
+                            >
+                              <Icon name="x" size={14} className="mr-1" />
+                              닫기
+                            </Button>
+                          </div>
+
+                          {/* 판례 상세 내용 */}
+                          <div className="flex-1 min-h-0">
+                            <PrecedentDetailPanel
+                              detail={selectedPrecedent}
+                              loading={loadingPrecedentDetail}
+                              onClose={collapsePrecedentPanel}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </Panel>
+                  </PanelGroup>
                 ) : (
                   <ScrollArea className="h-full" ref={contentRef}>
                     <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
