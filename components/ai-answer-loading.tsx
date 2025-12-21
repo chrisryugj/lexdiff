@@ -113,7 +113,13 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
 
           {/* 1-3단계 */}
           {searchProgress >= 0 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 10 && searchProgress < 25 && "opacity-50",
+              searchProgress >= 25 && searchProgress < 35 && "opacity-35",
+              searchProgress >= 35 && searchProgress < 50 && "opacity-25",
+              searchProgress >= 50 && "opacity-15"
+            )}>
               <TypingAnimation duration={15} delay={500} className="text-sky-400 text-[11px] font-pretendard">
                 $ 검색 시스템 초기화 중...
               </TypingAnimation>
@@ -121,7 +127,13 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 2 && (
-            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-yellow-400/70 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 10 && searchProgress < 25 && "opacity-40",
+              searchProgress >= 25 && searchProgress < 35 && "opacity-30",
+              searchProgress >= 35 && searchProgress < 50 && "opacity-20",
+              searchProgress >= 50 && "opacity-12"
+            )}>
               <TypingAnimation duration={15} delay={800} className="text-yellow-400/70 text-[11px] font-pretendard">
                 → 법령 임베딩 로딩 중...
               </TypingAnimation>
@@ -129,7 +141,13 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 10 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 25 && searchProgress < 35 && "opacity-60",
+              searchProgress >= 35 && searchProgress < 50 && "opacity-40",
+              searchProgress >= 50 && searchProgress < 85 && "opacity-25",
+              searchProgress >= 85 && "opacity-15"
+            )}>
               <TypingAnimation duration={15} delay={1100} className="text-sky-400 text-[11px] font-pretendard">
                 ✓ 질문 분석 완료
               </TypingAnimation>
@@ -139,7 +157,12 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
 
           {/* 4-5단계 */}
           {searchProgress >= 25 && (
-            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-yellow-400/70 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 35 && searchProgress < 50 && "opacity-50",
+              searchProgress >= 50 && searchProgress < 85 && "opacity-30",
+              searchProgress >= 85 && "opacity-18"
+            )}>
               <TypingAnimation duration={15} delay={1400} className="text-yellow-400/70 text-[11px] font-pretendard">
                 → 검색 토큰 생성 중...
               </TypingAnimation>
@@ -147,7 +170,12 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 28 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 35 && searchProgress < 50 && "opacity-60",
+              searchProgress >= 50 && searchProgress < 85 && "opacity-35",
+              searchProgress >= 85 && "opacity-20"
+            )}>
               <TypingAnimation duration={15} delay={1700} className="text-sky-400 text-[11px] font-pretendard">
                 ✓ 검색어 최적화 완료
               </TypingAnimation>
@@ -157,7 +185,11 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
 
           {/* 검색 단계 */}
           {searchProgress >= 35 && (
-            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-yellow-400/70 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 50 && searchProgress < 85 && "opacity-50",
+              searchProgress >= 85 && "opacity-25"
+            )}>
               <TypingAnimation duration={15} delay={2000} className="text-yellow-400/70 text-[11px] font-pretendard">
                 → 쿼리 확장 중...
               </TypingAnimation>
@@ -165,7 +197,11 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 38 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 50 && searchProgress < 85 && "opacity-60",
+              searchProgress >= 85 && "opacity-30"
+            )}>
               <TypingAnimation duration={15} delay={2300} className="text-sky-400 text-[11px] font-pretendard">
                 ✓ 법령 DB 검색 완료
               </TypingAnimation>
@@ -175,7 +211,7 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
 
           {/* AI 답변 생성 - 50~85% */}
           {searchProgress >= 50 && searchProgress < 85 && (
-            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center transition-opacity duration-500">
               <TypingAnimation duration={15} delay={2600} className="text-yellow-400/70 text-[11px] font-pretendard">
                 → AI 답변 스트리밍 중...
               </TypingAnimation>
@@ -183,7 +219,10 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 85 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className={cn(
+              "text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500",
+              searchProgress >= 92 && "opacity-70"
+            )}>
               <TypingAnimation duration={15} delay={0} className="text-sky-400 text-[11px] font-pretendard">
                 ✓ AI 답변 생성 완료
               </TypingAnimation>
@@ -192,7 +231,7 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
 
           {/* 조문 추출 - 92~100% */}
           {searchProgress >= 92 && searchProgress < 100 && (
-            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center transition-opacity duration-500">
               <TypingAnimation duration={15} delay={0} className="text-yellow-400/70 text-[11px] font-pretendard">
                 → 관련 조문 추출 중...
               </TypingAnimation>
@@ -200,7 +239,7 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
             </div>
           )}
           {searchProgress >= 100 && (
-            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center transition-opacity duration-500">
               <TypingAnimation duration={15} delay={0} className="text-sky-400 text-[11px] font-pretendard">
                 ✓ 관련 조문 추출 완료
               </TypingAnimation>

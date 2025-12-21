@@ -445,26 +445,26 @@ export function useSearchHandlers({
             const receivedConfidenceLevel = data.confidenceLevel || 'high'
             const receivedQueryType = data.queryType || 'application'
 
-            // ✅ 프로그레스 70% → 95% 점진적 증가
+            // ✅ 프로그레스 70% → 100% 점진적 증가
             let typingProgress = 70
             const typingProgressInterval = setInterval(() => {
-              if (typingProgress < 95) {
+              if (typingProgress < 100) {
                 typingProgress += 1
                 actions.updateProgress('streaming', typingProgress)
               }
-            }, 100) // 100ms마다 1%씩 증가 (약 2.5초)
+            }, 100) // 100ms마다 1%씩 증가 (약 3초)
 
             // ✅ 즉시 전체 내용 설정 (UI에서 어절 단위 타이핑 효과 적용)
             const processedContent = fullContent.replace(/\^/g, ' ')
             actions.setAiAnswerContent(processedContent)
 
-            // 프로그레스가 95%까지 도달할 때까지 대기
-            await new Promise(resolve => setTimeout(resolve, 2500))
+            // 프로그레스가 100%까지 도달할 때까지 대기
+            await new Promise(resolve => setTimeout(resolve, 3000))
             clearInterval(typingProgressInterval)
             if (signal?.aborted) return
 
-            // ✅ 4단계: 최종 검토 (95%)
-            actions.updateProgress('extracting', 95)
+            // ✅ 4단계: 최종 검토 (100%)
+            actions.updateProgress('extracting', 100)
 
             const searchFailed = detectSearchFailed(processedContent)
             actions.setFileSearchFailed(searchFailed)
@@ -499,7 +499,7 @@ export function useSearchHandlers({
             actions.setLawData(aiLawData)
             actions.setMobileView("content")
 
-            // IndexedDB 캐시 저장
+            // IndexedDB 캐시 저장 (백그라운드)
             try {
               const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
               const currentState = window.history.state
@@ -525,16 +525,15 @@ export function useSearchHandlers({
               debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
             }
 
-            // RAG 캐시에도 저장
+            // RAG 캐시에도 저장 (백그라운드)
             try {
               await cacheResponse(fullQuery, processedContent, receivedCitations, receivedConfidenceLevel, receivedQueryType)
             } catch (ragCacheError) {
               debugLogger.error('⚠️ RAG 캐시 저장 실패', ragCacheError)
             }
 
-            // ✅ 완료 표시 (100%) → 1초 대기 → 로딩 UI 숨김
-            actions.updateProgress('complete', 100)
-            await new Promise(resolve => setTimeout(resolve, 1000))  // 완료 메시지 1초간 표시
+            // ✅ 100% 완료 상태 1.5초 대기 → 로딩 UI 숨김
+            await new Promise(resolve => setTimeout(resolve, 1500))  // 100% 완료 메시지 표시
             actions.setIsSearching(false)
 
           } catch (parseError) {
