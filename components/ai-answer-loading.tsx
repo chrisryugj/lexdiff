@@ -37,6 +37,7 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef<number | null>(null)
   const [hasStarted, setHasStarted] = useState(false)
+  const [shouldHide, setShouldHide] = useState(false)
 
   // 전체 프로세스 타이머 (0초부터 시작) - 기존 로직 유지
   useEffect(() => {
@@ -62,13 +63,22 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
     }
   }, [searchProgress, hasStarted])
 
+  // 100% 도달 후 800ms 대기 후 숨김
+  useEffect(() => {
+    if (searchProgress >= 100) {
+      const hideTimeout = setTimeout(() => {
+        setShouldHide(true)
+      }, 800)
+      return () => clearTimeout(hideTimeout)
+    } else {
+      setShouldHide(false)
+    }
+  }, [searchProgress])
+
   // 현재 실제 단계 계산
   const currentRealStage = REAL_STAGES.find(
     (stage) => searchProgress >= stage.range[0] && searchProgress < stage.range[1]
   ) || REAL_STAGES[REAL_STAGES.length - 1]
-
-  // 완료 여부 (100% 도달 시)
-  const isComplete = searchProgress >= 100
 
   // 단계별 메시지
   const getStageMessage = () => {
@@ -87,77 +97,77 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
     <div
       className={cn(
         "w-full relative px-4 py-8 transition-all duration-500 min-h-[450px]",
-        isComplete && "opacity-0 -translate-y-8 pointer-events-none",
+        shouldHide && "opacity-0 -translate-y-8 pointer-events-none",
         className
       )}
     >
       {/* 왼쪽: 터미널 로그 */}
       <div className="relative w-full lg:w-[280px]">
         <Terminal className="h-auto w-full" sequence={false} startOnView={false}>
-          <TypingAnimation duration={20} className="text-green-400">
+          <TypingAnimation duration={20} delay={0} className="text-green-400">
             LexDiff AI Search Engine v2.0
           </TypingAnimation>
           <AnimatedSpan className="text-gray-500">
             ────────────────────────────────
           </AnimatedSpan>
 
-          {/* 1-3단계: 초고속 */}
+          {/* 1-3단계 */}
           {searchProgress >= 0 && (
-            <TypingAnimation duration={8} delay={0} className="text-sky-400">
+            <TypingAnimation duration={15} delay={500} className="text-sky-400">
               $ initializing search system...
             </TypingAnimation>
           )}
           {searchProgress >= 2 && (
-            <TypingAnimation duration={8} delay={250} className="text-yellow-400/70">
+            <TypingAnimation duration={15} delay={800} className="text-yellow-400/70">
               → loading legal embeddings...
             </TypingAnimation>
           )}
           {searchProgress >= 4 && (
-            <TypingAnimation duration={8} delay={500} className="text-sky-400">
+            <TypingAnimation duration={15} delay={1100} className="text-sky-400">
               ✓ user query analysis complete
             </TypingAnimation>
           )}
 
-          {/* 4-5단계: 고속 */}
+          {/* 4-5단계 */}
           {searchProgress >= 25 && (
-            <TypingAnimation duration={10} delay={750} className="text-yellow-400/70">
+            <TypingAnimation duration={15} delay={1400} className="text-yellow-400/70">
               → generating search tokens...
             </TypingAnimation>
           )}
           {searchProgress >= 28 && (
-            <TypingAnimation duration={10} delay={1000} className="text-sky-400">
+            <TypingAnimation duration={15} delay={1700} className="text-sky-400">
               ✓ search params optimized
             </TypingAnimation>
           )}
 
-          {/* 나머지: 고속 */}
+          {/* 나머지 */}
           {searchProgress >= 35 && (
-            <TypingAnimation duration={10} delay={1250} className="text-yellow-400/70">
+            <TypingAnimation duration={15} delay={2000} className="text-yellow-400/70">
               → expanding query terms...
             </TypingAnimation>
           )}
           {searchProgress >= 38 && (
-            <TypingAnimation duration={10} delay={1500} className="text-sky-400">
+            <TypingAnimation duration={15} delay={2300} className="text-sky-400">
               ✓ law database search complete
             </TypingAnimation>
           )}
           {searchProgress >= 50 && (
-            <TypingAnimation duration={10} delay={1750} className="text-yellow-400/70">
+            <TypingAnimation duration={15} delay={2600} className="text-yellow-400/70">
               → calculating relevance scores...
             </TypingAnimation>
           )}
           {searchProgress >= 53 && (
-            <TypingAnimation duration={10} delay={2000} className="text-sky-400">
+            <TypingAnimation duration={15} delay={2900} className="text-sky-400">
               ✓ AI response generated
             </TypingAnimation>
           )}
           {searchProgress >= 90 && (
-            <TypingAnimation duration={10} delay={2250} className="text-yellow-400/70">
+            <TypingAnimation duration={15} delay={3200} className="text-yellow-400/70">
               → formatting citations...
             </TypingAnimation>
           )}
           {searchProgress >= 93 && (
-            <TypingAnimation duration={10} delay={2500} className="text-sky-400">
+            <TypingAnimation duration={15} delay={3500} className="text-sky-400">
               ✓ relevant articles extracted
             </TypingAnimation>
           )}
