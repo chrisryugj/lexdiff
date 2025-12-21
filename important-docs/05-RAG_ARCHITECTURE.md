@@ -11,7 +11,7 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
     ↓
 [file-search-rag-view.tsx] SSE 스트리밍 시작
     ↓
-[/api/file-search-rag] Gemini 3.0 Flash + File Search + 2-Tier 라우팅
+[/api/file-search-rag] Gemini 2.5 Flash + File Search + 2-Tier 라우팅
     ↓
 [SSE Stream] data: {"type":"text","text":"..."} 실시간 전송
     ↓
@@ -119,7 +119,7 @@ const articleUnits = lawData?.조문?.조문단위
 
 ## 🔗 참고
 
-- Gemini 3.0 Flash 모델 사용 (2-Tier AI 라우팅)
+- Gemini 2.5 Flash 모델 사용 (2-Tier AI 라우팅)
 - File Search Store ID: 환경변수 `GEMINI_FILE_SEARCH_STORE_ID`
 - Token usage 로깅: `lib/file-search-client.ts`
 - Exponential Backoff 재시도 로직 포함
