@@ -29,8 +29,8 @@ const REAL_STAGES = [
   { range: [10, 25], key: "analyzing", terminal: "✓ analyzing user query" },
   { range: [25, 35], key: "optimizing", terminal: "✓ optimizing search parameters" },
   { range: [35, 50], key: "searching", terminal: "✓ searching law database" },
-  { range: [50, 90], key: "streaming", terminal: "✓ generating AI response" },
-  { range: [90, 100], key: "extracting", terminal: "✓ extracting relevant articles" },
+  { range: [50, 85], key: "streaming", terminal: "✓ generating AI response" },
+  { range: [85, 100], key: "extracting", terminal: "✓ extracting relevant articles" },
 ] as const
 
 export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingProps) {
@@ -63,12 +63,12 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
     }
   }, [searchProgress, hasStarted])
 
-  // 100% 도달 후 800ms 대기 후 숨김
+  // 100% 도달 후 4500ms 대기 후 숨김 (마지막 애니메이션 3500ms + 여유 1000ms)
   useEffect(() => {
     if (searchProgress >= 100) {
       const hideTimeout = setTimeout(() => {
         setShouldHide(true)
-      }, 800)
+      }, 4500)
       return () => clearTimeout(hideTimeout)
     } else {
       setShouldHide(false)
@@ -101,92 +101,127 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
         className
       )}
     >
-      {/* 왼쪽: 터미널 로그 */}
-      <div className="relative w-full lg:w-[280px]">
+      {/* 좌측 상단: 참고용 터미널 로그 */}
+      <div className="absolute top-4 left-4 w-[220px]">
         <Terminal className="h-auto w-full" sequence={false} startOnView={false}>
-          <TypingAnimation duration={20} delay={0} className="text-green-400">
+          <TypingAnimation duration={20} delay={0} className="text-white text-[11px] font-medium">
             LexDiff AI Search Engine v2.0
           </TypingAnimation>
-          <AnimatedSpan className="text-gray-500">
-            ────────────────────────────────
+          <AnimatedSpan className="text-gray-500 text-[11px]">
+            ──────────────────────────────
           </AnimatedSpan>
 
           {/* 1-3단계 */}
           {searchProgress >= 0 && (
-            <TypingAnimation duration={15} delay={500} className="text-sky-400">
-              $ initializing search system...
-            </TypingAnimation>
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={500} className="text-sky-400 text-[11px] font-pretendard">
+                $ 검색 시스템 초기화 중...
+              </TypingAnimation>
+              {currentRealStage.key === "init" && searchProgress < 2 && <span className="inline-block w-1 h-3 bg-sky-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
           {searchProgress >= 2 && (
-            <TypingAnimation duration={15} delay={800} className="text-yellow-400/70">
-              → loading legal embeddings...
-            </TypingAnimation>
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={800} className="text-yellow-400/70 text-[11px] font-pretendard">
+                → 법령 임베딩 로딩 중...
+              </TypingAnimation>
+              {currentRealStage.key === "init" && searchProgress >= 2 && searchProgress < 10 && <span className="inline-block w-1 h-3 bg-yellow-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
-          {searchProgress >= 4 && (
-            <TypingAnimation duration={15} delay={1100} className="text-sky-400">
-              ✓ user query analysis complete
-            </TypingAnimation>
+          {searchProgress >= 10 && (
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={1100} className="text-sky-400 text-[11px] font-pretendard">
+                ✓ 질문 분석 완료
+              </TypingAnimation>
+              {currentRealStage.key === "analyzing" && <span className="inline-block w-1 h-3 bg-sky-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
 
           {/* 4-5단계 */}
           {searchProgress >= 25 && (
-            <TypingAnimation duration={15} delay={1400} className="text-yellow-400/70">
-              → generating search tokens...
-            </TypingAnimation>
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={1400} className="text-yellow-400/70 text-[11px] font-pretendard">
+                → 검색 토큰 생성 중...
+              </TypingAnimation>
+              {currentRealStage.key === "optimizing" && searchProgress < 28 && <span className="inline-block w-1 h-3 bg-yellow-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
           {searchProgress >= 28 && (
-            <TypingAnimation duration={15} delay={1700} className="text-sky-400">
-              ✓ search params optimized
-            </TypingAnimation>
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={1700} className="text-sky-400 text-[11px] font-pretendard">
+                ✓ 검색어 최적화 완료
+              </TypingAnimation>
+              {currentRealStage.key === "optimizing" && searchProgress >= 28 && <span className="inline-block w-1 h-3 bg-sky-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
 
-          {/* 나머지 */}
+          {/* 검색 단계 */}
           {searchProgress >= 35 && (
-            <TypingAnimation duration={15} delay={2000} className="text-yellow-400/70">
-              → expanding query terms...
-            </TypingAnimation>
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={2000} className="text-yellow-400/70 text-[11px] font-pretendard">
+                → 쿼리 확장 중...
+              </TypingAnimation>
+              {currentRealStage.key === "searching" && searchProgress < 38 && <span className="inline-block w-1 h-3 bg-yellow-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
           {searchProgress >= 38 && (
-            <TypingAnimation duration={15} delay={2300} className="text-sky-400">
-              ✓ law database search complete
-            </TypingAnimation>
-          )}
-          {searchProgress >= 50 && (
-            <TypingAnimation duration={15} delay={2600} className="text-yellow-400/70">
-              → calculating relevance scores...
-            </TypingAnimation>
-          )}
-          {searchProgress >= 53 && (
-            <TypingAnimation duration={15} delay={2900} className="text-sky-400">
-              ✓ AI response generated
-            </TypingAnimation>
-          )}
-          {searchProgress >= 90 && (
-            <TypingAnimation duration={15} delay={3200} className="text-yellow-400/70">
-              → formatting citations...
-            </TypingAnimation>
-          )}
-          {searchProgress >= 93 && (
-            <TypingAnimation duration={15} delay={3500} className="text-sky-400">
-              ✓ relevant articles extracted
-            </TypingAnimation>
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={2300} className="text-sky-400 text-[11px] font-pretendard">
+                ✓ 법령 DB 검색 완료
+              </TypingAnimation>
+              {currentRealStage.key === "searching" && searchProgress >= 38 && <span className="inline-block w-1 h-3 bg-sky-400 ml-0.5 animate-pulse" />}
+            </div>
           )}
 
-          <AnimatedSpan className="text-gray-500">
-            ────────────────────────────────
+          {/* AI 답변 생성 - 50~85% */}
+          {searchProgress >= 50 && searchProgress < 85 && (
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={2600} className="text-yellow-400/70 text-[11px] font-pretendard">
+                → AI 답변 스트리밍 중...
+              </TypingAnimation>
+              {currentRealStage.key === "streaming" && <span className="inline-block w-1 h-3 bg-yellow-400 ml-0.5 animate-pulse" />}
+            </div>
+          )}
+          {searchProgress >= 85 && (
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={0} className="text-sky-400 text-[11px] font-pretendard">
+                ✓ AI 답변 생성 완료
+              </TypingAnimation>
+            </div>
+          )}
+
+          {/* 조문 추출 - 92~100% */}
+          {searchProgress >= 92 && searchProgress < 100 && (
+            <div className="text-yellow-400/70 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={0} className="text-yellow-400/70 text-[11px] font-pretendard">
+                → 관련 조문 추출 중...
+              </TypingAnimation>
+              {currentRealStage.key === "extracting" && <span className="inline-block w-1 h-3 bg-yellow-400 ml-0.5 animate-pulse" />}
+            </div>
+          )}
+          {searchProgress >= 100 && (
+            <div className="text-sky-400 text-[11px] font-pretendard flex items-center">
+              <TypingAnimation duration={15} delay={0} className="text-sky-400 text-[11px] font-pretendard">
+                ✓ 관련 조문 추출 완료
+              </TypingAnimation>
+            </div>
+          )}
+
+          <AnimatedSpan className="text-gray-500 text-[11px]">
+            ──────────────────────────────
           </AnimatedSpan>
         </Terminal>
 
-        {/* 터미널 좌측 하단 배지 */}
-        <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 bg-muted rounded-full">
-          <span className="text-xs font-mono font-medium tabular-nums">
+        {/* 터미널 하단 타이머 */}
+        <div className="mt-2 opacity-30">
+          <span className="text-[10px] font-mono text-gray-400 tabular-nums">
             {elapsedTime.toFixed(1)}s
           </span>
         </div>
       </div>
 
       {/* 중앙: 원형 프로그레스 스피너 (화면 중앙 고정) - 항상 표시 */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-[105px] flex flex-col items-center gap-3 min-w-[220px]">
+      <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 min-w-[220px]">
         <AnimatedCircularProgressBar
           value={searchProgress}
           min={0}
