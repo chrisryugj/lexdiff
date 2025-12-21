@@ -29,7 +29,7 @@
 ## 🎯 현재 주요 기술
 
 ### AI 검색 시스템
-- **Google File Search RAG** (Gemini 3.0 Flash)
+- **Google File Search RAG** (Gemini 2.5 Flash)
   - 자연어 질문으로 법령 검색
   - 실시간 SSE 스트리밍 답변
   - 2-Tier AI 라우팅 (법률 질문 vs 일반 질문)
@@ -59,7 +59,6 @@
 ## 📅 최근 업데이트
 
 ### 2025-12-20
-- Gemini 3.0 Flash 업그레이드
 - 판례/해석례/재결례 검색 API 9개 추가 (korean-law-mcp 도입)
 - 2-Tier AI 라우팅 시스템
 - hugeicons 아이콘 시스템 마이그레이션

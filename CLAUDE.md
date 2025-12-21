@@ -59,7 +59,7 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 
 한국 법령 비교 시스템 + Google File Search RAG AI 검색
 - 법제처 API (law.go.kr) 연동
-- AI: Gemini 3.0 Flash (RAG, 요약, 2-Tier 라우팅)
+- AI: Gemini 2.5 Flash (RAG, 요약, 2-Tier 라우팅)
 
 **핵심**: AI 검색, 3단 비교, 행정규칙 조회, 판례/해석례 연동, 통합 링크 시스템
 
@@ -117,7 +117,7 @@ LAW_OC=ryuseungin curl "https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=
 |------|------|
 | Framework | Next.js 16, React 19, TypeScript 5 |
 | Styling | Tailwind CSS v4, shadcn/ui, hugeicons |
-| AI | Gemini 3.0 Flash, `@google/genai`, 2-Tier 라우팅 |
+| AI | Gemini 2.5 Flash, `@google/genai`, 2-Tier 라우팅 |
 | State | React Hooks + IndexedDB |
 | DB | Turso/LibSQL |
 
