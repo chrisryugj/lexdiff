@@ -391,33 +391,45 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                   animation: border-beam-normal 4s linear infinite;
                 }
               `}</style>
-              <div className={cn(
-                showDropdown && (isAiMode ? "input-beam-wrapper-ai" : "input-beam-wrapper-normal")
-              )}>
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value)
-                    setSelectedIndex(-1)
-                  }}
-                  onFocus={() => setShowDropdown(true)}
-                  onKeyDown={handleKeyDown}
-                  className={cn(
-                    "pl-11 h-12 text-base relative",
-                    "focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none",
-                    showDropdown && "border-transparent",
-                    isAiMode && [
-                      "bg-purple-50/50 dark:bg-gradient-to-r dark:from-purple-950/30 dark:to-blue-950/30",
-                      "text-foreground placeholder:text-muted-foreground"
-                    ]
-                  )}
-                  disabled={isLoading}
-                  autoComplete="off"
-                />
-              </div>
+              {showDropdown ? (
+                <div className={isAiMode ? "input-beam-wrapper-ai" : "input-beam-wrapper-normal"}>
+                  <div className="rounded-md bg-background">
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value)
+                        setSelectedIndex(-1)
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      onKeyDown={handleKeyDown}
+                      className="pl-11 h-12 text-base relative bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                      disabled={isLoading}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-[2px]">
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value)
+                      setSelectedIndex(-1)
+                    }}
+                    onFocus={() => setShowDropdown(true)}
+                    onKeyDown={handleKeyDown}
+                    className="pl-11 h-12 text-base relative rounded-md"
+                    disabled={isLoading}
+                    autoComplete="off"
+                  />
+                </div>
+              )}
             </div>
 
             {/* 자동완성 드롭다운 */}

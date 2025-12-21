@@ -6,10 +6,12 @@ import { FeatureCards } from "@/components/feature-cards"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
 import { Dock, DockIcon } from "@/components/ui/dock"
+import { Particles } from "@/components/ui/particles"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTheme } from "next-themes"
 
 // Dynamic import for FavoritesDialog (reduce initial bundle)
 const FavoritesDialog = dynamic(
@@ -43,6 +45,8 @@ export function SearchViewImproved({
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
+  const { resolvedTheme } = useTheme()
+  const [particleColor, setParticleColor] = useState("#ffffff")
 
   // Refs for scrolling to sections
   const featuresRef = useRef<HTMLElement>(null)
@@ -51,6 +55,11 @@ export function SearchViewImproved({
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
 
   const isLoading = isSearching || ragLoading
+
+  // Theme-based particle color
+  useEffect(() => {
+    setParticleColor(resolvedTheme === "dark" ? "#ffffff" : "#000000")
+  }, [resolvedTheme])
 
   // Scroll detection for floating nav + favorites count
   useEffect(() => {
@@ -211,7 +220,15 @@ export function SearchViewImproved({
 
       {/* Hero Section - 스크롤 가능 */}
       <section className="hero-section-fixed pt-32 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">
-        <div className="container mx-auto max-w-4xl">
+        {/* Particles Background */}
+        <Particles
+          className="absolute inset-0 z-0"
+          quantity={100}
+          ease={80}
+          color={particleColor}
+          refresh
+        />
+        <div className="container mx-auto max-w-4xl relative z-10">
           <motion.div
             className="flex flex-col items-center text-center"
             variants={containerVariants}
@@ -250,7 +267,7 @@ export function SearchViewImproved({
             </div>
 
             {/* Search Bar */}
-            <motion.div variants={itemVariants} className="w-full max-w-3xl mb-6 md:mb-15">
+            <motion.div variants={itemVariants} className="w-full max-w-3xl mb-6 md:mb-15 relative z-[110]">
               <SearchBar
                 onSearch={onSearch}
                 isLoading={isLoading}
@@ -261,7 +278,7 @@ export function SearchViewImproved({
             {/* Scroll Indicator */}
             <motion.button
               variants={itemVariants}
-              className="scroll-indicator-apple p-2 rounded-full hover:bg-white/5 transition-colors"
+              className="scroll-indicator-apple p-2 rounded-full hover:bg-white/5 transition-colors relative z-0"
               onClick={handleScrollIndicatorClick}
               aria-label="스크롤하여 다음 섹션으로 이동"
             >
@@ -276,9 +293,17 @@ export function SearchViewImproved({
         {/* Features Section */}
         <section
           ref={featuresRef}
-          className={`section-primary py-5 md:py-40 reveal-on-scroll ${featuresRevealed ? 'revealed' : ''}`}
+          className={`section-primary py-5 md:py-40 reveal-on-scroll ${featuresRevealed ? 'revealed' : ''} relative`}
         >
-          <div className="container mx-auto max-w-4xl px-6">
+          {/* Particles Background for entire Features section */}
+          <Particles
+            className="absolute inset-0 z-0"
+            quantity={100}
+            ease={80}
+            color={particleColor}
+            refresh
+          />
+          <div className="container mx-auto max-w-4xl px-6 relative z-10">
             <FeatureCards revealed={featuresRevealed} />
           </div>
         </section>

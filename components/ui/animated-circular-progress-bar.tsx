@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils"
+import { NumberTicker } from "@/components/ui/number-ticker"
+import { useState, useEffect, useRef } from "react"
 
 interface AnimatedCircularProgressBarProps {
   max?: number
@@ -19,7 +21,51 @@ export function AnimatedCircularProgressBar({
 }: AnimatedCircularProgressBarProps) {
   const circumference = 2 * Math.PI * 45
   const percentPx = circumference / 100
-  const currentPercent = Math.round(((value - min) / (max - min)) * 100)
+  const targetPercent = Math.round(((value - min) / (max - min)) * 100)
+
+  // 부드럽게 증가하는 진행률
+  const [currentPercent, setCurrentPercent] = useState(0)
+  const previousTargetRef = useRef(0)
+
+  useEffect(() => {
+    const startPercent = previousTargetRef.current
+
+    // 목표값이 현재보다 작으면 즉시 설정 (뒤로 가는 경우)
+    if (targetPercent < startPercent) {
+      setCurrentPercent(targetPercent)
+      previousTargetRef.current = targetPercent
+      return
+    }
+
+    // 같으면 아무것도 안 함
+    if (targetPercent === startPercent) {
+      return
+    }
+
+    // 부드럽게 증가
+    const startTime = Date.now()
+    const duration = 800
+    const delta = targetPercent - startPercent
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+
+      // easeOutQuad 이징
+      const eased = 1 - (1 - progress) * (1 - progress)
+      const current = Math.round(startPercent + delta * eased)
+
+      setCurrentPercent(current)
+
+      if (progress < 1) {
+        requestAnimationFrame(animate)
+      } else {
+        previousTargetRef.current = targetPercent
+      }
+    }
+
+    requestAnimationFrame(animate)
+  }, [targetPercent])
 
   return (
     <div
@@ -101,7 +147,7 @@ export function AnimatedCircularProgressBar({
         data-current-value={currentPercent}
         className="animate-in fade-in absolute inset-0 m-auto size-fit text-5xl font-bold tabular-nums delay-[var(--delay)] duration-[var(--transition-length)] ease-linear animate-shimmer bg-gradient-to-r from-white via-gray-100 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
       >
-        {currentPercent}
+        <NumberTicker value={currentPercent} />
       </span>
     </div>
   )
