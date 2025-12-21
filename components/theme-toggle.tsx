@@ -61,26 +61,24 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <Icon name="sun" className="h-4 w-4" />
-      </Button>
+      <button className="flex items-center justify-center">
+        <Icon name="sun" size={16} className="text-muted-foreground" />
+      </button>
     )
   }
 
   return (
-    <Button
+    <button
       ref={buttonRef}
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8"
       onClick={toggleTheme}
       title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+      className="flex items-center justify-center cursor-pointer"
     >
       {theme === "dark" ? (
-        <Icon name="sun" className="h-4 w-4" />
+        <Icon name="sun" size={16} className="text-muted-foreground hover:text-foreground" />
       ) : (
-        <Icon name="moon" className="h-4 w-4" />
+        <Icon name="moon" size={16} className="text-muted-foreground hover:text-foreground" />
       )}
-    </Button>
+    </button>
   )
 }

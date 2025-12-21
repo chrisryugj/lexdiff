@@ -5,6 +5,7 @@ import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { FeatureCards } from "@/components/feature-cards"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
+import { Dock, DockIcon } from "@/components/ui/dock"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
@@ -142,20 +143,26 @@ export function SearchViewImproved({
 
   return (
     <div className="min-h-screen page-bg">
-      {/* Floating Navigation - 항상 표시 */}
+      {/* Floating Navigation with Dock Style */}
       <motion.header
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="fixed top-3 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
       >
-        <div className="pointer-events-auto flex items-center justify-between gap-4 md:gap-6 px-3 md:px-5 py-1.5 md:py-2 rounded-full bg-background/60 backdrop-blur-md border border-border/30 shadow-lg shadow-black/10">
-          <button
+        <Dock
+          iconSize={32}
+          iconMagnification={48}
+          iconDistance={120}
+          className="pointer-events-auto bg-background/30 backdrop-blur-md border border-border/20 shadow-lg shadow-black/5 gap-4 px-5 py-3"
+        >
+          {/* Logo Button with Text - 확대 효과 제외 */}
+          <div
             onClick={handleLogoClick}
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2 px-2 cursor-pointer shrink-0"
           >
-            <div className="relative flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 animate-[glow_3s_ease-in-out_infinite] group-hover:animate-[glow-hover_1.5s_ease-in-out_infinite]">
-              <Icon name="scale" size={18} className="text-white" />
+            <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 animate-[glow_3s_ease-in-out_infinite] hover:animate-[glow-hover_1.5s_ease-in-out_infinite]">
+              <Icon name="scale" size={16} className="text-white" />
               <style jsx>{`
                 @keyframes glow {
                   0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
@@ -167,49 +174,39 @@ export function SearchViewImproved({
                 }
               `}</style>
             </div>
-            <span className="text-sm md:text-base font-bold text-foreground" style={{ fontFamily: "GiantsInline, sans-serif" }}>
+            <span className="text-sm md:text-base font-bold text-foreground whitespace-nowrap" style={{ fontFamily: "GiantsInline, sans-serif" }}>
               LexDiff
             </span>
-          </button>
-
-          <div className="h-4 w-[1px] bg-border/50" />
-
-          <div className="flex items-center gap-1">
-            {/* 테마 토글 */}
-            <ThemeToggle />
-
-            {favoritesCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleFavoritesClick}
-                className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors h-7 px-2"
-              >
-                <Icon name="star" size={14} className="mr-1 text-yellow-400" />
-                <span className="text-xs font-medium">{favoritesCount}</span>
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleHelpClick}
-              className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-7 h-7 md:w-8 md:h-8"
-              title="사용 가이드"
-            >
-              <Icon name="help-circle" size={14} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSettingsClick}
-              className="rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors w-7 h-7 md:w-8 md:h-8"
-            >
-              <Icon name="settings" size={14} />
-            </Button>
           </div>
-        </div>
+
+          {/* Divider */}
+          <div className="h-8 w-[1px] bg-border/50" />
+
+          {/* Theme Toggle */}
+          <DockIcon className="flex items-center justify-center">
+            <ThemeToggle />
+          </DockIcon>
+
+          {/* Favorites */}
+          {favoritesCount > 0 && (
+            <DockIcon onClick={handleFavoritesClick} className="cursor-pointer">
+              <div className="flex items-center gap-1">
+                <Icon name="star" size={16} className="text-yellow-400" />
+                <span className="text-xs font-medium text-foreground">{favoritesCount}</span>
+              </div>
+            </DockIcon>
+          )}
+
+          {/* Help */}
+          <DockIcon onClick={handleHelpClick} className="cursor-pointer" title="사용 가이드">
+            <Icon name="help-circle" size={16} className="text-muted-foreground hover:text-foreground" />
+          </DockIcon>
+
+          {/* Settings */}
+          <DockIcon onClick={handleSettingsClick} className="cursor-pointer">
+            <Icon name="settings" size={16} className="text-muted-foreground hover:text-foreground" />
+          </DockIcon>
+        </Dock>
       </motion.header>
 
       {/* Hero Section - 스크롤 가능 */}
