@@ -138,8 +138,8 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
                     "cursor-pointer rounded-xl overflow-hidden"
                   )}
                   gradientSize={200}
-                  gradientColor="#262626"
-                  gradientOpacity={0.8}
+                  gradientColor="rgba(158, 122, 255, 0.3)"
+                  gradientOpacity={0.3}
                   gradientFrom="#9E7AFF"
                   gradientTo="#FE8BBB"
                 >
