@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/icon"
 import { AuroraText } from "@/components/ui/aurora-text"
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text"
 import { MagicCard } from "@/components/ui/magic-card"
+import { LightRays } from "@/components/ui/light-rays"
 import { cn } from "@/lib/utils"
 
 // 행별로 그룹화된 features
@@ -134,7 +135,7 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
                   key={cardIndex}
                   className={cn(
                     feature.colSpan,
-                    "cursor-pointer rounded-xl"
+                    "cursor-pointer rounded-xl overflow-hidden"
                   )}
                   gradientSize={200}
                   gradientColor="#262626"
@@ -142,7 +143,18 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
                   gradientFrom="#9E7AFF"
                   gradientTo="#FE8BBB"
                 >
-                  <div className="group relative flex flex-col justify-between p-5 h-full overflow-hidden">
+                  <div className="group relative flex flex-col justify-between p-5 h-full">
+                    {/* Light Rays - 호버 시에만 표시 */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <LightRays
+                        count={5}
+                        color="rgba(158, 122, 255, 0.15)"
+                        blur={24}
+                        speed={10}
+                        length="100%"
+                      />
+                    </div>
+
                     {/* Background Icon */}
                     <div className="absolute top-0 right-0 p-4 opacity-[0.05] transition-opacity duration-500 group-hover:opacity-[0.1]">
                       <Icon
