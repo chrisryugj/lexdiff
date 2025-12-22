@@ -162,46 +162,59 @@ function PrecedentListItem({
   onClick: () => void
 }) {
   return (
-    <div
+    <button
       className={cn(
-        "p-3 rounded-lg border cursor-pointer transition-colors",
-        isSelected
-          ? "bg-primary/10 border-primary"
-          : "bg-muted/30 border-border hover:bg-muted/50"
+        "group relative p-4 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden w-full",
+        isSelected && "border-primary bg-primary/5"
       )}
       onClick={onClick}
+      style={{ fontFamily: "Pretendard, sans-serif" }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm line-clamp-2">{precedent.name}</div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-            <span>{precedent.court}</span>
-            <span>·</span>
-            <span className="truncate">{precedent.caseNumber}</span>
+          <div className="font-bold text-sm md:text-base leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2">
+            {precedent.name}
           </div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-            <span>선고일: {formatPrecedentDate(precedent.date)}</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              {precedent.court}
+            </span>
+            <span className="flex items-center gap-1.5 truncate">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              {precedent.caseNumber}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              {formatPrecedentDate(precedent.date)}
+            </span>
             {precedent.type && (
-              <>
-                <span>·</span>
-                <span>{precedent.type}</span>
-              </>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {precedent.type}
+              </span>
             )}
           </div>
         </div>
-        {precedent.link && (
-          <a
-            href={precedent.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 text-muted-foreground hover:text-primary mt-0.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        )}
+
+        <div className="flex items-center gap-2">
+          {precedent.link && (
+            <a
+              href={precedent.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
+            <Scale className="w-4 h-4 text-primary transition-colors" />
+          </div>
+        </div>
       </div>
-    </div>
+    </button>
   )
 }
 

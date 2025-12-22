@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       type: "XML",
       target: "ordin",
       query: query,
-      display: "20",
+      display: "100",
     })
 
     // 법령종류 필터 추가
