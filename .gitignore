@@ -33,3 +33,15 @@ NUL
 
 # data folder (ordinances storage)
 /data/
+
+# Claude Code - 민감 정보 제외
+.claude/.credentials.json
+.claude/history.jsonl
+.claude/stats-cache.json
+.claude/telemetry/
+.claude/debug/
+.claude/file-history/
+.claude/shell-snapshots/
+.claude/plans/
+.claude/todos/
+.claude/session-env/
