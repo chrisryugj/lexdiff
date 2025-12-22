@@ -107,6 +107,7 @@ export interface LawDataState {
   viewMode?: "single" | "full"
   searchQueryId?: number
   searchResultId?: number
+  isPrecedent?: boolean  // 판례 모드
 }
 
 export interface LawSelectionState {

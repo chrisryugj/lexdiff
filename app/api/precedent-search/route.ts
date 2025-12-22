@@ -39,8 +39,32 @@ export async function GET(request: NextRequest) {
       page,
     })
 
-    if (query) params.append("query", query)
-    if (court) params.append("curt", court)
+    // ✅ 법원명 + 연도 조합 처리 (예: "대법원 2025")
+    let extractedYear: string | null = null
+    let extractedCourt: string | null = court
+
+    if (query && !caseNumber) {
+      // 법원명 추출
+      const courtMatch = query.match(/(대법원|서울고등법원|서울고법|부산고등법원|부산고법|대구고등법원|대구고법|광주고등법원|광주고법|서울중앙지법|서울동부지법|서울남부지법|서울북부지법|서울서부지법|인천지법|수원지법|부산지법|대구지법|광주지법|대전지법|울산지법|창원지법)/)
+      if (courtMatch && !extractedCourt) {
+        extractedCourt = courtMatch[0]
+      }
+
+      // 연도 추출 (4자리 숫자)
+      const yearMatch = query.match(/\b(19\d{2}|20\d{2})\b/)
+      if (yearMatch) {
+        extractedYear = yearMatch[0]
+      }
+    }
+
+    // ✅ 법원명으로만 검색 (query 파라미터 사용 안 함)
+    if (extractedCourt) {
+      params.append("curt", extractedCourt)
+    } else if (query && !extractedCourt && !caseNumber) {
+      // 법원명 없으면 query로 검색
+      params.append("query", query)
+    }
+
     if (caseNumber) params.append("nb", caseNumber)
     if (sort) params.append("sort", sort)
 
@@ -60,11 +84,28 @@ export async function GET(request: NextRequest) {
 
     const { totalCount, precedents } = parsePrecedentSearchXML(xmlText)
 
+    // ✅ 연도 필터링 (클라이언트 사이드)
+    let filteredPrecedents = precedents
+    let filteredCount = totalCount
+
+    if (extractedYear) {
+      filteredPrecedents = precedents.filter(prec => {
+        // 사건번호나 선고일자에서 연도 추출
+        const yearInCaseNumber = prec.caseNumber?.match(/^(\d{4})/)
+        const yearInDate = prec.decisionDate?.substring(0, 4)
+
+        return yearInCaseNumber?.[1] === extractedYear || yearInDate === extractedYear
+      })
+      filteredCount = filteredPrecedents.length
+    }
+
     return NextResponse.json({
-      totalCount,
-      precedents,
+      totalCount: filteredCount,
+      precedents: filteredPrecedents,
       page: parseInt(page, 10),
-      display: parseInt(display, 10)
+      display: parseInt(display, 10),
+      yearFilter: extractedYear || undefined,
+      courtFilter: extractedCourt || undefined
     })
 
   } catch (error) {

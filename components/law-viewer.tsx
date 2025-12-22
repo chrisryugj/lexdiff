@@ -77,6 +77,9 @@ interface LawViewerProps {
   // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
   isStreaming?: boolean  // 스트리밍 중 여부
   searchProgress?: number  // 진행률 (0-100)
+
+  // ✅ 판례 모드
+  isPrecedent?: boolean  // 판례 뷰 여부
 }
 
 export function LawViewer({
@@ -102,8 +105,9 @@ export function LawViewer({
   onAiRefresh,
   isStreaming = false,
   searchProgress = 0,
+  isPrecedent = false,
 }: LawViewerProps) {
-  const isFullView = isOrdinance || viewMode === "full"
+  const isFullView = isOrdinance || viewMode === "full" || isPrecedent  // 판례는 항상 전체 뷰
   const { toast } = useToast()
 
 
@@ -828,7 +832,7 @@ export function LawViewer({
               </>
             )
             }
-          </Card >
+          </Card>
 
           {/* Mobile Bottom Sheet for Article List */}
           <ArticleBottomSheet
@@ -888,40 +892,66 @@ export function LawViewer({
             {!aiAnswerMode && (
               <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 sm:pb-3.5">
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon name="book-open" size={20} className="text-primary" />
+                  <Icon name={isPrecedent ? "gavel" : "book-open"} size={20} className="text-primary" />
                   <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
-                  {!isOrdinance && viewMode === "full" && (
+                  {!isPrecedent && !isOrdinance && viewMode === "full" && (
                     <Badge variant="outline" className="text-xs">
                       전체 조문
                     </Badge>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {meta.latestEffectiveDate && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                      <Icon name="calendar" size={12} className="mr-1" />
-                      {formatDate(meta.latestEffectiveDate)}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                    <Icon name="file-text" size={12} className="mr-1" />
-                    {articles.length}개
-                  </Badge>
+                  {isPrecedent ? (
+                    // 판례 전용 배지
+                    <>
+                      {meta.caseNumber && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          <Icon name="file-text" size={12} className="mr-1" />
+                          {meta.caseNumber}
+                        </Badge>
+                      )}
+                      {meta.promulgationDate && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          <Icon name="calendar" size={12} className="mr-1" />
+                          선고일: {meta.promulgationDate}
+                        </Badge>
+                      )}
+                      {meta.lawType && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          {meta.lawType}
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    // 법령 전용 배지
+                    <>
+                      {meta.latestEffectiveDate && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          <Icon name="calendar" size={12} className="mr-1" />
+                          {formatDate(meta.latestEffectiveDate)}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                        <Icon name="file-text" size={12} className="mr-1" />
+                        {articles.length}개 조문
+                      </Badge>
 
-                  {isOrdinance && (
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs px-1.5 py-0.5">
-                      <Icon name="building-2" size={12} className="mr-1" />
-                      자치법규
-                    </Badge>
-                  )}
-                  {meta.revisionType && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                      {meta.revisionType}
-                    </Badge>
+                      {isOrdinance && (
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs px-1.5 py-0.5">
+                          <Icon name="building-2" size={12} className="mr-1" />
+                          자치법규
+                        </Badge>
+                      )}
+                      {meta.revisionType && (
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                          {meta.revisionType}
+                        </Badge>
+                      )}
+                    </>
                   )}
 
-                  {/* 법령 전체 즐겨찾기 개수 */}
-                  {favoriteCount > 0 && (
+                  {/* 법령 전체 즐겨찾기 개수 - 판례는 제외 */}
+                  {!isPrecedent && favoriteCount > 0 && (
                     <Badge
                       key={`header-fav-count-${favoriteCount}`}
                       variant="outline"
@@ -931,7 +961,7 @@ export function LawViewer({
                       {favoriteCount}
                     </Badge>
                   )}
-                  {!isOrdinance && viewMode === "full" && activeArticle && (
+                  {!isPrecedent && !isOrdinance && viewMode === "full" && activeArticle && (
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                       현재: {formatSimpleJo(activeArticle.jo)}
                     </Badge>
@@ -941,27 +971,56 @@ export function LawViewer({
             )}
 
             {/* Action Buttons */}
-            {
-              !aiAnswerMode && !isOrdinance && activeArticle && (
-                <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
-                  <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
-                    <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <Icon name="git-compare" size={14} className="sm:mr-1" />
-                      <span className="hidden sm:inline">신·구법 비교</span>
-                      <span className="sm:hidden">비교</span>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <Icon name="sparkles" size={14} className="sm:mr-1" />
-                      <span className="hidden sm:inline">AI 요약</span>
-                      <span className="sm:hidden">요약</span>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
-                      <Icon name="external-link" size={14} className="sm:mr-1" />
-                      <span className="hidden sm:inline">원문 보기</span>
-                      <span className="sm:hidden">원문</span>
-                    </Button>
-                    {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
-                    {!isOrdinance && !aiAnswerMode && (
+            {!aiAnswerMode && activeArticle && (
+              <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
+                <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
+                  {isPrecedent ? (
+                    // 판례 전용 액션 버튼
+                    <>
+                      <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
+                        <Icon name="external-link" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">원문 보기</span>
+                        <span className="sm:hidden">원문</span>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+                        <Icon name="sparkles" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">판례 요약</span>
+                        <span className="sm:hidden">요약</span>
+                      </Button>
+                      <Button
+                        variant={favorites.has(favoriteKey(activeArticle.jo)) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                        className="h-7 px-1.5 sm:px-2 shrink-0"
+                      >
+                        <Icon
+                          name="star"
+                          size={14}
+                          className={`sm:mr-1 ${favorites.has(favoriteKey(activeArticle.jo)) ? "fill-yellow-400 text-yellow-500" : ""}`}
+                        />
+                        <span className="hidden sm:inline">즐겨찾기</span>
+                        <span className="sm:hidden">★</span>
+                      </Button>
+                    </>
+                  ) : !isOrdinance ? (
+                    // 법령 전용 액션 버튼
+                    <>
+                      <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+                        <Icon name="git-compare" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">신·구법 비교</span>
+                        <span className="sm:hidden">비교</span>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+                        <Icon name="sparkles" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">AI 요약</span>
+                        <span className="sm:hidden">요약</span>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
+                        <Icon name="external-link" size={14} className="sm:mr-1" />
+                        <span className="hidden sm:inline">원문 보기</span>
+                        <span className="sm:hidden">원문</span>
+                      </Button>
+                      {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
                       <Button
                         variant={tierViewMode === "2-tier" ? "default" : "outline"}
                         size="sm"
@@ -991,9 +1050,7 @@ export function LawViewer({
                         <span className="hidden sm:inline">{tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}</span>
                         <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
                       </Button>
-                    )}
-                    {/* 판례 보기 버튼 */}
-                    {!aiAnswerMode && (
+                      {/* 판례 보기 버튼 */}
                       <Button
                         variant={showPrecedents ? "default" : "outline"}
                         size="sm"
@@ -1005,26 +1062,26 @@ export function LawViewer({
                         <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
                         <span className="sm:hidden">{showPrecedents ? "닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
                       </Button>
-                    )}
-                    {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
-                    <Button
-                      key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                      data-favorited={isFavorite(activeArticle.jo)}
-                      className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                        : ''
-                        }`}
-                    >
-                      <Icon name="star" size={14} className={`mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
-                      즐겨찾기
-                    </Button>
-                  </div>
+                      {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
+                      <Button
+                        key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onToggleFavorite?.(activeArticle.jo)}
+                        data-favorited={isFavorite(activeArticle.jo)}
+                        className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                          : ''
+                          }`}
+                      >
+                        <Icon name="star" size={14} className={`mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
+                        즐겨찾기
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
-              )
-            }
+              </div>
+            )}
 
             {
               isOrdinance && (
@@ -1129,6 +1186,7 @@ export function LawViewer({
                         articleRefs={articleRefs}
                         scrollParentRef={contentRef}
                         isOrdinance={isOrdinance}
+                        isPrecedent={isPrecedent}
                       />
                     </div>
                   </ScrollArea>
@@ -1303,6 +1361,7 @@ export function LawViewer({
                               detail={selectedPrecedent}
                               loading={loadingPrecedentDetail}
                               onClose={collapsePrecedentPanel}
+                              onContentClick={handleContentClick}
                             />
                           </div>
                         </div>

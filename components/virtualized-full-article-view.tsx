@@ -15,16 +15,18 @@ import { cn } from "@/lib/utils"
 // ✅ 성능 최적화: 컴포넌트를 외부로 이동 (매번 재생성 방지)
 const ArticleContent = React.memo(function ArticleContent({
   article,
-  lawTitle
+  lawTitle,
+  onContentClick
 }: {
   article: LawArticle
   lawTitle: string
+  onContentClick?: (e: React.MouseEvent<HTMLDivElement>) => void
 }) {
   const html = useMemo(
     () => extractArticleText(article, false, lawTitle),
     [article.jo, article.content, lawTitle]
   )
-  return <div dangerouslySetInnerHTML={{ __html: html }} />
+  return <div onClick={onContentClick} dangerouslySetInnerHTML={{ __html: html }} />
 })
 
 interface VirtualizedFullArticleViewProps {
@@ -40,6 +42,7 @@ interface VirtualizedFullArticleViewProps {
   articleRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
   scrollParentRef?: React.RefObject<HTMLDivElement | null>
   isOrdinance?: boolean
+  isPrecedent?: boolean  // 판례 모드
 }
 
 /**
@@ -61,6 +64,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   articleRefs,
   scrollParentRef,
   isOrdinance = false,
+  isPrecedent = false,
 }: VirtualizedFullArticleViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -173,7 +177,13 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       : undefined,
   })
 
-  const formatSimpleJo = (jo: string): string => {
+  const formatSimpleJo = (article: LawArticle): string => {
+    // ✅ 판례는 joNum을 직접 사용
+    if (isPrecedent && article.joNum) {
+      return article.joNum
+    }
+
+    const jo = article.jo
     try {
       // Already formatted (e.g., "제1조", "제10조의2")
       if (jo.startsWith("제") && jo.includes("조")) {
@@ -327,7 +337,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   <div className="mb-2 pb-1 border-b border-border">
                     <div className="flex items-center justify-between gap-1">
                       <h3 className="text-lg font-bold text-foreground flex items-center gap-1 lg:gap-2 flex-1 min-w-0">
-                        {formatSimpleJo(item.article.jo)}
+                        {formatSimpleJo(item.article)}
                         {item.article.title && (
                           <span className="text-muted-foreground truncate">({item.article.title})</span>
                         )}
@@ -391,7 +401,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                     }}
                     onClick={onContentClick}
                   >
-                    <ArticleContent article={item.article} lawTitle={lawTitle} />
+                    <ArticleContent article={item.article} lawTitle={lawTitle} onContentClick={onContentClick} />
                   </div>
 
                   {item.article.hasChanges && (

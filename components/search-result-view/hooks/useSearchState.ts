@@ -79,6 +79,11 @@ export interface SearchState {
   ragError: string | null
   ragProgress: number
   ragAnswer: RagAnswer | null
+
+  // 판례/해석례/재결례 상태
+  precedentResults: any[] | null
+  interpretationResults: any[] | null
+  rulingResults: any[] | null
 }
 
 export interface SearchStateActions {
@@ -126,6 +131,11 @@ export interface SearchStateActions {
   setRagError: (error: string | null) => void
   setRagProgress: (progress: number) => void
   setRagAnswer: (answer: RagAnswer | null) => void
+
+  // 판례/해석례/재결례 상태 업데이트
+  setPrecedentResults: (results: any[] | null) => void
+  setInterpretationResults: (results: any[] | null) => void
+  setRulingResults: (results: any[] | null) => void
 
   // 복합 액션
   resetSearchState: () => void
@@ -195,6 +205,13 @@ export function useSearchState({
   const [ragError, setRagError] = useState<string | null>(null)
   const [ragProgress, setRagProgress] = useState(0)
   const [ragAnswer, setRagAnswer] = useState<RagAnswer | null>(null)
+
+  // ============================================================
+  // 판례/해석례/재결례 상태
+  // ============================================================
+  const [precedentResults, setPrecedentResults] = useState<any[] | null>(null)
+  const [interpretationResults, setInterpretationResults] = useState<any[] | null>(null)
+  const [rulingResults, setRulingResults] = useState<any[] | null>(null)
 
   // ============================================================
   // 즐겨찾기 구독
@@ -309,6 +326,9 @@ export function useSearchState({
     ragError,
     ragProgress,
     ragAnswer,
+    precedentResults,
+    interpretationResults,
+    rulingResults,
   }
 
   const actions: SearchStateActions = {
@@ -345,6 +365,9 @@ export function useSearchState({
     setRagError,
     setRagProgress,
     setRagAnswer,
+    setPrecedentResults,
+    setInterpretationResults,
+    setRulingResults,
     resetSearchState,
     resetToHome,
   }

@@ -79,7 +79,7 @@ export function StageIndicator({
       <div className={cn("space-y-3", className)}>
         <div className="flex items-center gap-2 text-sm">
           <Icon
-            name={current?.icon || "loading-03"}
+            name={current?.icon || "loader"}
             className={cn(
               "h-5 w-5",
               currentStage === "complete"

@@ -72,6 +72,39 @@ export function parsePrecedentSearchXML(xml: string): {
 }
 
 /**
+ * 판례 전문 XML 파싱
+ */
+export function parsePrecedentDetailXML(xml: string): PrecedentDetail | null {
+  const extractTag = (tag: string): string => {
+    // CDATA 지원
+    const cdataRegex = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`)
+    const cdataMatch = xml.match(cdataRegex)
+    if (cdataMatch) return cdataMatch[1].trim()
+
+    const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`)
+    const tagMatch = xml.match(regex)
+    return tagMatch ? tagMatch[1].trim() : ""
+  }
+
+  const name = extractTag("사건명")
+  if (!name) return null
+
+  return {
+    name,
+    caseNumber: extractTag("사건번호"),
+    court: extractTag("법원명"),
+    date: extractTag("선고일자"),
+    caseType: extractTag("사건종류명"),
+    judgmentType: extractTag("판결유형"),
+    holdings: extractTag("판시사항"),
+    summary: extractTag("판결요지"),
+    refStatutes: extractTag("참조조문"),
+    refPrecedents: extractTag("참조판례"),
+    fullText: extractTag("판례내용")
+  }
+}
+
+/**
  * 판례 전문 JSON 파싱
  */
 export function parsePrecedentDetailJSON(json: any): PrecedentDetail | null {

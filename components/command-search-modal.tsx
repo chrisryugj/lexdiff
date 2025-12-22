@@ -13,11 +13,19 @@ import type { Favorite } from "@/lib/law-types"
 import { formatJO, parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { cn } from "@/lib/utils"
+import { classifySearchQuery, type UnifiedQueryClassification, type SearchType } from "@/lib/unified-query-classifier"
 
 interface CommandSearchModalProps {
   isOpen: boolean
   onClose: () => void
-  onSearch: (query: { lawName: string; article?: string; jo?: string }) => void
+  onSearch: (query: {
+    lawName: string
+    article?: string
+    jo?: string
+    searchType?: SearchType  // ✅ 신규
+    caseNumber?: string  // ✅ 신규
+    classification?: UnifiedQueryClassification  // ✅ 신규
+  }) => void
   isAiMode?: boolean // AI 모드 여부
 }
 
@@ -169,14 +177,43 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     setRecentSearches(updated)
     localStorage.setItem('recentSearches', JSON.stringify(updated))
 
-    // parseSearchQuery로 파싱하여 조문 번호 추출
+    // ✅ unified-query-classifier 사용
+    const classification = classifySearchQuery(query)
+    debugLogger.info('CommandSearchModal 통합 검색 분류', { query, classification })
+
+    // ✅ 판례/해석례/재결례는 분류 결과 그대로 전달 (SearchBar와 동일)
+    if (['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
+      debugLogger.info(`${classification.searchType} 검색 실행`, { query })
+      onSearch({
+        lawName: classification.entities.lawName || query,
+        article: classification.entities.articleNumber,
+        jo: classification.entities.articleNumber,
+        searchType: classification.searchType,
+        caseNumber: classification.entities.caseNumber,
+        classification: classification
+      })
+      onClose()
+      return
+    }
+
+    // parseSearchQuery로 조문 번호 추출 (기존 호환성 유지)
     try {
       const parsed = parseSearchQuery(query)
-      debugLogger.info('CommandSearchModal 검색 파싱', { query, parsed })
-      onSearch(parsed)
+      onSearch({
+        lawName: classification.entities.lawName || parsed.lawName || query,
+        article: classification.entities.articleNumber || parsed.article,
+        jo: classification.entities.articleNumber || parsed.jo,
+        searchType: classification.searchType,
+        caseNumber: classification.entities.caseNumber,
+        classification: classification
+      })
     } catch (error) {
-      debugLogger.error('검색 파싱 실패', error)
-      onSearch({ lawName: query })
+      debugLogger.error('검색 파싱 실패 (Fallback)', error)
+      onSearch({
+        lawName: classification.entities.lawName || query,
+        searchType: classification.searchType,
+        classification: classification
+      })
     }
     onClose()
   }

@@ -16,17 +16,24 @@ import {
 import { parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { cn } from "@/lib/utils"
-import { detectQueryType } from "@/lib/query-detector"
+import { classifySearchQuery, type UnifiedQueryClassification, type SearchType } from "@/lib/unified-query-classifier"
 
 interface SearchBarProps {
-  onSearch: (query: { lawName: string; article?: string; jo?: string }) => void
+  onSearch: (query: {
+    lawName: string
+    article?: string
+    jo?: string
+    searchType?: SearchType
+    caseNumber?: string
+    classification?: UnifiedQueryClassification
+  }) => void
   isLoading?: boolean
   searchMode?: 'basic' | 'rag'
 }
 
 interface Suggestion {
   text: string
-  type: 'law' | 'ai' | 'recent'
+  type: 'law' | 'ai' | 'recent' | 'precedent' | 'interpretation' | 'ruling'
   category: string
 }
 
@@ -78,20 +85,23 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       return
     }
 
-    const queryDetection = detectQueryType(query)
+    // ✅ 통합 분류기 사용
+    const classification = classifySearchQuery(query)
 
-    if (queryDetection.type === 'natural' && queryDetection.confidence >= 0.7) {
+    if (classification.searchType === 'ai' && classification.confidence >= 0.7) {
       setSearchType("ai")
       setIsNaturalQuery(true)
       return
     }
 
-    const hasLawKeyword = /법|법률|시행령|시행규칙/.test(query)
-    const hasOrdinanceKeyword = /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
-    const isOrdinanceQuery = hasOrdinanceKeyword && !hasLawKeyword
+    if (classification.searchType === 'ordinance') {
+      setSearchType("ordinance")
+      setIsNaturalQuery(false)
+      return
+    }
 
-    if (hasLawKeyword || hasOrdinanceKeyword) {
-      setSearchType(isOrdinanceQuery ? "ordinance" : "law")
+    if (classification.searchType === 'law') {
+      setSearchType("law")
       setIsNaturalQuery(false)
       return
     }
@@ -222,29 +232,59 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
   const executeSearch = (searchQuery: string) => {
     try {
+      // ✅ 통합 분류 먼저 실행
+      const classification = classifySearchQuery(searchQuery)
+      debugLogger.info("SearchBar 통합 검색 분류", { query: searchQuery, classification })
+
       // 수동으로 AI 모드를 선택한 경우
       if (forceAiMode) {
         debugLogger.info("AI 검색 실행 (수동 선택)", { query: searchQuery })
         saveRecentSearch(searchQuery)
-        onSearch({ lawName: searchQuery, article: undefined, jo: undefined })
+        onSearch({
+          lawName: searchQuery,
+          article: undefined,
+          jo: undefined,
+          searchType: 'ai',
+          classification: classification
+        })
+        setShowDropdown(false)
+        return
+      }
+
+      // ✅ 판례/해석례/재결례는 분류 결과 그대로 전달
+      if (['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
+        debugLogger.info(`${classification.searchType} 검색 실행`, { query: searchQuery })
+        saveRecentSearch(searchQuery)
+        onSearch({
+          lawName: classification.entities.lawName || searchQuery,
+          article: classification.entities.articleNumber,
+          jo: classification.entities.articleNumber,
+          searchType: classification.searchType,
+          caseNumber: classification.entities.caseNumber,
+          classification: classification
+        })
         setShowDropdown(false)
         return
       }
 
       // 자동 감지로 AI 모드가 확실한 경우
-      if (searchType === 'ai' && isNaturalQuery) {
+      if (classification.searchType === 'ai' && classification.confidence >= 0.75) {
         debugLogger.info("AI 검색 실행 (자동 감지)", { query: searchQuery })
         saveRecentSearch(searchQuery)
-        onSearch({ lawName: searchQuery, article: undefined, jo: undefined })
+        onSearch({
+          lawName: searchQuery,
+          article: undefined,
+          jo: undefined,
+          searchType: 'ai',
+          classification: classification
+        })
         setShowDropdown(false)
         return
       }
 
-      // 애매한 경우 판별
-      const queryDetection = detectQueryType(searchQuery)
+      // 애매한 경우 판별 (기존 로직 유지)
       const hasArticleNumber = /제?\s*\d+\s*조(?:의\s*\d+)?/.test(searchQuery)
-
-      if (hasArticleNumber && queryDetection.confidence >= 0.6 && queryDetection.confidence < 0.95) {
+      if (hasArticleNumber && classification.confidence >= 0.6 && classification.confidence < 0.95) {
         setPendingQuery(searchQuery)
         setShowChoiceDialog(true)
         return
@@ -255,7 +295,11 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       debugLogger.info("통합 검색 실행", parsed)
 
       saveRecentSearch(searchQuery)
-      onSearch(parsed)
+      onSearch({
+        ...parsed,
+        searchType: classification.searchType,
+        classification: classification
+      })
       setShowDropdown(false)
     } catch (error) {
       debugLogger.error("검색어 파싱 실패", error)
@@ -266,14 +310,27 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setShowChoiceDialog(false)
     saveRecentSearch(pendingQuery)
 
+    // ✅ 분류 실행
+    const classification = classifySearchQuery(pendingQuery)
+
     if (choice === 'ai') {
       debugLogger.info("AI 검색 실행 (사용자 선택)", { query: pendingQuery })
-      onSearch({ lawName: pendingQuery, article: undefined, jo: undefined })
+      onSearch({
+        lawName: pendingQuery,
+        article: undefined,
+        jo: undefined,
+        searchType: 'ai',
+        classification: classification
+      })
     } else {
       try {
         const parsed = parseSearchQuery(pendingQuery)
         debugLogger.info("법령 검색 실행 (사용자 선택)", parsed)
-        onSearch(parsed)
+        onSearch({
+          ...parsed,
+          searchType: classification.searchType,
+          classification: classification
+        })
       } catch (error) {
         debugLogger.error("법령 검색 파싱 실패", error)
       }
@@ -287,19 +344,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
     setShowDropdown(false)
     setSelectedIndex(-1)
 
-    // ✅ 최근 검색은 무조건 즉시 실행
-    if (isRecent) {
-      executeSearch(text)
-      return
-    }
-
-    // 제안 목록은 기존 로직 유지 (AI 패턴 감지)
-    if (text.endsWith('?') || text.includes('요건') || text.includes('절차') || text.includes('방법')) {
-      executeSearch(text)
-    } else {
-      // 일반 제안은 입력만 (기존 동작 유지)
-      inputRef.current?.focus()
-    }
+    // ✅ 모든 제안 클릭 시 즉시 검색 실행
+    executeSearch(text)
   }
 
   // 드롭다운에 표시할 항목들 - 실시간 추천을 먼저 표시 (최대 5개)
@@ -332,13 +378,13 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
           <div className="relative flex-1">
             {isAiMode ? (
-              <Icon name="brain" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse z-10" />
+              <Icon name="brain" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500 animate-pulse z-10 pointer-events-none" />
             ) : searchType === "ordinance" ? (
-              <Icon name="building-2" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500 z-10" />
+              <Icon name="building-2" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500 z-10 pointer-events-none" />
             ) : searchType === "law" ? (
-              <Icon name="scale" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500 z-10" />
+              <Icon name="scale" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-500 z-10 pointer-events-none" />
             ) : (
-              <Icon name="search" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground z-10" />
+              <Icon name="search" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
             )}
             <div className="relative">
               <style>{`
@@ -391,28 +437,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                   animation: border-beam-normal 4s linear infinite;
                 }
               `}</style>
-              {showDropdown ? (
-                <div className={isAiMode ? "input-beam-wrapper-ai" : "input-beam-wrapper-normal"}>
-                  <div className="rounded-md bg-background">
-                    <Input
-                      ref={inputRef}
-                      type="text"
-                      placeholder={isAiMode ? '🤖 AI에게 질문하세요... 예: "수출통관 절차는?", "청년 창업 지원은?"' : '법령명 또는 조문 검색... 예: "관세법 38조", "민법 제1조"'}
-                      value={query}
-                      onChange={(e) => {
-                        setQuery(e.target.value)
-                        setSelectedIndex(-1)
-                      }}
-                      onFocus={() => setShowDropdown(true)}
-                      onKeyDown={handleKeyDown}
-                      className="pl-11 h-12 text-base relative bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-                      disabled={isLoading}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="p-[2px]">
+              <div className={showDropdown ? (isAiMode ? "input-beam-wrapper-ai" : "input-beam-wrapper-normal") : "p-[2px]"}>
+                <div className={showDropdown ? "rounded-md bg-background" : ""}>
                   <Input
                     ref={inputRef}
                     type="text"
@@ -424,19 +450,22 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                     }}
                     onFocus={() => setShowDropdown(true)}
                     onKeyDown={handleKeyDown}
-                    className="pl-11 h-12 text-base relative rounded-md"
+                    className={cn(
+                      "pl-11 h-12 text-base relative",
+                      showDropdown ? "bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none" : "rounded-md"
+                    )}
                     disabled={isLoading}
                     autoComplete="off"
                   />
                 </div>
-              )}
+              </div>
             </div>
 
             {/* 자동완성 드롭다운 */}
             {showDropdown && hasDropdownItems && (
               <div
                 ref={dropdownRef}
-                className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-xl z-[100] overflow-hidden"
+                className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-xl z-[100] overflow-hidden pointer-events-auto"
               >
                 {/* 로딩 표시 */}
                 {isLoadingSuggestions && query.trim() && (
@@ -480,10 +509,48 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                         </>
                       )}
 
+                      {/* 판례/해석례/재결례 추천 */}
+                      {suggestions.filter(s => ['precedent', 'interpretation', 'ruling'].includes(s.type)).length > 0 && (
+                        <>
+                          {suggestions.filter(s => s.type === 'law').length > 0 && (
+                            <div className="border-t border-border my-1.5" />
+                          )}
+                          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
+                            <Icon name="gavel" className="h-3 w-3 text-blue-600" />
+                            <span>판례/해석례/재결례</span>
+                          </div>
+                          {suggestions
+                            .filter(s => ['precedent', 'interpretation', 'ruling'].includes(s.type))
+                            .map((suggestion, index) => {
+                              const lawCount = suggestions.filter(s => s.type === 'law').length
+                              const globalIndex = lawCount + index
+
+                              const iconName = suggestion.type === 'precedent' ? 'gavel' : suggestion.type === 'interpretation' ? 'file-text' : 'shield'
+                              const iconColor = suggestion.type === 'precedent' ? 'text-blue-600' : suggestion.type === 'interpretation' ? 'text-green-600' : 'text-indigo-600'
+
+                              return (
+                                <button
+                                  key={`${suggestion.type}-${index}`}
+                                  type="button"
+                                  onClick={() => handleSuggestionClick(suggestion.text)}
+                                  className={cn(
+                                    "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2",
+                                    selectedIndex === globalIndex ? "bg-accent" : "hover:bg-secondary"
+                                  )}
+                                >
+                                  <Icon name={iconName} className={cn("h-3.5 w-3.5 flex-shrink-0", iconColor)} />
+                                  <span className="truncate">{suggestion.text}</span>
+                                  <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">{suggestion.category}</span>
+                                </button>
+                              )
+                            })}
+                        </>
+                      )}
+
                       {/* AI 질문 추천 */}
                       {suggestions.filter(s => s.type === 'ai').length > 0 && (
                         <>
-                          {suggestions.filter(s => s.type === 'law').length > 0 && (
+                          {(suggestions.filter(s => s.type === 'law').length > 0 || suggestions.filter(s => ['precedent', 'interpretation', 'ruling'].includes(s.type)).length > 0) && (
                             <div className="border-t border-border my-1.5" />
                           )}
                           <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
@@ -494,7 +561,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
                             .filter(s => s.type === 'ai')
                             .map((suggestion, index) => {
                               const lawCount = suggestions.filter(s => s.type === 'law').length
-                              const globalIndex = lawCount + index
+                              const precedentCount = suggestions.filter(s => ['precedent', 'interpretation', 'ruling'].includes(s.type)).length
+                              const globalIndex = lawCount + precedentCount + index
 
                               return (
                                 <button

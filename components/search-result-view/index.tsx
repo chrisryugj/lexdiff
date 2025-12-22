@@ -17,6 +17,7 @@ import { LawViewer } from "@/components/law-viewer"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { LawViewerSkeleton } from "@/components/law-viewer-skeleton"
+import { Icon } from "@/components/ui/icon"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 
@@ -187,7 +188,21 @@ export function SearchResultView({
 
           actions.setIsSearching(true)
           actions.updateProgress('searching', 20)
-          await handlers.handleSearchInternal(cached.query, abortController.signal)
+
+          // ✅ 통합검색 분기
+          const classification = (cached.query as any).classification
+          if (classification && ['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
+            // 판례/해석례/재결례는 handleSearchInternal 스킵하고 전용 핸들러 사용
+            debugLogger.info('📡 캐시 복원: 전용 핸들러 실행', { searchType: classification.searchType })
+            // 핸들러가 자체적으로 setIsSearching(false) 처리함
+            switch (classification.searchType) {
+              case 'precedent': handlers.handlePrecedentSearch(cached.query); break
+              case 'interpretation': handlers.handleInterpretationSearch(cached.query); break
+              case 'ruling': handlers.handleRulingSearch(cached.query); break
+            }
+          } else {
+            await handlers.handleSearchInternal(cached.query, abortController.signal)
+          }
         }
       } catch (error) {
         if (!isSubscribed) return
@@ -218,7 +233,44 @@ export function SearchResultView({
       <CommandSearchModal
         isOpen={state.showSearchModal}
         onClose={() => actions.setShowSearchModal(false)}
-        onSearch={handlers.handleSearch}
+        onSearch={(query) => {
+          // ✅ 통합검색: searchType에 따라 분기
+          if (query.classification) {
+            console.log('[통합검색 분기] searchType:', query.classification.searchType, 'query:', query)
+
+            switch (query.classification.searchType) {
+              case 'precedent':
+                console.log('[통합검색] → handlePrecedentSearch')
+                handlers.handlePrecedentSearch(query)
+                break
+              case 'interpretation':
+                console.log('[통합검색] → handleInterpretationSearch')
+                handlers.handleInterpretationSearch(query)
+                break
+              case 'ruling':
+                console.log('[통합검색] → handleRulingSearch')
+                handlers.handleRulingSearch(query)
+                break
+              case 'ai':
+                console.log('[통합검색] → handleSearch (AI 모드)')
+                // AI 검색은 기존 handleSearch로 처리
+                handlers.handleSearch(query)
+                break
+              case 'multi':
+                console.log('[통합검색] → handleMultiSearch')
+                handlers.handleMultiSearch(query)
+                break
+              default:
+                console.log('[통합검색] → handleSearch (법령/조례)')
+                // law, ordinance는 기존 handleSearch로 처리
+                handlers.handleSearch(query)
+            }
+          } else {
+            console.log('[통합검색] classification 없음 → handleSearch (Fallback)')
+            // Fallback: classification 없으면 기존 로직
+            handlers.handleSearch(query)
+          }
+        }}
         isAiMode={state.isAiMode}
       />
 
@@ -302,6 +354,41 @@ export function SearchResultView({
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */
             <LawViewerSkeleton stage={state.searchStage} />
+          ) : state.precedentResults !== null ? (
+            /* 판례 검색 결과 */
+            <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Icon name="gavel" className="h-5 w-5 text-blue-600" />
+                <h2 className="text-lg font-semibold">판례 검색 결과 ({state.precedentResults.length}건)</h2>
+              </div>
+              {state.precedentResults.length === 0 ? (
+                <p className="text-muted-foreground">검색 결과가 없습니다.</p>
+              ) : (
+                <div className="space-y-2">
+                  {state.precedentResults.map((precedent, idx) => (
+                    <div
+                      key={idx}
+                      className="border rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer group"
+                      onClick={() => handlers.handlePrecedentSelect(precedent.id)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{precedent.name || '사건명 없음'}</h3>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                            <span className="font-mono">{precedent.caseNumber}</span>
+                            <span>{precedent.court}</span>
+                            <span>{precedent.date}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                          {precedent.type || '판결'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : !state.lawData ? (
             /* 데이터 없음 */
             null
@@ -312,7 +399,19 @@ export function SearchResultView({
               <div className="md:hidden">
                 {state.mobileView === "list" ? (
                   <div className="space-y-2 sm:space-y-4">
-                    <SearchBar onSearch={handlers.handleSearch} isLoading={state.isSearching} />
+                    <SearchBar onSearch={(query) => {
+                      if (query.classification) {
+                        switch (query.classification.searchType) {
+                          case 'precedent': handlers.handlePrecedentSearch(query); break
+                          case 'interpretation': handlers.handleInterpretationSearch(query); break
+                          case 'ruling': handlers.handleRulingSearch(query); break
+                          case 'multi': handlers.handleMultiSearch(query); break
+                          default: handlers.handleSearch(query)
+                        }
+                      } else {
+                        handlers.handleSearch(query)
+                      }
+                    }} isLoading={state.isSearching} />
                   </div>
                 ) : (
                   <div className="space-y-2 sm:space-y-4">
@@ -350,6 +449,7 @@ export function SearchResultView({
                       userQuery={state.userQuery}
                       aiQueryType={state.aiQueryType}
                       onAiRefresh={handlers.handleAiRefresh}
+                      isPrecedent={state.lawData.isPrecedent}
                     />
                   </div>
                 )}
@@ -357,7 +457,19 @@ export function SearchResultView({
 
               {/* 데스크톱 뷰 */}
               <div className="hidden md:block space-y-4">
-                <SearchBar onSearch={handlers.handleSearch} isLoading={state.isSearching} />
+                <SearchBar onSearch={(query) => {
+                  if (query.classification) {
+                    switch (query.classification.searchType) {
+                      case 'precedent': handlers.handlePrecedentSearch(query); break
+                      case 'interpretation': handlers.handleInterpretationSearch(query); break
+                      case 'ruling': handlers.handleRulingSearch(query); break
+                      case 'multi': handlers.handleMultiSearch(query); break
+                      default: handlers.handleSearch(query)
+                    }
+                  } else {
+                    handlers.handleSearch(query)
+                  }
+                }} isLoading={state.isSearching} />
                 {state.articleNotFound && (
                   <ArticleNotFoundBanner
                     requestedJo={state.articleNotFound.requestedJo}
@@ -392,6 +504,7 @@ export function SearchResultView({
                   userQuery={state.userQuery}
                   aiQueryType={state.aiQueryType}
                   onAiRefresh={handlers.handleAiRefresh}
+                  isPrecedent={state.lawData.isPrecedent}
                 />
               </div>
             </div>

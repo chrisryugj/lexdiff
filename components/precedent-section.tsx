@@ -222,11 +222,13 @@ function PrecedentListItem({
 export function PrecedentDetailPanel({
   detail,
   loading,
-  onClose
+  onClose,
+  onContentClick
 }: {
   detail: PrecedentDetail | null
   loading: boolean
   onClose: () => void
+  onContentClick?: (e: React.MouseEvent) => void
 }) {
   if (loading) {
     return (
@@ -266,6 +268,7 @@ export function PrecedentDetailPanel({
             <h4 className="font-semibold text-sm mb-2 text-primary">판시사항</h4>
             <div
               className="text-sm leading-relaxed bg-muted/30 p-3 rounded-lg"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: detail.holdings }}
             />
           </div>
@@ -277,6 +280,7 @@ export function PrecedentDetailPanel({
             <h4 className="font-semibold text-sm mb-2 text-primary">판결요지</h4>
             <div
               className="text-sm leading-relaxed bg-muted/30 p-3 rounded-lg"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: detail.summary }}
             />
           </div>
@@ -288,6 +292,7 @@ export function PrecedentDetailPanel({
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">참조조문</h4>
             <div
               className="text-sm leading-relaxed"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: detail.refStatutes }}
             />
           </div>
@@ -299,6 +304,7 @@ export function PrecedentDetailPanel({
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">참조판례</h4>
             <div
               className="text-sm leading-relaxed"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: detail.refPrecedents }}
             />
           </div>
@@ -310,6 +316,7 @@ export function PrecedentDetailPanel({
             <h4 className="font-semibold text-sm mb-2 text-muted-foreground">판결 전문</h4>
             <div
               className="text-sm leading-relaxed bg-muted/20 p-3 rounded-lg max-h-[400px] overflow-y-auto"
+              onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: detail.fullText }}
             />
           </div>

@@ -121,7 +121,7 @@ export function AISearchLoading({
                 <span className="text-xs text-muted-foreground">답변 준비 중...</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Icon name="loading-03" className="h-4 w-4 animate-spin" />
+                <Icon name="loader" className="h-4 w-4 animate-spin" />
                 <span className="text-sm animate-pulse">
                   {stage === "analyzing" && "질문을 분석하고 있습니다..."}
                   {stage === "optimizing" && "검색어를 최적화하고 있습니다..."}

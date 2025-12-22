@@ -36,7 +36,7 @@ export function LawViewerSkeleton({ stage = 'searching', message }: LawViewerSke
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="relative">
           <Icon
-            name="loading-03"
+            name="loader"
             className="h-10 w-10 animate-spin text-primary"
           />
           <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping" />

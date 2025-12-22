@@ -208,7 +208,7 @@ function generateAiQuestions(keyword: string): string[] {
 
 interface Suggestion {
   text: string
-  type: 'law' | 'ai' | 'recent'
+  type: 'law' | 'ai' | 'recent' | 'precedent' | 'interpretation' | 'ruling'
   category: string
   score: number  // 정렬용 점수
 }
@@ -225,8 +225,44 @@ export async function GET(request: NextRequest) {
 
   const suggestions: Suggestion[] = []
 
+  // 0. 판례/해석례/재결례 패턴 감지 (공백 허용)
+  const precedentPattern = /(대법원|서울고등법원|고등법원|지방법원|특허법원|행정법원)\s*\d{4}(?:(도|나|가|마|머|바|사|아|자|카|타|파|하|고단|노|초|추|로|두|구|누|부)\s*\d*)?/
+  const rulingPattern = /(\d{4}[가-힣]{2,4}\s*\d+|조심\d{4}[가-힣]{2,4}\s*\d+|국심\d{4}[가-힣]{2,4}\s*\d+)/
+  const interpretationPattern = /(행정해석|예규|고시|훈령|지침|기획재정부|국토교통부|법제처)/
+
+  if (precedentPattern.test(query)) {
+    suggestions.push({
+      text: query,
+      type: 'precedent',
+      category: '판례',
+      score: 200  // 최우선
+    })
+  }
+
+  if (rulingPattern.test(query)) {
+    suggestions.push({
+      text: query,
+      type: 'ruling',
+      category: '재결례',
+      score: 199
+    })
+  }
+
+  if (interpretationPattern.test(query)) {
+    suggestions.push({
+      text: query,
+      type: 'interpretation',
+      category: '해석례',
+      score: 198
+    })
+  }
+
   // 1. 법제처 API에서 법령명 + 조례 검색 (2글자 이상, 병렬 호출)
-  if (query.length >= 2) {
+  // ⚠️ 판례 패턴이면 법령 검색 스킵
+  const isPrecedent = precedentPattern.test(query)
+  const isRuling = rulingPattern.test(query)
+
+  if (query.length >= 2 && !isPrecedent && !isRuling) {
     // 조문 패턴 감지 및 법령명 추출 (예: "관세법 38조" → "관세법")
     let searchQuery = query
     const articlePattern = /^(.+?)\s+(?:제?\s*\d+\s*조(?:의\s*\d+)?)/

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useErrorReportStore } from "@/lib/error-report-store"
 import { debugLogger } from "@/lib/debug-logger"
 import { favoritesStore } from "@/lib/favorites-store"
-import { detectQueryType } from "@/lib/query-detector"
+import { detectQueryType } from "@/lib/unified-query-classifier"
 import { normalizeLawSearchText } from "@/lib/search-normalizer"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
@@ -53,6 +53,12 @@ export interface SearchHandlers {
   handleAiRefresh: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
+  // ✅ 통합검색 핸들러 (신규)
+  handlePrecedentSearch: (query: SearchQuery) => void
+  handlePrecedentSelect: (precedentId: string) => void
+  handleInterpretationSearch: (query: SearchQuery) => void
+  handleRulingSearch: (query: SearchQuery) => void
+  handleMultiSearch: (query: SearchQuery) => void
 }
 
 export function useSearchHandlers({
@@ -264,6 +270,22 @@ export function useSearchHandlers({
     actions.setSearchQuery(fullQuery)
     actions.setUserQuery(fullQuery)
     debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode })
+
+    // ✅ 통합검색: classification이 있으면 재감지 스킵
+    const classification = (query as any).classification
+    if (classification) {
+      debugLogger.info('✅ 통합검색: 사전 분류 결과 사용', {
+        searchType: classification.searchType,
+        confidence: classification.confidence
+      })
+
+      // 판례/해석례/재결례는 handleSearchInternal이 아니라 전용 핸들러에서 처리
+      // 여기 도달하면 안 되지만, 방어 코드
+      if (['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
+        debugLogger.warning('⚠️  판례/해석례/재결례는 전용 핸들러를 사용해야 함')
+        return
+      }
+    }
 
     // 검색 모드 초기화
     actions.setSearchMode('basic')
@@ -1094,6 +1116,394 @@ export function useSearchHandlers({
     handleSearchInternal({ lawName: state.userQuery }, undefined, 'ai', true)
   }, [state.userQuery, handleSearchInternal, toast])
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ✅ 통합검색 핸들러 (신규)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  const handlePrecedentSearch = useCallback(async (query: SearchQuery) => {
+    debugLogger.info('[통합검색] 판례 검색 실행', { query })
+
+    try {
+      // classification에서 추출한 정보 사용
+      const classification = (query as any).classification
+      const caseNumber = classification?.entities?.caseNumber
+      const court = classification?.entities?.court
+      const searchQuery = caseNumber || query.lawName || query.article || ''
+
+      if (!searchQuery) {
+        toast({
+          title: "검색어 오류",
+          description: "판례 검색어를 입력해주세요.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // ✅ 판례 검색 모드로 명시적 설정 (AI 모드 비활성화)
+      actions.setIsAiMode(false)
+      actions.setSearchMode('law')
+
+      // 로딩 상태로 전환
+      actions.setIsSearching(true)
+
+      // API 호출
+      const params = new URLSearchParams({ query: searchQuery })
+      if (court) params.append('court', court)
+      if (caseNumber) params.append('caseNumber', caseNumber)
+
+      const apiUrl = `/api/precedent-search?${params.toString()}`
+      debugLogger.info('[통합검색] 판례 API 호출', { url: apiUrl })
+
+      const res = await fetch(apiUrl)
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        debugLogger.error('[통합검색] 판례 API 에러', { status: res.status, error: errorText })
+        throw new Error(`판례 검색 실패: ${res.status}`)
+      }
+
+      const data = await res.json()
+      debugLogger.info('[통합검색] 판례 API 응답', { data })
+
+      // 결과 표시
+      if (data.precedents && data.precedents.length > 0) {
+        // ✅ 상태 저장
+        actions.setPrecedentResults(data.precedents)
+
+        toast({
+          title: "판례 검색 완료",
+          description: `${data.precedents.length}건의 판례를 찾았습니다.`,
+          variant: "default"
+        })
+
+        debugLogger.info('[통합검색] 판례 검색 결과', { count: data.precedents.length, results: data.precedents })
+      } else {
+        actions.setPrecedentResults([])
+
+        toast({
+          title: "검색 결과 없음",
+          description: "판례를 찾을 수 없습니다.",
+          variant: "default"
+        })
+      }
+    } catch (error) {
+      debugLogger.error('[통합검색] 판례 검색 실패', error)
+      toast({
+        title: "판례 검색 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions])
+
+  const handlePrecedentSelect = useCallback(async (precedentId: string) => {
+    debugLogger.info('[통합검색] 판례 선택', { id: precedentId })
+
+    try {
+      actions.setIsSearching(true)
+      actions.updateProgress('parsing', 50)
+
+      const res = await fetch(`/api/precedent-detail?id=${precedentId}`)
+
+      if (!res.ok) {
+        throw new Error(`판례 조회 실패: ${res.status}`)
+      }
+
+      const precedent = await res.json()
+      debugLogger.info('[통합검색] 판례 상세 조회 완료', { precedent })
+
+      actions.updateProgress('parsing', 80)
+
+      // ✅ 판례 내용을 법령 뷰어 형식으로 변환
+      const { formatPrecedentDate } = await import('@/lib/precedent-parser')
+
+      const articles = []
+
+      // HTML 태그 정리 함수
+      const cleanHtml = (text: string) => {
+        return text
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .trim()
+      }
+
+      // 전문에서 섹션 추출
+      let sectionCounter = 1
+
+      // 1. 판결요지 먼저 추가 (있으면)
+      if (precedent.summary) {
+        articles.push({
+          jo: String(sectionCounter).padStart(6, '0'),
+          joNum: '판결요지',
+          content: cleanHtml(precedent.summary),
+          title: '판결요지'
+        })
+        sectionCounter++
+      }
+
+      // 2. 전문 처리
+      if (precedent.fullText) {
+        const fullText = cleanHtml(precedent.fullText)
+
+        // 섹션별 정규식 (【심급】, 【세목】, 【주문】, 【이유】 등)
+        const sectionPattern = /【([^】]+)】/g
+        const sectionTitles: string[] = []
+        let match
+
+        // 모든 섹션 제목 찾기
+        while ((match = sectionPattern.exec(fullText)) !== null) {
+          sectionTitles.push(match[1].trim())
+        }
+
+        if (sectionTitles.length > 0) {
+          // 섹션별로 분리
+          sectionTitles.forEach((title, idx) => {
+            const startMarker = `【${title}】`
+            const endMarker = idx < sectionTitles.length - 1 ? `【${sectionTitles[idx + 1]}】` : null
+
+            const startIdx = fullText.indexOf(startMarker)
+            if (startIdx === -1) return
+
+            let content = endMarker
+              ? fullText.substring(startIdx + startMarker.length, fullText.indexOf(endMarker))
+              : fullText.substring(startIdx + startMarker.length)
+
+            content = content.trim()
+            if (content) {
+              articles.push({
+                jo: String(sectionCounter).padStart(6, '0'),
+                joNum: title,
+                content: content,
+                title: title
+              })
+              sectionCounter++
+            }
+          })
+        } else {
+          // 섹션 구분이 없는 경우 - 전문 전체
+          articles.push({
+            jo: String(sectionCounter).padStart(6, '0'),
+            joNum: '판결문',
+            content: fullText,
+            title: '판결문'
+          })
+        }
+      }
+
+      const lawData = {
+        meta: {
+          lawId: `prec-${precedentId}`,
+          lawTitle: precedent.name,
+          promulgationDate: formatPrecedentDate(precedent.date),
+          lawType: `${precedent.court} ${precedent.judgmentType}`,
+          isOrdinance: false,
+          fetchedAt: new Date().toISOString(),
+          caseNumber: precedent.caseNumber
+        },
+        articles,
+        selectedJo: undefined,
+        viewMode: 'full' as const,
+        isPrecedent: true
+      }
+
+      actions.setLawData(lawData)
+      actions.setPrecedentResults(null)  // 검색 결과 숨기기
+      actions.setMobileView("content")
+      actions.updateProgress('complete', 100)
+
+      debugLogger.success('[통합검색] 판례 뷰어 표시 완료')
+    } catch (error) {
+      debugLogger.error('[통합검색] 판례 조회 실패', error)
+      toast({
+        title: "판례 조회 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions])
+
+  const handleInterpretationSearch = useCallback(async (query: SearchQuery) => {
+    debugLogger.info('[통합검색] 해석례 검색 실행', { query })
+
+    try {
+      const classification = (query as any).classification
+      const ruleType = classification?.entities?.ruleType
+      const lawName = classification?.entities?.lawName || query.lawName
+      const searchQuery = lawName || query.article || ''
+
+      if (!searchQuery) {
+        toast({
+          title: "검색어 오류",
+          description: "해석례 검색어를 입력해주세요.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // ✅ 해석례 검색 모드로 명시적 설정
+      actions.setIsAiMode(false)
+      actions.setSearchMode('law')
+
+      actions.setIsSearching(true)
+
+      const params = new URLSearchParams({ query: searchQuery })
+      if (ruleType) params.append('ruleType', ruleType)
+
+      const res = await fetch(`/api/interpretation-search?${params.toString()}`)
+
+      if (!res.ok) {
+        throw new Error(`해석례 검색 실패: ${res.status}`)
+      }
+
+      const data = await res.json()
+
+      if (data.interpretations && data.interpretations.length > 0) {
+        toast({
+          title: "⚠️ 해석례 검색 기능 준비 중",
+          description: `${data.interpretations.length}건의 해석례를 찾았지만, 표시 화면이 아직 구현되지 않았습니다.`,
+          variant: "default"
+        })
+        debugLogger.info('[통합검색] 해석례 검색 결과', { count: data.interpretations.length })
+      } else {
+        toast({
+          title: "검색 결과 없음",
+          description: "해석례를 찾을 수 없습니다.",
+          variant: "default"
+        })
+      }
+
+      actions.resetToHome()
+    } catch (error) {
+      debugLogger.error('[통합검색] 해석례 검색 실패', error)
+      toast({
+        title: "해석례 검색 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions])
+
+  const handleRulingSearch = useCallback(async (query: SearchQuery) => {
+    debugLogger.info('[통합검색] 재결례 검색 실행', { query })
+
+    try {
+      const classification = (query as any).classification
+      const rulingNumber = classification?.entities?.rulingNumber
+      const searchQuery = rulingNumber || query.lawName || ''
+
+      if (!searchQuery) {
+        toast({
+          title: "검색어 오류",
+          description: "재결례 검색어를 입력해주세요.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // ✅ 재결례 검색 모드로 명시적 설정
+      actions.setIsAiMode(false)
+      actions.setSearchMode('law')
+
+      actions.setIsSearching(true)
+
+      const res = await fetch(`/api/ruling-search?query=${encodeURIComponent(searchQuery)}`)
+
+      if (!res.ok) {
+        throw new Error(`재결례 검색 실패: ${res.status}`)
+      }
+
+      const data = await res.json()
+
+      if (data.rulings && data.rulings.length > 0) {
+        toast({
+          title: "재결례 검색 완료",
+          description: `${data.rulings.length}건의 재결례를 찾았습니다.`,
+          variant: "default"
+        })
+        debugLogger.info('[통합검색] 재결례 검색 결과', { count: data.rulings.length })
+      } else {
+        toast({
+          title: "검색 결과 없음",
+          description: "재결례를 찾을 수 없습니다.",
+          variant: "default"
+        })
+      }
+    } catch (error) {
+      debugLogger.error('[통합검색] 재결례 검색 실패', error)
+      toast({
+        title: "재결례 검색 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions])
+
+  const handleMultiSearch = useCallback(async (query: SearchQuery) => {
+    debugLogger.info('[통합검색] 복합 검색 실행', { query })
+
+    try {
+      const classification = (query as any).classification
+      const secondaryTypes = classification?.secondaryTypes || []
+
+      if (secondaryTypes.length === 0) {
+        toast({
+          title: "복합 검색 오류",
+          description: "검색 타입을 확인할 수 없습니다.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      actions.setIsSearching(true)
+
+      toast({
+        title: "복합 검색 시작",
+        description: `${secondaryTypes.length}개 소스에서 검색 중...`,
+        variant: "default"
+      })
+
+      // 병렬 검색 실행
+      const promises = secondaryTypes.map(async (type: string) => {
+        switch (type) {
+          case 'law':
+            return handleSearch(query)
+          case 'precedent':
+            return handlePrecedentSearch(query)
+          case 'interpretation':
+            return handleInterpretationSearch(query)
+          case 'ruling':
+            return handleRulingSearch(query)
+          default:
+            return Promise.resolve()
+        }
+      })
+
+      await Promise.all(promises)
+
+      debugLogger.info('[통합검색] 복합 검색 완료', { types: secondaryTypes })
+    } catch (error) {
+      debugLogger.error('[통합검색] 복합 검색 실패', error)
+      toast({
+        title: "복합 검색 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions, handleSearch, handlePrecedentSearch, handleInterpretationSearch, handleRulingSearch])
+
   return {
     handleSearch,
     handleSearchInternal,
@@ -1113,5 +1523,11 @@ export function useSearchHandlers({
     handleAiRefresh,
     fetchLawContent,
     fetchRelatedSearches,
+    // ✅ 통합검색 핸들러
+    handlePrecedentSearch,
+    handlePrecedentSelect,
+    handleInterpretationSearch,
+    handleRulingSearch,
+    handleMultiSearch,
   }
 }
