@@ -100,9 +100,23 @@ const LawResultCard = memo(function LawResultCard({
   index,
   onSelect,
 }: LawResultCardProps) {
+  const [showTooltip, setShowTooltip] = React.useState(false)
+  const [isTruncated, setIsTruncated] = React.useState(false)
+  const titleRef = React.useRef<HTMLHeadingElement>(null)
+  const lawName = String(law.lawName)
+
+  React.useEffect(() => {
+    const element = titleRef.current
+    if (element) {
+      setIsTruncated(element.scrollWidth > element.clientWidth)
+    }
+  }, [lawName])
+
   return (
     <button
       onClick={() => onSelect(law)}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
       className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
@@ -112,32 +126,43 @@ const LawResultCard = memo(function LawResultCard({
       {/* 콘텐츠 */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-base md:text-lg leading-snug mb-2 group-hover:text-primary transition-colors">
-                {String(law.lawName)}
-              </h4>
-              <Badge
-                variant="secondary"
-                className={`text-xs font-semibold px-3 py-1 ${getLawTypeBadgeClass(String(law.lawType))}`}
-              >
-                {String(law.lawType)}
-              </Badge>
-            </div>
+          {/* 법령명 - 한 줄 말줄임 */}
+          <div className="relative mb-3">
+            <h4
+              ref={titleRef}
+              className="font-bold text-base md:text-lg leading-tight truncate group-hover:text-primary transition-colors"
+              style={{ minHeight: "1.5rem" }}
+            >
+              {lawName}
+            </h4>
+
+            {/* 툴팁 - 실제로 잘렸을 때만 표시 */}
+            {showTooltip && isTruncated && (
+              <div className="absolute left-0 top-full mt-2 z-50 max-w-md p-3 bg-popover border border-border rounded-lg shadow-xl">
+                <p className="text-sm font-semibold text-popover-foreground whitespace-normal break-words">
+                  {lawName}
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
+          {/* 배지들 - 한 줄 배치 */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <Badge
+              variant="secondary"
+              className={`text-xs font-semibold px-2.5 py-0.5 ${getLawTypeBadgeClass(String(law.lawType))}`}
+            >
+              {String(law.lawType)}
+            </Badge>
             {law.promulgationDate && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                공포: {formatDate(String(law.promulgationDate))}
-              </span>
+              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-blue-500/5 text-blue-600 dark:text-blue-400 border-blue-500/20">
+                공포 {formatDate(String(law.promulgationDate))}
+              </Badge>
             )}
             {law.effectiveDate && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                시행: {formatDate(String(law.effectiveDate))}
-              </span>
+              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-green-500/5 text-green-600 dark:text-green-400 border-green-500/20">
+                시행 {formatDate(String(law.effectiveDate))}
+              </Badge>
             )}
           </div>
         </div>
@@ -425,9 +450,23 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
   index,
   onSelect,
 }: OrdinanceResultCardProps) {
+  const [showTooltip, setShowTooltip] = React.useState(false)
+  const [isTruncated, setIsTruncated] = React.useState(false)
+  const titleRef = React.useRef<HTMLHeadingElement>(null)
+  const ordinName = String(ordinance.ordinName)
+
+  React.useEffect(() => {
+    const element = titleRef.current
+    if (element) {
+      setIsTruncated(element.scrollWidth > element.clientWidth)
+    }
+  }, [ordinName])
+
   return (
     <button
       onClick={() => onSelect(ordinance)}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
       className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
@@ -437,34 +476,45 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
       {/* 콘텐츠 */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-base md:text-lg leading-snug mb-2 group-hover:text-primary transition-colors">
-                {String(ordinance.ordinName)}
-              </h4>
-              {ordinance.ordinKind && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs font-semibold px-3 py-1 bg-blue-500/10 text-blue-600 border border-blue-500/20"
-                >
-                  {String(ordinance.ordinKind)}
-                </Badge>
-              )}
-            </div>
+          {/* 조례명 - 한 줄 말줄임 */}
+          <div className="relative mb-3">
+            <h4
+              ref={titleRef}
+              className="font-bold text-base md:text-lg leading-tight truncate group-hover:text-primary transition-colors"
+              style={{ minHeight: "1.5rem" }}
+            >
+              {ordinName}
+            </h4>
+
+            {/* 툴팁 - 실제로 잘렸을 때만 표시 */}
+            {showTooltip && isTruncated && (
+              <div className="absolute left-0 top-full mt-2 z-50 max-w-md p-3 bg-popover border border-border rounded-lg shadow-xl">
+                <p className="text-sm font-semibold text-popover-foreground whitespace-normal break-words">
+                  {ordinName}
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
+          {/* 배지들 - 한 줄 배치 */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {ordinance.ordinKind && (
+              <Badge
+                variant="secondary"
+                className="text-xs font-semibold px-2.5 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+              >
+                {String(ordinance.ordinKind)}
+              </Badge>
+            )}
             {ordinance.orgName && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-purple-500/5 text-purple-600 dark:text-purple-400 border-purple-500/20">
                 {String(ordinance.orgName)}
-              </span>
+              </Badge>
             )}
             {ordinance.effectiveDate && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                시행: {formatDate(String(ordinance.effectiveDate))}
-              </span>
+              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-green-500/5 text-green-600 dark:text-green-400 border-green-500/20">
+                시행 {formatDate(String(ordinance.effectiveDate))}
+              </Badge>
             )}
           </div>
         </div>
