@@ -6,7 +6,13 @@
     ],
     "deny": [],
     "ask": [],
-    "defaultMode": "default"
+    "defaultMode": "bypassPermissions"
+  },
+  "model": "opusplan",
+  "statusLine": {
+    "type": "command",
+    "command": "bash /c/Users/Chris/.claude/statusline.sh",
+    "padding": 0
   },
   "enabledPlugins": {
     "frontend-design@claude-code-plugins": true,
