@@ -221,6 +221,16 @@ export default function Home() {
           onModeChange={(mode) => {
             setSearchMode(mode)
           }}
+          onPrecedentSelect={(id) => {
+            // 판례 선택/해제 시 React 상태도 동기화
+            if (id) {
+              setViewMode('precedent-detail')
+              setPrecedentId(id)
+            } else {
+              setViewMode('search-result')
+              setPrecedentId(null)
+            }
+          }}
         />
       ) : null}
     </>

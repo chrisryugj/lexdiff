@@ -56,6 +56,7 @@ export function SearchResultView({
   onHomeClick,
   onProgressUpdate,
   onModeChange,
+  onPrecedentSelect,
   initialSearchMode,
   initialPrecedentId
 }: SearchResultViewProps) {
@@ -79,6 +80,7 @@ export function SearchResultView({
     actions,
     onBack,
     searchId,
+    onPrecedentSelect,
   })
 
   // ============================================================
@@ -89,6 +91,12 @@ export function SearchResultView({
     let abortController: AbortController | null = null
 
     const loadSearchResult = async () => {
+      // ✅ 이미 판례 상세가 로드된 상태면 복원 스킵 (handlePrecedentSelect에서 직접 로드한 경우)
+      if (state.lawData?.isPrecedent) {
+        debugLogger.info('⏭️ 판례 상세 이미 로드됨 - 복원 스킵')
+        return
+      }
+
       try {
         const { getSearchResult } = await import('@/lib/search-result-store')
         const cached = await getSearchResult(searchId)

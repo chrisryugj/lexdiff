@@ -69,13 +69,13 @@ global.fetch = mockFetch
 describe('useSearchHandlers', () => {
   let mockState: SearchState
   let mockActions: SearchStateActions
-  let mockOnBack: ReturnType<typeof vi.fn>
+  let mockOnBack: () => void
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetch.mockReset()
 
-    mockOnBack = vi.fn()
+    mockOnBack = vi.fn() as () => void
 
     // 기본 상태 mock
     mockState = {
@@ -113,6 +113,18 @@ describe('useSearchHandlers', () => {
       ragProgress: 0,
       ragAnswer: null,
       aiQueryType: 'application',
+      aiSearchMeta: null,
+      precedentResults: null,
+      precedentTotalCount: 0,
+      precedentPage: 1,
+      precedentPageSize: 10,
+      precedentYearFilter: undefined,
+      precedentCourtFilter: undefined,
+      interpretationResults: null,
+      rulingResults: null,
+      ordinancePage: 1,
+      ordinancePageSize: 10,
+      ordinanceTotalCount: 0,
     }
 
     // 액션 mock
@@ -149,6 +161,18 @@ describe('useSearchHandlers', () => {
       setRagProgress: vi.fn(),
       setRagAnswer: vi.fn(),
       setAiQueryType: vi.fn(),
+      setAiSearchMeta: vi.fn(),
+      setPrecedentResults: vi.fn(),
+      setPrecedentTotalCount: vi.fn(),
+      setPrecedentPage: vi.fn(),
+      setPrecedentPageSize: vi.fn(),
+      setPrecedentYearFilter: vi.fn(),
+      setPrecedentCourtFilter: vi.fn(),
+      setInterpretationResults: vi.fn(),
+      setRulingResults: vi.fn(),
+      setOrdinancePage: vi.fn(),
+      setOrdinancePageSize: vi.fn(),
+      setOrdinanceTotalCount: vi.fn(),
       resetSearchState: vi.fn(),
       resetToHome: vi.fn(),
     }

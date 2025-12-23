@@ -33,6 +33,7 @@ export interface UseSearchHandlersProps {
   actions: SearchStateActions
   onBack: () => void
   searchId?: string  // 현재 검색 ID (판례 상세 히스토리용)
+  onPrecedentSelect?: (precedentId: string | null) => void  // 판례 선택/해제 시 부모에 알림
 }
 
 export interface SearchHandlers {
@@ -68,6 +69,7 @@ export function useSearchHandlers({
   actions,
   onBack,
   searchId,
+  onPrecedentSelect,
 }: UseSearchHandlersProps): SearchHandlers {
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -1452,7 +1454,7 @@ export function useSearchHandlers({
         pushPrecedentHistory(searchId, precedentId, state.searchMode)
         debugLogger.info('[통합검색] 판례 상세 히스토리 추가', { searchId, precedentId })
 
-        // ✅ IndexedDB에 판례 상세 저장 (새로고침용)
+        // ✅ IndexedDB에 판례 상세 저장 (새로고침용) - 부모 알림 전에 저장해야 함
         const { getSearchResult, saveSearchResult } = await import('@/lib/search-result-store')
         const cached = await getSearchResult(searchId)
         if (cached) {
@@ -1464,6 +1466,9 @@ export function useSearchHandlers({
             }
           })
         }
+
+        // ✅ 부모 컴포넌트에 판례 선택 알림 (React 상태 동기화) - IndexedDB 저장 후 호출
+        onPrecedentSelect?.(precedentId)
       }
 
       // ✅ 최근 조회 판례 저장
@@ -1487,7 +1492,7 @@ export function useSearchHandlers({
     } finally {
       actions.setIsSearching(false)
     }
-  }, [toast, actions, searchId, state.searchMode])
+  }, [toast, actions, searchId, state.searchMode, onPrecedentSelect])
 
   // ✅ 법령/판례 강제 새로고침 (캐시 무시)
   const handleRefresh = useCallback(() => {
