@@ -11,6 +11,7 @@ export interface LinkConfig {
   mode: 'safe' | 'aggressive'  // safe: 「」 있는 것만, aggressive: 모든 패턴
   enableSameRef?: boolean       // "같은 법" 패턴 활성화
   enableAdminRules?: boolean    // 행정규칙 링크 활성화
+  enablePrecedents?: boolean    // 판례 링크 활성화
   currentLawName?: string       // 현재 보고 있는 법령명 (시행령에서 상위법 추론용)
 }
 
@@ -26,7 +27,7 @@ function detectLawType(lawName: string): 'decree' | 'rule' | 'law' {
 /**
  * 접근성: 링크 타입별 aria-label 생성
  */
-function getAriaLabel(type: string, lawName?: string, article?: string, annexNumber?: string): string {
+function getAriaLabel(type: string, lawName?: string, article?: string, annexNumber?: string, caseNumber?: string): string {
   const labels: Record<string, string> = {
     'law-quoted': '법령 참조',
     'law-article': '법령 조문 참조',
@@ -37,8 +38,10 @@ function getAriaLabel(type: string, lawName?: string, article?: string, annexNum
     'rule': '시행규칙 참조',
     'regulation': '행정규칙 참조',
     'annex': '별표 보기',
+    'precedent': '판례 보기',
   }
   const baseLabel = labels[type] || '법령 참조'
+  if (caseNumber) return `${caseNumber} ${baseLabel}`
   if (annexNumber) return `별표 ${annexNumber} ${baseLabel}`
   if (lawName && article) return `${lawName} ${article} ${baseLabel}`
   if (lawName) return `${lawName} ${baseLabel}`
@@ -49,10 +52,11 @@ function getAriaLabel(type: string, lawName?: string, article?: string, annexNum
 interface LinkMatch {
   start: number
   end: number
-  type: 'law-quoted' | 'law-article' | 'law-name' | 'article' | 'decree' | 'rule' | 'same-law' | 'annex'
+  type: 'law-quoted' | 'law-article' | 'law-name' | 'article' | 'decree' | 'rule' | 'same-law' | 'annex' | 'precedent'
   lawName?: string
   article?: string
   annexNumber?: string  // 별표 번호 (예: "1", "2의3")
+  caseNumber?: string   // 판례 사건번호 (예: "91누13670")
   displayText: string
   html: string
 }
@@ -86,6 +90,11 @@ export function generateLinks(text: string, config: LinkConfig = { mode: 'safe' 
 
   // 별표 패턴 수집 (항상 활성화)
   collectAnnexMatches(text, matches)
+
+  // 판례 패턴 수집 (옵션)
+  if (config.enablePrecedents) {
+    collectPrecedentMatches(text, matches)
+  }
 
   // DEBUG: 매칭 결과 로깅
   // 2단계: 충돌 해결 (위치 기반 중복 제거)
@@ -130,22 +139,28 @@ function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawNam
   }
 
   // 패턴 2: "법 제X조", "시행령 제X조", "규칙 제X조" (상위법 참조)
-  const shortRefRegex = /(법|시행령|규칙)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+  // ⚠️ "상법", "민법", "형법" 등 짧은 법령명은 제외 (별도 법령으로 처리)
+  // 부정 후방탐색: 한글 직전에 오는 "법"은 제외
+  const shortRefRegex = /(?<![가-힣])(법|시행령|규칙)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
 
   while ((match = shortRefRegex.exec(text)) !== null) {
     const offset = match.index
     const fullText = match[0]
     const refType = match[1] // "법", "시행령", "규칙"
 
-    // Find the last 「법령명」 before this position
+    // ⚠️ 바로 앞에 "X법" 또는 "X법 "이 붙어있으면 스킵 (simpleRegex가 전체 처리)
+    // 예: "상증세법 시행령 제54조"에서 "시행령 제54조"만 매칭되면 스킵
     const textBefore = text.substring(0, offset)
-    const lawMatches = Array.from(textBefore.matchAll(/「\s*([^」]+)\s*」/g))
+    if (/[가-힣]법\s*$/.test(textBefore)) {
+      continue
+    }
+    const quotedLawMatches = Array.from(textBefore.matchAll(/「\s*([^」]+)\s*」/g))
 
     let targetLawName: string | undefined
 
-    if (lawMatches.length > 0) {
+    if (quotedLawMatches.length > 0) {
       // 「법령명」이 있는 경우
-      const lastLaw = lawMatches[lawMatches.length - 1]
+      const lastLaw = quotedLawMatches[quotedLawMatches.length - 1]
       let baseLawName = lastLaw[1].trim()
 
       // 법령명 변환: "법" → 기본, "시행령" → "법 시행령", "규칙" → "법 시행규칙"
@@ -491,6 +506,7 @@ function resolveConflicts(matches: LinkMatch[]): LinkMatch[] {
       const priority: Record<string, number> = {
         'law-quoted': 100,
         'same-law': 90,
+        'precedent': 85,
         'law-article': 80,
         'law-name': 70,
         'annex': 65,
@@ -580,6 +596,79 @@ export function linkifyRefsAI(escapedText: string): string {
     }
     return match
   })
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 판례 링크 수집
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 판례 패턴 수집
+ * 예: "대법원 2004. 5. 28. 선고 2003두7392 판결", "91누13670 판결"
+ */
+function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
+  let match: RegExpExecArray | null
+
+  // 패턴 1: 완전한 형식 (대법원/고등법원 2024. 1. 2. 선고 2023다12345 판결)
+  const fullPattern = /(대법원|고등법원|지방법원|[가-힣]+법원)\s*(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*선고\s*(\d{2,4})(다|가|나|라|마|바|사|아|자|차|카|타|파|하|고|노|도|로|모|보|소|오|조|초|코|토|포|호|두|누|부|구|추|머|거|러|스|느|허|헌가|헌나|헌다|헌라|헌마|헌바|헌사|헌아)(\d+)\s*(판결|결정)/g
+
+  while ((match = fullPattern.exec(text)) !== null) {
+    const court = match[1]
+    const year = match[2]
+    const month = match[3]
+    const day = match[4]
+    const caseYear = match[5]
+    const caseType = match[6]
+    const caseNum = match[7]
+
+    const caseNumber = `${caseYear}${caseType}${caseNum}`
+    const fullText = match[0]
+
+    // 이미 처리된 영역인지 확인
+    const isOverlap = matches.some(m =>
+      match!.index >= m.start && match!.index < m.end
+    )
+
+    if (!isOverlap) {
+      matches.push({
+        start: match.index,
+        end: match.index + fullText.length,
+        type: 'precedent',
+        caseNumber,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${caseNumber}" data-court="${court}" data-date="${year}.${month}.${day}" aria-label="${getAriaLabel('precedent', undefined, undefined, undefined, caseNumber)}">${fullText}</a>`
+      })
+    }
+  }
+
+  // 패턴 2: 간단 패턴 - 사건번호만 (예: "91누13670 판결", "2023두12345")
+  const simpleCasePattern = /(?<!\d)(\d{2,4})(다|가|나|라|마|바|사|아|자|차|카|타|파|하|고|노|도|로|모|보|소|오|조|초|코|토|포|호|두|누|부|구|추|머|거|러|스|느|허|헌가|헌나|헌다|헌라|헌마|헌바|헌사|헌아)(\d+)(?:\s*(판결|결정))?/g
+
+  while ((match = simpleCasePattern.exec(text)) !== null) {
+    const caseYear = match[1]
+    const caseType = match[2]
+    const caseNum = match[3]
+
+    const caseNumber = `${caseYear}${caseType}${caseNum}`
+    const fullText = match[0]
+
+    // 이미 처리된 영역인지 확인
+    const isOverlap = matches.some(m =>
+      (match!.index >= m.start && match!.index < m.end) ||
+      (m.start >= match!.index && m.start < match!.index + fullText.length)
+    )
+
+    if (!isOverlap) {
+      matches.push({
+        start: match.index,
+        end: match.index + fullText.length,
+        type: 'precedent',
+        caseNumber,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${caseNumber}" aria-label="${getAriaLabel('precedent', undefined, undefined, undefined, caseNumber)}">${fullText}</a>`
+      })
+    }
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
