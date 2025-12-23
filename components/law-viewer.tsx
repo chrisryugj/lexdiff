@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Icon } from "@/components/ui/icon"
@@ -16,8 +15,6 @@ import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
 import { cn } from "@/lib/utils"
 import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
 import { buildJO, formatJO, formatSimpleJo, type ParsedRelatedLaw } from "@/lib/law-parser"
-import { RevisionHistory } from "@/components/revision-history"
-import { ArticleBottomSheet } from "@/components/article-bottom-sheet"
 
 // Dynamic import for ReferenceModal (reduce initial bundle)
 const ReferenceModal = dynamic(
@@ -30,14 +27,10 @@ const AnnexModal = dynamic(
   () => import("@/components/annex-modal").then(m => m.AnnexModal),
   { ssr: false }
 )
-import { FloatingActionButton } from "@/components/ui/floating-action-button"
-import { VirtualizedArticleList } from "@/components/virtualized-article-list"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
 import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
 import { DelegationPanel } from "@/components/law-viewer-delegation-panel"
-import { PrecedentSection, PrecedentDetailPanel } from "@/components/precedent-section"
-import { formatPrecedentDate, type PrecedentSearchResult } from "@/lib/precedent-parser"
-import { CopyButton } from "@/components/ui/copy-button"
+import { PrecedentDetailPanel } from "@/components/precedent-section"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
 import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
 import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
@@ -48,11 +41,12 @@ import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
 import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
 import type { ContentClickContext, ContentClickActions } from "@/lib/content-click-handlers"
-import { buildPrecedentHtml } from "@/lib/content-click-handlers"
 import { useSwipe } from "@/hooks/use-swipe"
+import { useRelatedPrecedentCases } from "@/hooks/use-related-precedent-cases"
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
-import { AIAnswerSidebar, AIAnswerContent } from "@/components/law-viewer-ai-answer"
+import { AIAnswerContent } from "@/components/law-viewer-ai-answer"
+import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerSingleArticle } from "@/components/law-viewer/index"
 
 interface LawViewerProps {
   meta?: LawMeta
@@ -139,26 +133,6 @@ export function LawViewer({
   // Swipe tutorial and hints
   const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
 
-  // 판례 관련 심급 상태
-  const [showRelatedCases, setShowRelatedCases] = useState(false)
-  const [relatedCases, setRelatedCases] = useState<PrecedentSearchResult[]>([])
-  const [loadingRelatedCases, setLoadingRelatedCases] = useState(false)
-
-  // 관련 심급이 존재하는지 (로딩 완료 후)
-  const hasRelatedCases = relatedCases.length > 0
-
-  // 판례 전문에서 심급 정보 추출 (배지 표시 + 버튼 활성화용)
-  const { hasLevelSection, currentCourtLevel } = useMemo(() => {
-    if (!isPrecedent) return { hasLevelSection: false, currentCourtLevel: null as (1 | 2 | 3 | null) }
-    // actualArticles 전체 내용 합치기
-    const allContent = actualArticles.map(a => a.content || '').join('')
-    // "3심", "2심", "1심" 텍스트에서 숫자 추출
-    const match = allContent.match(/([123])심/)
-    if (match) {
-      return { hasLevelSection: true, currentCourtLevel: parseInt(match[1]) as 1 | 2 | 3 }
-    }
-    return { hasLevelSection: false, currentCourtLevel: null }
-  }, [isPrecedent, actualArticles])
 
 
   // ✅ AI 답변 법령 링크 클릭 핸들러
@@ -443,134 +417,21 @@ export function LawViewer({
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance, isPrecedent])
 
-  // 의존성 안정화를 위한 값 추출
-  const currentCaseNumber = (meta as any).caseNumber as string | undefined
-  const currentCaseName = (meta as any).lawTitle as string | undefined
-
-  // 관련 심급 검색 AbortController
-  const relatedCasesAbortRef = useRef<AbortController | null>(null)
-  // 이미 검색한 사건명 캐시 (중복 API 호출 방지)
-  const lastSearchedNameRef = useRef<string | null>(null)
-
-  // 판례 관련 심급 검색 (사건명 기반 API 검색) - 버튼 클릭 시에만 검색
-  useEffect(() => {
-    if (!isPrecedent || !showRelatedCases) {
-      setRelatedCases([])
-      setLoadingRelatedCases(false)
-      return
-    }
-
-    // 사건명이 없으면 검색 불가
-    if (!currentCaseName) {
-      setRelatedCases([])
-      setLoadingRelatedCases(false)
-      return
-    }
-
-    // 이미 같은 사건명으로 검색했으면 스킵 (무한 루프 방지)
-    if (lastSearchedNameRef.current === currentCaseName) {
-      return
-    }
-
-    // 이전 요청 취소
-    relatedCasesAbortRef.current?.abort()
-    relatedCasesAbortRef.current = new AbortController()
-    const signal = relatedCasesAbortRef.current.signal
-
-    const fetchRelatedCases = async () => {
-      setLoadingRelatedCases(true)
-      lastSearchedNameRef.current = currentCaseName
-
-      try {
-        // 사건명으로 검색 (같은 사건의 1~3심 찾기)
-        const params = new URLSearchParams({
-          query: currentCaseName,
-          display: '20'
-        })
-        const res = await fetch(`/api/precedent-search?${params}`, { signal })
-
-        if (!res.ok) {
-          setRelatedCases([])
-          return
-        }
-
-        const data = await res.json()
-        const results: PrecedentSearchResult[] = data.precedents || []
-
-        // 사건명 100% 일치 필터링 + 현재 판례 제외
-        const related = results.filter(p =>
-          p.name === currentCaseName &&
-          p.caseNumber !== currentCaseNumber
-        )
-        console.log('[관련심급] 검색:', currentCaseName, '→', related.length, '건')
-
-        // 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
-        related.sort((a, b) => {
-          const dateA = a.date?.replace(/[.\-]/g, '') || ''
-          const dateB = b.date?.replace(/[.\-]/g, '') || ''
-          return dateA.localeCompare(dateB)
-        })
-
-        setRelatedCases(related)
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return
-        console.error('관련 심급 검색 실패:', e)
-        setRelatedCases([])
-      } finally {
-        if (!signal.aborted) {
-          setLoadingRelatedCases(false)
-        }
-      }
-    }
-
-    fetchRelatedCases()
-
-    return () => {
-      relatedCasesAbortRef.current?.abort()
-    }
-  }, [isPrecedent, showRelatedCases, currentCaseName, currentCaseNumber])
-
-  // 관련 심급 판례 클릭 → ReferenceModal로 상세 표시 (기존 판례 모달과 동일 스타일)
-  const handleRelatedPrecedentClick = async (prec: PrecedentSearchResult) => {
-    // 로딩 표시
-    setRefModal({
-      open: true,
-      title: `판례 조회 중...`,
-      html: '<div class="flex items-center justify-center py-8"><div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div></div>',
-    })
-
-    try {
-      const res = await fetch(`/api/precedent-detail?id=${prec.id}`)
-      if (res.ok) {
-        const detail = await res.json()
-        const html = buildPrecedentHtml(detail)
-        setRefModal({
-          open: true,
-          title: detail.name || prec.name,
-          html,
-          precedentMeta: {
-            court: detail.court,
-            caseNumber: detail.caseNumber,
-            date: formatPrecedentDate(detail.date),
-            judgmentType: detail.judgmentType,
-          },
-        })
-      } else {
-        setRefModal({
-          open: true,
-          title: '판례 조회 실패',
-          html: `<div class="text-destructive p-4"><p>판례를 불러올 수 없습니다.</p></div>`,
-        })
-      }
-    } catch (e) {
-      console.error('판례 상세 조회 실패:', e)
-      setRefModal({
-        open: true,
-        title: '판례 조회 실패',
-        html: `<div class="text-destructive p-4"><p>판례를 불러올 수 없습니다.</p></div>`,
-      })
-    }
-  }
+  // 관련 심급 훅
+  const {
+    showRelatedCases,
+    setShowRelatedCases,
+    relatedCases,
+    loadingRelatedCases,
+    hasLevelSection,
+    currentCourtLevel,
+    handleRelatedPrecedentClick,
+  } = useRelatedPrecedentCases({
+    isPrecedent,
+    meta,
+    actualArticles,
+    setRefModal,
+  })
 
   const handleArticleClick = async (jo: string) => {
 
@@ -868,196 +729,28 @@ export function LawViewer({
           }`}
           style={{ fontFamily: "Pretendard, sans-serif" }}
         >
-          {/* Mobile overlay backdrop */}
-          {isArticleListExpanded && (
-            <div
-              className="lg:hidden fixed inset-0 bg-black/50 z-40"
-              onClick={() => setIsArticleListExpanded(false)}
-            />
-          )}
-
-          {/* Left sidebar - AI 답변 모드 or 조문 목록 (Desktop only) */}
-          <Card className={`hidden lg:flex flex-col overflow-hidden h-full lg:sticky lg:top-4 transition-all duration-300 p-0 gap-0 ${isArticleListCollapsed ? 'lg:w-16' : ''}`}>
-            {aiAnswerMode && isArticleListCollapsed ? (
-              // ========== AI 슬림 모드 (접힌 상태) ==========
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsArticleListCollapsed(false)}
-                  className="mx-auto mt-2 mb-2"
-                  title="관련 법령 목록 펼치기"
-                >
-                  <Icon name="link" size={20} />
-                </Button>
-                <Separator />
-                <ScrollArea className="flex-1">
-                  <div className="flex flex-col items-center gap-1 py-2">
-                    {relatedArticles.slice(0, 20).map((article, idx) => {
-                      const isExcerpt = article.source === 'excerpt'
-                      return (
-                        <Button
-                          key={`${article.lawName}-${article.jo}-${idx}`}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openExternalLawArticleModal(article.lawName, article.article)}
-                          className="w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative"
-                          title={`${article.lawName} ${article.article}`}
-                        >
-                          {isExcerpt ? (
-                            <Icon name="bookmark" size={14} className="text-purple-400" />
-                          ) : (
-                            <Icon name="link" size={14} className="text-blue-400" />
-                          )}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                </ScrollArea>
-              </>
-            ) : aiAnswerMode ? (
-              // ========== AI 펼친 상태 ==========
-              <AIAnswerSidebar
-                relatedArticles={mergedRelatedArticles}
-                onRelatedArticleClick={openExternalLawArticleModal}
-                showHeader={true}
-                onCollapseClick={() => setIsArticleListCollapsed(true)}
-                isStreaming={isStreaming}
-              />
-            ) : isArticleListCollapsed ? (
-              // ========== 슬림 모드 (접힌 상태) ==========
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsArticleListCollapsed(false)}
-                  className="mx-auto mt-2 mb-2"
-                  title={isPrecedent ? "목차 펼치기" : "조문 목록 펼치기"}
-                >
-                  <Icon name="list-ordered" size={20} />
-                </Button>
-                <Separator />
-                <ScrollArea className="flex-1">
-                  <div className="flex flex-col items-center gap-1 py-2">
-                    {actualArticles.map((article) => {
-                      const joNum = formatSimpleJo(article.jo).replace('제', '').replace('조', '').replace('의', '-')
-                      const isActive = article.jo === activeJo
-                      const isArticleFavorite = isFavorite(article.jo)
-
-                      return (
-                        <Button
-                          key={article.jo}
-                          variant={isActive ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => handleArticleClick(article.jo)}
-                          className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''
-                            }`}
-                          title={`${formatSimpleJo(article.jo)}${article.title ? ` ${article.title}` : ''}`}
-                        >
-                          <span className="font-bold">{joNum}</span>
-                          {isArticleFavorite && (
-                            <Icon name="star" size={10} className="absolute top-0.5 right-0.5 fill-yellow-400 text-yellow-400" />
-                          )}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                </ScrollArea>
-              </>
-            ) : (
-              // ========== 기존 조문 목록 (펼친 상태) ==========
-              <>
-                {/* 헤더 - 본문 헤더와 동일한 디자인 */}
-                <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-1 justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon name={isPrecedent ? "list-checks" : "list-ordered"} size={20} className="text-primary" />
-                      <h3 className="text-xl font-bold text-foreground">{isPrecedent ? "목차" : "조문 목록"}</h3>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsArticleListCollapsed(true)}
-                      className="h-7 w-7"
-                      title={isPrecedent ? "목차 접기" : "조문 목록 접기"}
-                    >
-                      <Icon name="chevron-down" size={16} className="rotate-90" />
-                    </Button>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    <Icon name="file-text" size={12} className="mr-1" />
-                    {actualArticles.length}개 {isPrecedent ? "항목" : "조문"}
-                  </Badge>
-                </div>
-
-                <div className="flex-1 min-h-0 px-2 pt-2 pb-4">
-                  <VirtualizedArticleList
-                    articles={actualArticles}
-                    activeJo={activeJo}
-                    loadingJo={loadingJo}
-                    favorites={favorites}
-                    isOrdinance={isOrdinance}
-                    isPrecedent={isPrecedent}
-                    lawTitle={meta.lawTitle}
-                    onArticleClick={handleArticleClick}
-                    onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
-                  />
-                </div>
-              </>
-            )
-            }
-          </Card>
-
-          {/* Mobile Bottom Sheet for Article List */}
-          <ArticleBottomSheet
-            isOpen={isArticleListExpanded}
-            onClose={() => setIsArticleListExpanded(false)}
-            title={aiAnswerMode ? "관련 법령 목록" : isPrecedent ? "목차" : "조문 목록"}
-            snapPoints={[40, 70, 90]}
-          >
-            {aiAnswerMode ? (
-              <AIAnswerSidebar
-                relatedArticles={mergedRelatedArticles}
-                onRelatedArticleClick={openExternalLawArticleModal}
-                onCloseSidebar={() => setIsArticleListExpanded(false)}
-                showHeader={false}
-                isStreaming={isStreaming}
-              />
-            ) : (
-              // 일반 모드: 조문 목록
-              <>
-                <div className="mb-4">
-                  <Badge variant="outline" className="text-xs">
-                    <Icon name="file-text" size={12} className="mr-1" />
-                    {actualArticles.length}개 조문
-                  </Badge>
-                </div>
-
-                <div className="h-[60vh]">
-                  <VirtualizedArticleList
-                    articles={actualArticles}
-                    activeJo={activeJo}
-                    loadingJo={loadingJo}
-                    favorites={favorites}
-                    isOrdinance={isOrdinance}
-                    lawTitle={meta.lawTitle}
-                    onArticleClick={(jo) => {
-                      handleArticleClick(jo)
-                      setIsArticleListExpanded(false)
-                    }}
-                    onToggleFavorite={(jo) => onToggleFavorite?.(jo)}
-                  />
-                </div>
-              </>
-            )}
-          </ArticleBottomSheet>
-
-          {/* Floating Action Button (Mobile only) */}
-          <FloatingActionButton
-            onClick={() => setIsArticleListExpanded(true)}
-            icon={<Icon name="list-ordered" size={20} />}
-            count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
-            label={aiAnswerMode ? "관련 법령 목록 열기" : isPrecedent ? "목차 열기" : "조문 목록 열기"}
+          {/* Left Sidebar + Mobile Bottom Sheet + FAB */}
+          <LawViewerSidebar
+            aiAnswerMode={aiAnswerMode}
+            isPrecedent={isPrecedent}
+            isOrdinance={isOrdinance}
+            isArticleListCollapsed={isArticleListCollapsed}
+            setIsArticleListCollapsed={setIsArticleListCollapsed}
+            isArticleListExpanded={isArticleListExpanded}
+            setIsArticleListExpanded={setIsArticleListExpanded}
+            meta={meta}
+            actualArticles={actualArticles}
+            relatedArticles={relatedArticles}
+            mergedRelatedArticles={mergedRelatedArticles}
+            activeJo={activeJo}
+            loadingJo={loadingJo}
+            favorites={favorites}
+            isStreaming={isStreaming}
+            handleArticleClick={handleArticleClick}
+            openExternalLawArticleModal={openExternalLawArticleModal}
+            onToggleFavorite={onToggleFavorite}
+            formatSimpleJo={formatSimpleJo}
+            isFavorite={isFavorite}
           />
 
           {/* Right panel - Article content */}
@@ -1158,242 +851,66 @@ export function LawViewer({
             )}
 
             {/* Action Buttons */}
-            {!aiAnswerMode && (activeArticle || isPrecedent) && (
-              <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
-                <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
-                  {isPrecedent ? (
-                    // 판례 전용 액션 버튼
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex flex-nowrap gap-1 sm:gap-1.5">
-                        <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
-                          <Icon name="external-link" size={14} className="sm:mr-1" />
-                          <span className="hidden sm:inline">원문 보기</span>
-                          <span className="sm:hidden">원문</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle?.jo || '')} className="h-7 px-1.5 sm:px-2 shrink-0">
-                          <Icon name="sparkles" size={14} className="sm:mr-1" />
-                          <span className="hidden sm:inline">판례 요약</span>
-                          <span className="sm:hidden">요약</span>
-                        </Button>
-                        {/* 【심급】 섹션이 있는 판례만 관련 심급 버튼 표시 */}
-                        {hasLevelSection && (
-                          <Button
-                            variant={showRelatedCases ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setShowRelatedCases(!showRelatedCases)}
-                            className="h-7 px-1.5 sm:px-2 shrink-0"
-                          >
-                            <Icon name="git-compare" size={14} className="sm:mr-1" />
-                            <span className="hidden sm:inline">관련 심급</span>
-                            <span className="sm:hidden">심급</span>
-                            {loadingRelatedCases ? (
-                              <Icon name="loader" size={12} className="ml-1 animate-spin" />
-                            ) : hasRelatedCases ? (
-                              <Badge variant="secondary" className="ml-1 h-4 px-1 text-xs">
-                                {relatedCases.length}
-                              </Badge>
-                            ) : null}
-                          </Button>
-                        )}
-                        {activeArticle && (
-                          <Button
-                            variant={favorites.has(favoriteKey(activeArticle.jo)) ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                            className="h-7 px-1.5 sm:px-2 shrink-0"
-                          >
-                            <Icon
-                              name="star"
-                              size={14}
-                              className={`sm:mr-1 ${favorites.has(favoriteKey(activeArticle.jo)) ? "fill-yellow-400 text-yellow-500" : ""}`}
-                            />
-                            <span className="hidden sm:inline">즐겨찾기</span>
-                            <span className="sm:hidden">★</span>
-                          </Button>
-                        )}
-                      </div>
-                      {/* 우측: 새로고침 + 글자크기 + 복사 */}
-                      <div className="flex items-center gap-0.5">
-                        {/* ✅ 강제 새로고침 버튼 */}
-                        {onRefresh && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                            <Icon name="refresh-cw" size={14} />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                          <Icon name="zoom-out" size={14} />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                          <Icon name="rotate-clockwise" size={12} />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                          <Icon name="zoom-in" size={14} />
-                        </Button>
-                        <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                        <CopyButton
-                          getText={() => actualArticles.map(a => `【${a.joNum || a.title}】\n${a.content}`).join('\n\n')}
-                          message="판례 복사됨"
-                          className="h-7 w-7 p-0"
-                        />
-                      </div>
-                    </div>
-                  ) : !isOrdinance ? (
-                    // 법령 전용 액션 버튼
-                    <>
-                      <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                        <Icon name="git-compare" size={14} className="sm:mr-1" />
-                        <span className="hidden sm:inline">신·구법 비교</span>
-                        <span className="sm:hidden">비교</span>
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => onSummarize?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
-                        <Icon name="sparkles" size={14} className="sm:mr-1" />
-                        <span className="hidden sm:inline">AI 요약</span>
-                        <span className="sm:hidden">요약</span>
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={openLawCenter} className="h-7 px-1.5 sm:px-2 shrink-0">
-                        <Icon name="external-link" size={14} className="sm:mr-1" />
-                        <span className="hidden sm:inline">원문 보기</span>
-                        <span className="sm:hidden">원문</span>
-                      </Button>
-                      {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
-                      <Button
-                        variant={tierViewMode === "2-tier" ? "default" : "outline"}
-                        size="sm"
-                        disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && shouldDisableDelegationButton)}
-                        onClick={async () => {
-                          if (tierViewMode === "1-tier") {
-                            // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
-                            if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
-                            setTierViewMode("2-tier")
-                            // 행정규칙 탭이 선택되어 있고 데이터가 로드된 적 있으면 자동으로 활성화
-                            if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
-                              setShowAdminRules(true)
-                            }
-                          } else {
-                            // 1단 뷰로 복귀 (showAdminRules는 유지 - 패널 재오픈 시 복원용)
-                            setTierViewMode("1-tier")
-                          }
-                        }}
-                        title="위임법령 보기 (시행령/시행규칙/행정규칙)"
-                        className="h-7 px-1.5 sm:px-2 shrink-0"
-                      >
-                        {isLoadingThreeTier ? (
-                          <Icon name="loader" size={14} className="sm:mr-1 animate-spin" />
-                        ) : (
-                          <Icon name="file-text" size={14} className="sm:mr-1" />
-                        )}
-                        <span className="hidden sm:inline">{tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}</span>
-                        <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
-                      </Button>
-                      {/* 판례 보기 버튼 */}
-                      <Button
-                        variant={showPrecedents ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setShowPrecedents(!showPrecedents)}
-                        title="관련 판례 보기"
-                        className="h-7 px-1.5 sm:px-2 shrink-0"
-                      >
-                        <Icon name="scale" size={14} className="sm:mr-1" />
-                        <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
-                        <span className="sm:hidden">{showPrecedents ? "닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
-                      </Button>
-                      {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
-                      <Button
-                        key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                        data-favorited={isFavorite(activeArticle.jo)}
-                        className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                          : ''
-                          }`}
-                      >
-                        <Icon name="star" size={14} className={`mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
-                        즐겨찾기
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            )}
+            <LawViewerActionButtons
+              isPrecedent={isPrecedent}
+              isOrdinance={isOrdinance}
+              aiAnswerMode={aiAnswerMode}
+              activeArticle={activeArticle ?? null}
+              actualArticles={actualArticles}
+              hasLevelSection={hasLevelSection}
+              showRelatedCases={showRelatedCases}
+              setShowRelatedCases={setShowRelatedCases}
+              loadingRelatedCases={loadingRelatedCases}
+              relatedCases={relatedCases}
+              favorites={favorites}
+              isFavorite={isFavorite}
+              favoriteKey={favoriteKey}
+              onToggleFavorite={onToggleFavorite}
+              fontSize={fontSize}
+              increaseFontSize={increaseFontSize}
+              decreaseFontSize={decreaseFontSize}
+              resetFontSize={resetFontSize}
+              onCompare={onCompare}
+              onSummarize={onSummarize}
+              onRefresh={onRefresh}
+              openLawCenter={openLawCenter}
+              tierViewMode={tierViewMode}
+              setTierViewMode={setTierViewMode}
+              threeTierDelegation={threeTierDelegation}
+              threeTierCitation={threeTierCitation}
+              isLoadingThreeTier={isLoadingThreeTier}
+              fetchThreeTierData={fetchThreeTierData}
+              shouldDisableDelegationButton={shouldDisableDelegationButton}
+              delegationButtonCount={delegationButtonCount}
+              delegationActiveTab={delegationActiveTab}
+              loadedAdminRulesCount={loadedAdminRulesCount}
+              setShowAdminRules={setShowAdminRules}
+              showPrecedents={showPrecedents}
+              setShowPrecedents={setShowPrecedents}
+              precedentTotalCount={precedentTotalCount}
+            />
 
             {/* 판례 관련 심급 목록 */}
-            {isPrecedent && showRelatedCases && (
-              <div className="border-b border-border px-3 sm:px-4 py-2 bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Icon name="git-compare" size={14} className="text-blue-500" />
-                  <span className="text-sm font-medium">관련 심급</span>
-                  {loadingRelatedCases && (
-                    <Icon name="loader" size={14} className="animate-spin text-muted-foreground" />
-                  )}
-                </div>
-                {!loadingRelatedCases && relatedCases.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">관련 심급 판례가 없습니다</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {relatedCases.map((prec) => (
-                      <button
-                        key={prec.id}
-                        onClick={() => handleRelatedPrecedentClick(prec)}
-                        className="flex items-center gap-2 px-2 py-1.5 bg-background/80 rounded-md border border-border hover:border-primary/50 transition-colors text-left"
-                      >
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded text-xs font-medium shrink-0",
-                          prec.court.includes("대법원") ? "bg-purple-500/20 text-purple-500 dark:text-purple-400" :
-                          prec.court.includes("고등") ? "bg-blue-500/20 text-blue-500 dark:text-blue-400" :
-                          "bg-green-500/20 text-green-500 dark:text-green-400"
-                        )}>
-                          {prec.court.includes("대법원") ? "3심" :
-                           prec.court.includes("고등") ? "2심" : "1심"}
-                        </span>
-                        <span className="text-sm font-medium truncate max-w-[150px]">{prec.caseNumber}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{formatPrecedentDate(prec.date)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <LawViewerRelatedCases
+              isPrecedent={isPrecedent}
+              showRelatedCases={showRelatedCases}
+              loadingRelatedCases={loadingRelatedCases}
+              relatedCases={relatedCases}
+              onRelatedPrecedentClick={handleRelatedPrecedentClick}
+            />
 
-            {
-              isOrdinance && (
-                <div className="border-b border-border px-3 sm:px-4 py-0.5 pt-2 sm:pt-3 pb-2 sm:pb-3">
-                  <div className="flex items-center justify-between gap-1">
-                    {/* 좌측: 원문 보기 */}
-                    <Button variant="outline" size="sm" onClick={openLawCenter} className="bg-transparent h-7 px-2">
-                      <Icon name="external-link" size={14} className="mr-1" />
-                      원문 보기
-                    </Button>
-
-                    {/* 우측: 새로고침 + 글자크기 + 복사 */}
-                    <div className="flex items-center gap-0.5">
-                      {/* ✅ 강제 새로고침 버튼 */}
-                      {onRefresh && (
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                          <Icon name="refresh-cw" size={14} />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 px-2">
-                        <Icon name="zoom-out" size={14} />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 px-2">
-                        <Icon name="rotate-clockwise" size={12} />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 px-2">
-                        <Icon name="zoom-in" size={14} />
-                      </Button>
-                      <span className="text-xs text-muted-foreground ml-1">{fontSize}px</span>
-                      <CopyButton
-                        getText={() => actualArticles.map(a => `${formatSimpleJo(a.jo)}\n${a.content}`).join('\n\n')}
-                        message="전체 복사됨"
-                        className="h-7 w-7 p-0"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )
-            }
+            {/* 조례 전용 액션 버튼 */}
+            <LawViewerOrdinanceActions
+              isOrdinance={isOrdinance}
+              actualArticles={actualArticles}
+              fontSize={fontSize}
+              increaseFontSize={increaseFontSize}
+              decreaseFontSize={decreaseFontSize}
+              resetFontSize={resetFontSize}
+              openLawCenter={openLawCenter}
+              onRefresh={onRefresh}
+              formatSimpleJo={formatSimpleJo}
+            />
 
             <div className="flex-1 min-h-0">
               {/* ✅ Phase 11-B: AI 모드 우선 체크 (viewMode보다 우선) */}
@@ -1506,107 +1023,34 @@ export function LawViewer({
                     {/* 좌측: 조문 본문 */}
                     <Panel defaultSize={100 - precedentPanelSize} minSize={30}>
                       <ScrollArea className="h-full" ref={contentRef}>
-                        <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
-                          <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
-                            {/* 모바일/PC 모두 1줄: 제목 + 배지 + 버튼들 */}
-                            <div className="flex items-center justify-between gap-1 lg:gap-2">
-                              {/* 제목 + 배지 */}
-                              <div className="flex items-center gap-1 lg:gap-2 min-w-0 flex-1">
-                                <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
-                                  {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                                  {activeArticle.title && (
-                                    <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
-                                  )}
-                                </h2>
-                                {meta.lawTitle === "대한민국헌법" ? (
-                                  <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50 hidden sm:flex">
-                                    <Icon name="landmark" size={12} className="mr-1" />
-                                    헌법
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs shrink-0 hidden sm:flex">
-                                    {isOrdinance ? "자치법규" : "법률"}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* 버튼 그룹: 새로고침 + 즐겨찾기 + 글씨크기 + 복사 (컴팩트하게 1줄) */}
-                              <div className="flex items-center gap-0 shrink-0">
-                                {/* ✅ 강제 새로고침 버튼 */}
-                                {onRefresh && (
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                                    <Icon name="refresh-cw" size={14} />
-                                  </Button>
-                                )}
-                                {/* 즐겨찾기 버튼 */}
-                                <Button
-                                  key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                                  className="h-7 w-7 p-0"
-                                  title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                                >
-                                  <Icon name="star" size={16} className={`transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
-                                </Button>
-                                {/* 글씨크기 버튼 */}
-                                <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 w-7 p-0">
-                                  <Icon name="zoom-out" size={14} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 w-7 p-0">
-                                  <Icon name="rotate-clockwise" size={12} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 w-7 p-0">
-                                  <Icon name="zoom-in" size={14} />
-                                </Button>
-                                {/* px 텍스트: PC에서만 표시 */}
-                                <span className="hidden lg:inline text-xs text-muted-foreground ml-1 mr-1">{fontSize}px</span>
-                                {/* 복사 버튼 */}
-                                <CopyButton
-                                  getText={() => `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
-                                  message="복사됨"
-                                  className="h-7 w-7 p-0"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                            style={{
-                              fontSize: `${fontSize}px`,
-                              lineHeight: "1.8",
-                              overflowWrap: "break-word",
-                              wordBreak: "break-word",
-                            }}
-                            onClick={handleContentClick}
-                            dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
+                        <div ref={swipeRef}>
+                          <LawViewerSingleArticle
+                            activeArticle={activeArticle}
+                            activeArticleHtml={activeArticleHtml}
+                            meta={meta}
+                            revisionHistory={revisionHistory}
+                            fontSize={fontSize}
+                            isOrdinance={isOrdinance}
+                            onRefresh={onRefresh}
+                            onToggleFavorite={onToggleFavorite}
+                            isFavorite={isFavorite}
+                            increaseFontSize={increaseFontSize}
+                            decreaseFontSize={decreaseFontSize}
+                            resetFontSize={resetFontSize}
+                            handleContentClick={handleContentClick}
+                            formatSimpleJo={formatSimpleJo}
+                            showPrecedents={true}
+                            precedentViewMode="side"
+                            precedents={precedents}
+                            precedentTotalCount={precedentTotalCount}
+                            loadingPrecedents={loadingPrecedents}
+                            precedentsError={precedentsError}
+                            selectedPrecedent={selectedPrecedent}
+                            loadingPrecedentDetail={loadingPrecedentDetail}
+                            handleViewPrecedentDetail={handleViewPrecedentDetail}
+                            expandPrecedentPanel={expandPrecedentPanel}
+                            collapsePrecedentPanel={collapsePrecedentPanel}
                           />
-
-                          {!isOrdinance && revisionHistory.length > 0 && (
-                            <div className="mt-12">
-                              <RevisionHistory
-                                history={revisionHistory}
-                                articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
-                              />
-                            </div>
-                          )}
-
-                          {/* 판례 하단 섹션 - 사이드 모드일 때는 목록만 표시 */}
-                          <div className="mt-8">
-                            <PrecedentSection
-                              precedents={precedents}
-                              totalCount={precedentTotalCount}
-                              loading={loadingPrecedents}
-                              error={precedentsError}
-                              selectedPrecedent={selectedPrecedent}
-                              loadingDetail={loadingPrecedentDetail}
-                              viewMode={precedentViewMode}
-                              onViewDetail={handleViewPrecedentDetail}
-                              onExpand={expandPrecedentPanel}
-                              onCollapse={collapsePrecedentPanel}
-                            />
-                          </div>
                         </div>
                       </ScrollArea>
                     </Panel>
@@ -1656,109 +1100,34 @@ export function LawViewer({
                   </PanelGroup>
                 ) : (
                   <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef} className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
-                      <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
-                        {/* 모바일/PC 모두 1줄: 제목 + 배지 + 버튼들 */}
-                        <div className="flex items-center justify-between gap-1 lg:gap-2">
-                          {/* 제목 + 배지 */}
-                          <div className="flex items-center gap-1 lg:gap-2 min-w-0 flex-1">
-                            <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
-                              {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                              {activeArticle.title && (
-                                <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
-                              )}
-                            </h2>
-                            {meta.lawTitle === "대한민국헌법" ? (
-                              <Badge variant="outline" className="text-xs shrink-0 bg-amber-500/20 text-amber-300 border-amber-500/50 hidden sm:flex">
-                                <Icon name="landmark" size={12} className="mr-1" />
-                                헌법
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs shrink-0 hidden sm:flex">
-                                {isOrdinance ? "자치법규" : "법률"}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* 버튼 그룹: 새로고침 + 즐겨찾기 + 글씨크기 + 복사 (컴팩트하게 1줄) */}
-                          <div className="flex items-center gap-0 shrink-0">
-                            {/* ✅ 강제 새로고침 버튼 */}
-                            {onRefresh && (
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
-                                <Icon name="refresh-cw" size={14} />
-                              </Button>
-                            )}
-                            {/* 즐겨찾기 버튼 */}
-                            <Button
-                              key={`fav-btn-title-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                              className="h-7 w-7 p-0"
-                              title={isFavorite(activeArticle.jo) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                            >
-                              <Icon name="star" size={16} className={`transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
-                            </Button>
-                            {/* 글씨크기 버튼 */}
-                            <Button variant="ghost" size="sm" onClick={decreaseFontSize} title="글자 작게" className="h-7 w-7 p-0">
-                              <Icon name="zoom-out" size={14} />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={resetFontSize} title="기본 크기" className="h-7 w-7 p-0">
-                              <Icon name="rotate-clockwise" size={12} />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={increaseFontSize} title="글자 크게" className="h-7 w-7 p-0">
-                              <Icon name="zoom-in" size={14} />
-                            </Button>
-                            {/* px 텍스트: PC에서만 표시 */}
-                            <span className="hidden lg:inline text-xs text-muted-foreground ml-1 mr-1">{fontSize}px</span>
-                            {/* 복사 버튼 */}
-                            <CopyButton
-                              getText={() => `${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
-                              message="복사됨"
-                              className="h-7 w-7 p-0"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
-                        style={{
-                          fontSize: `${fontSize}px`,
-                          lineHeight: "1.8",
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={handleContentClick}
-                        dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
+                    <div ref={swipeRef}>
+                      <LawViewerSingleArticle
+                        activeArticle={activeArticle}
+                        activeArticleHtml={activeArticleHtml}
+                        meta={meta}
+                        revisionHistory={revisionHistory}
+                        fontSize={fontSize}
+                        isOrdinance={isOrdinance}
+                        onRefresh={onRefresh}
+                        onToggleFavorite={onToggleFavorite}
+                        isFavorite={isFavorite}
+                        increaseFontSize={increaseFontSize}
+                        decreaseFontSize={decreaseFontSize}
+                        resetFontSize={resetFontSize}
+                        handleContentClick={handleContentClick}
+                        formatSimpleJo={formatSimpleJo}
+                        showPrecedents={showPrecedents}
+                        precedentViewMode={precedentViewMode}
+                        precedents={precedents}
+                        precedentTotalCount={precedentTotalCount}
+                        loadingPrecedents={loadingPrecedents}
+                        precedentsError={precedentsError}
+                        selectedPrecedent={selectedPrecedent}
+                        loadingPrecedentDetail={loadingPrecedentDetail}
+                        handleViewPrecedentDetail={handleViewPrecedentDetail}
+                        expandPrecedentPanel={expandPrecedentPanel}
+                        collapsePrecedentPanel={collapsePrecedentPanel}
                       />
-
-                      {!isOrdinance && revisionHistory.length > 0 && (
-                        <div className="mt-12">
-                          <RevisionHistory
-                            history={revisionHistory}
-                            articleTitle={`${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ""}`}
-                          />
-                        </div>
-                      )}
-
-                      {/* 판례 섹션 - 하단 모드 */}
-                      {showPrecedents && precedentViewMode === "bottom" && (
-                        <div className="mt-8">
-                          <PrecedentSection
-                            precedents={precedents}
-                            totalCount={precedentTotalCount}
-                            loading={loadingPrecedents}
-                            error={precedentsError}
-                            selectedPrecedent={selectedPrecedent}
-                            loadingDetail={loadingPrecedentDetail}
-                            viewMode={precedentViewMode}
-                            onViewDetail={handleViewPrecedentDetail}
-                            onExpand={expandPrecedentPanel}
-                            onCollapse={collapsePrecedentPanel}
-                          />
-                        </div>
-                      )}
                     </div>
                   </ScrollArea>
                 )
