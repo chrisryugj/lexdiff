@@ -171,13 +171,14 @@ const LawResultCard = memo(function LawResultCard({
       <div className="relative mb-2.5">
         <h4
           ref={titleRef}
+          title={lawName}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
         >
           {lawName}
         </h4>
 
-        {/* 툴팁 - 디버그: 항상 표시 */}
-        {showTooltip && (
+        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
+        {showTooltip && isTruncated && (
           <div
             className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
             style={{
@@ -188,10 +189,6 @@ const LawResultCard = memo(function LawResultCard({
           >
             <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {lawName}
-              <br />
-              <span className="text-[10px] opacity-50">
-                (truncated: {String(isTruncated)})
-              </span>
             </p>
           </div>
         )}
@@ -536,13 +533,14 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
       <div className="relative mb-2.5">
         <h4
           ref={titleRef}
+          title={ordinName}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
         >
           {ordinName}
         </h4>
 
-        {/* 툴팁 - 디버그: 항상 표시 */}
-        {showTooltip && (
+        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
+        {showTooltip && isTruncated && (
           <div
             className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
             style={{
@@ -553,10 +551,6 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
           >
             <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {ordinName}
-              <br />
-              <span className="text-[10px] opacity-50">
-                (truncated: {String(isTruncated)})
-              </span>
             </p>
           </div>
         )}
