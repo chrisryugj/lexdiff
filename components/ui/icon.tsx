@@ -115,7 +115,8 @@ export const Icon = forwardRef<SVGSVGElement, IconProps>(
         size={extractedSize}
         color={color ?? 'currentColor'}
         strokeWidth={strokeWidth}
-        className={cn(remainingClasses)}
+        className={cn('transition-transform duration-200', remainingClasses)}
+        data-icon={name}
         {...props}
       />
     )

@@ -254,10 +254,115 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
  * 단순 법령명 + 시행령/시행규칙 패턴 처리
  */
 function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
+  // 패턴 0: "구 법령명(상세설명) 제X조" 패턴 (판례에서 자주 사용)
+  // 예: "구 지방세법(2018. 12. 31. 법률 제16194호로 개정되기 전의 것, 이하 같다) 제11조"
+  // 예: "구 상속세 및 증여세법(2015. 12. 15. 법률 제13557호로 개정되기 전의 것) 제63조"
+  // 괄호 안에서 날짜 추출하여 efYd로 사용 (과거 시점 법령 조회)
+  // ⚠️ "구 "가 반드시 있어야 함 (구 없이 괄호 있는 경우는 일반 패턴에서 처리)
+  const oldLawPattern = /(?<!「)구\s+([가-힣a-zA-Z0-9·]+\s*(?:및\s+)?[가-힣a-zA-Z0-9·]*(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s*\(([^)]+)\)\s*제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+  let match: RegExpExecArray | null
+
+  while ((match = oldLawPattern.exec(text)) !== null) {
+    const isInQuoted = matches.some(m =>
+      m.type === 'law-quoted' &&
+      match!.index >= m.start &&
+      match!.index < m.end
+    )
+
+    if (!isInQuoted) {
+      // "구 "가 반드시 포함됨 (정규식에서 필수)
+      const lawName = match[1].trim()
+      const parenContent = match[2] // 괄호 안 내용
+      const joLabel = `제${match[3]}조${match[5] ? '의' + match[5] : ''}`
+      const fullText = match[0]
+
+      // 괄호 안에서 날짜 추출: "2018. 12. 31." 또는 "2018.12.31" 형식
+      // "개정되기 전"이면 해당 날짜 하루 전으로 조회
+      const dateMatch = parenContent.match(/(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/)
+      let efYd: string | undefined
+
+      if (dateMatch) {
+        const year = dateMatch[1]
+        const month = dateMatch[2].padStart(2, '0')
+        const day = dateMatch[3].padStart(2, '0')
+
+        // "개정되기 전" 문구가 있으면 하루 전 날짜로 조회
+        if (parenContent.includes('개정되기 전') || parenContent.includes('개정 전')) {
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day) - 1)
+          efYd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
+        } else {
+          efYd = `${year}${month}${day}`
+        }
+      }
+
+      const efYdAttr = efYd ? ` data-efyd="${efYd}"` : ''
+
+      // 이 범위 내의 기존 짧은 매칭 제거 (예: "제11조"만 잡힌 경우)
+      const newStart = match.index
+      const newEnd = match.index + fullText.length
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i]
+        if (m.start >= newStart && m.end <= newEnd) {
+          matches.splice(i, 1)
+        }
+      }
+
+      matches.push({
+        start: newStart,
+        end: newEnd,
+        type: 'law-article',
+        lawName: lawName, // "구" 제외한 법령명으로 검색
+        article: joLabel,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}"${efYdAttr} data-old-law="true" aria-label="구 ${lawName} ${joLabel}">${fullText}</a>`
+      })
+    }
+  }
+
+  // 패턴 0-1: "구 법령명 제X조" 패턴 (괄호 없이 "구"만 있는 경우)
+  // 예: "구 지방세법 제11조", "구 상속세 및 증여세법 제63조"
+  // 날짜 정보가 없으므로 현행법으로 연결하되 "구" 표시 유지
+  // ⚠️ 중복 체크 없이 추가 - 나중에 긴 매칭이 짧은 매칭을 덮어씀
+  const simpleOldLawPattern = /(?<!「)구\s+([가-힣a-zA-Z0-9·]+\s*(?:및\s+)?[가-힣a-zA-Z0-9·]*(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!\s*\()/g
+
+  while ((match = simpleOldLawPattern.exec(text)) !== null) {
+    // 괄호 있는 패턴 0과 중복 방지만 체크 (패턴 0이 먼저 실행됨)
+    const isOverlapWithPattern0 = matches.some(m =>
+      m.type === 'law-article' &&
+      match!.index >= m.start && match!.index < m.end
+    )
+
+    if (!isOverlapWithPattern0) {
+      const lawName = match[1].trim()
+      const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
+      const fullText = match[0]
+
+      // 이 범위 내의 기존 짧은 매칭 제거 (예: "제11조"만 잡힌 경우)
+      const newStart = match.index
+      const newEnd = match.index + fullText.length
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i]
+        if (m.start >= newStart && m.end <= newEnd) {
+          matches.splice(i, 1)
+        }
+      }
+
+      // 날짜 정보 없음 → data-old-law 속성으로 구법령 표시
+      matches.push({
+        start: newStart,
+        end: newEnd,
+        type: 'law-article',
+        lawName: lawName,
+        article: joLabel,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" data-old-law="true" aria-label="구 ${lawName} ${joLabel}">${fullText}</a>`
+      })
+    }
+  }
+
   // 패턴 1: "및"이 포함된 법령명 (우선 매칭)
   // 예: "상속세 및 증여세법 제63조", "소득세법 및 법인세법 제10조"
   const andLawRegex = /(?<!「)([가-힣a-zA-Z0-9·]+\s+및\s+[가-힣a-zA-Z0-9·]+(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
-  let match: RegExpExecArray | null
 
   while ((match = andLawRegex.exec(text)) !== null) {
     const isInQuoted = matches.some(m =>
@@ -270,10 +375,20 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       const lawName = match[1].trim()
       const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
       const fullText = match[0]
+      const newStart = match.index
+      const newEnd = match.index + fullText.length
+
+      // 이 범위 내의 기존 짧은 매칭 제거 (예: "제2조"만 잡힌 경우)
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i]
+        if (m.start >= newStart && m.end <= newEnd) {
+          matches.splice(i, 1)
+        }
+      }
 
       matches.push({
-        start: match.index,
-        end: match.index + fullText.length,
+        start: newStart,
+        end: newEnd,
         type: 'law-article',
         lawName,
         article: joLabel,
@@ -298,10 +413,20 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       const lawName = match[1].trim()
       const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
       const fullText = match[0]
+      const newStart = match.index
+      const newEnd = match.index + fullText.length
+
+      // 이 범위 내의 기존 짧은 매칭 제거
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i]
+        if (m.start >= newStart && m.end <= newEnd) {
+          matches.splice(i, 1)
+        }
+      }
 
       matches.push({
-        start: match.index,
-        end: match.index + fullText.length,
+        start: newStart,
+        end: newEnd,
         type: 'law-article',
         lawName,
         article: joLabel,
@@ -326,10 +451,20 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       const lawName = match[1].trim()
       const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
       const fullText = match[0]
+      const newStart = match.index
+      const newEnd = match.index + fullText.length
+
+      // 이 범위 내의 기존 짧은 매칭 제거 (예: "제2조"만 잡힌 경우 → "주택법 제2조"로 대체)
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i]
+        if (m.start >= newStart && m.end <= newEnd) {
+          matches.splice(i, 1)
+        }
+      }
 
       matches.push({
-        start: match.index,
-        end: match.index + fullText.length,
+        start: newStart,
+        end: newEnd,
         type: 'law-article',
         lawName,
         article: joLabel,

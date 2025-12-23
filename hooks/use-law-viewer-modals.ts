@@ -204,7 +204,9 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
   })
 
   // Handler: open external law article modal
-  async function openExternalLawArticleModal(lawName: string, articleLabel: string) {
+  // efYd: 구법령 조회시 시행일자 (YYYYMMDD 형식, 예: "20181230")
+  // isOldLaw: "구 법령명" 패턴 (날짜 정보 없음)
+  async function openExternalLawArticleModal(lawName: string, articleLabel: string, efYd?: string, isOldLaw?: boolean) {
     // ✅ 법령명 정규화: 따옴표 제거 (「도로법」 → 도로법)
     const cleanedLawName = lawName.replace(/[「」『』]/g, '').trim()
 
@@ -508,8 +510,13 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       }
       // ⚠️ jo 파라미터 제거 - API가 잘못된 조문을 반환하는 버그 방지
       // 전체 법령을 가져온 후 클라이언트에서 필터링
-      // ⚠️ efYd를 사용하지 않음 - 최신 시행 버전 조회
-      // 타법개정으로 인한 조문 누락 방지
+
+      // ✅ efYd 또는 isOldLaw가 있으면 구법령 플래그 설정
+      // 현행법 조문을 보여주되 안내 메시지 추가
+      const isOldLawRequest = !!(efYd || isOldLaw)
+      if (isOldLawRequest) {
+        debugLogger.info('[citation] 구법령 조회 (현행법 조문 + 안내)', { lawName: cleanedLawName, articleLabel, efYd, isOldLaw })
+      }
 
       try {
         const eflawRes = await fetch(`/api/eflaw?${identifierParams.toString()}`)
@@ -621,11 +628,25 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
         // convertUnitToLawArticle 사용하여 LawArticle 구조로 변환
         const lawArticle = convertUnitToLawArticle(targetUnit)
-        const articleTitle = `${lawName} ${lawArticle.joNum}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
+
+        // 구법령인 경우 제목에 "구" 추가
+        const titlePrefix = isOldLawRequest ? '구 ' : ''
+        const articleTitle = `${titlePrefix}${lawName} ${lawArticle.joNum}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
 
 
         // ✅ FIX: meta.lawTitle 대신 cleanedLawName 사용 (AI 모드에서 meta가 비어있을 수 있음)
-        const htmlContent = extractArticleText(lawArticle, false, cleanedLawName)
+        let htmlContent = extractArticleText(lawArticle, false, cleanedLawName)
+
+        // 구법령인 경우 안내 메시지 추가
+        if (isOldLawRequest && htmlContent) {
+          const dateInfo = efYd
+            ? `${efYd.substring(0, 4)}. ${parseInt(efYd.substring(4, 6))}. ${parseInt(efYd.substring(6, 8))}.`
+            : '과거'
+          const oldLawNotice = `<div class="mb-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-sm text-amber-700 dark:text-amber-400">
+            <strong>⚠️ 구법령 참조</strong>: 해당 조문은 ${dateInfo} 기준 연혁법령입니다. 아래는 <strong>현행법</strong> 내용이며, 개정으로 인해 내용이 다를 수 있습니다.
+          </div>`
+          htmlContent = oldLawNotice + htmlContent
+        }
 
         // ⚠️ 조문 내용이 비어있는 경우 에러 메시지 표시
         if (!htmlContent || htmlContent.trim().length === 0) {

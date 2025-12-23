@@ -119,7 +119,7 @@ export function CopyButton({
 
       {/* 위치 기반 알림 - Portal로 body에 렌더링 */}
       {showFeedback && typeof document !== "undefined" && (
-        <CopyFeedbackPortal position={feedbackPosition} message={message} />
+        <CopyFeedbackPortal position={feedbackPosition} />
       )}
     </>
   )
@@ -128,10 +128,8 @@ export function CopyButton({
 /** 알림 포탈 컴포넌트 - 실제 React Portal로 body에 렌더링 */
 function CopyFeedbackPortal({
   position,
-  message,
 }: {
   position: { x: number; y: number; showBelow: boolean }
-  message: string
 }) {
   // 클라이언트 사이드에서만 렌더링
   if (typeof window === "undefined") return null
@@ -148,8 +146,8 @@ function CopyFeedbackPortal({
         transform: position.showBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
       }}
     >
-      <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
-        {message}
+      <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg">
+        <Icon name="check" className="w-4 h-4" />
       </div>
     </div>,
     document.body
