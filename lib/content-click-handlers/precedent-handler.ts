@@ -28,6 +28,14 @@ export async function handlePrecedentRef(
 
   debugLogger.info('[precedent-handler] 판례 클릭', { caseNumber, court, date })
 
+  // ✅ 같은 사건번호를 가진 모든 링크에 visited 클래스 추가 (개별 추적)
+  const allPrecedentLinks = document.querySelectorAll<HTMLElement>(
+    `a.precedent-ref[data-case-number="${caseNumber}"]`
+  )
+  allPrecedentLinks.forEach((link) => {
+    link.classList.add('precedent-ref-visited')
+  })
+
   try {
     // 로딩 표시
     actions.setRefModal({

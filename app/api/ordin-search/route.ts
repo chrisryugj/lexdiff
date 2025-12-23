@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const query = searchParams.get("query")
   const knd = searchParams.get("knd") // 법령종류: 30001-조례, 30002-규칙 등
   const org = searchParams.get("org") // 지자체코드
-  const display = searchParams.get("display") || "100" // 페이지당 결과 수 (기본 100)
+  const display = searchParams.get("display") || "20" // 페이지당 결과 수 (기본 20)
   const page = searchParams.get("page") || "1" // 페이지 번호 (기본 1)
 
   if (!OC) {
