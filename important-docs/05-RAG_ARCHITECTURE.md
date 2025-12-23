@@ -9,7 +9,7 @@
 ```
 User Query: "관세법 제38조에서 말하는 수입이란?"
     ↓
-[file-search-rag-view.tsx] SSE 스트리밍 시작
+[file-search-answer-display.tsx] SSE 스트리밍 시작
     ↓
 [/api/file-search-rag] Gemini 2.5 Flash + File Search + 2-Tier 라우팅
     ↓
@@ -24,30 +24,20 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
 
 ### 1. SSE Buffer Handling (CRITICAL)
 
-**파일**: `components/file-search-rag-view.tsx` (142-172줄)
+**파일**: `components/file-search-answer-display.tsx` (555-568줄)
 
 ```typescript
-while (true) {
-  const { done, value } = await reader.read()
-  if (done) break
+let buffer = ''
+const chunk = decoder.decode(value, { stream: true })
+buffer += chunk
 
-  buffer += decoder.decode(value, { stream: true })
-  const lines = buffer.split('\n')
-  buffer = lines.pop() || ''  // 마지막 불완전한 줄 보관
+const lines = buffer.split('\n')
+buffer = lines.pop() || ''  // 마지막 불완전한 줄 보관
 
-  for (const line of lines) {
-    if (line.startsWith('data: ')) {
-      const parsed = JSON.parse(line.slice(6))
-      // 처리...
-    }
-  }
-}
-
-// ⚠️ CRITICAL: 루프 종료 후 남은 buffer 처리
-if (buffer.trim()) {
-  if (buffer.startsWith('data: ')) {
-    const parsed = JSON.parse(buffer.slice(6))
-    // 최종 청크 처리
+for (const line of lines) {
+  if (line.startsWith('data: ')) {
+    const parsed = JSON.parse(line.slice(6))
+    // 처리...
   }
 }
 ```
@@ -56,28 +46,7 @@ if (buffer.trim()) {
 
 ---
 
-### 2. Overlay Progress Display
-
-**파일**: `components/file-search-rag-view.tsx` (288-365줄)
-
-```typescript
-// ❌ WRONG
-{isAnalyzing && !analysis && (<div>Progress</div>)}
-// → 첫 청크 도착 시 analysis가 생기면서 progress 사라짐
-
-// ✅ CORRECT
-{isAnalyzing && (
-  <div className="absolute inset-0 bg-background/95 backdrop-blur-sm">
-    {/* 진행 단계 표시 - 스트리밍 중에도 유지 */}
-  </div>
-)}
-```
-
----
-
-### 3. API Response Parsing
-
-**파일**: `components/file-search-rag-view.tsx` (155-249줄)
+### 2. API Response Parsing
 
 ```typescript
 // XML 파싱 (law-search)
@@ -101,7 +70,7 @@ const articleUnits = lawData?.조문?.조문단위
 | 파일 | 역할 |
 |------|------|
 | `app/api/file-search-rag/route.ts` | SSE 스트리밍 엔드포인트 |
-| `components/file-search-rag-view.tsx` | UI + SSE 처리 + Citation 모달 |
+| `components/file-search-answer-display.tsx` | UI + SSE 처리 + Citation 모달 |
 | `lib/file-search-client.ts` | Gemini File Search 클라이언트 |
 | `lib/ai-answer-processor.ts` | Markdown → HTML 변환 |
 | `components/reference-modal.tsx` | 조문 모달 표시 |
@@ -126,4 +95,4 @@ const articleUnits = lawData?.조문?.조문단위
 
 ---
 
-**버전**: 1.1 | **업데이트**: 2025-12-20
+**버전**: 1.2 | **업데이트**: 2025-12-24
