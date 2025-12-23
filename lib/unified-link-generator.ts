@@ -254,6 +254,39 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
  * 단순 법령명 + 시행령/시행규칙 패턴 처리
  */
 function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
+  // ✅ 1단계: "구 법령명(날짜...)" 패턴에서 efYd 추출하여 매핑 생성
+  // 예: "구 지방세법(2018. 12. 31. 법률 제16194호로 개정되기 전의 것, 이하 같다)"
+  // → 이후 "구 지방세법 제11조" 같은 참조에도 같은 efYd 적용
+  const oldLawEfYdMap = new Map<string, string>()
+
+  const defPattern = /구\s+([가-힣a-zA-Z0-9·]+\s*(?:및\s+)?[가-힣a-zA-Z0-9·]*(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s*\(([^)]+)\)/g
+  let defMatch: RegExpExecArray | null
+
+  while ((defMatch = defPattern.exec(text)) !== null) {
+    const lawName = defMatch[1].trim()
+    const parenContent = defMatch[2]
+
+    const dateMatch = parenContent.match(/(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/)
+    if (dateMatch) {
+      const year = dateMatch[1]
+      const month = dateMatch[2].padStart(2, '0')
+      const day = dateMatch[3].padStart(2, '0')
+
+      let efYd: string
+      if (parenContent.includes('개정되기 전') || parenContent.includes('개정 전')) {
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day) - 1)
+        efYd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
+      } else {
+        efYd = `${year}${month}${day}`
+      }
+
+      // 첫 번째 정의만 저장
+      if (!oldLawEfYdMap.has(lawName)) {
+        oldLawEfYdMap.set(lawName, efYd)
+      }
+    }
+  }
+
   // 패턴 0: "구 법령명(상세설명) 제X조" 패턴 (판례에서 자주 사용)
   // 예: "구 지방세법(2018. 12. 31. 법률 제16194호로 개정되기 전의 것, 이하 같다) 제11조"
   // 예: "구 상속세 및 증여세법(2015. 12. 15. 법률 제13557호로 개정되기 전의 것) 제63조"
@@ -321,8 +354,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
 
   // 패턴 0-1: "구 법령명 제X조" 패턴 (괄호 없이 "구"만 있는 경우)
   // 예: "구 지방세법 제11조", "구 상속세 및 증여세법 제63조"
-  // 날짜 정보가 없으므로 현행법으로 연결하되 "구" 표시 유지
-  // ⚠️ 중복 체크 없이 추가 - 나중에 긴 매칭이 짧은 매칭을 덮어씀
+  // ✅ 앞서 정의된 efYd가 있으면 적용 (이하 같다 패턴)
   const simpleOldLawPattern = /(?<!「)구\s+([가-힣a-zA-Z0-9·]+\s*(?:및\s+)?[가-힣a-zA-Z0-9·]*(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?(?!\s*\()/g
 
   while ((match = simpleOldLawPattern.exec(text)) !== null) {
@@ -337,6 +369,10 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
       const fullText = match[0]
 
+      // ✅ 앞서 정의된 efYd 참조 (이하 같다 패턴)
+      const inheritedEfYd = oldLawEfYdMap.get(lawName)
+      const efYdAttr = inheritedEfYd ? ` data-efyd="${inheritedEfYd}"` : ''
+
       // 이 범위 내의 기존 짧은 매칭 제거 (예: "제11조"만 잡힌 경우)
       const newStart = match.index
       const newEnd = match.index + fullText.length
@@ -347,7 +383,6 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         }
       }
 
-      // 날짜 정보 없음 → data-old-law 속성으로 구법령 표시
       matches.push({
         start: newStart,
         end: newEnd,
@@ -355,7 +390,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName: lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" data-old-law="true" aria-label="구 ${lawName} ${joLabel}">${fullText}</a>`
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}"${efYdAttr} data-old-law="true" aria-label="구 ${lawName} ${joLabel}">${fullText}</a>`
       })
     }
   }
@@ -438,6 +473,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
 
   // 패턴 3: 일반 법령명 (2글자 이상 + 법/령/규칙/조례)
   // "관세법 제38조", "도로법 시행령 제55조" 등
+  // ⚠️ "구 "로 시작하는 경우는 패턴 0-1에서 처리됨
   const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
 
   while ((match = simpleRegex.exec(text)) !== null) {
@@ -447,7 +483,11 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
       match!.index < m.end
     )
 
-    if (!isInQuoted) {
+    // ✅ "구 법령명" 패턴은 패턴 0-1에서 처리 - 스킵
+    const textBefore = text.substring(Math.max(0, match.index - 3), match.index)
+    const isOldLawPattern = /구\s*$/.test(textBefore)
+
+    if (!isInQuoted && !isOldLawPattern) {
       const lawName = match[1].trim()
       const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
       const fullText = match[0]
