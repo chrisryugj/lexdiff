@@ -240,7 +240,11 @@ export function PrecedentDetailPanel({
 
   // 관련 심급 판례 검색 (원심판결 사건번호 기반)
   React.useEffect(() => {
-    if (!detail || !showRelated) return
+    if (!detail || !showRelated) {
+      setRelatedPrecedents([])
+      setLoadingRelated(false)
+      return
+    }
 
     const fetchRelated = async () => {
       setLoadingRelated(true)
@@ -250,43 +254,34 @@ export function PrecedentDetailPanel({
         const originalCaseMatch = fullText.match(/【\s*원심\s*판결\s*】[^【]*?(\d{4}[가-힣]+\d+)/i)
         const originalCaseNumber = originalCaseMatch?.[1]
 
-        const relatedCaseNumbers: string[] = []
-        if (originalCaseNumber) {
-          relatedCaseNumbers.push(originalCaseNumber)
-        }
-
-        // 2. 현재 판례 사건번호도 검색 (상고심 찾기용)
-        if (detail.caseNumber) {
-          relatedCaseNumbers.push(detail.caseNumber)
-        }
-
-        if (relatedCaseNumbers.length === 0) {
+        // 원심판결 사건번호가 없으면 검색 안 함
+        if (!originalCaseNumber) {
           setRelatedPrecedents([])
           setLoadingRelated(false)
           return
         }
 
-        // 3. 각 사건번호로 검색
-        const results: PrecedentSearchResult[] = []
-        for (const caseNum of relatedCaseNumbers) {
-          const params = new URLSearchParams({
-            caseNumber: caseNum,
-            display: '5'
-          })
-          const res = await fetch(`/api/precedent-search?${params}`)
-          if (res.ok) {
-            const data = await res.json()
-            results.push(...(data.precedents || []))
-          }
+        // 2. 원심판결 사건번호로만 검색 (현재 판례 번호는 제외)
+        const params = new URLSearchParams({
+          caseNumber: originalCaseNumber,
+          display: '10'
+        })
+        const res = await fetch(`/api/precedent-search?${params}`)
+
+        if (!res.ok) {
+          throw new Error(`검색 실패: ${res.status}`)
         }
 
-        // 4. 중복 제거 + 현재 판례 제외
+        const data = await res.json()
+        const results: PrecedentSearchResult[] = data.precedents || []
+
+        // 3. 중복 제거 + 현재 판례 제외
         const uniqueResults = results.filter((p, idx, arr) =>
           arr.findIndex(x => x.caseNumber === p.caseNumber) === idx &&
           p.caseNumber !== detail.caseNumber
         )
 
-        // 5. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
+        // 4. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
         uniqueResults.sort((a, b) => {
           const dateA = a.date?.replace(/[.\-]/g, '') || ''
           const dateB = b.date?.replace(/[.\-]/g, '') || ''
@@ -296,13 +291,14 @@ export function PrecedentDetailPanel({
         setRelatedPrecedents(uniqueResults)
       } catch (e) {
         console.error('관련 심급 검색 실패:', e)
+        setRelatedPrecedents([])
       } finally {
         setLoadingRelated(false)
       }
     }
 
     fetchRelated()
-  }, [detail?.caseNumber, detail?.fullText, showRelated])
+  }, [detail?.caseNumber, showRelated])
 
   // HTML 정리 + 링크 생성
   const processHtml = React.useCallback((html: string) => {
