@@ -87,6 +87,7 @@ export interface SearchResultViewProps {
   onHomeClick?: () => void  // 로고 클릭 시 홈으로 직접 이동
   onProgressUpdate?: (stage: SearchStage, progress: number) => void
   onModeChange?: (mode: 'basic' | 'rag') => void
+  onPrecedentSelect?: (precedentId: string | null) => void  // 판례 선택/해제 시 부모에 알림
   initialSearchMode?: 'basic' | 'rag'
   initialPrecedentId?: string | null  // 새로고침 시 판례 상세 복원용
 }
