@@ -64,7 +64,7 @@ export function useLawViewerPrecedents(articleNumber: string, meta: LawMeta) {
     meta.lawTitle,
     articleNumber,
     showPrecedents,
-    5 // 기본 5건 조회
+    20 // 기본 20건 조회 (관련 심급 필터링용)
   )
 
   // 판례 상세 보기
