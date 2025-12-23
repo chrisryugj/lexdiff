@@ -49,7 +49,32 @@
 
 ---
 
-## 4. Key Files (빠른 참조)
+## 4. law-viewer 구조
+
+### 메인 컴포넌트
+`law-viewer.tsx` - 오케스트레이터 (1,189줄)
+
+### 하위 컴포넌트 (`components/law-viewer/`)
+| 파일 | 역할 |
+|------|------|
+| `law-viewer-action-buttons.tsx` | 액션 버튼 (비교/요약/위임법령/판례) |
+| `law-viewer-sidebar.tsx` | 좌측 사이드바 (조문 목록/AI 관련 법령) |
+| `law-viewer-single-article.tsx` | 단문 조회 본문 (헤더+본문+이력+판례) |
+| `law-viewer-related-cases.tsx` | 판례 관련 심급 목록 |
+| `law-viewer-ordinance-actions.tsx` | 조례 전용 액션 버튼 |
+
+### 관련 훅 (`hooks/`)
+| 훅 | 역할 |
+|----|------|
+| `use-law-viewer-modals.ts` | 외부 법령/별표 모달 관리 |
+| `use-law-viewer-three-tier.ts` | 위임법령 데이터 |
+| `use-law-viewer-admin-rules.ts` | 행정규칙 데이터 |
+| `use-law-viewer-precedents.ts` | 관련 판례 데이터 |
+| `use-related-precedent-cases.ts` | 판례 관련 심급 검색 |
+
+---
+
+## 5. Key Files (빠른 참조)
 
 ### 핵심
 | 파일 | 역할 |
@@ -61,7 +86,8 @@
 ### UI
 | 파일 | 역할 |
 |------|------|
-| `law-viewer.tsx` | 메인 법령/판례 뷰어 |
+| `law-viewer.tsx` | 메인 법령/판례 뷰어 (오케스트레이터) |
+| `components/law-viewer/` | law-viewer 하위 컴포넌트 |
 | `precedent-section.tsx` | 관련 판례 섹션 |
 | `reference-modal.tsx` | 참조 모달 |
 
@@ -74,7 +100,7 @@
 
 ---
 
-## 5. 환경변수
+## 6. 환경변수
 
 | 변수 | 용도 |
 |------|------|
@@ -84,7 +110,7 @@
 
 ---
 
-## 6. API 응답 형식
+## 7. API 응답 형식
 
 | API | 형식 | 파싱 |
 |-----|------|------|
@@ -94,7 +120,7 @@
 
 ---
 
-## 7. State Management
+## 8. State Management
 
 - **Singleton**: `favorites-store.ts`, `debug-logger.ts`, `error-report-store.ts`
 - **IndexedDB**: `law-content-cache.ts` (7일), `admin-rule-cache.ts` (영구)
