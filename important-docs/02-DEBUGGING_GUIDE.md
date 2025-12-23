@@ -89,7 +89,7 @@ const doc = new DOMParser().parseFromString(xml, 'text/xml')
 
 **원인**: SSE 버퍼 미처리
 
-**확인 위치**: `file-search-rag-view.tsx:142-172`
+**확인 위치**: `file-search-answer-display.tsx:555-568`
 
 **수정 방법**:
 ```typescript
@@ -106,7 +106,7 @@ if (buffer.trim() && buffer.startsWith('data: ')) {
 
 **원인**: 조건문에 `!analysis` 포함
 
-**확인 위치**: `file-search-rag-view.tsx:288-365`
+**확인 위치**: `file-search-answer-display.tsx`
 
 ```typescript
 // ❌ WRONG

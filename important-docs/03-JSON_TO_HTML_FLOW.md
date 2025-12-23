@@ -26,7 +26,7 @@
 └─────────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ 3. JSON 파싱: components/search-result-view.tsx                 │
+│ 3. JSON 파싱: components/search-result-view/index.tsx           │
 │    - parseLawXML(json)                                          │
 │    - 결과: LawData { articles: Article[] }                      │
 └─────────────────────────────────────────────────────────────────┘
@@ -405,7 +405,7 @@ HTML이 제대로 생성되지 않을 때:
 | `lib/law-parser.ts` | JSON → LawData 변환 | `parseLawXML()`, `buildJO()` |
 | `lib/law-xml-parser.tsx` | HTML 생성 | `extractArticleText()`, `applyRevisionStyling()` |
 | `lib/unified-link-generator.ts` | 링크 생성 | `generateLinks()`, `linkifyRefsB()` |
-| `components/search-result-view.tsx` | API 호출 및 파싱 | `handleSearch()` |
+| `components/search-result-view/index.tsx` | API 호출 및 파싱 | `handleSearch()` |
 | `components/law-viewer.tsx` | HTML 렌더링 | `dangerouslySetInnerHTML` |
 
 ---
