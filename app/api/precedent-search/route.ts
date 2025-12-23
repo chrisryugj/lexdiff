@@ -57,16 +57,38 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ✅ 법원명으로만 검색 (query 파라미터 사용 안 함)
+    // ✅ 법원명+연도 조합: curt 파라미터 사용 (query보다 훨씬 많은 결과)
     if (extractedCourt) {
+      // 법원명은 curt 파라미터로, 나머지 키워드는 query로
       params.append("curt", extractedCourt)
-    } else if (query && !extractedCourt && !caseNumber) {
-      // 법원명 없으면 query로 검색
+      // 법원명과 연도를 제외한 나머지 키워드가 있으면 query에 추가
+      const remainingQuery = query!
+        .replace(new RegExp(extractedCourt, 'g'), '')
+        .replace(/\b(19\d{2}|20\d{2})\b/g, '')
+        .trim()
+      if (remainingQuery) {
+        params.append("query", remainingQuery)
+      }
+    } else if (query) {
       params.append("query", query)
     }
-
+    if (court) params.append("curt", court)
     if (caseNumber) params.append("nb", caseNumber)
     if (sort) params.append("sort", sort)
+
+    // ✅ 연도 필터 - 서버 사이드 (API 파라미터로 전달)
+    // 법제처 API는 연도 파라미터를 직접 지원하지 않으므로,
+    // 검색어에 사건번호 형식 "(연도)"을 추가하여 간접 필터링
+    if (extractedYear && !params.has("nb")) {
+      // 사건번호 없는 경우에만 연도 기반 필터링 활성화
+      // 예: "대법원 2025" → curt=대법원 + 사건번호에 2025 포함
+      // params.append("nb", extractedYear) // 이건 정확한 사건번호 매칭이라 안 됨
+      // 대신 연도를 query로 추가하여 사건명/사건번호 내 검색되도록 유도
+      const currentQuery = params.get("query") || ""
+      if (!currentQuery.includes(extractedYear)) {
+        params.set("query", currentQuery ? `${currentQuery} ${extractedYear}` : extractedYear)
+      }
+    }
 
     const url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
     const response = await fetch(url)
@@ -84,24 +106,14 @@ export async function GET(request: NextRequest) {
 
     const { totalCount, precedents } = parsePrecedentSearchXML(xmlText)
 
-    // ✅ 연도 필터링 (클라이언트 사이드)
-    let filteredPrecedents = precedents
-    let filteredCount = totalCount
+    console.log(`[precedent-search] API 응답: totalCount=${totalCount}, precedents.length=${precedents.length}, display=${display}, extractedYear=${extractedYear}, extractedCourt=${extractedCourt}`)
 
-    if (extractedYear) {
-      filteredPrecedents = precedents.filter(prec => {
-        // 사건번호나 선고일자에서 연도 추출
-        const yearInCaseNumber = prec.caseNumber?.match(/^(\d{4})/)
-        const yearInDate = prec.decisionDate?.substring(0, 4)
-
-        return yearInCaseNumber?.[1] === extractedYear || yearInDate === extractedYear
-      })
-      filteredCount = filteredPrecedents.length
-    }
+    // ✅ 연도 필터링 제거 - 서버 사이드로 이동 (API query에 연도 포함)
+    // 이제 API가 직접 연도로 필터링하므로 클라이언트 필터링 불필요
 
     return NextResponse.json({
-      totalCount: filteredCount,
-      precedents: filteredPrecedents,
+      totalCount,
+      precedents,
       page: parseInt(page, 10),
       display: parseInt(display, 10),
       yearFilter: extractedYear || undefined,

@@ -325,8 +325,71 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   className="mb-8 text-xl font-bold text-center"
                   dangerouslySetInnerHTML={{ __html: item.content.content }}
                 />
+              ) : isPrecedent ? (
+                // ✅ 판례 전용 렌더링 - 컴팩트 스타일
+                <div
+                  id={`article-${item.article.jo}`}
+                  ref={(el) => {
+                    articleRefs.current[item.article.jo] = el
+                  }}
+                  className="prose prose-sm max-w-none dark:prose-invert scroll-mt-24"
+                >
+                  {/* 섹션 헤더 */}
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <h3 className="text-base font-bold text-foreground m-0 flex items-center gap-1.5">
+                      <span className="text-foreground">•</span>
+                      {item.article.joNum || item.article.title}
+                    </h3>
+                    {/* 복사 버튼만 표시 (즐겨찾기 없음) */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        copyArticle(item.article, e)
+                      }}
+                      title="복사"
+                    >
+                      {copiedJo === item.article.jo ? (
+                        <Icon name="check" className="h-3.5 w-3.5 text-green-500" />
+                      ) : (
+                        <Icon name="copy" className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* 내용 - br 태그 처리 + 빈줄 정리 */}
+                  <div
+                    className="text-foreground leading-relaxed"
+                    style={{
+                      fontSize: `${fontSize}px`,
+                      lineHeight: "1.7",
+                    }}
+                    onClick={onContentClick}
+                    dangerouslySetInnerHTML={{
+                      __html: (item.article.content || '')
+                        .replace(/<br\\>/g, '<br />')  // <br\> → <br />
+                        .replace(/<br>/g, '<br />')    // <br> → <br />
+                        .replace(/\n/g, '<br />')      // 줄바꿈 → <br />
+                        .replace(/&nbsp;/g, ' ')       // &nbsp; → 공백
+                        // 【】 뒤의 연속 공백을 탭 하나로 정리
+                        .replace(/【([^】]*)】\s{2,}/g, '【$1】\t')
+                        // 연속된 빈줄 제거 (br 사이 공백 포함)
+                        .replace(/(<br\s*\/?>\s*){2,}/gi, '<br />')
+                        // 시작/끝 빈줄 제거
+                        .replace(/^(\s*<br\s*\/?>\s*)+/gi, '')
+                        .replace(/(\s*<br\s*\/?>\s*)+$/gi, '')
+                        .trim()
+                    }}
+                  />
+
+                  {item.index < articles.length - 1 && (
+                    <Separator className="my-3" />
+                  )}
+                </div>
               ) : (
-                // Article rendering
+                // 일반 법령 Article rendering
                 <div
                   id={`article-${item.article.jo}`}
                   ref={(el) => {

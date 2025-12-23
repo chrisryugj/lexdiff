@@ -80,6 +80,20 @@ export interface SearchResultCache {
       article?: string
     }
   }
+  // 판례 검색 결과 (목록)
+  precedentResults?: Array<{
+    id: string
+    name: string
+    caseNumber: string
+    court: string
+    date: string
+    judgmentType: string
+  }>
+  // 현재 보고 있는 판례 상세 (뒤로가기용)
+  precedentDetail?: {
+    id: string
+    lawData: any  // LawDataState 형식
+  }
   timestamp: number
   expiresAt: number
 }

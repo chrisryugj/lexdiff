@@ -63,7 +63,7 @@ export interface AIStageInfo {
 export const AI_STAGES: AIStageInfo[] = [
   { key: 'analyzing', label: '분석 중', icon: 'brain', range: [0, 15] },
   { key: 'optimizing', label: '최적화', icon: 'settings-02', range: [15, 25] },
-  { key: 'searching', label: '검색 중', icon: 'search-01', range: [25, 40] },
+  { key: 'searching', label: '검색 중', icon: 'search', range: [25, 40] },
   { key: 'streaming', label: '생성 중', icon: 'ai-brain-04', range: [40, 95] },
   { key: 'extracting', label: '인용 추출', icon: 'file-01', range: [95, 99] },
   { key: 'complete', label: '완료', icon: 'checkmark-circle-02', range: [100, 100] },
@@ -84,9 +84,11 @@ export interface AISearchMeta {
 export interface SearchResultViewProps {
   searchId: string
   onBack: () => void
+  onHomeClick?: () => void  // 로고 클릭 시 홈으로 직접 이동
   onProgressUpdate?: (stage: SearchStage, progress: number) => void
   onModeChange?: (mode: 'basic' | 'rag') => void
   initialSearchMode?: 'basic' | 'rag'
+  initialPrecedentId?: string | null  // 새로고침 시 판례 상세 복원용
 }
 
 export interface SearchQuery {
@@ -117,6 +119,7 @@ export interface LawSelectionState {
 
 export interface OrdinanceSelectionState {
   results: OrdinanceSearchResult[]
+  totalCount?: number  // ✅ 전체 개수 (API totalCnt)
   query: { lawName: string }
 }
 
@@ -148,6 +151,7 @@ export interface SummaryDialogState {
   oldContent?: string
   newContent?: string
   effectiveDate?: string
+  isPrecedent?: boolean  // 판례 요약 모드
 }
 
 export interface RelatedSearch {

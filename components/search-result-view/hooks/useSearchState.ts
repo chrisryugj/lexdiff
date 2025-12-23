@@ -82,8 +82,18 @@ export interface SearchState {
 
   // 판례/해석례/재결례 상태
   precedentResults: any[] | null
+  precedentTotalCount: number
+  precedentPage: number
+  precedentPageSize: number
+  precedentYearFilter?: string
+  precedentCourtFilter?: string
   interpretationResults: any[] | null
   rulingResults: any[] | null
+
+  // 조례 페이지네이션 상태
+  ordinancePage: number
+  ordinancePageSize: number
+  ordinanceTotalCount: number
 }
 
 export interface SearchStateActions {
@@ -134,8 +144,18 @@ export interface SearchStateActions {
 
   // 판례/해석례/재결례 상태 업데이트
   setPrecedentResults: (results: any[] | null) => void
+  setPrecedentTotalCount: (count: number) => void
+  setPrecedentPage: (page: number) => void
+  setPrecedentPageSize: (size: number) => void
+  setPrecedentYearFilter: (year: string | undefined) => void
+  setPrecedentCourtFilter: (court: string | undefined) => void
   setInterpretationResults: (results: any[] | null) => void
   setRulingResults: (results: any[] | null) => void
+
+  // 조례 페이지네이션 상태 업데이트
+  setOrdinancePage: (page: number) => void
+  setOrdinancePageSize: (size: number) => void
+  setOrdinanceTotalCount: (count: number) => void
 
   // 복합 액션
   resetSearchState: () => void
@@ -210,8 +230,20 @@ export function useSearchState({
   // 판례/해석례/재결례 상태
   // ============================================================
   const [precedentResults, setPrecedentResults] = useState<any[] | null>(null)
+  const [precedentTotalCount, setPrecedentTotalCount] = useState(0)
+  const [precedentPage, setPrecedentPage] = useState(1)
+  const [precedentPageSize, setPrecedentPageSize] = useState(20)
+  const [precedentYearFilter, setPrecedentYearFilter] = useState<string | undefined>()
+  const [precedentCourtFilter, setPrecedentCourtFilter] = useState<string | undefined>()
   const [interpretationResults, setInterpretationResults] = useState<any[] | null>(null)
   const [rulingResults, setRulingResults] = useState<any[] | null>(null)
+
+  // ============================================================
+  // 조례 페이지네이션 상태
+  // ============================================================
+  const [ordinancePage, setOrdinancePage] = useState(1)
+  const [ordinancePageSize, setOrdinancePageSize] = useState(100)
+  const [ordinanceTotalCount, setOrdinanceTotalCount] = useState(0)
 
   // ============================================================
   // 즐겨찾기 구독
@@ -327,8 +359,16 @@ export function useSearchState({
     ragProgress,
     ragAnswer,
     precedentResults,
+    precedentTotalCount,
+    precedentPage,
+    precedentPageSize,
+    precedentYearFilter,
+    precedentCourtFilter,
     interpretationResults,
     rulingResults,
+    ordinancePage,
+    ordinancePageSize,
+    ordinanceTotalCount,
   }
 
   const actions: SearchStateActions = {
@@ -366,8 +406,16 @@ export function useSearchState({
     setRagProgress,
     setRagAnswer,
     setPrecedentResults,
+    setPrecedentTotalCount,
+    setPrecedentPage,
+    setPrecedentPageSize,
+    setPrecedentYearFilter,
+    setPrecedentCourtFilter,
     setInterpretationResults,
     setRulingResults,
+    setOrdinancePage,
+    setOrdinancePageSize,
+    setOrdinanceTotalCount,
     resetSearchState,
     resetToHome,
   }

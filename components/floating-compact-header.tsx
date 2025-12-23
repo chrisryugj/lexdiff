@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 interface FloatingCompactHeaderProps {
   onBack?: () => void
+  onHomeClick?: () => void // 로고 클릭 시 홈으로 이동
   onFavoritesClick?: () => void
   onSettingsClick?: () => void
   onSearchClick?: () => void // 검색 모달 열기
@@ -25,6 +26,7 @@ interface FloatingCompactHeaderProps {
 
 export function FloatingCompactHeader({
   onBack,
+  onHomeClick,
   onFavoritesClick,
   onSettingsClick,
   onSearchClick,
@@ -93,8 +95,9 @@ export function FloatingCompactHeader({
                   )}
 
                   <button
-                    onClick={onBack}
+                    onClick={onHomeClick || onBack}
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
+                    title="홈으로 이동"
                   >
                     <div className="relative flex h-8 w-8 lg:h-10 lg:w-10 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
                       <Icon name="scale" size={20} className="text-white" />

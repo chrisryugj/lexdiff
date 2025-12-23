@@ -81,7 +81,6 @@
     "immer": "latest",
     "input-otp": "latest",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.454.0",
     "motion": "^12.23.26",
     "next": "^16.0.7",
     "next-themes": "latest",

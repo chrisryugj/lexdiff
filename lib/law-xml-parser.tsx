@@ -10,8 +10,9 @@ function escapeRegExp(text: string): string {
 }
 
 function renderInlineLawText(text: string, currentLawName?: string): string {
-  // CORRECT order: linkify → selective escape → styling
-  let rendered = linkifyRefsB(text, currentLawName)
+  // CORRECT order: remove img tags → linkify → selective escape → styling
+  let rendered = removeImgTags(text)
+  rendered = linkifyRefsB(rendered, currentLawName)
   rendered = rendered.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, plainText) => {
     if (linkTag) return linkTag
     if (otherTag) return escapeHtml(otherTag)
@@ -22,6 +23,15 @@ function renderInlineLawText(text: string, currentLawName?: string): string {
   return rendered
 }
 
+/**
+ * 법령 본문의 <img> 태그 제거
+ * 법제처 API 응답에 포함된 이미지 참조를 숨김 처리
+ */
+function removeImgTags(text: string): string {
+  // <img src="..." alt="..." > 형태의 태그 제거
+  return text.replace(/<img\s[^>]*>/gi, '')
+}
+
 function splitBoxTableRow(line: string): string[] | null {
   const trimmed = line.trim()
   const isVertical = (ch: string) => ch === "│" || ch === "┃" || ch === "|"
@@ -30,7 +40,8 @@ function splitBoxTableRow(line: string): string[] | null {
 
   const inner = trimmed.slice(1, -1)
   const parts = inner.split(/[│┃|]/g)
-  if (parts.length < 2) return null
+  // 최소 1개 셀 필요 (단일 컬럼 박스 포함)
+  if (parts.length < 1) return null
 
   return parts.map((p) =>
     p
@@ -49,7 +60,22 @@ function parseBoxDrawingTableBlock(blockLines: string[], currentLawName?: string
 
   if (rows.length === 0) return null
   const columnCount = Math.max(...rows.map((r) => r.cells.length))
-  if (columnCount < 2) return null
+
+  // 단일 컬럼 박스: 수식/공식 박스로 렌더링
+  if (columnCount === 1) {
+    // 각 행을 개별 처리 후 <br>로 연결
+    const styledRows = rows
+      .map(({ cells }) => cells[0])
+      .filter(Boolean)
+      .map(cellContent => renderInlineLawText(cellContent, currentLawName))
+    if (styledRows.length === 0) return null
+    const styledContent = styledRows.join('<br>')
+    return (
+      `<div class="my-3 p-3 border border-border rounded-md bg-muted/20 whitespace-normal">` +
+      `<div class="text-center leading-relaxed">${styledContent}</div>` +
+      `</div>`
+    )
+  }
 
   const firstSeparatorIndex = blockLines.findIndex((line) => {
     const t = line.trim()
@@ -449,6 +475,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         }
       }
 
+      // <img> 태그 제거 (법제처 API 응답에 포함된 이미지 참조)
+      rawContent = removeImgTags(rawContent)
+
       // 박스(유니코드) 표를 HTML 테이블로 렌더링하기 위해 먼저 토큰으로 치환
       // (escape 단계에서 <table> 같은 태그는 모두 escape 되므로 마지막에 토큰을 HTML로 교체한다)
       {
@@ -461,7 +490,12 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       rawContent = rawContent.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])[\s\r\n\t\u00A0]*/g, '$1 ')
 
       // 1. 링크 생성 (escape 전에)
-      content = linkifyRefsB(rawContent, currentLawName)
+      // ⚠️ 이미 링크가 적용된 콘텐츠(판례 전문 등)는 스킵
+      if (rawContent.includes('<a ') || rawContent.includes('data-ref=')) {
+        content = rawContent
+      } else {
+        content = linkifyRefsB(rawContent, currentLawName)
+      }
 
       // 2. HTML escape (링크 태그만 보존, <개정> 같은 것은 escape)
       content = content.replace(/(<a\s[^>]*>|<\/a>)|(<[^>]*>)|([^<]+)/g, (match, linkTag, otherTag, text) => {
@@ -522,6 +556,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
         let paraContent = para.content || ""
         const paraNum = para.num || ""
 
+        // <img> 태그 제거
+        paraContent = removeImgTags(paraContent)
+
         {
           const boxed = replaceBoxTablesWithTokens(paraContent, currentLawName)
           paraContent = boxed.text
@@ -567,6 +604,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
             let itemContent = item.content || ""
             const itemNum = item.num || ""
 
+            // <img> 태그 제거
+            itemContent = removeImgTags(itemContent)
+
             {
               const boxed = replaceBoxTablesWithTokens(itemContent, currentLawName)
               itemContent = boxed.text
@@ -601,6 +641,9 @@ export function extractArticleText(article: LawArticle, isOrdinance = false, cur
       allItems.forEach((item, index) => {
         let itemContent = item.content || ""
         const itemNum = item.num || ""
+
+        // <img> 태그 제거
+        itemContent = removeImgTags(itemContent)
 
         {
           const boxed = replaceBoxTablesWithTokens(itemContent, currentLawName)
@@ -642,6 +685,9 @@ export function formatDelegationContent(content: string, currentLawName?: string
   if (!content || content.trim().length === 0) {
     return ""
   }
+
+  // <img> 태그 제거
+  content = removeImgTags(content)
 
   const boxTableReplacements: BoxTableReplacement[] = []
   {

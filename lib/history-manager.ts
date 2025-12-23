@@ -11,9 +11,10 @@
  * History 상태 데이터 구조
  */
 export interface HistoryState {
-  viewMode: 'home' | 'search-result'
+  viewMode: 'home' | 'search-result' | 'precedent-detail'
   searchId?: string
   searchMode?: 'basic' | 'rag'  // 검색 모드 (기본/AI)
+  precedentId?: string  // 판례 상세 보기 시 판례 ID
   timestamp: number
 }
 
@@ -94,6 +95,46 @@ export function replaceSearchHistory(searchId: string, searchMode: 'basic' | 'ra
 export function replaceHomeHistory(): void {
   const state: HistoryState = {
     viewMode: 'home',
+    timestamp: Date.now()
+  }
+  window.history.replaceState(state, '', '/')
+}
+
+/**
+ * 판례 상세 페이지로 이동
+ * - URL은 '/' 유지
+ * - History에 검색 ID + 판례 ID 저장
+ */
+export function pushPrecedentHistory(
+  searchId: string,
+  precedentId: string,
+  searchMode: 'basic' | 'rag' = 'basic'
+): void {
+  const state: HistoryState = {
+    viewMode: 'precedent-detail',
+    searchId,
+    precedentId,
+    searchMode,
+    timestamp: Date.now()
+  }
+  window.history.pushState(state, '', '/')
+}
+
+/**
+ * 판례 상세 페이지 상태로 교체
+ * - pushState 대신 replaceState 사용
+ * - History 스택에 추가하지 않음
+ */
+export function replacePrecedentHistory(
+  searchId: string,
+  precedentId: string,
+  searchMode: 'basic' | 'rag' = 'basic'
+): void {
+  const state: HistoryState = {
+    viewMode: 'precedent-detail',
+    searchId,
+    precedentId,
+    searchMode,
     timestamp: Date.now()
   }
   window.history.replaceState(state, '', '/')

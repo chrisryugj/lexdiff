@@ -15,6 +15,34 @@ import { getLawTypeBadgeClass } from "./utils"
 import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery } from "./types"
 
 // ============================================================
+// 헬퍼 함수
+// ============================================================
+
+/** 페이지네이션 번호 생성 (판례 리스트와 동일) */
+function generatePageNumbers(currentPage: number, totalPages: number): (number | string)[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1)
+  }
+
+  const pages: (number | string)[] = [1]
+
+  if (currentPage > 3) pages.push('...')
+
+  const start = Math.max(2, currentPage - 1)
+  const end = Math.min(totalPages - 1, currentPage + 1)
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+
+  if (currentPage < totalPages - 2) pages.push('...')
+
+  pages.push(totalPages)
+
+  return pages
+}
+
+// ============================================================
 // 법령 검색 결과 리스트
 // ============================================================
 
@@ -102,75 +130,87 @@ const LawResultCard = memo(function LawResultCard({
 }: LawResultCardProps) {
   const [showTooltip, setShowTooltip] = React.useState(false)
   const [isTruncated, setIsTruncated] = React.useState(false)
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
   const titleRef = React.useRef<HTMLHeadingElement>(null)
   const lawName = String(law.lawName)
 
+  // ResizeObserver로 truncated 상태 동적 감지
   React.useEffect(() => {
     const element = titleRef.current
-    if (element) {
+    if (!element) return
+
+    const checkTruncated = () => {
       setIsTruncated(element.scrollWidth > element.clientWidth)
     }
+
+    checkTruncated()
+
+    const observer = new ResizeObserver(checkTruncated)
+    observer.observe(element)
+
+    return () => observer.disconnect()
   }, [lawName])
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY })
+  }, [])
 
   return (
     <button
       onClick={() => onSelect(law)}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
+      onMouseMove={handleMouseMove}
+      className="group relative p-4 md:p-5 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
         fontFamily: "Pretendard, sans-serif"
       }}
     >
-      {/* 콘텐츠 */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          {/* 법령명 - 한 줄 말줄임 */}
-          <div className="relative mb-3">
-            <h4
-              ref={titleRef}
-              className="font-bold text-base md:text-lg leading-tight truncate group-hover:text-primary transition-colors"
-              style={{ minHeight: "1.5rem" }}
-            >
+      {/* 법령명 - 한 줄 말줄임 */}
+      <div className="relative mb-2.5">
+        <h4
+          ref={titleRef}
+          className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
+        >
+          {lawName}
+        </h4>
+
+        {/* 툴팁 - 마우스 따라가며 2줄까지 표시 */}
+        {showTooltip && isTruncated && (
+          <div
+            className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
+            style={{
+              fontFamily: "Pretendard, sans-serif",
+              left: `${mousePos.x + 12}px`,
+              top: `${mousePos.y + 16}px`,
+            }}
+          >
+            <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {lawName}
-            </h4>
-
-            {/* 툴팁 - 실제로 잘렸을 때만 표시 */}
-            {showTooltip && isTruncated && (
-              <div className="absolute left-0 top-full mt-2 z-50 max-w-md p-3 bg-popover border border-border rounded-lg shadow-xl">
-                <p className="text-sm font-semibold text-popover-foreground whitespace-normal break-words">
-                  {lawName}
-                </p>
-              </div>
-            )}
+            </p>
           </div>
+        )}
+      </div>
 
-          {/* 배지들 - 한 줄 배치 */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <Badge
-              variant="secondary"
-              className={`text-xs font-semibold px-2.5 py-0.5 ${getLawTypeBadgeClass(String(law.lawType))}`}
-            >
-              {String(law.lawType)}
-            </Badge>
-            {law.promulgationDate && (
-              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-blue-500/5 text-blue-600 dark:text-blue-400 border-blue-500/20">
-                공포 {formatDate(String(law.promulgationDate))}
-              </Badge>
-            )}
-            {law.effectiveDate && (
-              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-green-500/5 text-green-600 dark:text-green-400 border-green-500/20">
-                시행 {formatDate(String(law.effectiveDate))}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* 화살표 아이콘 */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
-          <Icon name="chevron-left" className="w-5 h-5 rotate-180 text-primary transition-colors" />
-        </div>
+      {/* 배지들 - 1열 컴팩트 배치 */}
+      <div className="flex flex-wrap gap-1.5 items-center">
+        <Badge
+          variant="outline"
+          className={`text-xs px-2 py-0.5 ${getLawTypeBadgeClass(String(law.lawType))}`}
+        >
+          {String(law.lawType)}
+        </Badge>
+        {law.promulgationDate && (
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+            공포 {formatDate(String(law.promulgationDate))}
+          </Badge>
+        )}
+        {law.effectiveDate && (
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+            시행 {formatDate(String(law.effectiveDate))}
+          </Badge>
+        )}
       </div>
     </button>
   )
@@ -246,22 +286,32 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
 
 interface OrdinanceSearchResultListProps {
   results: OrdinanceSearchResult[]
+  totalCount?: number  // ✅ 전체 개수 (API에서 받은 totalCnt)
+  currentPage?: number  // 현재 페이지 (서버 사이드 페이지네이션)
+  pageSize?: number  // 페이지당 개수
+  isLoading?: boolean  // 로딩 상태
   query: { lawName: string }
   onSelect: (ordinance: OrdinanceSearchResult) => void
+  onPageChange?: (page: number) => void  // 페이지 변경 핸들러
+  onPageSizeChange?: (size: number) => void  // 페이지 크기 변경 핸들러
   onCancel: () => void
 }
 
 export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList({
   results,
+  totalCount = 0,
+  currentPage = 1,
+  pageSize = 100,
+  isLoading = false,
   query,
   onSelect,
+  onPageChange,
+  onPageSizeChange,
   onCancel,
 }: OrdinanceSearchResultListProps) {
   const [filterKeyword, setFilterKeyword] = React.useState("")
-  const [itemsPerPage, setItemsPerPage] = React.useState(20)
-  const [currentPage, setCurrentPage] = React.useState(1)
 
-  // 실시간 필터링
+  // 키워드 필터링 (클라이언트 사이드 - 현재 페이지 내에서만)
   const filteredResults = React.useMemo(() => {
     if (!filterKeyword.trim()) return results
     const keyword = filterKeyword.toLowerCase()
@@ -273,20 +323,8 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
     )
   }, [results, filterKeyword])
 
-  // 페이지네이션
-  const totalPages = Math.ceil(filteredResults.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedResults = filteredResults.slice(startIndex, startIndex + itemsPerPage)
-
-  // 페이지 변경 시 스크롤 최상단으로
-  React.useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }, [currentPage])
-
-  // 필터링 시 1페이지로 리셋
-  React.useEffect(() => {
-    setCurrentPage(1)
-  }, [filterKeyword, itemsPerPage])
+  // 서버 사이드 페이지네이션
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
     <div className="py-4 md:py-8">
@@ -303,7 +341,7 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
                 className="h-7 px-3 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 text-foreground/80 border border-border font-semibold"
                 style={{ fontFamily: "Pretendard, sans-serif" }}
               >
-                {filteredResults.length}건
+                {totalCount ? `${totalCount.toLocaleString()}건` : `${filteredResults.length}건`}
               </Badge>
             </div>
             <Button
@@ -321,7 +359,7 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
             {/* 검색 필터 */}
             <div className="relative flex-1 max-w-md">
-              <Icon name="search-01" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="조례명, 지자체, 종류로 필터링..."
@@ -333,102 +371,103 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
             </div>
 
             {/* 페이지당 개수 선택 */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">표시 개수:</span>
-              <div className="flex gap-1">
-                {[20, 50, 100].map((count) => (
-                  <button
-                    key={count}
-                    onClick={() => setItemsPerPage(count)}
-                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                      itemsPerPage === count
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/30 hover:bg-muted/50 text-foreground/80"
-                    }`}
-                  >
-                    {count}
-                  </button>
-                ))}
+            {onPageSizeChange && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">표시 개수:</span>
+                <div className="flex gap-1">
+                  {[20, 50, 100].map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => onPageSizeChange(count)}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                        pageSize === count
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/30 hover:bg-muted/50 text-foreground/80"
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* 검색 결과 그리드 */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        {paginatedResults.map((ordinance, index) => (
-          <OrdinanceResultCard
-            key={ordinance.ordinSeq}
-            ordinance={ordinance}
-            index={index}
-            onSelect={onSelect}
-          />
-        ))}
+        {isLoading ? (
+          // 로딩 스켈레톤
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="p-5 bg-card/50 border-2 border-border/50 rounded-2xl animate-pulse">
+              <div className="h-5 bg-muted rounded w-3/4 mb-3" />
+              <div className="h-4 bg-muted rounded w-1/2 mb-3" />
+              <div className="flex gap-2">
+                <div className="h-6 bg-muted rounded w-16" />
+                <div className="h-6 bg-muted rounded w-20" />
+              </div>
+            </div>
+          ))
+        ) : filteredResults.length === 0 ? (
+          <div className="col-span-2 text-center py-12 text-muted-foreground">
+            <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg">검색 결과가 없습니다.</p>
+          </div>
+        ) : (
+          filteredResults.map((ordinance, index) => (
+            <OrdinanceResultCard
+              key={ordinance.ordinSeq}
+              ordinance={ordinance}
+              index={index}
+              onSelect={onSelect}
+            />
+          ))
+        )}
       </div>
 
       {/* 페이지네이션 */}
-      {totalPages > 1 && (
+      {totalPages > 1 && !isLoading && onPageChange && (
         <div className="max-w-6xl mx-auto mt-8 flex items-center justify-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="disabled:opacity-50"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+            className="gap-1"
           >
+            <Icon name="arrow-left" className="h-4 w-4" />
             이전
           </Button>
 
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum: number
-              if (totalPages <= 5) {
-                pageNum = i + 1
-              } else if (currentPage <= 3) {
-                pageNum = i + 1
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i
-              } else {
-                pageNum = currentPage - 2 + i
-              }
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${
-                    currentPage === pageNum
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/30 hover:bg-muted/50 text-foreground/80"
-                  }`}
+            {generatePageNumbers(currentPage, totalPages).map((page, idx) => (
+              page === '...' ? (
+                <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">...</span>
+              ) : (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => onPageChange(page as number)}
+                  className="w-9 h-9"
                 >
-                  {pageNum}
-                </button>
+                  {page}
+                </Button>
               )
-            })}
+            ))}
           </div>
 
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="disabled:opacity-50"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            className="gap-1"
           >
             다음
+            <Icon name="arrow-right" className="h-4 w-4" />
           </Button>
-
-          <span className="ml-4 text-sm text-muted-foreground">
-            {currentPage} / {totalPages} 페이지
-          </span>
-        </div>
-      )}
-
-      {/* 결과 없음 */}
-      {filteredResults.length === 0 && (
-        <div className="max-w-6xl mx-auto text-center py-12">
-          <p className="text-muted-foreground">필터 조건에 맞는 조례가 없습니다.</p>
         </div>
       )}
     </div>
@@ -452,77 +491,89 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
 }: OrdinanceResultCardProps) {
   const [showTooltip, setShowTooltip] = React.useState(false)
   const [isTruncated, setIsTruncated] = React.useState(false)
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
   const titleRef = React.useRef<HTMLHeadingElement>(null)
   const ordinName = String(ordinance.ordinName)
 
+  // ResizeObserver로 truncated 상태 동적 감지
   React.useEffect(() => {
     const element = titleRef.current
-    if (element) {
+    if (!element) return
+
+    const checkTruncated = () => {
       setIsTruncated(element.scrollWidth > element.clientWidth)
     }
+
+    checkTruncated()
+
+    const observer = new ResizeObserver(checkTruncated)
+    observer.observe(element)
+
+    return () => observer.disconnect()
   }, [ordinName])
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY })
+  }, [])
 
   return (
     <button
       onClick={() => onSelect(ordinance)}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      className="group relative p-5 md:p-6 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-2xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
+      onMouseMove={handleMouseMove}
+      className="group relative p-4 md:p-5 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
         fontFamily: "Pretendard, sans-serif"
       }}
     >
-      {/* 콘텐츠 */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          {/* 조례명 - 한 줄 말줄임 */}
-          <div className="relative mb-3">
-            <h4
-              ref={titleRef}
-              className="font-bold text-base md:text-lg leading-tight truncate group-hover:text-primary transition-colors"
-              style={{ minHeight: "1.5rem" }}
-            >
+      {/* 조례명 - 한 줄 말줄임 */}
+      <div className="relative mb-2.5">
+        <h4
+          ref={titleRef}
+          className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
+        >
+          {ordinName}
+        </h4>
+
+        {/* 툴팁 - 마우스 따라가며 2줄까지 표시 */}
+        {showTooltip && isTruncated && (
+          <div
+            className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
+            style={{
+              fontFamily: "Pretendard, sans-serif",
+              left: `${mousePos.x + 12}px`,
+              top: `${mousePos.y + 16}px`,
+            }}
+          >
+            <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {ordinName}
-            </h4>
-
-            {/* 툴팁 - 실제로 잘렸을 때만 표시 */}
-            {showTooltip && isTruncated && (
-              <div className="absolute left-0 top-full mt-2 z-50 max-w-md p-3 bg-popover border border-border rounded-lg shadow-xl">
-                <p className="text-sm font-semibold text-popover-foreground whitespace-normal break-words">
-                  {ordinName}
-                </p>
-              </div>
-            )}
+            </p>
           </div>
+        )}
+      </div>
 
-          {/* 배지들 - 한 줄 배치 */}
-          <div className="flex flex-wrap gap-2 items-center">
-            {ordinance.ordinKind && (
-              <Badge
-                variant="secondary"
-                className="text-xs font-semibold px-2.5 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-              >
-                {String(ordinance.ordinKind)}
-              </Badge>
-            )}
-            {ordinance.orgName && (
-              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-purple-500/5 text-purple-600 dark:text-purple-400 border-purple-500/20">
-                {String(ordinance.orgName)}
-              </Badge>
-            )}
-            {ordinance.effectiveDate && (
-              <Badge variant="outline" className="text-xs px-2.5 py-0.5 bg-green-500/5 text-green-600 dark:text-green-400 border-green-500/20">
-                시행 {formatDate(String(ordinance.effectiveDate))}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* 화살표 아이콘 */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
-          <Icon name="chevron-left" className="w-5 h-5 rotate-180 text-primary transition-colors" />
-        </div>
+      {/* 배지들 - 1열 컴팩트 배치 */}
+      <div className="flex flex-wrap gap-1.5 items-center">
+        {ordinance.ordinKind && (
+          <Badge
+            variant="outline"
+            className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+          >
+            {String(ordinance.ordinKind)}
+          </Badge>
+        )}
+        {ordinance.orgName && (
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+            {String(ordinance.orgName)}
+          </Badge>
+        )}
+        {ordinance.effectiveDate && (
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+            시행 {formatDate(String(ordinance.effectiveDate))}
+          </Badge>
+        )}
       </div>
     </button>
   )

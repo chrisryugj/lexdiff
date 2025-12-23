@@ -27,11 +27,12 @@ import {
 } from "@/lib/history-manager"
 import type { Favorite } from "@/lib/law-types"
 
-type ViewMode = 'home' | 'search-result'
+type ViewMode = 'home' | 'search-result' | 'precedent-detail'
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('home')
   const [searchId, setSearchId] = useState<string | null>(null)
+  const [precedentId, setPrecedentId] = useState<string | null>(null)  // 판례 상세 ID
   const [isSearching, setIsSearching] = useState(false)
   const [ragLoading, setRagLoading] = useState(false)
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
@@ -54,7 +55,20 @@ export default function Home() {
     // 현재 상태 확인
     const currentState = getCurrentHistoryState()
 
-    if (currentState?.viewMode === 'search-result' && currentState.searchId) {
+    if (currentState?.viewMode === 'precedent-detail' && currentState.searchId && currentState.precedentId) {
+      // 새로고침 시 판례 상세 복원
+      debugLogger.info('🔄 새로고침 감지: 판례 상세 복원', {
+        searchId: currentState.searchId,
+        precedentId: currentState.precedentId,
+        searchMode: currentState.searchMode,
+        timestamp: currentState.timestamp
+      })
+
+      setViewMode('precedent-detail')
+      setSearchId(currentState.searchId)
+      setPrecedentId(currentState.precedentId)
+      setSearchMode(currentState.searchMode || 'basic')
+    } else if (currentState?.viewMode === 'search-result' && currentState.searchId) {
       // 새로고침 시 검색 결과 복원
       debugLogger.info('🔄 새로고침 감지: 검색 결과 복원', {
         searchId: currentState.searchId,
@@ -64,6 +78,7 @@ export default function Home() {
 
       setViewMode('search-result')
       setSearchId(currentState.searchId)
+      setPrecedentId(null)
       setSearchMode(currentState.searchMode || 'basic')  // 검색 모드 복원
     }
 
@@ -74,6 +89,7 @@ export default function Home() {
         debugLogger.info('⬅️ History 이동 (초기 상태 → 홈)', { state })
         setViewMode('home')
         setSearchId(null)
+        setPrecedentId(null)
         setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
         setIsSearching(false) // 검색 중 상태 초기화
         return
@@ -82,18 +98,28 @@ export default function Home() {
       debugLogger.info('⬅️ History 이동', {
         viewMode: state.viewMode,
         searchId: state.searchId,
+        precedentId: state.precedentId,
         searchMode: state.searchMode
       })
 
       if (state.viewMode === 'home') {
         setViewMode('home')
         setSearchId(null)
+        setPrecedentId(null)
         setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
         setIsSearching(false) // 검색 중 상태 초기화
+      } else if (state.viewMode === 'precedent-detail' && state.searchId && state.precedentId) {
+        // 판례 상세 → 앞으로가기로 다시 판례 상세
+        setViewMode('precedent-detail')
+        setSearchId(state.searchId)
+        setPrecedentId(state.precedentId)
+        setSearchMode(state.searchMode || 'basic')
       } else if (state.viewMode === 'search-result' && state.searchId) {
+        // 판례 상세 → 뒤로가기 → 검색 결과 리스트
         setViewMode('search-result')
         setSearchId(state.searchId)
-        setSearchMode(state.searchMode || 'basic')  // 검색 모드 복원
+        setPrecedentId(null)  // 판례 상세 초기화
+        setSearchMode(state.searchMode || 'basic')
       }
     })
 
@@ -148,15 +174,22 @@ export default function Home() {
     })
   }
 
-  // 홈으로 돌아가기
+  // 뒤로가기 (히스토리 기반)
   const handleBack = () => {
-    debugLogger.info('🏠 홈으로 돌아가기')
-
-    // History.back() 사용 (pushHomeHistory 대신)
-    // 이렇게 하면 뒤로가기 시 검색 결과로 복원 가능
+    debugLogger.info('⬅️ 뒤로가기')
     window.history.back()
-
     // popstate 이벤트에서 상태 업데이트가 처리됨
+  }
+
+  // 홈으로 직접 이동 (로고 클릭)
+  const handleHomeClick = () => {
+    debugLogger.info('🏠 홈으로 이동')
+    pushHomeHistory()
+    setViewMode('home')
+    setSearchId(null)
+    setPrecedentId(null)
+    setSearchMode('basic')
+    setIsSearching(false)
   }
 
   return (
@@ -170,11 +203,13 @@ export default function Home() {
           ragLoading={ragLoading}
           searchMode={searchMode}
         />
-      ) : viewMode === 'search-result' && searchId ? (
+      ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView
           searchId={searchId}
           onBack={handleBack}
+          onHomeClick={handleHomeClick}
           initialSearchMode={searchMode}  // History에서 복원된 검색 모드 전달
+          initialPrecedentId={precedentId}  // 판례 상세 ID (새로고침 복원용)
           onProgressUpdate={(stage, progress) => {
             setSearchStage(stage)
             setSearchProgress(progress)

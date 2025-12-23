@@ -32,6 +32,7 @@ export interface UseSearchHandlersProps {
   state: SearchState
   actions: SearchStateActions
   onBack: () => void
+  searchId?: string  // 현재 검색 ID (판례 상세 히스토리용)
 }
 
 export interface SearchHandlers {
@@ -51,6 +52,7 @@ export interface SearchHandlers {
   handleFavoritesClick: () => void
   handleSettingsClick: () => void
   handleAiRefresh: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
+  handleRefresh: () => void  // ✅ 법령/판례 강제 새로고침 (캐시 무시)
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
   // ✅ 통합검색 핸들러 (신규)
@@ -65,6 +67,7 @@ export function useSearchHandlers({
   state,
   actions,
   onBack,
+  searchId,
 }: UseSearchHandlersProps): SearchHandlers {
   const { toast } = useToast()
   const { reportError } = useErrorReportStore()
@@ -685,17 +688,19 @@ export function useSearchHandlers({
 
         actions.updateProgress('parsing', 60)
         const xmlText = await response.text()
-        const results = parseOrdinanceSearchXML(xmlText)
+        const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
         actions.updateProgress('parsing', 80)
 
-        if (results.length === 0) {
+        console.log(`[ordin-search] API 응답: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
+
+        if (ordinances.length === 0) {
           reportError("조례 검색", new Error(`검색 결과를 찾을 수 없습니다: ${query.lawName}`), { query: query.lawName }, apiLogs)
           actions.updateProgress('complete', 0)
           actions.setIsSearching(false)
           return
         }
 
-        actions.setOrdinanceSelectionState({ results, query: { lawName } })
+        actions.setOrdinanceSelectionState({ results: ordinances, totalCount, query: { lawName } })
         actions.setMobileView("list")
         actions.updateProgress('complete', 100)
         actions.setIsSearching(false)
@@ -987,8 +992,38 @@ export function useSearchHandlers({
   const handleSummarize = useCallback(async (jo: string) => {
     if (!state.lawData) return
 
-    debugLogger.info("AI 요약 요청", { jo })
+    debugLogger.info("AI 요약 요청", { jo, isPrecedent: state.lawData.isPrecedent })
 
+    // 판례 모드: 판례 전문 요약
+    if (state.lawData.isPrecedent) {
+      try {
+        // 판례 전체 내용 수집
+        const allContent = state.lawData.articles
+          .map(a => `【${a.joNum || a.title}】\n${a.content}`)
+          .join('\n\n')
+
+        if (!allContent.trim()) {
+          toast({ title: "요약할 내용 없음", description: "판례 내용이 비어있습니다.", variant: "destructive" })
+          return
+        }
+
+        // 판례 요약 다이얼로그 열기 (신·구법 대신 판례 전문)
+        actions.setSummaryDialog({
+          isOpen: true,
+          jo: state.lawData.meta.lawTitle,  // 판례 제목
+          oldContent: '',  // 판례는 비교할 이전 버전 없음
+          newContent: allContent,  // 판례 전문
+          effectiveDate: (state.lawData.meta as any).promulgationDate,
+          isPrecedent: true,  // 판례 모드 플래그
+        })
+      } catch (error) {
+        debugLogger.error("❌ 판례 요약 준비 실패", error)
+        toast({ title: "판례 요약 실패", description: error instanceof Error ? error.message : "판례 요약 준비 중 오류가 발생했습니다.", variant: "destructive" })
+      }
+      return
+    }
+
+    // 일반 법령 모드: 신·구법 비교 요약
     try {
       const params = new URLSearchParams()
       if (state.lawData.meta.lawId) {
@@ -1143,11 +1178,20 @@ export function useSearchHandlers({
       actions.setIsAiMode(false)
       actions.setSearchMode('law')
 
+      // ✅ 기존 법령/조례 검색 상태 초기화
+      actions.setLawSelectionState(null)
+      actions.setOrdinanceSelectionState(null)
+      actions.setLawData(null)
+
+      // ✅ 검색어 업데이트 (헤더 표시용)
+      actions.setSearchQuery(searchQuery)
+      actions.setUserQuery(searchQuery)
+
       // 로딩 상태로 전환
       actions.setIsSearching(true)
 
-      // API 호출
-      const params = new URLSearchParams({ query: searchQuery })
+      // API 호출 (pageSize 사용)
+      const params = new URLSearchParams({ query: searchQuery, display: String(state.precedentPageSize) })
       if (court) params.append('court', court)
       if (caseNumber) params.append('caseNumber', caseNumber)
 
@@ -1169,6 +1213,30 @@ export function useSearchHandlers({
       if (data.precedents && data.precedents.length > 0) {
         // ✅ 상태 저장
         actions.setPrecedentResults(data.precedents)
+        actions.setPrecedentTotalCount(data.totalCount || data.precedents.length)
+        actions.setPrecedentPage(1)
+        actions.setPrecedentYearFilter(data.yearFilter)
+        actions.setPrecedentCourtFilter(data.courtFilter)
+
+        // ✅ IndexedDB에 검색 결과 저장 (뒤로가기용)
+        if (searchId) {
+          const { getSearchResult, saveSearchResult } = await import('@/lib/search-result-store')
+          const cached = await getSearchResult(searchId)
+          if (cached) {
+            await saveSearchResult({
+              ...cached,
+              precedentResults: data.precedents.map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                caseNumber: p.caseNumber,
+                court: p.court,
+                date: p.date,
+                judgmentType: p.judgmentType
+              })),
+              precedentDetail: undefined  // 상세 보기 초기화
+            })
+          }
+        }
 
         toast({
           title: "판례 검색 완료",
@@ -1196,7 +1264,7 @@ export function useSearchHandlers({
     } finally {
       actions.setIsSearching(false)
     }
-  }, [toast, actions])
+  }, [toast, actions, searchId, state.precedentPageSize])
 
   const handlePrecedentSelect = useCallback(async (precedentId: string) => {
     debugLogger.info('[통합검색] 판례 선택', { id: precedentId })
@@ -1218,13 +1286,15 @@ export function useSearchHandlers({
 
       // ✅ 판례 내용을 법령 뷰어 형식으로 변환
       const { formatPrecedentDate } = await import('@/lib/precedent-parser')
+      const { generateLinks } = await import('@/lib/unified-link-generator')
 
       const articles = []
 
       // HTML 태그 정리 함수
       const cleanHtml = (text: string) => {
         return text
-          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<br\\>/g, '\n')       // <br\> (법제처 API 특이 형식)
+          .replace(/<br\s*\/?>/gi, '\n')  // <br>, <br/>, <br />
           .replace(/&nbsp;/g, ' ')
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
@@ -1232,21 +1302,77 @@ export function useSearchHandlers({
           .trim()
       }
 
+      // 링크 적용 함수 (참조조문, 참조판례, 본문용)
+      const applyLinks = (text: string, enablePrecedents: boolean = false) => {
+        let result = generateLinks(text, {
+          mode: 'aggressive',
+          enableSameRef: true,
+          enableAdminRules: false,
+          enablePrecedents,
+        })
+
+        // 원심판결 섹션 내 판례 링크 제거 (판결문 번호는 링크 불필요)
+        if (enablePrecedents) {
+          result = result.replace(
+            /【\s*원심\s*판결\s*】[\s\S]*?(?=【|$)/gi,
+            (section) => section.replace(
+              /<a[^>]*class="[^"]*precedent-ref[^"]*"[^>]*>([\s\S]*?)<\/a>/gi,
+              '$1'
+            )
+          )
+        }
+
+        return result
+      }
+
       // 전문에서 섹션 추출
       let sectionCounter = 1
 
-      // 1. 판결요지 먼저 추가 (있으면)
+      // 1. 판시사항 (있으면) - 법령+판례 링크
+      if (precedent.holdings) {
+        articles.push({
+          jo: String(sectionCounter).padStart(6, '0'),
+          joNum: '판시사항',
+          content: applyLinks(cleanHtml(precedent.holdings), true),
+          title: '판시사항'
+        })
+        sectionCounter++
+      }
+
+      // 2. 판결요지 (있으면) - 법령+판례 링크
       if (precedent.summary) {
         articles.push({
           jo: String(sectionCounter).padStart(6, '0'),
           joNum: '판결요지',
-          content: cleanHtml(precedent.summary),
+          content: applyLinks(cleanHtml(precedent.summary), true),
           title: '판결요지'
         })
         sectionCounter++
       }
 
-      // 2. 전문 처리
+      // 3. 참조조문 (있으면) - 법령+판례 링크
+      if (precedent.refStatutes) {
+        articles.push({
+          jo: String(sectionCounter).padStart(6, '0'),
+          joNum: '참조조문',
+          content: applyLinks(cleanHtml(precedent.refStatutes), true),
+          title: '참조조문'
+        })
+        sectionCounter++
+      }
+
+      // 4. 참조판례 (있으면) - 법령+판례 링크
+      if (precedent.refPrecedents) {
+        articles.push({
+          jo: String(sectionCounter).padStart(6, '0'),
+          joNum: '참조판례',
+          content: applyLinks(cleanHtml(precedent.refPrecedents), true),
+          title: '참조판례'
+        })
+        sectionCounter++
+      }
+
+      // 5. 전문 처리
       if (precedent.fullText) {
         const fullText = cleanHtml(precedent.fullText)
 
@@ -1275,21 +1401,22 @@ export function useSearchHandlers({
 
             content = content.trim()
             if (content) {
+              // 모든 섹션에 법령+판례 링크 적용
               articles.push({
                 jo: String(sectionCounter).padStart(6, '0'),
                 joNum: title,
-                content: content,
+                content: applyLinks(content, true),
                 title: title
               })
               sectionCounter++
             }
           })
         } else {
-          // 섹션 구분이 없는 경우 - 전문 전체
+          // 섹션 구분이 없는 경우 - 전문 전체 (법령+판례 링크 적용)
           articles.push({
             jo: String(sectionCounter).padStart(6, '0'),
             joNum: '판결문',
-            content: fullText,
+            content: applyLinks(fullText, true),
             title: '판결문'
           })
         }
@@ -1316,6 +1443,36 @@ export function useSearchHandlers({
       actions.setMobileView("content")
       actions.updateProgress('complete', 100)
 
+      // ✅ 히스토리에 판례 상세 상태 추가 (뒤로가기 지원)
+      if (searchId) {
+        const { pushPrecedentHistory } = await import('@/lib/history-manager')
+        pushPrecedentHistory(searchId, precedentId, state.searchMode)
+        debugLogger.info('[통합검색] 판례 상세 히스토리 추가', { searchId, precedentId })
+
+        // ✅ IndexedDB에 판례 상세 저장 (새로고침용)
+        const { getSearchResult, saveSearchResult } = await import('@/lib/search-result-store')
+        const cached = await getSearchResult(searchId)
+        if (cached) {
+          await saveSearchResult({
+            ...cached,
+            precedentDetail: {
+              id: precedentId,
+              lawData
+            }
+          })
+        }
+      }
+
+      // ✅ 최근 조회 판례 저장
+      const { addRecentPrecedent } = await import('@/lib/recent-precedent-store')
+      await addRecentPrecedent({
+        id: precedentId,
+        caseNumber: precedent.caseNumber || '',
+        caseName: precedent.name || '',
+        court: precedent.court || '',
+        date: precedent.date || '',
+      })
+
       debugLogger.success('[통합검색] 판례 뷰어 표시 완료')
     } catch (error) {
       debugLogger.error('[통합검색] 판례 조회 실패', error)
@@ -1327,7 +1484,36 @@ export function useSearchHandlers({
     } finally {
       actions.setIsSearching(false)
     }
-  }, [toast, actions])
+  }, [toast, actions, searchId, state.searchMode])
+
+  // ✅ 법령/판례 강제 새로고침 (캐시 무시)
+  const handleRefresh = useCallback(() => {
+    if (!state.lawData) {
+      toast({ title: "새로고침 실패", description: "데이터가 없습니다.", variant: "destructive" })
+      return
+    }
+    debugLogger.info('🔄 법령/판례 강제 새로고침 (캐시 무시)', {
+      lawTitle: state.lawData.meta.lawTitle,
+      isPrecedent: state.lawData.isPrecedent,
+      lawId: state.lawData.meta.lawId
+    })
+
+    // 판례인 경우: lawId에서 precedentId 추출하여 전용 핸들러 사용
+    if (state.lawData.isPrecedent && state.lawData.meta.lawId?.startsWith('prec-')) {
+      const precedentId = state.lawData.meta.lawId.replace('prec-', '')
+      debugLogger.info('🔄 판례 새로고침', { precedentId })
+      handlePrecedentSelect(precedentId)
+      return
+    }
+
+    // 법령인 경우: 기존 handleSearchInternal 사용
+    handleSearchInternal(
+      { lawName: state.lawData.meta.lawTitle },
+      undefined,
+      'law',  // 법령 모드 강제
+      true    // forceRefresh
+    )
+  }, [state.lawData, handleSearchInternal, handlePrecedentSelect, toast])
 
   const handleInterpretationSearch = useCallback(async (query: SearchQuery) => {
     debugLogger.info('[통합검색] 해석례 검색 실행', { query })
@@ -1350,6 +1536,15 @@ export function useSearchHandlers({
       // ✅ 해석례 검색 모드로 명시적 설정
       actions.setIsAiMode(false)
       actions.setSearchMode('law')
+
+      // ✅ 기존 법령/조례 검색 상태 초기화
+      actions.setLawSelectionState(null)
+      actions.setOrdinanceSelectionState(null)
+      actions.setLawData(null)
+
+      // ✅ 검색어 업데이트 (헤더 표시용)
+      actions.setSearchQuery(searchQuery)
+      actions.setUserQuery(searchQuery)
 
       actions.setIsSearching(true)
 
@@ -1412,6 +1607,15 @@ export function useSearchHandlers({
       // ✅ 재결례 검색 모드로 명시적 설정
       actions.setIsAiMode(false)
       actions.setSearchMode('law')
+
+      // ✅ 기존 법령/조례 검색 상태 초기화
+      actions.setLawSelectionState(null)
+      actions.setOrdinanceSelectionState(null)
+      actions.setLawData(null)
+
+      // ✅ 검색어 업데이트 (헤더 표시용)
+      actions.setSearchQuery(searchQuery)
+      actions.setUserQuery(searchQuery)
 
       actions.setIsSearching(true)
 
@@ -1504,6 +1708,160 @@ export function useSearchHandlers({
     }
   }, [toast, actions, handleSearch, handlePrecedentSearch, handleInterpretationSearch, handleRulingSearch])
 
+  // ✅ 판례 페이지 변경 핸들러
+  const handlePrecedentPageChange = useCallback(async (page: number) => {
+    debugLogger.info('[판례] 페이지 변경', { page })
+
+    try {
+      actions.setIsSearching(true)
+      actions.setPrecedentPage(page)
+
+      // 현재 검색어로 다시 검색 (pageSize 사용)
+      const params = new URLSearchParams({
+        query: state.userQuery || '',
+        page: page.toString(),
+        display: String(state.precedentPageSize)
+      })
+
+      const res = await fetch(`/api/precedent-search?${params.toString()}`)
+
+      if (!res.ok) {
+        throw new Error(`판례 검색 실패: ${res.status}`)
+      }
+
+      const data = await res.json()
+
+      actions.setPrecedentResults(data.precedents || [])
+      actions.setPrecedentTotalCount(data.totalCount || 0)
+      actions.setPrecedentYearFilter(data.yearFilter)
+      actions.setPrecedentCourtFilter(data.courtFilter)
+
+    } catch (error) {
+      debugLogger.error('[판례] 페이지 변경 실패', error)
+      toast({
+        title: "페이지 로드 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions, state.userQuery, state.precedentPageSize])
+
+  // ✅ 판례 페이지 크기 변경 핸들러
+  const handlePrecedentPageSizeChange = useCallback(async (size: number) => {
+    debugLogger.info('[판례] 페이지 크기 변경', { size })
+
+    try {
+      actions.setIsSearching(true)
+      actions.setPrecedentPageSize(size)
+      actions.setPrecedentPage(1)  // 페이지 리셋
+
+      const params = new URLSearchParams({
+        query: state.userQuery || '',
+        page: '1',
+        display: size.toString()
+      })
+
+      const res = await fetch(`/api/precedent-search?${params.toString()}`)
+
+      if (!res.ok) {
+        throw new Error(`판례 검색 실패: ${res.status}`)
+      }
+
+      const data = await res.json()
+
+      actions.setPrecedentResults(data.precedents || [])
+      actions.setPrecedentTotalCount(data.totalCount || 0)
+      actions.setPrecedentYearFilter(data.yearFilter)
+      actions.setPrecedentCourtFilter(data.courtFilter)
+
+    } catch (error) {
+      debugLogger.error('[판례] 페이지 크기 변경 실패', error)
+      toast({
+        title: "로드 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions, state.userQuery])
+
+  // ============================================================
+  // 조례 페이지네이션 핸들러
+  // ============================================================
+  const handleOrdinancePageChange = useCallback(async (newPage: number) => {
+    if (!state.ordinanceSelectionState) return
+
+    try {
+      actions.setIsSearching(true)
+      actions.setOrdinancePage(newPage)
+
+      const { lawName } = state.ordinanceSelectionState.query
+      const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${state.ordinancePageSize}&page=${newPage}`
+
+      const response = await fetch(apiUrl)
+      if (!response.ok) throw new Error("조례 검색 실패")
+
+      const xmlText = await response.text()
+      const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
+
+      console.log(`[ordin-page-change] 페이지 ${newPage}: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
+
+      actions.setOrdinanceSelectionState({
+        results: ordinances,
+        totalCount,
+        query: { lawName }
+      })
+    } catch (error) {
+      debugLogger.error('[조례] 페이지 변경 실패', error)
+      toast({
+        title: "페이지 로드 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions, state.ordinanceSelectionState, state.ordinancePageSize])
+
+  const handleOrdinancePageSizeChange = useCallback(async (newSize: number) => {
+    if (!state.ordinanceSelectionState) return
+
+    try {
+      actions.setIsSearching(true)
+      actions.setOrdinancePageSize(newSize)
+      actions.setOrdinancePage(1) // 크기 변경 시 1페이지로 리셋
+
+      const { lawName } = state.ordinanceSelectionState.query
+      const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${newSize}&page=1`
+
+      const response = await fetch(apiUrl)
+      if (!response.ok) throw new Error("조례 검색 실패")
+
+      const xmlText = await response.text()
+      const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
+
+      console.log(`[ordin-size-change] ${newSize}개씩: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
+
+      actions.setOrdinanceSelectionState({
+        results: ordinances,
+        totalCount,
+        query: { lawName }
+      })
+    } catch (error) {
+      debugLogger.error('[조례] 페이지 크기 변경 실패', error)
+      toast({
+        title: "로드 실패",
+        description: error instanceof Error ? error.message : '알 수 없는 오류',
+        variant: "destructive"
+      })
+    } finally {
+      actions.setIsSearching(false)
+    }
+  }, [toast, actions, state.ordinanceSelectionState])
+
   return {
     handleSearch,
     handleSearchInternal,
@@ -1521,13 +1879,19 @@ export function useSearchHandlers({
     handleFavoritesClick,
     handleSettingsClick,
     handleAiRefresh,
+    handleRefresh,
     fetchLawContent,
     fetchRelatedSearches,
     // ✅ 통합검색 핸들러
     handlePrecedentSearch,
     handlePrecedentSelect,
+    handlePrecedentPageChange,
+    handlePrecedentPageSizeChange,
     handleInterpretationSearch,
     handleRulingSearch,
     handleMultiSearch,
+    // ✅ 조례 페이지네이션
+    handleOrdinancePageChange,
+    handleOrdinancePageSizeChange,
   }
 }

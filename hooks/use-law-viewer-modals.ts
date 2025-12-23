@@ -247,7 +247,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           const ordinSearchXml = await ordinSearchRes.text()
 
           // 기존 파서 사용하여 검색 결과 파싱
-          const ordinSearchResults = parseOrdinanceSearchXML(ordinSearchXml)
+          const { ordinances: ordinSearchResults } = parseOrdinanceSearchXML(ordinSearchXml)
 
           // 특수문자와 공백 모두 제거하여 비교
           const normalizeForCompare = (s: string) => s.replace(/[·•‧\s]/g, "")

@@ -13,7 +13,7 @@ export interface OrdinanceSearchResult {
   ordinField?: string // 자치법규분야명
 }
 
-export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[] {
+export function parseOrdinanceSearchXML(xmlText: string): { totalCount: number; ordinances: OrdinanceSearchResult[] } {
   try {
 
     const parser = new DOMParser()
@@ -26,8 +26,12 @@ export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[
       throw new Error("XML 파싱 오류")
     }
 
+    // ✅ totalCnt 파싱 (판례 API와 동일한 형식)
+    const totalCnt = xmlDoc.querySelector("totalCnt")?.textContent || "0"
+    const totalCount = parseInt(totalCnt, 10) || 0
+
     const ordinances = xmlDoc.querySelectorAll("law")
-    console.log("Found ordinances:", ordinances.length)
+    console.log("Found ordinances:", ordinances.length, "totalCount:", totalCount)
 
     const results: OrdinanceSearchResult[] = []
 
@@ -59,10 +63,10 @@ export function parseOrdinanceSearchXML(xmlText: string): OrdinanceSearchResult[
       }
     })
 
-    return results
+    return { totalCount, ordinances: results }
   } catch (error) {
     console.log("Ordinance search parsing error:", error)
     debugLogger.error("자치법규 검색 결과 파싱 실패", error)
-    return []
+    return { totalCount: 0, ordinances: [] }
   }
 }

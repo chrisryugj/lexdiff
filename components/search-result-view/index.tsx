@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
@@ -43,6 +43,7 @@ const HelpGuideSheet = dynamic(
 import { useSearchState } from "./hooks/useSearchState"
 import { useSearchHandlers } from "./hooks/useSearchHandlers"
 import { LawSearchResultList, OrdinanceSearchResultList } from "./SearchResultList"
+import { PrecedentResultList } from "./PrecedentResultList"
 import { SearchChoiceDialog, NoResultDialog } from "./SearchDialogs"
 import type { SearchResultViewProps } from "./types"
 
@@ -52,9 +53,11 @@ export type { SearchResultViewProps } from "./types"
 export function SearchResultView({
   searchId,
   onBack,
+  onHomeClick,
   onProgressUpdate,
   onModeChange,
-  initialSearchMode
+  initialSearchMode,
+  initialPrecedentId
 }: SearchResultViewProps) {
   // ============================================================
   // 상태 관리 훅
@@ -75,6 +78,7 @@ export function SearchResultView({
     state,
     actions,
     onBack,
+    searchId,
   })
 
   // ============================================================
@@ -98,10 +102,52 @@ export function SearchResultView({
 
         debugLogger.info('📦 IndexedDB에서 데이터 복원', {
           query: cached.query,
-          hasLawData: !!cached.lawData
+          hasLawData: !!cached.lawData,
+          hasPrecedentDetail: !!cached.precedentDetail,
+          initialPrecedentId
         })
 
         actions.setSearchQuery(cached.query.lawName || '')
+
+        // ✅ 판례 상세 복원 (새로고침 시)
+        if (initialPrecedentId && cached.precedentDetail && cached.precedentDetail.id === initialPrecedentId) {
+          debugLogger.success('✅ 판례 상세 캐시 HIT - API 호출 없음')
+
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+
+          actions.setLawData(cached.precedentDetail.lawData)
+          actions.setPrecedentResults(null)
+          actions.setMobileView("content")
+
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, 300)
+          return
+        }
+
+        // ✅ 판례 검색 결과 복원 (뒤로가기 시)
+        if (cached.precedentResults && cached.precedentResults.length > 0 && !initialPrecedentId) {
+          debugLogger.success('✅ 판례 검색 결과 캐시 HIT')
+
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+
+          actions.setPrecedentResults(cached.precedentResults)
+          actions.setLawData(null)  // 판례 상세 초기화
+          actions.setMobileView("list")
+
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, 300)
+          return
+        }
 
         // AI 모드 캐시 복원
         if (cached.aiMode) {
@@ -222,7 +268,37 @@ export function SearchResultView({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchId])
+  }, [searchId, initialPrecedentId])
+
+  // ============================================================
+  // 뒤로가기로 판례 상세 → 검색 결과 복원
+  // ============================================================
+  const prevInitialPrecedentIdRef = useRef<string | null | undefined>(initialPrecedentId)
+  useEffect(() => {
+    // initialPrecedentId가 값→null로 "변경"된 경우만 복원 (뒤로가기)
+    // 처음부터 null인 경우나, 방금 설정된 경우는 무시
+    const wasSet = prevInitialPrecedentIdRef.current !== null && prevInitialPrecedentIdRef.current !== undefined
+    const isNowNull = initialPrecedentId === null
+    prevInitialPrecedentIdRef.current = initialPrecedentId
+
+    if (wasSet && isNowNull && state.lawData?.isPrecedent) {
+      debugLogger.info('⬅️ 판례 상세 → 검색 결과 복원 시도')
+
+      const restorePrecedentResults = async () => {
+        const { getSearchResult } = await import('@/lib/search-result-store')
+        const cached = await getSearchResult(searchId)
+
+        if (cached?.precedentResults && cached.precedentResults.length > 0) {
+          debugLogger.success('✅ 판례 검색 결과 복원')
+          actions.setPrecedentResults(cached.precedentResults)
+          actions.setLawData(null)
+          actions.setMobileView("list")
+        }
+      }
+
+      restorePrecedentResults()
+    }
+  }, [initialPrecedentId, searchId, state.lawData?.isPrecedent, actions])
 
   // ============================================================
   // 렌더링
@@ -278,6 +354,7 @@ export function SearchResultView({
 
       <FloatingCompactHeader
         onBack={handlers.handleReset}
+        onHomeClick={onHomeClick}
         onFavoritesClick={handlers.handleFavoritesClick}
         onSettingsClick={handlers.handleSettingsClick}
         onSearchClick={() => actions.setShowSearchModal(true)}
@@ -318,8 +395,14 @@ export function SearchResultView({
             /* 조례 검색 결과 선택 */
             <OrdinanceSearchResultList
               results={state.ordinanceSelectionState.results}
+              totalCount={state.ordinanceSelectionState.totalCount}
+              currentPage={state.ordinancePage}
+              pageSize={state.ordinancePageSize}
+              isLoading={state.isSearching}
               query={state.ordinanceSelectionState.query}
               onSelect={handlers.handleOrdinanceSelect}
+              onPageChange={handlers.handleOrdinancePageChange}
+              onPageSizeChange={handlers.handleOrdinancePageSizeChange}
               onCancel={() => {
                 actions.setOrdinanceSelectionState(null)
                 actions.setIsSearching(false)
@@ -356,39 +439,19 @@ export function SearchResultView({
             <LawViewerSkeleton stage={state.searchStage} />
           ) : state.precedentResults !== null ? (
             /* 판례 검색 결과 */
-            <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Icon name="gavel" className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-semibold">판례 검색 결과 ({state.precedentResults.length}건)</h2>
-              </div>
-              {state.precedentResults.length === 0 ? (
-                <p className="text-muted-foreground">검색 결과가 없습니다.</p>
-              ) : (
-                <div className="space-y-2">
-                  {state.precedentResults.map((precedent, idx) => (
-                    <div
-                      key={idx}
-                      className="border rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer group"
-                      onClick={() => handlers.handlePrecedentSelect(precedent.id)}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{precedent.name || '사건명 없음'}</h3>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                            <span className="font-mono">{precedent.caseNumber}</span>
-                            <span>{precedent.court}</span>
-                            <span>{precedent.date}</span>
-                          </div>
-                        </div>
-                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                          {precedent.type || '판결'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <PrecedentResultList
+              results={state.precedentResults}
+              totalCount={state.precedentTotalCount}
+              currentPage={state.precedentPage}
+              pageSize={state.precedentPageSize}
+              isLoading={state.isSearching}
+              yearFilter={state.precedentYearFilter}
+              courtFilter={state.precedentCourtFilter}
+              onSelect={(precedent) => handlers.handlePrecedentSelect(precedent.id)}
+              onPageChange={handlers.handlePrecedentPageChange}
+              onPageSizeChange={handlers.handlePrecedentPageSizeChange}
+              onBack={handlers.handleReset}
+            />
           ) : !state.lawData ? (
             /* 데이터 없음 */
             null
@@ -450,6 +513,7 @@ export function SearchResultView({
                       aiQueryType={state.aiQueryType}
                       onAiRefresh={handlers.handleAiRefresh}
                       isPrecedent={state.lawData.isPrecedent}
+                      onRefresh={handlers.handleRefresh}
                     />
                   </div>
                 )}
@@ -505,6 +569,7 @@ export function SearchResultView({
                   aiQueryType={state.aiQueryType}
                   onAiRefresh={handlers.handleAiRefresh}
                   isPrecedent={state.lawData.isPrecedent}
+                  onRefresh={handlers.handleRefresh}
                 />
               </div>
             </div>
@@ -524,15 +589,16 @@ export function SearchResultView({
             targetJo={state.comparisonModal.jo}
           />
 
-          {state.summaryDialog.isOpen && state.summaryDialog.oldContent && state.summaryDialog.newContent && (
+          {state.summaryDialog.isOpen && state.summaryDialog.newContent && (
             <AISummaryDialog
               isOpen={state.summaryDialog.isOpen}
               onClose={() => actions.setSummaryDialog({ isOpen: false })}
               lawTitle={state.lawData.meta.lawTitle}
               joNum={state.summaryDialog.jo || ""}
-              oldContent={state.summaryDialog.oldContent}
+              oldContent={state.summaryDialog.oldContent || ""}
               newContent={state.summaryDialog.newContent}
               effectiveDate={state.summaryDialog.effectiveDate}
+              isPrecedent={state.summaryDialog.isPrecedent}
             />
           )}
         </>

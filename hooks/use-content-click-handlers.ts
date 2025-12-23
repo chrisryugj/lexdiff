@@ -18,6 +18,7 @@ import {
   handleSameRef,
   handleRelatedRef,
   handleAnnexRef,
+  handlePrecedentRef,
 } from '@/lib/content-click-handlers'
 
 /** 링크 타입별 핸들러 매핑 */
@@ -29,6 +30,7 @@ const HANDLERS: Record<string, RefHandler> = {
   same: handleSameRef,
   related: handleRelatedRef,
   annex: handleAnnexRef as RefHandler,
+  precedent: handlePrecedentRef,
 }
 
 /**

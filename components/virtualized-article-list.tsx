@@ -11,6 +11,7 @@ interface VirtualizedArticleListProps {
   loadingJo: string | null
   favorites: Set<string>
   isOrdinance: boolean
+  isPrecedent?: boolean  // 판례 모드
   lawTitle?: string // ✅ 법령명 추가
   onArticleClick: (jo: string) => void
   onToggleFavorite: (jo: string) => void
@@ -23,6 +24,7 @@ export const VirtualizedArticleList = React.memo(
     loadingJo,
     favorites,
     isOrdinance,
+    isPrecedent = false,
     lawTitle = '',
     onArticleClick,
     onToggleFavorite,
@@ -32,8 +34,9 @@ export const VirtualizedArticleList = React.memo(
     const virtualizer = useVirtualizer({
       count: articles.length,
       getScrollElement: () => parentRef.current,
-      estimateSize: () => 60, // Estimated item height in pixels
+      estimateSize: () => isPrecedent ? 28 : 60, // 판례: 컴팩트 / 법령: 일반
       overscan: 5, // Render 5 extra items above/below viewport
+      measureElement: typeof window !== 'undefined' ? element => element?.getBoundingClientRect().height : undefined,
     })
 
     // activeJo가 변경되면 해당 위치로 스크롤
@@ -78,12 +81,13 @@ export const VirtualizedArticleList = React.memo(
             return (
               <div
                 key={article.jo}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: "absolute",
                   top: 0,
                   left: 0,
                   width: "100%",
-                  height: `${virtualItem.size}px`,
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
@@ -93,6 +97,7 @@ export const VirtualizedArticleList = React.memo(
                   isLoading={isLoading}
                   isFavorite={isFavorite}
                   isOrdinance={isOrdinance}
+                  isPrecedent={isPrecedent}
                   onClick={() => onArticleClick(article.jo)}
                   onToggleFavorite={(e) => {
                     e.stopPropagation()

@@ -126,9 +126,12 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-foreground text-sm">{favorite.lawTitle}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {formatJO(favorite.jo)}
-                      </Badge>
+                      {/* 판례는 조문 배지 숨김 */}
+                      {!favorite.lawId?.startsWith('prec-') && (
+                        <Badge variant="outline" className="text-xs">
+                          {formatJO(favorite.jo)}
+                        </Badge>
+                      )}
                       {favorite.effectiveDate && (
                         <Badge variant="secondary" className="text-xs">
                           {formatDate(favorite.effectiveDate)}

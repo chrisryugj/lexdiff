@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -27,6 +27,23 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const contentRef = useRef<HTMLDivElement>(null)
+  const savedScrollRef = useRef<number>(0) // 스크롤 위치 저장
+
+  // 모달 열릴 때 스크롤 위치 저장, 닫힐 때 복원
+  useEffect(() => {
+    if (isOpen) {
+      // 모달 열릴 때 현재 스크롤 위치 저장
+      savedScrollRef.current = window.scrollY
+    } else {
+      // 모달 닫힐 때 스크롤 위치 복원
+      if (savedScrollRef.current > 0) {
+        // requestAnimationFrame으로 DOM 업데이트 후 스크롤 복원
+        requestAnimationFrame(() => {
+          window.scrollTo(0, savedScrollRef.current)
+        })
+      }
+    }
+  }, [isOpen])
 
   const canShowOriginal = !!originalUrl
 
@@ -225,6 +242,11 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               /* 항 사이 간격 (whitespace-pre-wrap에서 \n\n을 공백으로 표시) */
               .law-article-content {
                 white-space: pre-wrap !important;
+              }
+
+              /* 박스 테이블/수식 박스는 whitespace-normal로 표시 */
+              .law-article-content .whitespace-normal {
+                white-space: normal !important;
               }
 
               /* <개정> 태그와 [ ] 태그 크기 조정 - rev-mark 클래스 사용 */

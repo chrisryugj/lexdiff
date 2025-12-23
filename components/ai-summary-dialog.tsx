@@ -18,6 +18,7 @@ interface AISummaryDialogProps {
   oldContent: string
   newContent: string
   effectiveDate?: string
+  isPrecedent?: boolean  // 판례 요약 모드
 }
 
 export function AISummaryDialog({
@@ -28,6 +29,7 @@ export function AISummaryDialog({
   oldContent,
   newContent,
   effectiveDate,
+  isPrecedent = false,
 }: AISummaryDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
@@ -51,6 +53,7 @@ export function AISummaryDialog({
           oldContent,
           newContent,
           effectiveDate,
+          isPrecedent,
         }),
       })
 
@@ -84,10 +87,10 @@ export function AISummaryDialog({
             <div className="flex-1">
               <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Icon name="sparkles" className="h-5 w-5 text-primary" />
-                AI 변경 요약
+                {isPrecedent ? "AI 판례 요약" : "AI 변경 요약"}
               </DialogTitle>
               <DialogDescription className="mt-2 flex items-center gap-2 flex-wrap">
-                <span>{lawTitle} {joNum}</span>
+                <span>{isPrecedent ? lawTitle : `${lawTitle} ${joNum}`}</span>
                 {effectiveDate && (
                   <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                     <Icon name="calendar" className="h-3 w-3 mr-1" />
@@ -103,7 +106,7 @@ export function AISummaryDialog({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Icon name="loader" className="h-8 w-8 animate-spin text-primary mb-4" />
-              <p className="text-sm text-muted-foreground">AI가 변경 내용을 분석하고 있습니다...</p>
+              <p className="text-sm text-muted-foreground">{isPrecedent ? "AI가 판례를 요약하고 있습니다..." : "AI가 변경 내용을 분석하고 있습니다..."}</p>
               <p className="text-xs text-muted-foreground mt-2">최대 30초 정도 소요될 수 있습니다</p>
             </div>
           ) : error ? (

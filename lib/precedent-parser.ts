@@ -50,11 +50,14 @@ export function parsePrecedentSearchXML(xml: string): {
       // CDATA 지원
       const cdataRegex = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`)
       const cdataMatch = precContent.match(cdataRegex)
-      if (cdataMatch) return cdataMatch[1].trim()
+      if (cdataMatch) {
+        // 줄 시작의 ? 문자 제거 (법제처 API 특수문자)
+        return cdataMatch[1].trim().replace(/^[?？]\s*/gm, '')
+      }
 
       const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`)
       const tagMatch = precContent.match(regex)
-      return tagMatch ? tagMatch[1].trim() : ""
+      return tagMatch ? tagMatch[1].trim().replace(/^[?？]\s*/gm, '') : ""
     }
 
     precedents.push({
@@ -79,11 +82,14 @@ export function parsePrecedentDetailXML(xml: string): PrecedentDetail | null {
     // CDATA 지원
     const cdataRegex = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`)
     const cdataMatch = xml.match(cdataRegex)
-    if (cdataMatch) return cdataMatch[1].trim()
+    if (cdataMatch) {
+      // 줄 시작의 ? 문자 제거 (법제처 API 특수문자)
+      return cdataMatch[1].trim().replace(/^[?？]\s*/gm, '')
+    }
 
     const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`)
     const tagMatch = xml.match(regex)
-    return tagMatch ? tagMatch[1].trim() : ""
+    return tagMatch ? tagMatch[1].trim().replace(/^[?？]\s*/gm, '') : ""
   }
 
   const name = extractTag("사건명")
@@ -114,18 +120,21 @@ export function parsePrecedentDetailJSON(json: any): PrecedentDetail | null {
 
   const prec = json.PrecService
 
+  // 줄 시작의 ? 문자 제거 (법제처 API 특수문자)
+  const clean = (s: string) => (s || "").replace(/^[?？]\s*/gm, '')
+
   return {
-    name: prec.사건명 || "",
-    caseNumber: prec.사건번호 || "",
-    court: prec.법원명 || "",
-    date: prec.선고일자 || "",
-    caseType: prec.사건종류명 || "",
-    judgmentType: prec.판결유형 || "",
-    holdings: prec.판시사항 || "",
-    summary: prec.판결요지 || "",
-    refStatutes: prec.참조조문 || "",
-    refPrecedents: prec.참조판례 || "",
-    fullText: prec.판례내용 || ""
+    name: clean(prec.사건명),
+    caseNumber: clean(prec.사건번호),
+    court: clean(prec.법원명),
+    date: clean(prec.선고일자),
+    caseType: clean(prec.사건종류명),
+    judgmentType: clean(prec.판결유형),
+    holdings: clean(prec.판시사항),
+    summary: clean(prec.판결요지),
+    refStatutes: clean(prec.참조조문),
+    refPrecedents: clean(prec.참조판례),
+    fullText: clean(prec.판례내용)
   }
 }
 

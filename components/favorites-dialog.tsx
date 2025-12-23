@@ -91,7 +91,10 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-medium text-foreground">{favorite.lawTitle}</span>
-                      <Badge variant="outline">{formatJO(favorite.jo)}</Badge>
+                      {/* 판례는 조문 배지 숨김 */}
+                      {!favorite.lawId?.startsWith('prec-') && (
+                        <Badge variant="outline">{formatJO(favorite.jo)}</Badge>
+                      )}
                       {favorite.effectiveDate && (
                         <Badge variant="secondary" className="text-xs">
                           {formatDate(favorite.effectiveDate)}

@@ -11,6 +11,7 @@ interface ArticleListItemProps {
   isLoading: boolean
   isFavorite: boolean
   isOrdinance: boolean
+  isPrecedent?: boolean  // 판례 모드
   onClick: () => void
   onToggleFavorite: (e: React.MouseEvent | React.KeyboardEvent) => void
 }
@@ -42,6 +43,7 @@ export const ArticleListItem = React.memo(function ArticleListItem({
   isLoading,
   isFavorite,
   isOrdinance,
+  isPrecedent = false,
   onClick,
   onToggleFavorite,
 }: ArticleListItemProps) {
@@ -56,7 +58,9 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     <button
       onClick={onClick}
       disabled={isLoading}
-      className={`w-full text-left px-2 py-2 rounded-md transition-colors ${
+      className={`w-full text-left px-2 rounded-md transition-colors ${
+        isPrecedent ? "py-1" : "py-2"
+      } ${
         isActive
           ? "bg-primary text-primary-foreground font-bold"
           : "hover:bg-secondary text-foreground font-medium"
@@ -64,7 +68,8 @@ export const ArticleListItem = React.memo(function ArticleListItem({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 text-base font-bold">
+          <div className="flex items-center gap-1.5 font-bold text-base">
+            {isPrecedent && <span className="text-primary">•</span>}
             {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
             {isDeleted && (
               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded">
@@ -72,7 +77,8 @@ export const ArticleListItem = React.memo(function ArticleListItem({
               </span>
             )}
           </div>
-          {article.title && !isDeleted && (
+          {/* 판례 모드에서는 joNum과 title이 같으므로 title 생략 */}
+          {article.title && !isDeleted && !isPrecedent && (
             <div
               className="text-sm opacity-75 mt-0.5 truncate"
               title={article.title}
