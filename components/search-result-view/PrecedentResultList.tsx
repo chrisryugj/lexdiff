@@ -317,13 +317,14 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
       <div className="relative mb-2.5">
         <h4
           ref={titleRef}
+          title={precedent.name || '사건명 없음'}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
         >
           {precedent.name || '사건명 없음'}
         </h4>
 
-        {/* 툴팁 - 디버그: 항상 표시 */}
-        {showTooltip && (
+        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
+        {showTooltip && isTruncated && (
           <div
             className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
             style={{
@@ -334,10 +335,6 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
           >
             <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {precedent.name}
-              <br />
-              <span className="text-[10px] opacity-50">
-                (truncated: {String(isTruncated)})
-              </span>
             </p>
           </div>
         )}
