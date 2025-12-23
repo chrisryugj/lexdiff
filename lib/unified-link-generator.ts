@@ -254,17 +254,72 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
  * 단순 법령명 + 시행령/시행규칙 패턴 처리
  */
 function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
-  // 법령명 패턴: 기본 법령명 + 선택적 시행령/시행규칙
-  // "관세법 제38조", "도로법 시행령 제55조" 등
-  const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+  // 패턴 1: "및"이 포함된 법령명 (우선 매칭)
+  // 예: "상속세 및 증여세법 제63조", "소득세법 및 법인세법 제10조"
+  const andLawRegex = /(?<!「)([가-힣a-zA-Z0-9·]+\s+및\s+[가-힣a-zA-Z0-9·]+(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
   let match: RegExpExecArray | null
 
-  while ((match = simpleRegex.exec(text)) !== null) {
-    // 이미 「」로 처리된 영역 제외
+  while ((match = andLawRegex.exec(text)) !== null) {
     const isInQuoted = matches.some(m =>
       m.type === 'law-quoted' &&
-      match.index >= m.start &&
-      match.index < m.end
+      match!.index >= m.start &&
+      match!.index < m.end
+    )
+
+    if (!isInQuoted) {
+      const lawName = match[1].trim()
+      const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
+      const fullText = match[0]
+
+      matches.push({
+        start: match.index,
+        end: match.index + fullText.length,
+        type: 'law-article',
+        lawName,
+        article: joLabel,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" aria-label="${getAriaLabel('law-article', lawName, joLabel)}">${fullText}</a>`
+      })
+    }
+  }
+
+  // 패턴 2: 짧은 법령명 (상법, 민법, 형법 등 1-2글자 + 법)
+  // 예: "상법 제38조", "민법 제390조", "형법 제10조"
+  const shortLawRegex = /(?<!「)(?<![가-힣])(상법|민법|형법|상증세법|소득세법|부가세법|관세법|국세기본법)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+
+  while ((match = shortLawRegex.exec(text)) !== null) {
+    const isInQuoted = matches.some(m =>
+      m.type === 'law-quoted' &&
+      match!.index >= m.start &&
+      match!.index < m.end
+    )
+
+    if (!isInQuoted) {
+      const lawName = match[1].trim()
+      const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
+      const fullText = match[0]
+
+      matches.push({
+        start: match.index,
+        end: match.index + fullText.length,
+        type: 'law-article',
+        lawName,
+        article: joLabel,
+        displayText: fullText,
+        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${lawName}" data-article="${joLabel}" aria-label="${getAriaLabel('law-article', lawName, joLabel)}">${fullText}</a>`
+      })
+    }
+  }
+
+  // 패턴 3: 일반 법령명 (2글자 이상 + 법/령/규칙/조례)
+  // "관세법 제38조", "도로법 시행령 제55조" 등
+  const simpleRegex = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법|령|규칙|조례)(?:\s+시행령|\s+시행규칙)?)\s+제\s*(\d+)\s*조(의\s*(\d+))?(제\s*(\d+)\s*항)?(제\s*(\d+)\s*호)?/g
+
+  while ((match = simpleRegex.exec(text)) !== null) {
+    const isInQuoted = matches.some(m =>
+      m.type === 'law-quoted' &&
+      match!.index >= m.start &&
+      match!.index < m.end
     )
 
     if (!isInQuoted) {
@@ -603,8 +658,25 @@ export function linkifyRefsAI(escapedText: string): string {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
+ * 【원심판결】 섹션 내 판례 링크 제거용 헬퍼
+ * "【원심판결】 부산고법 2025. 4. 25. 선고 2024누22242 판결" 같은 줄은 링크 안 걸기
+ */
+function isInOriginalJudgmentSection(text: string, position: number): boolean {
+  // 현재 위치에서 앞으로 최대 100자 탐색해서 【원심판결】 태그 찾기
+  const searchStart = Math.max(0, position - 100)
+  const beforeText = text.substring(searchStart, position)
+
+  // 【원심판결】이 같은 줄에 있는지 확인
+  const lastLineBreak = beforeText.lastIndexOf('\n')
+  const currentLine = lastLineBreak === -1 ? beforeText : beforeText.substring(lastLineBreak + 1)
+
+  return /【\s*원심\s*판결\s*】/.test(currentLine)
+}
+
+/**
  * 판례 패턴 수집
  * 예: "대법원 2004. 5. 28. 선고 2003두7392 판결", "91누13670 판결"
+ * ⚠️ 【원심판결】 섹션 내 판례는 링크 제외
  */
 function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
   let match: RegExpExecArray | null
@@ -629,7 +701,10 @@ function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
       match!.index >= m.start && match!.index < m.end
     )
 
-    if (!isOverlap) {
+    // ✅ 【원심판결】 섹션 내 판례는 링크 제외
+    const isOriginalJudgment = isInOriginalJudgmentSection(text, match.index)
+
+    if (!isOverlap && !isOriginalJudgment) {
       matches.push({
         start: match.index,
         end: match.index + fullText.length,
@@ -658,7 +733,10 @@ function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
       (m.start >= match!.index && m.start < match!.index + fullText.length)
     )
 
-    if (!isOverlap) {
+    // ✅ 【원심판결】 섹션 내 판례는 링크 제외
+    const isOriginalJudgment = isInOriginalJudgmentSection(text, match.index)
+
+    if (!isOverlap && !isOriginalJudgment) {
       matches.push({
         start: match.index,
         end: match.index + fullText.length,

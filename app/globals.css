@@ -1083,10 +1083,10 @@ a.law-ref:hover {
   color: oklch(0.8 0.25 250) !important;
 }
 
-/* 판례 링크: 기본 색상 (보라색 계열) */
-/* ⚠️ :visited는 브라우저 history 기반이라 의도치 않게 변경됨 → JS 클래스로 처리 */
+/* 판례 링크: 기본 색상 (보라색 계열) - visited 상태 없음 */
 a.precedent-ref,
-a.precedent-ref:link {
+a.precedent-ref:link,
+a.precedent-ref:visited {
   color: oklch(0.6 0.18 300) !important;
   text-decoration: none;
   cursor: pointer;
@@ -1097,21 +1097,10 @@ a.precedent-ref:link {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* :visited 강제 덮어쓰기 - 기본 색상 유지 */
-a.precedent-ref:visited {
-  color: oklch(0.6 0.18 300) !important;
-}
-
 a.precedent-ref:hover {
   color: oklch(0.75 0.22 300) !important;
   background-color: oklch(0.6 0.18 300 / 0.1);
   box-shadow: inset 0 -2px 0 oklch(0.6 0.18 300 / 0.4);
-}
-
-/* 판례 링크: 실제 클릭한 링크 (JS로 클래스 추가) */
-a.precedent-ref.precedent-ref-visited {
-  color: oklch(0.5 0.12 320) !important;
-  background-image: linear-gradient(to top, oklch(0.5 0.12 320 / 0.15) 0%, oklch(0.5 0.12 320 / 0.15) 30%, transparent 30%);
 }
 
 /* AI 답변 마크다운: 부모 font-size 상속 */

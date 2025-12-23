@@ -1299,6 +1299,9 @@ export function useSearchHandlers({
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .replace(/&amp;/g, '&')
+          // 연속된 빈줄 제거 (3개 이상 → 2개로)
+          .replace(/\n{3,}/g, '\n\n')
+          // 앞뒤 공백/빈줄 제거
           .trim()
       }
 

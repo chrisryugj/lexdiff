@@ -28,14 +28,6 @@ export async function handlePrecedentRef(
 
   debugLogger.info('[precedent-handler] 판례 클릭', { caseNumber, court, date })
 
-  // ✅ 같은 사건번호를 가진 모든 링크에 visited 클래스 추가 (개별 추적)
-  const allPrecedentLinks = document.querySelectorAll<HTMLElement>(
-    `a.precedent-ref[data-case-number="${caseNumber}"]`
-  )
-  allPrecedentLinks.forEach((link) => {
-    link.classList.add('precedent-ref-visited')
-  })
-
   try {
     // 로딩 표시
     actions.setRefModal({
@@ -120,11 +112,16 @@ function buildPrecedentHtml(precedent: any): string {
       .replace(/<br\\>/g, '<br>')
       .replace(/<br\s*\/?>/gi, '<br>')
       .replace(/&nbsp;/g, ' ')
-      // 연속된 br 태그 제거 (빈 줄 정리)
-      .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>')
+      // 【】 뒤의 연속 공백/탭 제거 (【원고, 상고인】    텍스트 → 【원고, 상고인】 텍스트)
+      .replace(/【([^】]*)】[\s\t]+/g, '【$1】 ')
+      // 연속된 br 태그 제거 (빈 줄 정리, 3개 이상 → 2개로)
+      .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
       // 시작/끝 br 태그 제거
       .replace(/^(\s*<br\s*\/?>\s*)+/gi, '')
       .replace(/(\s*<br\s*\/?>\s*)+$/gi, '')
+      // 연속된 일반 공백/줄바꿈도 정리 (3개 이상 → 2개로)
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{3,}/g, '  ')
       .trim()
 
     // 링크 적용 (참조조문, 참조판례용)
@@ -197,16 +194,15 @@ function buildPrecedentHtml(precedent: any): string {
     `
   }
 
-  // 전문 (일부만 표시)
+  // 전문 (전체 표시)
   if (precedent.fullText) {
     const fullText = cleanHtml(precedent.fullText, true)
-    const truncated = fullText.length > 3000 ? fullText.substring(0, 3000) + '...' : fullText
     html += `
       <div>
         <h4 class="flex items-center gap-1.5 font-semibold text-foreground text-[15px] mb-1">
           <span class="w-1.5 h-1.5 rounded-full bg-foreground"></span>판결 전문
         </h4>
-        <div class="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg max-h-[300px] overflow-y-auto whitespace-pre-wrap">${truncated}</div>
+        <div class="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg max-h-[300px] overflow-y-auto whitespace-pre-wrap">${fullText}</div>
       </div>
     `
   }

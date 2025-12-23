@@ -120,8 +120,13 @@ export function parsePrecedentDetailJSON(json: any): PrecedentDetail | null {
 
   const prec = json.PrecService
 
-  // 줄 시작의 ? 문자 제거 (법제처 API 특수문자)
-  const clean = (s: string) => (s || "").replace(/^[?？]\s*/gm, '')
+  // 줄 시작의 ? 문자 제거 (법제처 API 특수문자) + 앞뒤 공백/빈줄 제거
+  const clean = (s: string) => {
+    return (s || "")
+      .replace(/^[?？]\s*/gm, '')  // 줄 시작 ? 제거
+      .replace(/\n{3,}/g, '\n\n')  // 연속된 빈줄 제거 (3개 이상 → 2개로)
+      .trim()  // 앞뒤 공백 제거
+  }
 
   return {
     name: clean(prec.사건명),

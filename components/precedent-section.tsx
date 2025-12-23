@@ -314,12 +314,14 @@ export function PrecedentDetailPanel({
       // 【】 뒤의 연속 공백을 탭 하나로 정리
       .replace(/【([^】]*)】\s{2,}/g, '【$1】\t')
       // 연속된 빈줄 제거 (br 사이 공백 포함)
-      .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>')
-      // 시작/끝 빈줄 제거
+      .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
+      // 시작 빈줄 제거
       .replace(/^(\s*<br\s*\/?>\s*)+/gi, '')
+      // 끝 빈줄 제거
       .replace(/(\s*<br\s*\/?>\s*)+$/gi, '')
-      // 연속된 일반 공백/줄바꿈도 정리
-      .replace(/\n\s*\n/g, '\n')
+      // 연속된 일반 공백/줄바꿈도 정리 (3개 이상 → 2개로)
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\s{3,}/g, '  ')
       .trim()
 
     let result = generateLinks(cleaned, {
