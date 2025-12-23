@@ -176,8 +176,8 @@ const LawResultCard = memo(function LawResultCard({
           {lawName}
         </h4>
 
-        {/* 툴팁 - 마우스 따라가며 2줄까지 표시 */}
-        {showTooltip && isTruncated && (
+        {/* 툴팁 - 디버그: 항상 표시 */}
+        {showTooltip && (
           <div
             className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
             style={{
@@ -188,6 +188,10 @@ const LawResultCard = memo(function LawResultCard({
           >
             <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {lawName}
+              <br />
+              <span className="text-[10px] opacity-50">
+                (truncated: {String(isTruncated)})
+              </span>
             </p>
           </div>
         )}
@@ -537,8 +541,8 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
           {ordinName}
         </h4>
 
-        {/* 툴팁 - 마우스 따라가며 2줄까지 표시 */}
-        {showTooltip && isTruncated && (
+        {/* 툴팁 - 디버그: 항상 표시 */}
+        {showTooltip && (
           <div
             className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
             style={{
@@ -549,6 +553,10 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
           >
             <p className="text-xs text-popover-foreground line-clamp-2 break-words">
               {ordinName}
+              <br />
+              <span className="text-[10px] opacity-50">
+                (truncated: {String(isTruncated)})
+              </span>
             </p>
           </div>
         )}
