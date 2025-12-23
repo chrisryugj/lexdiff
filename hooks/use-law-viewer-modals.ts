@@ -6,6 +6,13 @@ import { debugLogger } from '@/lib/debug-logger'
 import { parseOrdinanceSearchXML } from '@/lib/ordin-search-parser'
 import { parseOrdinanceXML } from '@/lib/ordin-parser'
 
+interface PrecedentMeta {
+  court?: string
+  caseNumber?: string
+  date?: string
+  judgmentType?: string
+}
+
 interface ModalState {
   open: boolean
   title?: string
@@ -14,6 +21,7 @@ interface ModalState {
   lawName?: string
   articleNumber?: string
   loading?: boolean
+  precedentMeta?: PrecedentMeta
 }
 
 interface ModalHistoryItem {

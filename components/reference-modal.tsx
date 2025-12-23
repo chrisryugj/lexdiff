@@ -1,12 +1,39 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import type React from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
+
+interface PrecedentMeta {
+  court?: string
+  caseNumber?: string
+  date?: string
+  judgmentType?: string
+}
+
+// 스타일을 컴포넌트 외부로 이동 (매 렌더링마다 파싱 방지)
+const LAW_CONTENT_STYLES = `
+  .law-article-content {
+    white-space: pre-wrap !important;
+  }
+  .law-article-content .whitespace-normal {
+    white-space: normal !important;
+  }
+  .law-article-content .rev-mark {
+    font-size: 0.8em !important;
+    color: #64748b !important;
+  }
+  .law-article-content span[style*="color"] {
+    font-size: inherit !important;
+  }
+  .law-article-content span[style*="color"][class="rev-mark"] {
+    font-size: 0.8em !important;
+  }
+`
 
 interface ReferenceModalProps {
   isOpen: boolean
@@ -21,13 +48,17 @@ interface ReferenceModalProps {
   hasHistory?: boolean
   onBack?: () => void
   loading?: boolean
+  /** 판례용 메타 정보 (헤더에 배지로 표시) */
+  precedentMeta?: PrecedentMeta
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false, precedentMeta }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const contentRef = useRef<HTMLDivElement>(null)
   const savedScrollRef = useRef<number>(0) // 스크롤 위치 저장
+  const onContentClickRef = useRef(onContentClick) // 콜백 ref로 저장 (의존성 제거용)
+  onContentClickRef.current = onContentClick
 
   // 모달 열릴 때 스크롤 위치 저장, 닫힐 때 복원
   useEffect(() => {
@@ -61,6 +92,11 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
       ? `https://www.law.go.kr/${isOrdinanceLaw ? '자치법규' : '법령'}/${encodeURIComponent(lawName)}`
       : null
 
+  // 판례 원문 링크 생성 (사건번호 기반)
+  const precedentUrl = precedentMeta?.caseNumber
+    ? `https://www.law.go.kr/precSc.do?menuId=7&subMenuId=47&tabMenuId=213&query=${encodeURIComponent(precedentMeta.caseNumber)}`
+    : null
+
   // 폰트 크기 조절
   const increaseFontSize = () => setFontSize(prev => Math.min(prev + 1, 28))
   const decreaseFontSize = () => setFontSize(prev => Math.max(prev - 1, 11))
@@ -76,6 +112,15 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     if (!html) return "연결된 본문을 불러올 수 없습니다."
     return html
   }, [html])
+
+  // 제목 파싱 (매 렌더링마다 regex 방지)
+  const parsedTitle = useMemo(() => {
+    const match = title.match(/^(.*)(\s\(.*\))$/)
+    if (match) {
+      return { main: match[1], suffix: match[2] }
+    }
+    return null
+  }, [title])
 
   // 접근성: 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
   useEffect(() => {
@@ -113,10 +158,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
           e.preventDefault()
           e.stopPropagation()
 
-          // onContentClick이 있으면 호출
-          if (onContentClick) {
+          // onContentClick이 있으면 호출 (ref 사용으로 의존성 제거)
+          if (onContentClickRef.current) {
             const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
-            onContentClick(reactEvent)
+            onContentClickRef.current(reactEvent)
           }
         }
       }
@@ -132,7 +177,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     return () => {
       clearTimeout(timer)
     }
-  }, [isOpen, loading, onContentClick, html])
+  }, [isOpen, loading, html]) // onContentClick은 ref로 관리
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
@@ -152,20 +197,29 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   <Icon name="arrow-left" className="w-4 h-4" />
                 </Button>
               )}
-              <DialogTitle className="text-base font-bold truncate text-primary">
-                {(() => {
-                  const match = title.match(/^(.*)(\s\(.*\))$/)
-                  if (match) {
-                    return (
-                      <>
-                        {match[1]}
-                        <span className="text-muted-foreground font-normal">{match[2]}</span>
-                      </>
-                    )
-                  }
-                  return title
-                })()}
+              {/* 판례인 경우 아이콘 표시 */}
+              {precedentMeta && (
+                <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400" />
+              )}
+              <DialogTitle className="text-base font-bold truncate text-primary max-w-[calc(100%-100px)] sm:max-w-[600px]" title={title}>
+                {parsedTitle ? (
+                  <>
+                    {parsedTitle.main}
+                    <span className="text-muted-foreground font-normal">{parsedTitle.suffix}</span>
+                  </>
+                ) : title}
               </DialogTitle>
+              {/* 심급 배지 (법원명 기반) */}
+              {precedentMeta?.court && (
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                  precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
+                  precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
+                  "bg-green-500/20 text-green-400"
+                }`}>
+                  {precedentMeta.court.includes("대법원") ? "3심" :
+                   precedentMeta.court.includes("고등") ? "2심" : "1심"}
+                </span>
+              )}
               <DialogDescription className="sr-only">
                 {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
               </DialogDescription>
@@ -203,15 +257,15 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                 className="p-1 h-7 w-7"
               />
 
-              {/* 법제처 원문 링크 */}
-              {molegUrl && (
+              {/* 법제처 원문 링크 (법령 또는 판례) */}
+              {(molegUrl || precedentUrl) && (
                 <Button
                   variant="outline"
                   size="sm"
                   asChild
                   className="h-7 gap-1 px-2"
                 >
-                  <a href={molegUrl} target="_blank" rel="noopener noreferrer">
+                  <a href={molegUrl || precedentUrl || ''} target="_blank" rel="noopener noreferrer">
                     <Icon name="external-link" className="w-3 h-3" />
                     <span className="text-xs hidden sm:inline">원문</span>
                   </a>
@@ -226,6 +280,15 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               )}
             </div>
           </div>
+          {/* 판례 메타 정보 배지 (헤더 내 제목 아래) */}
+          {precedentMeta && (
+            <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+              {precedentMeta.court && <span className="px-1.5 py-0.5 bg-muted rounded">{precedentMeta.court}</span>}
+              {precedentMeta.caseNumber && <span className="px-1.5 py-0.5 bg-muted rounded">{precedentMeta.caseNumber}</span>}
+              {precedentMeta.date && <span className="px-1.5 py-0.5 bg-muted rounded">{precedentMeta.date}</span>}
+              {precedentMeta.judgmentType && <span className="px-1.5 py-0.5 bg-muted rounded">{precedentMeta.judgmentType}</span>}
+            </div>
+          )}
         </DialogHeader>
         {loading ? (
           <div className="flex flex-col items-center justify-center h-[40vh] gap-3">
@@ -238,34 +301,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
           </div>
         ) : (
           <ScrollArea className="max-h-[65vh]">
-            <style>{`
-              /* 항 사이 간격 (whitespace-pre-wrap에서 \n\n을 공백으로 표시) */
-              .law-article-content {
-                white-space: pre-wrap !important;
-              }
-
-              /* 박스 테이블/수식 박스는 whitespace-normal로 표시 */
-              .law-article-content .whitespace-normal {
-                white-space: normal !important;
-              }
-
-              /* <개정> 태그와 [ ] 태그 크기 조정 - rev-mark 클래스 사용 */
-              .law-article-content .rev-mark {
-                font-size: 0.8em !important;
-                color: #64748b !important;
-              }
-
-              /* 추가로 inline span 태그도 처리 */
-              .law-article-content span[style*="color"] {
-                font-size: inherit !important;
-              }
-              .law-article-content span[style*="color"][class="rev-mark"] {
-                font-size: 0.8em !important;
-              }
-            `}</style>
+            <style>{LAW_CONTENT_STYLES}</style>
             <div
               ref={contentRef}
-              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere p-4 sm:p-6 ${forceWhiteTheme
+              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere px-4 sm:px-6 pt-2 pb-4 sm:pb-6 ${forceWhiteTheme
                 ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
                 : "dark:prose-invert"
                 }`}

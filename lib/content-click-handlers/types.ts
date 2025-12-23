@@ -16,6 +16,14 @@ export interface ModalHistoryItem {
   articleNumber?: string
 }
 
+/** 판례 메타 정보 */
+export interface PrecedentMeta {
+  court?: string
+  caseNumber?: string
+  date?: string
+  judgmentType?: string
+}
+
 /** 모달 상태 */
 export interface RefModalState {
   open: boolean
@@ -24,6 +32,7 @@ export interface RefModalState {
   forceWhiteTheme?: boolean
   lawName?: string
   articleNumber?: string
+  precedentMeta?: PrecedentMeta
 }
 
 /** 외부 참조 정보 */
