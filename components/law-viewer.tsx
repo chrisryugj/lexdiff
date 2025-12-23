@@ -143,6 +143,20 @@ export function LawViewer({
   const [relatedCases, setRelatedCases] = useState<PrecedentSearchResult[]>([])
   const [loadingRelatedCases, setLoadingRelatedCases] = useState(false)
 
+  // 심급 판별 함수 (법원명 기반)
+  const getCourtLevel = (court: string | undefined): 1 | 2 | 3 | null => {
+    if (!court) return null
+    if (court.includes("대법원")) return 3
+    if (court.includes("고등") || court.includes("고법")) return 2
+    if (court.includes("지방") || court.includes("지법") || court.includes("지원")) return 1
+    return null
+  }
+
+  // 현재 판례의 심급
+  const currentCourtLevel = isPrecedent ? getCourtLevel(meta.court) : null
+  // 관련 심급이 존재하는지 (로딩 완료 후)
+  const hasRelatedCases = relatedCases.length > 0
+
   // 관련 심급 판례 모달 상태
   const [relatedPrecedentModal, setRelatedPrecedentModal] = useState<{
     isOpen: boolean
@@ -432,72 +446,92 @@ export function LawViewer({
     fetchRevisionHistory(activeJo)
   }, [meta.lawId, activeJo, isOrdinance, isPrecedent])
 
-  // 판례 관련 심급 검색 (원심판결 사건번호 기반)
+  // 의존성 안정화를 위한 값 추출
+  const currentCaseNumber = (meta as any).caseNumber as string | undefined
+  const currentCaseName = (meta as any).lawTitle as string | undefined
+
+  // 관련 심급 검색 AbortController
+  const relatedCasesAbortRef = useRef<AbortController | null>(null)
+  // 이미 검색한 사건명 캐시 (중복 API 호출 방지)
+  const lastSearchedNameRef = useRef<string | null>(null)
+
+  // 판례 관련 심급 검색 (사건명 기반 API 검색) - 버튼 클릭 시에만 검색
   useEffect(() => {
-    if (!isPrecedent || !showRelatedCases) return
+    if (!isPrecedent || !showRelatedCases) {
+      setRelatedCases([])
+      setLoadingRelatedCases(false)
+      return
+    }
+
+    // 사건명이 없으면 검색 불가
+    if (!currentCaseName) {
+      setRelatedCases([])
+      setLoadingRelatedCases(false)
+      return
+    }
+
+    // 이미 같은 사건명으로 검색했으면 스킵 (무한 루프 방지)
+    if (lastSearchedNameRef.current === currentCaseName) {
+      return
+    }
+
+    // 이전 요청 취소
+    relatedCasesAbortRef.current?.abort()
+    relatedCasesAbortRef.current = new AbortController()
+    const signal = relatedCasesAbortRef.current.signal
 
     const fetchRelatedCases = async () => {
       setLoadingRelatedCases(true)
+      lastSearchedNameRef.current = currentCaseName
+
       try {
-        // 1. 현재 판례의 전문에서 【원심판결】 사건번호 추출
-        const fullText = actualArticles.find(a => a.content)?.content || ''
-        const originalCaseMatch = fullText.match(/【\s*원심\s*판결\s*】[^【]*?(\d{4}[가-힣]+\d+)/i)
-        const originalCaseNumber = originalCaseMatch?.[1]
+        // 사건명으로 검색 (같은 사건의 1~3심 찾기)
+        const params = new URLSearchParams({
+          query: currentCaseName,
+          display: '20'
+        })
+        const res = await fetch(`/api/precedent-search?${params}`, { signal })
 
-        const relatedCaseNumbers: string[] = []
-        if (originalCaseNumber) {
-          relatedCaseNumbers.push(originalCaseNumber)
-        }
-
-        // 2. 현재 판례 사건번호도 검색 (상고심 찾기용)
-        const currentCaseNumber = (meta as any).caseNumber
-        if (currentCaseNumber) {
-          relatedCaseNumbers.push(currentCaseNumber)
-        }
-
-        if (relatedCaseNumbers.length === 0) {
+        if (!res.ok) {
           setRelatedCases([])
-          setLoadingRelatedCases(false)
           return
         }
 
-        // 3. 각 사건번호로 검색
-        const results: PrecedentSearchResult[] = []
-        for (const caseNum of relatedCaseNumbers) {
-          const params = new URLSearchParams({
-            caseNumber: caseNum,
-            display: '5'
-          })
-          const res = await fetch(`/api/precedent-search?${params}`)
-          if (res.ok) {
-            const data = await res.json()
-            results.push(...(data.precedents || []))
-          }
-        }
+        const data = await res.json()
+        const results: PrecedentSearchResult[] = data.precedents || []
 
-        // 4. 중복 제거 + 현재 판례 제외
-        const uniqueResults = results.filter((p, idx, arr) =>
-          arr.findIndex(x => x.caseNumber === p.caseNumber) === idx &&
+        // 사건명 100% 일치 필터링 + 현재 판례 제외
+        const related = results.filter(p =>
+          p.name === currentCaseName &&
           p.caseNumber !== currentCaseNumber
         )
+        console.log('[관련심급] 검색:', currentCaseName, '→', related.length, '건')
 
-        // 5. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
-        uniqueResults.sort((a, b) => {
+        // 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
+        related.sort((a, b) => {
           const dateA = a.date?.replace(/[.\-]/g, '') || ''
           const dateB = b.date?.replace(/[.\-]/g, '') || ''
           return dateA.localeCompare(dateB)
         })
 
-        setRelatedCases(uniqueResults)
+        setRelatedCases(related)
       } catch (e) {
+        if ((e as Error).name === 'AbortError') return
         console.error('관련 심급 검색 실패:', e)
+        setRelatedCases([])
       } finally {
-        setLoadingRelatedCases(false)
+        if (!signal.aborted) {
+          setLoadingRelatedCases(false)
+        }
       }
     }
 
     fetchRelatedCases()
-  }, [isPrecedent, showRelatedCases, actualArticles, (meta as any).caseNumber])
+
+    return () => {
+      relatedCasesAbortRef.current?.abort()
+    }
+  }, [isPrecedent, showRelatedCases, currentCaseName, currentCaseNumber])
 
   // 관련 심급 판례 클릭 → 모달로 상세 표시
   const handleRelatedPrecedentClick = async (prec: PrecedentSearchResult) => {
@@ -1022,6 +1056,20 @@ export function LawViewer({
                   {isPrecedent ? (
                     // 판례 전용 배지
                     <>
+                      {/* 심급 배지 (1심/2심/3심) */}
+                      {currentCourtLevel && (
+                        <Badge
+                          className={cn(
+                            "text-xs px-1.5 py-0.5 font-medium",
+                            currentCourtLevel === 3 && "bg-purple-500/20 text-purple-400 border-purple-500/30",
+                            currentCourtLevel === 2 && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                            currentCourtLevel === 1 && "bg-green-500/20 text-green-400 border-green-500/30"
+                          )}
+                        >
+                          <Icon name="git-branch" size={12} className="mr-1" />
+                          {currentCourtLevel}심
+                        </Badge>
+                      )}
                       {meta.caseNumber && (
                         <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                           <Icon name="file-text" size={12} className="mr-1" />
@@ -1115,11 +1163,13 @@ export function LawViewer({
                           <Icon name="git-branch" size={14} className="sm:mr-1" />
                           <span className="hidden sm:inline">관련 심급</span>
                           <span className="sm:hidden">심급</span>
-                          {relatedCases.length > 0 && (
+                          {loadingRelatedCases ? (
+                            <Icon name="loader" size={12} className="ml-1 animate-spin" />
+                          ) : hasRelatedCases ? (
                             <Badge variant="secondary" className="ml-1 h-4 px-1 text-xs">
                               {relatedCases.length}
                             </Badge>
-                          )}
+                          ) : null}
                         </Button>
                         {activeArticle && (
                           <Button
