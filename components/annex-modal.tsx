@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icon } from "@/components/ui/icon"
+import { CopyButton } from "@/components/ui/copy-button"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import type { LawAnnex } from "@/lib/law-types"
 import { getAnnexCache, setAnnexCache } from "@/lib/annex-cache"
@@ -75,7 +76,6 @@ export function AnnexModal({
   const [viewMode, setViewMode] = useState<ViewMode>("markdown")
   const [fileType, setFileType] = useState<"pdf" | "hwp" | "unknown">("unknown")
   const [fontSize, setFontSize] = useState(14)
-  const [copied, setCopied] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   // 조례 여부 판별 (자치법규)
@@ -91,17 +91,6 @@ export function AnnexModal({
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 1, 28))
   const decreaseFontSize = () => setFontSize((prev) => Math.max(prev - 1, 11))
 
-  // 복사 기능
-  const copyToClipboard = useCallback(() => {
-    if (!markdown) return
-
-    navigator.clipboard.writeText(markdown).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }).catch((err) => {
-      console.error("복사 실패:", err)
-    })
-  }, [markdown])
 
   // 파일 다운로드
   const handleDownload = useCallback(() => {
@@ -364,15 +353,11 @@ export function AnnexModal({
 
             {/* 기능 버튼들 */}
             {markdown && (
-              <Button
+              <CopyButton
+                getText={() => markdown}
                 variant="ghost"
-                size="icon"
                 className="h-7 w-7 hidden sm:flex"
-                onClick={copyToClipboard}
-                title={copied ? "복사됨" : "복사"}
-              >
-                <Icon name={copied ? "check" : "copy"} className="w-3.5 h-3.5" />
-              </Button>
+              />
             )}
             <Button
               variant="ghost"

@@ -35,6 +35,8 @@ export async function handleLawArticleRef(
   let lawName = target.getAttribute('data-law') || ''
   const articleLabel = target.getAttribute('data-article') || ''
   const lawType = target.getAttribute('data-law-type') as 'law' | 'decree' | 'rule' | null
+  const efYd = target.getAttribute('data-efyd') || undefined  // 구법령 시행일자
+  const isOldLaw = target.getAttribute('data-old-law') === 'true'  // 구법령 여부 (날짜 없음)
   const { refModal } = context
 
   // 모달에서 클릭 시: "법 제X조" 형태 링크는 현재 모달의 법령에서 상위법 추론
@@ -127,6 +129,6 @@ export async function handleLawArticleRef(
   }
 
   // 탭 전환 실패 또는 2-tier 모드가 아닐 때 모달 열기
-  await openExternalLawArticleModal(lawName, articleLabel)
+  await openExternalLawArticleModal(lawName, articleLabel, efYd, isOldLaw)
   setLastExternalRef({ lawName, joLabel: articleLabel })
 }

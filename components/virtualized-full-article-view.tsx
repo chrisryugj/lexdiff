@@ -504,8 +504,8 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
             transform: "translate(-50%, -100%)",
           }}
         >
-          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium shadow-lg">
-            복사됨
+          <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg">
+            <Icon name="check" className="w-4 h-4" />
           </div>
         </div>,
         document.body

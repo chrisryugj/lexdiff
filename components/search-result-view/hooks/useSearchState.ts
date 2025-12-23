@@ -242,7 +242,7 @@ export function useSearchState({
   // 조례 페이지네이션 상태
   // ============================================================
   const [ordinancePage, setOrdinancePage] = useState(1)
-  const [ordinancePageSize, setOrdinancePageSize] = useState(100)
+  const [ordinancePageSize, setOrdinancePageSize] = useState(20)
   const [ordinanceTotalCount, setOrdinanceTotalCount] = useState(0)
 
   // ============================================================

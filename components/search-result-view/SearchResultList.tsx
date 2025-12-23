@@ -10,6 +10,8 @@ import React, { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatDate } from "@/lib/revision-parser"
 import { getLawTypeBadgeClass } from "./utils"
 import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery } from "./types"
@@ -302,7 +304,7 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
   results,
   totalCount = 0,
   currentPage = 1,
-  pageSize = 100,
+  pageSize = 20,
   isLoading = false,
   query,
   onSelect,
@@ -356,41 +358,31 @@ export const OrdinanceSearchResultList = memo(function OrdinanceSearchResultList
             </Button>
           </div>
 
-          {/* 필터링 및 페이지네이션 컨트롤 */}
-          <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
-            {/* 검색 필터 */}
-            <div className="relative flex-1 max-w-md">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="조례명, 지자체, 종류로 필터링..."
-                value={filterKeyword}
-                onChange={(e) => setFilterKeyword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-muted/30 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                style={{ fontFamily: "Pretendard, sans-serif" }}
-              />
-            </div>
-
-            {/* 페이지당 개수 선택 */}
-            {onPageSizeChange && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">표시 개수:</span>
-                <div className="flex gap-1">
-                  {[20, 50, 100].map((count) => (
-                    <button
-                      key={count}
-                      onClick={() => onPageSizeChange(count)}
-                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                        pageSize === count
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/30 hover:bg-muted/50 text-foreground/80"
-                      }`}
-                    >
-                      {count}
-                    </button>
-                  ))}
-                </div>
+          {/* 필터 + 키워드 검색 + 표시개수 (판례 UI와 동일) */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[200px] max-w-xs">
+              <div className="relative">
+                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="결과 내 검색..."
+                  value={filterKeyword}
+                  onChange={(e) => setFilterKeyword(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
               </div>
+            </div>
+            {/* 표시 개수 선택 */}
+            {onPageSizeChange && (
+              <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>
+                <SelectTrigger className="w-24 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20개</SelectItem>
+                  <SelectItem value="50">50개</SelectItem>
+                  <SelectItem value="100">100개</SelectItem>
+                </SelectContent>
+              </Select>
             )}
           </div>
         </div>

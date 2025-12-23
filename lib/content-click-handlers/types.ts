@@ -75,7 +75,7 @@ export interface ContentClickActions {
   setActiveJo: (jo: string) => void
 
   // Modal
-  openExternalLawArticleModal: (lawName: string, articleLabel: string) => Promise<void>
+  openExternalLawArticleModal: (lawName: string, articleLabel: string, efYd?: string, isOldLaw?: boolean) => Promise<void>
   setRefModal: (state: RefModalState) => void
   setRefModalHistory: (updater: (prev: ModalHistoryItem[]) => ModalHistoryItem[]) => void
   setLastExternalRef: (ref: ExternalRef | null) => void
