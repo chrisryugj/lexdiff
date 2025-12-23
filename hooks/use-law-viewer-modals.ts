@@ -519,11 +519,162 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       // ⚠️ jo 파라미터 제거 - API가 잘못된 조문을 반환하는 버그 방지
       // 전체 법령을 가져온 후 클라이언트에서 필터링
 
-      // ✅ efYd 또는 isOldLaw가 있으면 구법령 플래그 설정
-      // 현행법 조문을 보여주되 안내 메시지 추가
+      // ✅ efYd가 있으면 구법령 API로 실제 연혁 법령 조회
       const isOldLawRequest = !!(efYd || isOldLaw)
-      if (isOldLawRequest) {
-        debugLogger.info('[citation] 구법령 조회 (현행법 조문 + 안내)', { lawName: cleanedLawName, articleLabel, efYd, isOldLaw })
+
+      // 구법령 조회: efYd가 있으면 /api/old-law 사용
+      if (efYd) {
+        debugLogger.info('[citation] 구법령 조회 시작 (연혁 법령)', { lawName: cleanedLawName, articleLabel, efYd })
+
+        try {
+          const oldLawParams = new URLSearchParams({
+            lawName: cleanedLawName,
+            efYd: efYd,
+          })
+          if (joCode) {
+            oldLawParams.append('jo', joCode)
+          }
+
+          const oldLawRes = await fetch(`/api/old-law?${oldLawParams.toString()}`)
+
+          if (!oldLawRes.ok) {
+            throw new Error(`HTTP ${oldLawRes.status}`)
+          }
+
+          const oldLawData = await oldLawRes.json()
+
+          if (oldLawData.error) {
+            throw new Error(oldLawData.error)
+          }
+
+          const { historyInfo, lawData, targetArticle } = oldLawData
+
+          // 조문 추출
+          let articleUnits: any[] = []
+          if (lawData?.법령?.조문?.조문단위) {
+            const raw = lawData.법령.조문.조문단위
+            articleUnits = Array.isArray(raw) ? raw : [raw]
+          }
+
+          // targetArticle이 있으면 사용, 없으면 조문에서 찾기
+          let targetUnit = targetArticle
+          if (!targetUnit && hasArticleLabel && articleUnits.length > 0) {
+            targetUnit = articleUnits.find((unit: any) => {
+              const isArticle = unit?.조문여부 === "조문"
+              const hasKey = typeof unit?.조문키 === "string"
+              return isArticle && hasKey && unit.조문키.startsWith(joCode)
+            }) || articleUnits.find((unit: any) => {
+              const num = typeof unit?.조문번호 === "string" ? unit.조문번호.replace(/\D/g, "") : ""
+              const targetNum = articleLabel.replace(/\D/g, "")
+              return unit?.조문여부 === "조문" && num !== "" && targetNum !== "" && num === targetNum
+            })
+          }
+
+          if (!targetUnit && hasArticleLabel) {
+            // 조문을 찾지 못한 경우
+            setRefModal({
+              open: true,
+              title: `구 ${cleanedLawName} ${articleLabel || ''}`.trim(),
+              html: `<div class="space-y-3">
+                <div class="p-2 bg-amber-500/10 border border-amber-500/20 rounded text-sm text-amber-700 dark:text-amber-400">
+                  <strong>📜 연혁 법령</strong>: ${historyInfo.efYd.substring(0, 4)}. ${parseInt(historyInfo.efYd.substring(4, 6))}. ${parseInt(historyInfo.efYd.substring(6, 8))}. 시행 (${historyInfo.rrCls || '개정'}, 법률 제${historyInfo.ancNo}호)
+                </div>
+                <p>해당 조문을 찾지 못했습니다.</p>
+                <p class="text-sm text-muted-foreground"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>
+              </div>`,
+            })
+            return
+          }
+
+          // 조문 번호가 없으면 전체 조문 표시
+          if (!hasArticleLabel) {
+            const allArticleUnits = articleUnits.filter((unit: any) => unit?.조문여부 === "조문")
+            const allArticlesHtml = allArticleUnits
+              .map((unit: any) => {
+                const lawArticle = convertUnitToLawArticle(unit)
+                const titlePart = lawArticle.title ? ` (${lawArticle.title})` : ''
+                const header = `<div class="font-semibold text-primary mb-1">${lawArticle.joNum}${titlePart}</div>`
+                const content = extractArticleText(lawArticle, false, cleanedLawName)
+                return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed">${content}</div></div>`
+              })
+              .join('')
+
+            const historyNotice = `<div class="mb-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-sm text-amber-700 dark:text-amber-400">
+              <strong>📜 연혁 법령</strong>: ${historyInfo.efYd.substring(0, 4)}. ${parseInt(historyInfo.efYd.substring(4, 6))}. ${parseInt(historyInfo.efYd.substring(6, 8))}. 시행 (${historyInfo.rrCls || '개정'}, 법률 제${historyInfo.ancNo}호)
+            </div>`
+
+            if (refModal.open && refModal.title) {
+              setRefModalHistory(prev => [...prev, {
+                title: refModal.title!,
+                html: refModal.html,
+                forceWhiteTheme: refModal.forceWhiteTheme,
+                lawName: refModal.lawName,
+                articleNumber: refModal.articleNumber,
+              }])
+            }
+
+            setRefModal({
+              open: true,
+              title: `구 ${cleanedLawName} 전문`,
+              html: `${historyNotice}<div class="space-y-2">${allArticlesHtml}</div>`,
+              lawName: cleanedLawName,
+              articleNumber: '',
+            })
+
+            debugLogger.success('[citation] 구법령 전문 모달 열기 완료', { lawName: cleanedLawName, articleCount: allArticleUnits.length })
+            return
+          }
+
+          // 특정 조문 표시
+          const lawArticle = convertUnitToLawArticle(targetUnit)
+          const articleTitle = `구 ${cleanedLawName} ${lawArticle.joNum}${lawArticle.title ? ` (${lawArticle.title})` : ""}`
+
+          let htmlContent = extractArticleText(lawArticle, false, cleanedLawName)
+
+          // 구법령 안내 메시지 추가
+          const historyNotice = `<div class="mb-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-sm text-amber-700 dark:text-amber-400">
+            <strong>📜 연혁 법령</strong>: ${historyInfo.efYd.substring(0, 4)}. ${parseInt(historyInfo.efYd.substring(4, 6))}. ${parseInt(historyInfo.efYd.substring(6, 8))}. 시행 (${historyInfo.rrCls || '개정'}, 법률 제${historyInfo.ancNo}호)
+          </div>`
+          htmlContent = historyNotice + htmlContent
+
+          if (refModal.open && refModal.title) {
+            setRefModalHistory(prev => [...prev, {
+              title: refModal.title!,
+              html: refModal.html,
+              forceWhiteTheme: refModal.forceWhiteTheme,
+              lawName: refModal.lawName,
+              articleNumber: refModal.articleNumber,
+            }])
+          }
+
+          setRefModal({
+            open: true,
+            title: articleTitle,
+            html: htmlContent,
+            lawName: cleanedLawName,
+            articleNumber: lawArticle.joNum,
+          })
+
+          debugLogger.success('[citation] 구법령 조문 모달 열기 완료', {
+            lawName: cleanedLawName,
+            articleLabel,
+            mst: historyInfo.mst,
+            efYd: historyInfo.efYd,
+          })
+          return
+        } catch (oldLawErr: any) {
+          debugLogger.error('[citation] 구법령 조회 실패, 현행법으로 폴백', {
+            error: oldLawErr?.message || oldLawErr,
+            lawName: cleanedLawName,
+            efYd,
+          })
+          // 구법령 조회 실패 시 현행법으로 폴백 (아래 로직 계속 진행)
+        }
+      }
+
+      // 현행법 조회 (기본 경로)
+      if (isOldLawRequest && !efYd) {
+        debugLogger.info('[citation] 구법령 플래그만 있음 (efYd 없음) - 현행법으로 조회', { lawName: cleanedLawName, articleLabel, isOldLaw })
       }
 
       try {
