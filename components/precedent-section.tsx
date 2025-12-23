@@ -162,6 +162,57 @@ function PrecedentListItem({
   isSelected: boolean
   onClick: () => void
 }) {
+  const [showTooltip, setShowTooltip] = React.useState(false)
+  const [isTruncated, setIsTruncated] = React.useState(false)
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
+  const titleRef = React.useRef<HTMLDivElement>(null)
+
+  // ResizeObserver로 truncated 상태 동적 감지 + 폰트 로딩 대기
+  React.useEffect(() => {
+    const element = titleRef.current
+    if (!element) return
+
+    let mounted = true
+
+    const checkTruncated = () => {
+      if (!mounted || !element) return
+      // scrollHeight가 clientHeight보다 크면 잘림 (line-clamp-2)
+      const isTrunc = element.scrollHeight > element.clientHeight ||
+                      (precedent.name?.length || 0) > 30
+      setIsTruncated(isTrunc)
+    }
+
+    // 폰트 로딩 후 체크 (Pretendard 로딩 대기)
+    const init = async () => {
+      try {
+        if (document.fonts?.ready) {
+          await document.fonts.ready
+        }
+      } catch {
+        // fonts API 실패 시 무시
+      }
+      // 렌더링 안정화를 위해 여러 프레임 대기
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          checkTruncated()
+        })
+      })
+    }
+    init()
+
+    const observer = new ResizeObserver(checkTruncated)
+    observer.observe(element)
+
+    return () => {
+      mounted = false
+      observer.disconnect()
+    }
+  }, [precedent.name])
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY })
+  }, [])
+
   return (
     <button
       className={cn(
@@ -169,13 +220,38 @@ function PrecedentListItem({
         isSelected && "border-primary bg-primary/5"
       )}
       onClick={onClick}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onMouseMove={handleMouseMove}
       style={{ fontFamily: "Pretendard, sans-serif" }}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-sm md:text-base leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2">
-            {precedent.name}
+          <div className="relative">
+            <div
+              ref={titleRef}
+              className="font-bold text-sm md:text-base leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2"
+            >
+              {precedent.name}
+            </div>
+
+            {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
+            {showTooltip && isTruncated && (
+              <div
+                className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
+                style={{
+                  fontFamily: "Pretendard, sans-serif",
+                  left: `${mousePos.x + 12}px`,
+                  top: `${mousePos.y + 16}px`,
+                }}
+              >
+                <p className="text-xs text-popover-foreground line-clamp-2 break-words">
+                  {precedent.name}
+                </p>
+              </div>
+            )}
           </div>
+
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -238,7 +314,7 @@ export function PrecedentDetailPanel({
   const [loadingRelated, setLoadingRelated] = React.useState(false)
   const [showRelated, setShowRelated] = React.useState(false)
 
-  // 관련 심급 판례 검색 (원심판결 사건번호 기반)
+  // 관련 심급 판례 검색 (이미 로드된 목록에서 필터링)
   React.useEffect(() => {
     if (!detail || !showRelated) {
       setRelatedPrecedents([])
@@ -246,59 +322,56 @@ export function PrecedentDetailPanel({
       return
     }
 
-    const fetchRelated = async () => {
-      setLoadingRelated(true)
-      try {
-        // 1. 현재 판례의 전문에서 【원심판결】 사건번호 추출
-        const fullText = detail.fullText || ''
-        const originalCaseMatch = fullText.match(/【\s*원심\s*판결\s*】[^【]*?(\d{4}[가-힣]+\d+)/i)
-        const originalCaseNumber = originalCaseMatch?.[1]
+    setLoadingRelated(true)
 
-        // 원심판결 사건번호가 없으면 검색 안 함
-        if (!originalCaseNumber) {
-          setRelatedPrecedents([])
-          setLoadingRelated(false)
-          return
+    try {
+      // 1. 현재 판례의 전문에서 【원심판결】 사건번호 추출
+      const fullText = detail.fullText || ''
+      const originalCaseMatch = fullText.match(/【\s*원심\s*판결\s*】[^【]*?(\d{4}[가-힣]+\d+)/i)
+      const originalCaseNumber = originalCaseMatch?.[1]
+
+      // 2. 이미 로드된 precedents 목록에서 관련 심급 찾기
+      let related = precedents.filter(p => {
+        // 현재 판례는 제외
+        if (p.caseNumber === detail.caseNumber) return false
+
+        // 원심판결 사건번호와 일치하는 경우
+        if (originalCaseNumber && p.caseNumber === originalCaseNumber) return true
+
+        // 사건 유형이 같고 번호가 비슷한 경우 (같은 사건의 다른 심급)
+        // 예: 2024누1234 vs 2024가합1234 (사건번호 기반 유사도)
+        const currentCase = detail.caseNumber || ''
+        const targetCase = p.caseNumber || ''
+
+        // 연도 추출 (앞 4자리)
+        const currentYear = currentCase.slice(0, 4)
+        const targetYear = targetCase.slice(0, 4)
+
+        // 같은 연도이고, 사건번호 끝자리가 유사한 경우
+        if (currentYear === targetYear) {
+          const currentNum = currentCase.replace(/[가-힣]/g, '')
+          const targetNum = targetCase.replace(/[가-힣]/g, '')
+          return currentNum === targetNum
         }
 
-        // 2. 원심판결 사건번호로만 검색 (현재 판례 번호는 제외)
-        const params = new URLSearchParams({
-          caseNumber: originalCaseNumber,
-          display: '10'
-        })
-        const res = await fetch(`/api/precedent-search?${params}`)
+        return false
+      })
 
-        if (!res.ok) {
-          throw new Error(`검색 실패: ${res.status}`)
-        }
+      // 3. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
+      related.sort((a, b) => {
+        const dateA = a.date?.replace(/[.\-]/g, '') || ''
+        const dateB = b.date?.replace(/[.\-]/g, '') || ''
+        return dateA.localeCompare(dateB)
+      })
 
-        const data = await res.json()
-        const results: PrecedentSearchResult[] = data.precedents || []
-
-        // 3. 중복 제거 + 현재 판례 제외
-        const uniqueResults = results.filter((p, idx, arr) =>
-          arr.findIndex(x => x.caseNumber === p.caseNumber) === idx &&
-          p.caseNumber !== detail.caseNumber
-        )
-
-        // 4. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
-        uniqueResults.sort((a, b) => {
-          const dateA = a.date?.replace(/[.\-]/g, '') || ''
-          const dateB = b.date?.replace(/[.\-]/g, '') || ''
-          return dateA.localeCompare(dateB)
-        })
-
-        setRelatedPrecedents(uniqueResults)
-      } catch (e) {
-        console.error('관련 심급 검색 실패:', e)
-        setRelatedPrecedents([])
-      } finally {
-        setLoadingRelated(false)
-      }
+      setRelatedPrecedents(related)
+    } catch (e) {
+      console.error('관련 심급 검색 실패:', e)
+      setRelatedPrecedents([])
+    } finally {
+      setLoadingRelated(false)
     }
-
-    fetchRelated()
-  }, [detail?.caseNumber, showRelated])
+  }, [detail?.caseNumber, showRelated, precedents])
 
   // HTML 정리 + 링크 생성
   const processHtml = React.useCallback((html: string) => {
