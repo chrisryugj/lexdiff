@@ -314,7 +314,7 @@ export function PrecedentDetailPanel({
   const [loadingRelated, setLoadingRelated] = React.useState(false)
   const [showRelated, setShowRelated] = React.useState(false)
 
-  // 관련 심급 판례 검색 (이미 로드된 목록에서 필터링)
+  // 관련 심급 판례 검색 (이미 로드된 목록에서 제목 유사도로 필터링)
   React.useEffect(() => {
     if (!detail || !showRelated) {
       setRelatedPrecedents([])
@@ -324,53 +324,57 @@ export function PrecedentDetailPanel({
 
     setLoadingRelated(true)
 
-    try {
-      // 1. 현재 판례의 전문에서 【원심판결】 사건번호 추출
-      const fullText = detail.fullText || ''
-      const originalCaseMatch = fullText.match(/【\s*원심\s*판결\s*】[^【]*?(\d{4}[가-힣]+\d+)/i)
-      const originalCaseNumber = originalCaseMatch?.[1]
+    // 비동기 처리를 위해 setTimeout 사용 (UI 블로킹 방지)
+    const timeoutId = setTimeout(() => {
+      try {
+        const currentName = detail.name || ''
 
-      // 2. 이미 로드된 precedents 목록에서 관련 심급 찾기
-      let related = precedents.filter(p => {
         // 현재 판례는 제외
-        if (p.caseNumber === detail.caseNumber) return false
+        const filtered = precedents.filter(p => p.caseNumber !== detail.caseNumber)
 
-        // 원심판결 사건번호와 일치하는 경우
-        if (originalCaseNumber && p.caseNumber === originalCaseNumber) return true
+        // 제목 유사도 계산 (간단한 단어 매칭)
+        const scored = filtered.map(p => {
+          const targetName = p.name || ''
 
-        // 사건 유형이 같고 번호가 비슷한 경우 (같은 사건의 다른 심급)
-        // 예: 2024누1234 vs 2024가합1234 (사건번호 기반 유사도)
-        const currentCase = detail.caseNumber || ''
-        const targetCase = p.caseNumber || ''
+          // 제목이 비어있으면 점수 0
+          if (!currentName || !targetName) return { precedent: p, score: 0 }
 
-        // 연도 추출 (앞 4자리)
-        const currentYear = currentCase.slice(0, 4)
-        const targetYear = targetCase.slice(0, 4)
+          // 단어 단위로 분리 (공백 기준)
+          const currentWords = currentName.split(/\s+/).filter(w => w.length > 1)
+          const targetWords = targetName.split(/\s+/).filter(w => w.length > 1)
 
-        // 같은 연도이고, 사건번호 끝자리가 유사한 경우
-        if (currentYear === targetYear) {
-          const currentNum = currentCase.replace(/[가-힣]/g, '')
-          const targetNum = targetCase.replace(/[가-힣]/g, '')
-          return currentNum === targetNum
-        }
+          // 공통 단어 개수 계산
+          const commonWords = currentWords.filter(w => targetWords.includes(w)).length
 
-        return false
-      })
+          // 점수: 공통 단어 개수 / 현재 판례 단어 개수 (0~1)
+          const score = currentWords.length > 0 ? commonWords / currentWords.length : 0
 
-      // 3. 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
-      related.sort((a, b) => {
-        const dateA = a.date?.replace(/[.\-]/g, '') || ''
-        const dateB = b.date?.replace(/[.\-]/g, '') || ''
-        return dateA.localeCompare(dateB)
-      })
+          return { precedent: p, score }
+        })
 
-      setRelatedPrecedents(related)
-    } catch (e) {
-      console.error('관련 심급 검색 실패:', e)
-      setRelatedPrecedents([])
-    } finally {
-      setLoadingRelated(false)
-    }
+        // 점수가 0.3 이상인 것만 필터링 (30% 이상 유사)
+        const related = scored
+          .filter(s => s.score >= 0.3)
+          .sort((a, b) => {
+            // 점수 내림차순
+            if (b.score !== a.score) return b.score - a.score
+            // 점수 같으면 날짜 오름차순 (오래된 것 먼저)
+            const dateA = a.precedent.date?.replace(/[.\-]/g, '') || ''
+            const dateB = b.precedent.date?.replace(/[.\-]/g, '') || ''
+            return dateA.localeCompare(dateB)
+          })
+          .map(s => s.precedent)
+
+        setRelatedPrecedents(related)
+      } catch (e) {
+        console.error('관련 심급 검색 실패:', e)
+        setRelatedPrecedents([])
+      } finally {
+        setLoadingRelated(false)
+      }
+    }, 0)
+
+    return () => clearTimeout(timeoutId)
   }, [detail?.caseNumber, showRelated, precedents])
 
   // HTML 정리 + 링크 생성
