@@ -48,6 +48,7 @@ import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
 import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
 import type { ContentClickContext, ContentClickActions } from "@/lib/content-click-handlers"
+import { buildPrecedentHtml } from "@/lib/content-click-handlers"
 import { useSwipe } from "@/hooks/use-swipe"
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
@@ -143,26 +144,22 @@ export function LawViewer({
   const [relatedCases, setRelatedCases] = useState<PrecedentSearchResult[]>([])
   const [loadingRelatedCases, setLoadingRelatedCases] = useState(false)
 
-  // 심급 판별 함수 (법원명 기반)
-  const getCourtLevel = (court: string | undefined): 1 | 2 | 3 | null => {
-    if (!court) return null
-    if (court.includes("대법원")) return 3
-    if (court.includes("고등") || court.includes("고법")) return 2
-    if (court.includes("지방") || court.includes("지법") || court.includes("지원")) return 1
-    return null
-  }
-
-  // 현재 판례의 심급
-  const currentCourtLevel = isPrecedent ? getCourtLevel(meta.court) : null
   // 관련 심급이 존재하는지 (로딩 완료 후)
   const hasRelatedCases = relatedCases.length > 0
 
-  // 관련 심급 판례 모달 상태
-  const [relatedPrecedentModal, setRelatedPrecedentModal] = useState<{
-    isOpen: boolean
-    loading: boolean
-    detail: import("@/lib/precedent-parser").PrecedentDetail | null
-  }>({ isOpen: false, loading: false, detail: null })
+  // 판례 전문에서 심급 정보 추출 (배지 표시 + 버튼 활성화용)
+  const { hasLevelSection, currentCourtLevel } = useMemo(() => {
+    if (!isPrecedent) return { hasLevelSection: false, currentCourtLevel: null as (1 | 2 | 3 | null) }
+    // actualArticles 전체 내용 합치기
+    const allContent = actualArticles.map(a => a.content || '').join('')
+    // "3심", "2심", "1심" 텍스트에서 숫자 추출
+    const match = allContent.match(/([123])심/)
+    if (match) {
+      return { hasLevelSection: true, currentCourtLevel: parseInt(match[1]) as 1 | 2 | 3 }
+    }
+    return { hasLevelSection: false, currentCourtLevel: null }
+  }, [isPrecedent, actualArticles])
+
 
   // ✅ AI 답변 법령 링크 클릭 핸들러
   const handleLawLinkClick = (lawName: string, article?: string) => {
@@ -533,20 +530,45 @@ export function LawViewer({
     }
   }, [isPrecedent, showRelatedCases, currentCaseName, currentCaseNumber])
 
-  // 관련 심급 판례 클릭 → 모달로 상세 표시
+  // 관련 심급 판례 클릭 → ReferenceModal로 상세 표시 (기존 판례 모달과 동일 스타일)
   const handleRelatedPrecedentClick = async (prec: PrecedentSearchResult) => {
-    setRelatedPrecedentModal({ isOpen: true, loading: true, detail: null })
+    // 로딩 표시
+    setRefModal({
+      open: true,
+      title: `판례 조회 중...`,
+      html: '<div class="flex items-center justify-center py-8"><div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div></div>',
+    })
+
     try {
       const res = await fetch(`/api/precedent-detail?id=${prec.id}`)
       if (res.ok) {
         const detail = await res.json()
-        setRelatedPrecedentModal({ isOpen: true, loading: false, detail })
+        const html = buildPrecedentHtml(detail)
+        setRefModal({
+          open: true,
+          title: detail.name || prec.name,
+          html,
+          precedentMeta: {
+            court: detail.court,
+            caseNumber: detail.caseNumber,
+            date: formatPrecedentDate(detail.date),
+            judgmentType: detail.judgmentType,
+          },
+        })
       } else {
-        setRelatedPrecedentModal({ isOpen: false, loading: false, detail: null })
+        setRefModal({
+          open: true,
+          title: '판례 조회 실패',
+          html: `<div class="text-destructive p-4"><p>판례를 불러올 수 없습니다.</p></div>`,
+        })
       }
     } catch (e) {
       console.error('판례 상세 조회 실패:', e)
-      setRelatedPrecedentModal({ isOpen: false, loading: false, detail: null })
+      setRefModal({
+        open: true,
+        title: '판례 조회 실패',
+        html: `<div class="text-destructive p-4"><p>판례를 불러올 수 없습니다.</p></div>`,
+      })
     }
   }
 
@@ -1046,6 +1068,19 @@ export function LawViewer({
                 <div className="flex items-center gap-2 mb-1">
                   <Icon name={isPrecedent ? "gavel" : "book-open"} size={20} className="text-primary" />
                   <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
+                  {/* 심급 배지 - 제목 옆에 표시 */}
+                  {isPrecedent && hasLevelSection && currentCourtLevel && (
+                    <Badge
+                      className={cn(
+                        "text-xs px-1.5 py-0.5 font-medium",
+                        currentCourtLevel === 3 && "bg-purple-500/20 text-purple-400 border-purple-500/30",
+                        currentCourtLevel === 2 && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                        currentCourtLevel === 1 && "bg-green-500/20 text-green-400 border-green-500/30"
+                      )}
+                    >
+                      {currentCourtLevel}심
+                    </Badge>
+                  )}
                   {!isPrecedent && !isOrdinance && viewMode === "full" && (
                     <Badge variant="outline" className="text-xs">
                       전체 조문
@@ -1056,20 +1091,6 @@ export function LawViewer({
                   {isPrecedent ? (
                     // 판례 전용 배지
                     <>
-                      {/* 심급 배지 (1심/2심/3심) */}
-                      {currentCourtLevel && (
-                        <Badge
-                          className={cn(
-                            "text-xs px-1.5 py-0.5 font-medium",
-                            currentCourtLevel === 3 && "bg-purple-500/20 text-purple-400 border-purple-500/30",
-                            currentCourtLevel === 2 && "bg-blue-500/20 text-blue-400 border-blue-500/30",
-                            currentCourtLevel === 1 && "bg-green-500/20 text-green-400 border-green-500/30"
-                          )}
-                        >
-                          <Icon name="git-branch" size={12} className="mr-1" />
-                          {currentCourtLevel}심
-                        </Badge>
-                      )}
                       {meta.caseNumber && (
                         <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                           <Icon name="file-text" size={12} className="mr-1" />
@@ -1154,23 +1175,26 @@ export function LawViewer({
                           <span className="hidden sm:inline">판례 요약</span>
                           <span className="sm:hidden">요약</span>
                         </Button>
-                        <Button
-                          variant={showRelatedCases ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setShowRelatedCases(!showRelatedCases)}
-                          className="h-7 px-1.5 sm:px-2 shrink-0"
-                        >
-                          <Icon name="git-branch" size={14} className="sm:mr-1" />
-                          <span className="hidden sm:inline">관련 심급</span>
-                          <span className="sm:hidden">심급</span>
-                          {loadingRelatedCases ? (
-                            <Icon name="loader" size={12} className="ml-1 animate-spin" />
-                          ) : hasRelatedCases ? (
-                            <Badge variant="secondary" className="ml-1 h-4 px-1 text-xs">
-                              {relatedCases.length}
-                            </Badge>
-                          ) : null}
-                        </Button>
+                        {/* 【심급】 섹션이 있는 판례만 관련 심급 버튼 표시 */}
+                        {hasLevelSection && (
+                          <Button
+                            variant={showRelatedCases ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setShowRelatedCases(!showRelatedCases)}
+                            className="h-7 px-1.5 sm:px-2 shrink-0"
+                          >
+                            <Icon name="git-compare" size={14} className="sm:mr-1" />
+                            <span className="hidden sm:inline">관련 심급</span>
+                            <span className="sm:hidden">심급</span>
+                            {loadingRelatedCases ? (
+                              <Icon name="loader" size={12} className="ml-1 animate-spin" />
+                            ) : hasRelatedCases ? (
+                              <Badge variant="secondary" className="ml-1 h-4 px-1 text-xs">
+                                {relatedCases.length}
+                              </Badge>
+                            ) : null}
+                          </Button>
+                        )}
                         {activeArticle && (
                           <Button
                             variant={favorites.has(favoriteKey(activeArticle.jo)) ? "default" : "outline"}
@@ -1298,7 +1322,7 @@ export function LawViewer({
             {isPrecedent && showRelatedCases && (
               <div className="border-b border-border px-3 sm:px-4 py-2 bg-muted/30">
                 <div className="flex items-center gap-2 mb-2">
-                  <Icon name="git-branch" size={14} className="text-blue-500" />
+                  <Icon name="git-compare" size={14} className="text-blue-500" />
                   <span className="text-sm font-medium">관련 심급</span>
                   {loadingRelatedCases && (
                     <Icon name="loader" size={14} className="animate-spin text-muted-foreground" />
@@ -1760,6 +1784,7 @@ export function LawViewer({
             hasHistory={refModalHistory.length > 0}
             onBack={handleRefModalBack}
             loading={refModal.loading}
+            precedentMeta={refModal.precedentMeta}
           />
           <AnnexModal
             isOpen={annexModal.open}
@@ -1776,67 +1801,6 @@ export function LawViewer({
             }}
           />
         </div >
-
-        {/* 관련 심급 판례 모달 */}
-        <Dialog
-          open={relatedPrecedentModal.isOpen}
-          onOpenChange={(open) => !open && setRelatedPrecedentModal({ isOpen: false, loading: false, detail: null })}
-        >
-          <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[85vh] overflow-hidden p-0">
-            <DialogHeader className="px-4 py-3 border-b">
-              <DialogTitle className="text-lg font-bold">
-                {relatedPrecedentModal.detail?.name || '판례 상세'}
-              </DialogTitle>
-              {relatedPrecedentModal.detail && (
-                <DialogDescription className="text-sm text-muted-foreground">
-                  {relatedPrecedentModal.detail.court} | {relatedPrecedentModal.detail.caseNumber} | {formatPrecedentDate(relatedPrecedentModal.detail.date)}
-                </DialogDescription>
-              )}
-            </DialogHeader>
-            <ScrollArea className="max-h-[70vh]">
-              {relatedPrecedentModal.loading ? (
-                <div className="flex items-center justify-center h-40">
-                  <Icon name="loader" className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : relatedPrecedentModal.detail ? (
-                <div className="p-4 space-y-4">
-                  {relatedPrecedentModal.detail.summary && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">판결요지</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{relatedPrecedentModal.detail.summary}</p>
-                    </div>
-                  )}
-                  {relatedPrecedentModal.detail.holdings && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">판시사항</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{relatedPrecedentModal.detail.holdings}</p>
-                    </div>
-                  )}
-                  {relatedPrecedentModal.detail.fullText && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1">판결 전문</h4>
-                      <div
-                        className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg"
-                        dangerouslySetInnerHTML={{
-                          __html: relatedPrecedentModal.detail.fullText
-                            .replace(/<br\\>/g, '<br>')
-                            .replace(/<br>/g, '<br>')
-                            .replace(/&nbsp;/g, ' ')
-                            .replace(/【([^】]*)】\s{2,}/g, '【$1】\t')
-                            .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>')
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-40 text-muted-foreground">
-                  판례 정보를 불러올 수 없습니다
-                </div>
-              )}
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
 
         {/* Swipe Tutorial (첫 방문 시 표시) */}
         <SwipeTutorial onComplete={() => { }} />
