@@ -27,7 +27,25 @@ npm run lint     # 린트
 |----------|------|
 | `reference-modal.tsx` | 참조 법령 팝업 (히스토리 스택) |
 | `comparison-modal.tsx` | 법령 비교 팝업 (히스토리 스택) |
-| `law-viewer.tsx` | **메인** 법령/판례 뷰어 |
+| `law-viewer.tsx` | **메인** 법령/판례 뷰어 (오케스트레이터) |
+
+### law-viewer 하위 컴포넌트 (`components/law-viewer/`)
+| 컴포넌트 | 역할 |
+|----------|------|
+| `law-viewer-action-buttons.tsx` | 액션 버튼 (비교/요약/위임법령/판례) |
+| `law-viewer-sidebar.tsx` | 좌측 사이드바 (조문 목록/AI 관련 법령) |
+| `law-viewer-single-article.tsx` | 단문 조회 본문 (헤더+본문+이력+판례) |
+| `law-viewer-related-cases.tsx` | 판례 관련 심급 목록 |
+| `law-viewer-ordinance-actions.tsx` | 조례 전용 액션 버튼 |
+
+### law-viewer 관련 훅 (`hooks/`)
+| 훅 | 역할 |
+|----|------|
+| `use-law-viewer-modals.ts` | 외부 법령/별표 모달 관리 |
+| `use-law-viewer-three-tier.ts` | 위임법령 데이터 |
+| `use-law-viewer-admin-rules.ts` | 행정규칙 데이터 |
+| `use-law-viewer-precedents.ts` | 관련 판례 데이터 |
+| `use-related-precedent-cases.ts` | 판례 관련 심급 검색 |
 
 ## 🔴 핵심 규칙
 
