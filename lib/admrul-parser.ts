@@ -411,8 +411,9 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
     return ""
   }
 
-  // 앞뒤 공백만 제거, 중간 줄바꿈은 보존
-  let text = content.trim()
+  // 앞뒤 공백 제거 + 연속 빈줄(2개 이상)을 하나로 정리
+  // 행정규칙 원본 데이터에 불필요한 빈줄이 있어 시행령/시행규칙과 다르게 보임
+  let text = content.trim().replace(/\n{2,}/g, '\n')
 
   // 1. 링크 생성 (법령 참조 정규화 후)
   const normalized = baseLawName ? normalizeLawReferences(text, baseLawName) : text
@@ -446,17 +447,7 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
   // 6. 하위 항목 (가., 나., 다.) 앞에 <br> + 들여쓰기 추가
   // 공백 또는 구두점(. ! ?) 뒤에 나타나는 단일 한글 글자 + ". " 패턴만 매칭
   // 예: "분장한다. 가. " ✅, "담당한다. 나. " ✅
-  const beforeReplace = text
   text = text.replace(/(\s|^)([가나다라마바사아자차카타파하]\.)\s/g, '$1<br>&nbsp;&nbsp;$2 ')
-
-  // DEBUG: 한 번만 출력
-  if (beforeReplace.includes('가.') || beforeReplace.includes('나.')) {
-    console.log('[formatAdminRuleHTML] Sub-item processing:', {
-      hasMatch: beforeReplace !== text,
-      beforeSample: beforeReplace.substring(0, 200),
-      afterSample: text.substring(0, 200)
-    })
-  }
 
   return text
 }
