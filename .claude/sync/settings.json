@@ -11,7 +11,7 @@
   "model": "opusplan",
   "statusLine": {
     "type": "command",
-    "command": "bash /c/Users/Chris/.claude/statusline.sh",
+    "command": "py C:/Users/Chris/.claude/statusline.py",
     "padding": 0
   },
   "enabledPlugins": {
