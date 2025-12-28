@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">AI RAG Pipeline</text>
+
+  <!-- Row 1 -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="100" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">사용자 질문</text>
+    <text x="100" y="95" text-anchor="middle" font-size="11" fill="#64748b">"청년 창업 요건"</text>
+  </g>
+
+  <line x1="170" y1="80" x2="195" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="192,75 202,80 192,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="205" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="275" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">쿼리 분류</text>
+    <text x="275" y="95" text-anchor="middle" font-size="11" fill="#64748b">유형 + 도메인</text>
+  </g>
+
+  <line x1="345" y1="80" x2="370" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="367,75 377,80 367,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="380" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="450" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">2-Tier 라우팅</text>
+    <text x="450" y="95" text-anchor="middle" font-size="11" fill="#64748b">프롬프트 선택</text>
+  </g>
+
+  <line x1="520" y1="80" x2="545" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="542,75 552,80 542,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="555" y="50" width="160" height="60" rx="6" fill="#fef3c7" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="635" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#92400e">Gemini RAG</text>
+    <text x="635" y="95" text-anchor="middle" font-size="11" fill="#b45309">벡터 스토어 검색</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="635" y1="110" x2="635" y2="140" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="630,137 635,147 640,137" fill="#94a3b8"/>
+
+  <!-- Row 2 -->
+  <g filter="url(#shadow)">
+    <rect x="555" y="150" width="160" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="635" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">SSE 스트리밍</text>
+    <text x="635" y="195" text-anchor="middle" font-size="11" fill="#64748b">실시간 청크</text>
+  </g>
+
+  <line x1="555" y1="180" x2="530" y2="180" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="533,175 523,180 533,185" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="380" y="150" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="450" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">후처리</text>
+    <text x="450" y="195" text-anchor="middle" font-size="11" fill="#64748b">MD → HTML</text>
+  </g>
+
+  <line x1="380" y1="180" x2="355" y2="180" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="358,175 348,180 358,185" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="205" y="150" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="275" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">UI 렌더링</text>
+    <text x="275" y="195" text-anchor="middle" font-size="11" fill="#64748b">타이핑 효과</text>
+  </g>
+
+  <line x1="205" y1="180" x2="180" y2="180" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="183,175 173,180 183,185" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="30" y="150" width="140" height="60" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+    <text x="100" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#166534">Citation 모달</text>
+    <text x="100" y="195" text-anchor="middle" font-size="11" fill="#16a34a">조문 바로가기</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(30, 235)">
+    <rect width="12" height="12" rx="2" fill="#fef3c7" stroke="#fde68a" stroke-width="1"/>
+    <text x="20" y="11" font-size="11" fill="#64748b">Gemini AI</text>
+
+    <rect x="100" width="12" height="12" rx="2" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+    <text x="120" y="11" font-size="11" fill="#64748b">사용자 인터랙션</text>
+  </g>
+</svg>
