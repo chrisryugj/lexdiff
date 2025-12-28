@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 180" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="180" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="350" y="30" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">Test Coverage (667 Cases)</text>
+
+  <!-- Three columns -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="50" width="200" height="110" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="130" y="75" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">Unit Tests</text>
+    <line x1="50" y1="85" x2="210" y2="85" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="130" y="108" text-anchor="middle" font-size="12" fill="#64748b">JO코드 파싱</text>
+    <text x="130" y="128" text-anchor="middle" font-size="12" fill="#64748b">유사도 매칭</text>
+    <text x="130" y="148" text-anchor="middle" font-size="12" fill="#64748b">링크 생성</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="250" y="50" width="200" height="110" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="350" y="75" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">Integration Tests</text>
+    <line x1="270" y1="85" x2="430" y2="85" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="350" y="108" text-anchor="middle" font-size="12" fill="#64748b">API 엔드포인트</text>
+    <text x="350" y="128" text-anchor="middle" font-size="12" fill="#64748b">캐시 동작</text>
+    <text x="350" y="148" text-anchor="middle" font-size="12" fill="#64748b">Rate Limiting</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="470" y="50" width="200" height="110" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="570" y="75" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">E2E Tests</text>
+    <line x1="490" y1="85" x2="650" y2="85" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="570" y="108" text-anchor="middle" font-size="12" fill="#64748b">법령 검색 → 조회</text>
+    <text x="570" y="128" text-anchor="middle" font-size="12" fill="#64748b">AI 질문 → 스트리밍</text>
+    <text x="570" y="148" text-anchor="middle" font-size="12" fill="#64748b">판례 검색 → 상세</text>
+  </g>
+</svg>

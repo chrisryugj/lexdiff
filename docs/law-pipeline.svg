@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">Law Query Pipeline</text>
+
+  <!-- Row 1: Main flow -->
+  <g filter="url(#shadow)">
+    <rect x="30" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="100" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">사용자 입력</text>
+    <text x="100" y="95" text-anchor="middle" font-size="11" fill="#64748b">"관세법 38조"</text>
+  </g>
+
+  <line x1="170" y1="80" x2="195" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="192,75 202,80 192,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="205" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="275" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">쿼리 파싱</text>
+    <text x="275" y="95" text-anchor="middle" font-size="11" fill="#64748b">JO 정규화</text>
+  </g>
+
+  <line x1="345" y1="80" x2="370" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="367,75 377,80 367,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="380" y="50" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="450" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">캐시 확인</text>
+    <text x="450" y="95" text-anchor="middle" font-size="11" fill="#64748b">IndexedDB</text>
+  </g>
+
+  <!-- Cache Hit path -->
+  <line x1="520" y1="80" x2="545" y2="80" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="542,75 552,80 542,85" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="555" y="50" width="140" height="60" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+    <text x="625" y="75" text-anchor="middle" font-size="13" font-weight="500" fill="#166534">응답 반환</text>
+    <text x="625" y="95" text-anchor="middle" font-size="11" fill="#16a34a">~25ms (Hit)</text>
+  </g>
+
+  <text x="537" y="68" font-size="10" fill="#64748b">Hit</text>
+
+  <!-- Cache Miss path -->
+  <line x1="450" y1="110" x2="450" y2="140" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="445,137 450,147 455,137" fill="#94a3b8"/>
+  <text x="465" y="130" font-size="10" fill="#64748b">Miss</text>
+
+  <!-- Row 2: Miss flow -->
+  <g filter="url(#shadow)">
+    <rect x="380" y="150" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="450" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">법제처 API</text>
+    <text x="450" y="195" text-anchor="middle" font-size="11" fill="#64748b">law.go.kr</text>
+  </g>
+
+  <line x1="380" y1="180" x2="355" y2="180" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="358,175 348,180 358,185" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="205" y="150" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="275" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">API 호출</text>
+    <text x="275" y="195" text-anchor="middle" font-size="11" fill="#64748b">eflaw JSON</text>
+  </g>
+
+  <line x1="205" y1="180" x2="180" y2="180" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="183,175 173,180 183,185" fill="#94a3b8"/>
+
+  <g filter="url(#shadow)">
+    <rect x="30" y="150" width="140" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="100" y="175" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">렌더링</text>
+    <text x="100" y="195" text-anchor="middle" font-size="11" fill="#64748b">조문 트리</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(30, 235)">
+    <rect width="12" height="12" rx="2" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+    <text x="20" y="11" font-size="11" fill="#64748b">Cache Hit (~25ms)</text>
+
+    <rect x="150" width="12" height="12" rx="2" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="170" y="11" font-size="11" fill="#64748b">Cache Miss (API 호출)</text>
+  </g>
+</svg>

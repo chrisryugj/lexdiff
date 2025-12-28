@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-size="18" font-weight="600" fill="#111827">Precedent Search System</text>
+
+  <!-- Top: Search API -->
+  <g filter="url(#shadow)">
+    <rect x="200" y="50" width="400" height="50" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="400" y="80" text-anchor="middle" font-size="14" font-weight="500" fill="#334155">통합 검색 API (/api/search-all)</text>
+  </g>
+
+  <!-- Arrows down -->
+  <line x1="280" y1="100" x2="280" y2="130" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="275,127 280,137 285,127" fill="#94a3b8"/>
+
+  <line x1="400" y1="100" x2="400" y2="130" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="395,127 400,137 405,127" fill="#94a3b8"/>
+
+  <line x1="520" y1="100" x2="520" y2="130" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="515,127 520,137 525,127" fill="#94a3b8"/>
+
+  <text x="400" y="120" text-anchor="middle" font-size="10" fill="#64748b">병렬 실행</text>
+
+  <!-- Middle: Three search types -->
+  <g filter="url(#shadow)">
+    <rect x="180" y="140" width="150" height="50" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="255" y="163" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">법령 검색</text>
+    <text x="255" y="180" text-anchor="middle" font-size="10" fill="#64748b">target: law</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="350" y="140" width="150" height="50" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="425" y="163" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">판례 검색</text>
+    <text x="425" y="180" text-anchor="middle" font-size="10" fill="#64748b">target: prec</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="520" y="140" width="150" height="50" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="595" y="163" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">해석례 검색</text>
+    <text x="595" y="180" text-anchor="middle" font-size="10" fill="#64748b">target: expc</text>
+  </g>
+
+  <!-- Arrows down -->
+  <line x1="255" y1="190" x2="255" y2="215" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="250,212 255,222 260,212" fill="#94a3b8"/>
+
+  <line x1="425" y1="190" x2="425" y2="215" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="420,212 425,222 430,212" fill="#94a3b8"/>
+
+  <line x1="595" y1="190" x2="595" y2="215" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="590,212 595,222 600,212" fill="#94a3b8"/>
+
+  <!-- Bottom: Results -->
+  <g filter="url(#shadow)">
+    <rect x="180" y="225" width="150" height="40" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+    <text x="255" y="250" text-anchor="middle" font-size="12" fill="#166534">법령 결과 + 상세</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="350" y="225" width="150" height="40" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+    <text x="425" y="250" text-anchor="middle" font-size="12" fill="#166534">판례 결과 + 전문</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="520" y="225" width="150" height="40" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+    <text x="595" y="250" text-anchor="middle" font-size="12" fill="#166534">해석례 결과 + 전문</text>
+  </g>
+</svg>
