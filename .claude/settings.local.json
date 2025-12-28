@@ -19,7 +19,10 @@
       "Bash(dir node_moduleshwp.jsbuild)",
       "Bash(npm uninstall:*)",
       "Bash(node -e:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run lint:*)",
+      "Bash(iconv:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
