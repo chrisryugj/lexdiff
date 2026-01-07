@@ -33,6 +33,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('home')
   const [searchId, setSearchId] = useState<string | null>(null)
   const [precedentId, setPrecedentId] = useState<string | null>(null)  // 판례 상세 ID
+  const [historyKey, setHistoryKey] = useState(0)  // 뒤로가기 시 강제 리마운트용
   const [isSearching, setIsSearching] = useState(false)
   const [ragLoading, setRagLoading] = useState(false)
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
@@ -115,11 +116,12 @@ export default function Home() {
         setPrecedentId(state.precedentId)
         setSearchMode(state.searchMode || 'basic')
       } else if (state.viewMode === 'search-result' && state.searchId) {
-        // 판례 상세 → 뒤로가기 → 검색 결과 리스트
+        // 판례 상세 / 조례 상세 → 뒤로가기 → 검색 결과 리스트
         setViewMode('search-result')
         setSearchId(state.searchId)
         setPrecedentId(null)  // 판례 상세 초기화
         setSearchMode(state.searchMode || 'basic')
+        setHistoryKey(prev => prev + 1)  // 같은 searchId여도 강제 리마운트
       }
     })
 
@@ -205,6 +207,7 @@ export default function Home() {
         />
       ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView
+          key={`${searchId}-${historyKey}`}  // 뒤로가기 시 강제 리마운트
           searchId={searchId}
           onBack={handleBack}
           onHomeClick={handleHomeClick}
