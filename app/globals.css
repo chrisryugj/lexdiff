@@ -391,7 +391,7 @@ a.law-ref:hover,
   .rev-mark-move {
     background-color: var(--rev-move-bg);
     color: var(--rev-move-fg);
-    font-size: 0.9em;
+    font-size: 0.9em !important;
   }
 
   /* prose 컨텍스트 오버라이드 */
