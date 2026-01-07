@@ -821,7 +821,9 @@ export function useSearchHandlers({
   // ============================================================
 
   const handleSearch = useCallback((query: SearchQuery) => {
-    handleSearchInternal(query)
+    // ✅ SearchBar에서 전달된 forcedMode 추출 (무한 루프 방지)
+    const passedForcedMode = (query as any).forcedMode as 'law' | 'ai' | undefined
+    handleSearchInternal(query, undefined, passedForcedMode)
   }, [handleSearchInternal])
 
   const handleSearchChoice = useCallback((mode: 'law' | 'ai') => {
