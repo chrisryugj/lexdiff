@@ -320,7 +320,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         article: undefined,
         jo: undefined,
         searchType: 'ai',
-        classification: classification
+        classification: classification,
+        forcedMode: 'ai'  // ✅ 사용자 선택 전달 (무한 루프 방지)
       })
     } else {
       try {
@@ -329,7 +330,8 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
         onSearch({
           ...parsed,
           searchType: classification.searchType,
-          classification: classification
+          classification: classification,
+          forcedMode: 'law'  // ✅ 사용자 선택 전달 (무한 루프 방지)
         })
       } catch (error) {
         debugLogger.error("법령 검색 파싱 실패", error)

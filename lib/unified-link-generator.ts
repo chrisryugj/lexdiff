@@ -543,6 +543,15 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
       continue
     }
 
+    // ⚠️ 개정 태그 패턴 제외: [제N조에서 이동 <날짜>], [제N조로 이동 <날짜>] 등
+    // 예: "[제24조에서 이동 <2023.6.16.>]", "[종전 제5조에서 이동, <2020.1.1.>]"
+    const beforeChar = text[match.index - 1]
+    const afterText = text.substring(match.index + match[0].length, match.index + match[0].length + 20)
+    const isAmendmentTag = beforeChar === '[' && /^에서\s*이동|^로\s*이동|^는\s*제/.test(afterText)
+    if (isAmendmentTag) {
+      continue
+    }
+
     // 그룹: (1)전체, (2)조번호, (3)의X전체, (4)X, (5)항, (6)호
     const joLabel = `제${match[2]}조${match[4] ? '의' + match[4] : ''}`
     const fullLabel = match[1] + (match[5] ? `제${match[5]}항` : '') + (match[6] ? `제${match[6]}호` : '')
@@ -686,10 +695,14 @@ function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
 
   // 패턴 2: 별표 X (대괄호 없이, 문맥 포함)
   // "별표 1과 같다", "별표 1에 따른", "별표 1에서 정하는" 등
-  const plainPattern = /(?<!\[)별표\s*(\d+)(?:의(\d+))?(?:\s*(?:과|와|에|을|를|의|이|가)\s*(?:같다|따른|따르는|따라|정하는|정한|따름|해당))?/g
+  // ✅ 숫자 선택적: "별표와 같다" (숫자 없음) 케이스 지원
+  const plainPattern = /(?<!\[)별표(?:\s*(\d+)(?:의(\d+))?)?(?:\s*(?:과|와|에|을|를|의|이|가)\s*(?:같다|따른|따르는|따라|정하는|정한|따름|해당))?/g
 
   while ((match = plainPattern.exec(text)) !== null) {
-    const annexNum = match[2] ? `${match[1]}의${match[2]}` : match[1]
+    // 숫자가 없으면 "1" 기본값 (조례에서 별표가 하나인 경우)
+    const annexNum = match[1]
+      ? (match[2] ? `${match[1]}의${match[2]}` : match[1])
+      : '1'
     const lawName = extractLawNameBeforeAnnex(text, match.index)
 
     // 이미 처리된 영역인지 확인 (대괄호 패턴과 중복 방지)
@@ -999,10 +1012,11 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
   )
 
   // 패턴 3: 별표/별지 단독 (문맥 추론)
-  // "조례 별표1", "별표 1에 따르며" → 가장 가까운 「법령명」 찾기
+  // "조례 별표1", "별표 1에 따르며", "별지 제2호서식", "별표와 같다" → 가장 가까운 「법령명」 찾기
+  // ✅ 수정: "별지 제X호서식" 순서 지원 + 숫자 선택적 (별표와 같다)
   result = result.replace(
-    /(?<!\[)(별표|별지)\s*(\d+)(?:의(\d+))?\s*(?:제\s*(\d+)\s*호\s*서식)?(?:\s*(?:에|을|를|과|와|의|이|가)\s*(?:따르|정하는|같다|해당|따른))?/g,
-    (match, type, num1, num2, formNum, offset, fullString) => {
+    /(?<!\[)(별표|별지)(?:\s*제\s*(\d+)\s*호\s*서식|\s*(\d+)(?:의(\d+))?)?(?:\s*(?:에|을|를|과|와|의|이|가)\s*(?:따르|정하는|같다|해당|따른))?/g,
+    (match, type, formNum, num1, num2, offset, fullString) => {
       // 이미 링크로 변환된 부분 제외 (「법령명」 패턴)
       const beforeText = fullString.substring(Math.max(0, offset - 150), offset)
       if (beforeText.includes('](annex://')) return match
@@ -1024,15 +1038,24 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
       let displayText: string
 
       if (type === '별표') {
-        annexId = num2 ? `${num1}의${num2}` : num1
-        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+        // ✅ 별표: 숫자 없으면 "1" 기본값 (조례에서 별표 하나인 경우)
+        if (num1) {
+          annexId = num2 ? `${num1}의${num2}` : num1
+          displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+        } else {
+          annexId = '1'
+          displayText = '별표'
+        }
       } else {
+        // ✅ 별지: "제X호서식" 형태가 우선
         if (formNum) {
           annexId = `별지제${formNum}호서식`
           displayText = `별지 제${formNum}호서식`
-        } else {
+        } else if (num1) {
           annexId = num2 ? `별지${num1}의${num2}` : `별지${num1}`
           displayText = num2 ? `별지 ${num1}의${num2}` : `별지 ${num1}`
+        } else {
+          return match  // 별지는 숫자/서식번호 필수
         }
       }
 

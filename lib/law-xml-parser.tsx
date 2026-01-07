@@ -352,7 +352,8 @@ function extractRevisionMarks(
 ): Array<{ date: string; type: string; description?: string }> {
   const revisions: Array<{ date: string; type: string; description?: string }> = []
 
-  const halfWidthPattern = /<(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)>/g
+  // ✅ "이동" 타입 추가
+  const halfWidthPattern = /<(개정|신설|전문개정|제정|삭제|이동)\s+([0-9., ]+)>/g
   let match: RegExpExecArray | null
 
   while ((match = halfWidthPattern.exec(content)) !== null) {
@@ -365,7 +366,7 @@ function extractRevisionMarks(
     }
   }
 
-  const fullWidthPattern = /＜(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)＞/g
+  const fullWidthPattern = /＜(개정|신설|전문개정|제정|삭제|이동)\s+([0-9., ]+)＞/g
 
   while ((match = fullWidthPattern.exec(content)) !== null) {
     const dateStr = match[2].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
@@ -377,13 +378,29 @@ function extractRevisionMarks(
     }
   }
 
-  const squareBracketPattern = /\[(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)\]/g
+  const squareBracketPattern = /\[(개정|신설|전문개정|제정|삭제|이동)\s+([0-9., ]+)\]/g
 
   while ((match = squareBracketPattern.exec(content)) !== null) {
     const dateStr = match[2].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
     if (dateStr.length === 8) {
       revisions.push({
         type: match[1],
+        date: dateStr,
+      })
+    }
+  }
+
+  // ✅ 이동 형식 (복합 패턴 지원):
+  // - "[제22조에서 이동 <2023.6.16.>]"
+  // - "[제25조에서 이동, 종전 제21조는 제17조로 이동 <2023.6.16.>]"
+  // 대괄호 안에 "이동"이 있고 꺽쇠 안에 날짜가 있으면 모두 매칭
+  const movePattern = /\[[^\]]*이동[^\]]*<([0-9., ]+)>\]/g
+
+  while ((match = movePattern.exec(content)) !== null) {
+    const dateStr = match[1].replace(/\./g, "").replace(/,/g, "").replace(/\s+/g, "").trim()
+    if (dateStr.length === 8) {
+      revisions.push({
+        type: '이동',
         date: dateStr,
       })
     }
@@ -425,7 +442,7 @@ function extractRevisionMarks(
     hangElements.forEach((hangEl) => {
       const hangContent = hangEl.textContent || ""
 
-      const hangRevPattern = /<(개정|신설|전문개정|제정|삭제)\s+([0-9., ]+)>/g
+      const hangRevPattern = /<(개정|신설|전문개정|제정|삭제|이동)\s+([0-9., ]+)>/g
       let hangMatch: RegExpExecArray | null
 
       while ((hangMatch = hangRevPattern.exec(hangContent)) !== null) {
