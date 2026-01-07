@@ -839,6 +839,13 @@ function applyRevisionStyling(text: string): string {
     '<span class="rev-mark rev-mark-move">＜$1$2＞</span>',
   )
 
+  // 이동 태그: HTML escaped 버전 (대괄호 없이)
+  // "&lt;제21조에서 이동 2023.6.16.&gt;" 형식
+  styled = styled.replace(
+    /(?<!>)&lt;([^&]*(?:에서|로)\s*이동[^&]*?)([0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.?)&gt;/g,
+    '<span class="rev-mark rev-mark-move">＜$1$2＞</span>',
+  )
+
   return styled
 }
 
