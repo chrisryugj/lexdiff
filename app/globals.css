@@ -210,6 +210,8 @@
   --rev-delete-fg: oklch(0.40 0.18 25);
   --rev-etc-bg: oklch(0.95 0.02 240);
   --rev-etc-fg: oklch(0.45 0.05 240);
+  --rev-move-bg: oklch(0.94 0.08 70);
+  --rev-move-fg: oklch(0.42 0.16 70);
 }
 
 /* 다크 테마 */
@@ -271,6 +273,8 @@
   --rev-delete-fg: oklch(0.75 0.18 25);
   --rev-etc-bg: oklch(0.20 0.03 240);
   --rev-etc-fg: oklch(0.65 0.05 240);
+  --rev-move-bg: oklch(0.28 0.12 70);
+  --rev-move-fg: oklch(0.78 0.16 70);
 }
 
 /* 법령 링크 스타일 */
@@ -384,12 +388,19 @@ a.law-ref:hover,
     color: var(--rev-etc-fg);
   }
 
+  .rev-mark-move {
+    background-color: var(--rev-move-bg);
+    color: var(--rev-move-fg);
+    font-size: 0.9em;
+  }
+
   /* prose 컨텍스트 오버라이드 */
   .prose .rev-mark,
   .prose .rev-mark-new,
   .prose .rev-mark-edit,
   .prose .rev-mark-delete,
-  .prose .rev-mark-etc {
+  .prose .rev-mark-etc,
+  .prose .rev-mark-move {
     display: inline-block !important;
     padding: 0px 2px !important;
     border-radius: 2px !important;
@@ -399,7 +410,7 @@ a.law-ref:hover,
   }
 
   /* 하위 호환성 - 기존 rev-mark만 있는 경우 */
-  .rev-mark:not(.rev-mark-new):not(.rev-mark-edit):not(.rev-mark-delete):not(.rev-mark-etc) {
+  .rev-mark:not(.rev-mark-new):not(.rev-mark-edit):not(.rev-mark-delete):not(.rev-mark-etc):not(.rev-mark-move) {
     color: rgb(147, 197, 253) !important;
     background-color: transparent !important;
     padding: 0 !important;
