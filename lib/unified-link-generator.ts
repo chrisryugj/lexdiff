@@ -545,10 +545,16 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
 
     // ⚠️ 개정 태그 패턴 제외: [제N조에서 이동 <날짜>], [제N조로 이동 <날짜>] 등
     // 예: "[제24조에서 이동 <2023.6.16.>]", "[종전 제5조에서 이동, <2020.1.1.>]"
-    const beforeChar = text[match.index - 1]
-    const afterText = text.substring(match.index + match[0].length, match.index + match[0].length + 20)
-    const isAmendmentTag = beforeChar === '[' && /^에서\s*이동|^로\s*이동|^는\s*제/.test(afterText)
-    if (isAmendmentTag) {
+    // 예: "[종전 제10조는 제12조로 이동 <2020.3.1.>]"
+    const beforeText10 = text.substring(Math.max(0, match.index - 10), match.index)
+    const afterText = text.substring(match.index + match[0].length, match.index + match[0].length + 30)
+
+    // 패턴 1: [제N조에서 이동, [제N조로 이동
+    const isDirectAmendment = beforeText10.endsWith('[') && /^에서\s*이동|^로\s*이동|^는\s*제/.test(afterText)
+    // 패턴 2: [종전 제N조는 제M조로 이동 - 대괄호 안에 있고 뒤에 <날짜>] 패턴
+    const isInBracket = beforeText10.includes('[') && !beforeText10.includes(']') && /<\d{4}\.\d{1,2}\.\d{1,2}\.?>.*?\]/.test(afterText)
+
+    if (isDirectAmendment || isInBracket) {
       continue
     }
 
