@@ -706,6 +706,35 @@ export function useSearchHandlers({
         actions.setMobileView("list")
         actions.updateProgress('complete', 100)
         actions.setIsSearching(false)
+
+        // ✅ 조례 검색 결과 IndexedDB 저장 (뒤로가기 복원용)
+        try {
+          const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+          const currentState = window.history.state
+          const currentSearchId = currentState?.searchId
+
+          if (currentSearchId) {
+            const existingCache = await getSearchResult(currentSearchId)
+            await saveSearchResult({
+              ...existingCache,
+              searchId: currentSearchId,
+              query: { lawName },
+              ordinanceSelectionState: {
+                results: ordinances.map(o => ({
+                  자치법규ID: o.ordinId || o.ordinSeq,
+                  자치법규명: o.ordinName,
+                  공포일자: o.promulgationDate || '',
+                })),
+                query: lawName,
+              },
+              timestamp: Date.now(),
+              expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+            })
+            debugLogger.success('💾 조례 검색 결과 IndexedDB 저장', { searchId: currentSearchId, count: ordinances.length })
+          }
+        } catch (cacheError) {
+          debugLogger.error('⚠️ 조례 검색 결과 저장 실패', cacheError)
+        }
       } else {
         const apiUrl = "/api/law-search?query=" + encodeURIComponent(lawName)
 
@@ -956,6 +985,14 @@ export function useSearchHandlers({
         debugLogger.error('⚠️ 조례 lawData 저장 실패', cacheError)
       }
 
+      // ✅ 조례 상세 History entry 추가 (뒤로가기 시 검색 결과 목록으로 돌아가기 위함)
+      const currentSearchId = window.history.state?.searchId
+      if (currentSearchId) {
+        const { pushSearchHistory } = await import('@/lib/history-manager')
+        pushSearchHistory(currentSearchId, state.searchMode || 'basic', { hasOrdinanceDetail: true })
+        debugLogger.info('[통합검색] 조례 상세 히스토리 추가', { searchId: currentSearchId })
+      }
+
       actions.setOrdinanceSelectionState(null)
       actions.setMobileView("content")
       debugLogger.success("자치법규 조회 완료", { ordinName: meta.lawTitle, articleCount: articles.length })
@@ -966,7 +1003,7 @@ export function useSearchHandlers({
     } finally {
       actions.setIsSearching(false)
     }
-  }, [actions, state.ordinanceSelectionState, reportError, toast])
+  }, [actions, state.ordinanceSelectionState, state.searchMode, reportError, toast])
 
   const handleRecentSelect = useCallback((search: any) => {
     debugLogger.info("최근 검색 선택", search)

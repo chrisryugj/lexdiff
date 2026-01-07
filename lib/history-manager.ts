@@ -15,6 +15,7 @@ export interface HistoryState {
   searchId?: string
   searchMode?: 'basic' | 'rag'  // 검색 모드 (기본/AI)
   precedentId?: string  // 판례 상세 보기 시 판례 ID
+  hasOrdinanceDetail?: boolean  // 조례 상세 보기 여부 (뒤로가기 시 목록 복원용)
   timestamp: number
 }
 
@@ -42,11 +43,16 @@ export function initializeHistory(): void {
  * - URL은 '/' 유지
  * - History에 검색 ID와 검색 모드 저장
  */
-export function pushSearchHistory(searchId: string, searchMode: 'basic' | 'rag' = 'basic'): void {
+export function pushSearchHistory(
+  searchId: string,
+  searchMode: 'basic' | 'rag' = 'basic',
+  options?: { hasOrdinanceDetail?: boolean }
+): void {
   const state: HistoryState = {
     viewMode: 'search-result',
     searchId,
     searchMode,
+    hasOrdinanceDetail: options?.hasOrdinanceDetail,
     timestamp: Date.now()
   }
   window.history.pushState(state, '', '/')

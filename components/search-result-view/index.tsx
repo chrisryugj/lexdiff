@@ -157,6 +157,40 @@ export function SearchResultView({
           return
         }
 
+        // ✅ 조례 검색 결과 복원 (뒤로가기 시)
+        // hasOrdinanceDetail이 false/undefined면 목록으로 복원
+        const historyState = window.history.state
+        if (cached.ordinanceSelectionState && !historyState?.hasOrdinanceDetail) {
+          debugLogger.success('✅ 조례 검색 결과 캐시 HIT')
+
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+
+          // IndexedDB 스키마 → React state 변환
+          const ordinanceResults = cached.ordinanceSelectionState.results.map(o => ({
+            ordinSeq: o.자치법규ID,
+            ordinName: o.자치법규명,
+            ordinId: o.자치법규ID,
+            promulgationDate: o.공포일자,
+          }))
+
+          actions.setOrdinanceSelectionState({
+            results: ordinanceResults,
+            totalCount: ordinanceResults.length,
+            query: { lawName: cached.ordinanceSelectionState.query }
+          })
+          actions.setLawData(null)  // 조례 상세 초기화
+          actions.setMobileView("list")
+
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, 300)
+          return
+        }
+
         // AI 모드 캐시 복원
         if (cached.aiMode) {
           debugLogger.success('✅ AI 답변 캐시 HIT - API 호출 없음')
