@@ -6,7 +6,7 @@ import { parseHwpxToMarkdown, isHwpxFile, isOldHwpFile } from "@/lib/hwpx-parser
 /**
  * 별표 파일 → 마크다운 변환 API
  * - HWPX (신 한글): 직접 파싱 (빠르고 정확)
- * - 구 HWP (OLE2): hwp.js로 파싱 시도
+ * - 구 HWP (OLE2): 다운로드만 제공 (표 형식이라 파싱 결과가 좋지 않음)
  * - PDF: Gemini Vision API 사용
  *
  * POST /api/annex-to-markdown
@@ -40,85 +40,15 @@ export async function POST(request: Request) {
     const isOldHwp = isOldHwpFile(fileBuffer)
 
     if (isOldHwp) {
-      // 구 HWP 파일: hwp.js로 파싱 시도
-      debugLogger.info("구 HWP 파일 감지, hwp.js로 파싱 시도", { annexNumber })
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const hwpjs = require("hwp.js")
-        const parse = hwpjs.parse
-
-        const buffer = Buffer.from(fileBuffer)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const hwpDoc: any = parse(buffer, { type: "buffer" })
-
-        if (!hwpDoc.sections || hwpDoc.sections.length === 0) {
-          throw new Error("HWP 문서에 내용이 없습니다")
-        }
-
-        // 재귀적으로 텍스트 추출
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const extractTextFromContent = (content: any[]): string => {
-          let text = ""
-          for (const item of content) {
-            if (item.value !== undefined && typeof item.value === "string") {
-              text += item.value
-            }
-            if (item.content && Array.isArray(item.content)) {
-              text += extractTextFromContent(item.content)
-            }
-          }
-          return text
-        }
-
-        const lines: string[] = []
-        for (const section of hwpDoc.sections) {
-          const paragraphs = section.content || []
-          for (const paragraph of paragraphs) {
-            const content = paragraph.content || []
-            const paragraphText = extractTextFromContent(content)
-            if (paragraphText.trim()) {
-              lines.push(paragraphText.trim())
-            }
-          }
-        }
-
-        if (lines.length === 0) {
-          // 텍스트 추출 실패 (표 형식 문서)
-          debugLogger.warn("구 HWP 텍스트 추출 실패 - 표 형식 문서", { annexNumber })
-          return NextResponse.json(
-            {
-              error: "표 형식 HWP 문서는 텍스트 추출이 제한적입니다. 다운로드하여 확인해주세요.",
-              fileType: "old-hwp",
-            },
-            { status: 400 }
-          )
-        }
-
-        const markdown = lines.join("\n\n")
-        debugLogger.success("구 HWP→마크다운 변환 완료", {
-          annexNumber,
-          markdownLength: markdown.length,
-          paragraphs: lines.length,
-        })
-
-        return NextResponse.json({
-          markdown,
-          source: "hwp-js",
-        })
-      } catch (hwpError) {
-        debugLogger.warn("구 HWP 파싱 실패, 다운로드만 제공", {
-          annexNumber,
-          error: hwpError instanceof Error ? hwpError.message : "알 수 없는 에러",
-        })
-        return NextResponse.json(
-          {
-            error: "구 HWP 파일 파싱에 실패했습니다. 다운로드하여 한컴오피스로 열어주세요.",
-            fileType: "old-hwp",
-          },
-          { status: 400 }
-        )
-      }
+      // 구 HWP 파일: 표 형식이 대부분이라 파싱해도 결과가 좋지 않음
+      debugLogger.warn("구 HWP 파일 감지 - 다운로드만 제공", { annexNumber })
+      return NextResponse.json(
+        {
+          error: "구 HWP 파일은 다운로드하여 한컴오피스로 열어주세요.",
+          fileType: "old-hwp",
+        },
+        { status: 400 }
+      )
     }
 
     if (isHwpx) {
