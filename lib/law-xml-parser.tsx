@@ -810,15 +810,24 @@ function applyRevisionStyling(text: string): string {
     '<span class="rev-mark rev-mark-delete">$&</span>',
   )
 
-  // 4. [종전...], [제X조에서 이동...]
+  // 4. [종전...], [제X조에서/로 이동...]
   styled = styled.replace(
     /\[종전[^\]]*\]/g,
     '<span class="rev-mark rev-mark-etc">$&</span>',
   )
 
+  // 이동 태그: HTML escaped 버전 처리 및 전각 괄호로 통일
+  // "[제21조에서 이동 &lt;2023.6.16.&gt;]" → "＜제21조에서 이동 2023.6.16.＞"
+  // "[종전 제21조는 제17조로 이동 &lt;2023.6.16.&gt;]" 등
   styled = styled.replace(
-    /\[제\d+조[^\]]*에서 이동[^\]]*\]/g,
-    '<span class="rev-mark rev-mark-etc">$&</span>',
+    /\[([^\]]*(?:에서|로)\s*이동[^\]]*?)&lt;([0-9., ]+)&gt;\]/g,
+    '<span class="rev-mark rev-mark-etc">＜$1$2＞</span>',
+  )
+
+  // 이동 태그: 원본 꺽쇠 버전 (escape 안 된 경우)
+  styled = styled.replace(
+    /\[([^\]]*(?:에서|로)\s*이동[^\]]*?)<([0-9., ]+)>\]/g,
+    '<span class="rev-mark rev-mark-etc">＜$1$2＞</span>',
   )
 
   return styled
