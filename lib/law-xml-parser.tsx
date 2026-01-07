@@ -770,7 +770,8 @@ function getRevisionType(keyword: string): 'new' | 'edit' | 'delete' | 'etc' {
  * - 신설: 녹색 (rev-mark-new)
  * - 개정/전문개정/제정: 파란색 (rev-mark-edit)
  * - 삭제: 빨간색 (rev-mark-delete)
- * - 기타(종전/이동): 회색 (rev-mark-etc)
+ * - 기타(종전): 회색 (rev-mark-etc)
+ * - 이동: 주황색 (rev-mark-move)
  */
 function applyRevisionStyling(text: string): string {
   let styled = text
@@ -821,13 +822,20 @@ function applyRevisionStyling(text: string): string {
   // 날짜 뒤 공백 허용
   styled = styled.replace(
     /\[([^\]]*(?:에서|로)\s*이동[^\]]*?)&lt;([0-9., ]+)&gt;\s*\]/g,
-    '<span class="rev-mark rev-mark-etc">＜$1$2＞</span>',
+    '<span class="rev-mark rev-mark-move">＜$1$2＞</span>',
   )
 
   // 이동 태그: 원본 꺽쇠 버전 (escape 안 된 경우)
   styled = styled.replace(
     /\[([^\]]*(?:에서|로)\s*이동[^\]]*?)<([0-9., ]+)>\s*\]/g,
-    '<span class="rev-mark rev-mark-etc">＜$1$2＞</span>',
+    '<span class="rev-mark rev-mark-move">＜$1$2＞</span>',
+  )
+
+  // 이동 태그: 전각 괄호 버전 (대괄호 없이 직접 전각 괄호로 들어온 경우)
+  // "＜제21조에서 이동 2023.6.16.＞" 형식
+  styled = styled.replace(
+    /＜([^＞]*(?:에서|로)\s*이동[^＞]*?)([0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.?)＞/g,
+    '<span class="rev-mark rev-mark-move">＜$1$2＞</span>',
   )
 
   return styled
