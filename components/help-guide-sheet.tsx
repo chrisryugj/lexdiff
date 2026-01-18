@@ -9,6 +9,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { Icon } from '@/components/ui/icon'
+import { IconName } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
 type TabType = 'law' | 'ai'
@@ -300,7 +301,7 @@ function GuideSection({
   children,
 }: {
   title: string
-  icon: string
+  icon: IconName
   children: React.ReactNode
 }) {
   return (

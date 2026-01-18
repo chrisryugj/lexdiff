@@ -33,12 +33,12 @@ export function ErrorReportDialog({ onDismiss }: { onDismiss?: () => void }) {
             <p className="mb-2 text-xs font-medium">상세 로그</p>
             <div className="space-y-2 text-xs text-muted-foreground">
               <p>시간: {new Date(currentError.timestamp).toLocaleString("ko-KR")}</p>
-              {currentError.context?.query && (
+              {currentError.context?.query != null && (
                 <p>검색어: {typeof currentError.context.query === 'object'
                   ? JSON.stringify(currentError.context.query)
                   : String(currentError.context.query)}</p>
               )}
-              {currentError.context?.resultCount !== undefined && <p>결과 수: {currentError.context.resultCount}개</p>}
+              {currentError.context?.resultCount !== undefined && <p>결과 수: {String(currentError.context.resultCount)}개</p>}
             </div>
           </div>
 

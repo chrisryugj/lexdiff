@@ -605,6 +605,7 @@ export async function POST(request: NextRequest) {
       promulgationNumber: parsed.promulgationNumber,
       lastAmendmentDate: parsed.lastAmendmentDate,
       revisionType: parsed.revisionType,
+      mst: parsed.mst,
       articleCount: parsed.articleCount,
       totalCharacters: parsed.totalCharacters,
       url: generateLawUrl(parsed.mst, parsed.lawName),

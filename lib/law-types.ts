@@ -10,6 +10,13 @@ export interface LawMeta {
   }
   revisionType?: string
   fetchedAt: string
+  // 판례용 속성
+  caseNumber?: string
+  promulgationDate?: string
+  lawType?: string
+  effectiveDate?: string
+  // 조례 구분
+  isOrdinance?: boolean
 }
 
 export type LawCategory = "law" | "ordinance"

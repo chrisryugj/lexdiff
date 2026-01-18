@@ -149,7 +149,7 @@ ${newContent.substring(0, 2000)}
 
     const summary = response.text
 
-    debugLogger.success("AI 요약 생성 완료", { length: summary.length })
+    debugLogger.success("AI 요약 생성 완료", { length: summary?.length ?? 0 })
 
     return NextResponse.json({ summary })
   } catch (error) {

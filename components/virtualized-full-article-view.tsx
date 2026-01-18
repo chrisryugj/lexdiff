@@ -85,7 +85,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
 
     updateFavorites()
     const unsubscribe = favoritesStore.subscribe(updateFavorites)
-    return () => unsubscribe()
+    return () => { unsubscribe() }
   }, [lawTitle])
 
   // 즐겨찾기 토글

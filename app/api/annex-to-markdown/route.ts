@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     if (isOldHwp) {
       // 구 HWP 파일: 표 형식이 대부분이라 파싱해도 결과가 좋지 않음
-      debugLogger.warn("구 HWP 파일 감지 - 다운로드만 제공", { annexNumber })
+      debugLogger.info("⚠️ 구 HWP 파일 감지 - 다운로드만 제공", { annexNumber })
       return NextResponse.json(
         {
           error: "구 HWP 파일은 다운로드하여 한컴오피스로 열어주세요.",

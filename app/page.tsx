@@ -26,6 +26,7 @@ import {
   type HistoryState
 } from "@/lib/history-manager"
 import type { Favorite } from "@/lib/law-types"
+import type { SearchStage } from "@/components/search-result-view/types"
 
 type ViewMode = 'home' | 'search-result' | 'precedent-detail'
 
@@ -39,7 +40,7 @@ export default function Home() {
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
-  const [searchStage, setSearchStage] = useState<'searching' | 'parsing' | 'streaming' | 'complete'>('searching')
+  const [searchStage, setSearchStage] = useState<SearchStage>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
 

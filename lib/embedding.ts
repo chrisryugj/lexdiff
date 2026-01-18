@@ -126,7 +126,7 @@ export async function generateEmbedding(
 
     if (cached.rows.length > 0) {
       const row = cached.rows[0]
-      const embeddingBlob = row.embedding as Buffer
+      const embeddingBlob = row.embedding as unknown as Buffer
 
       // Update hit count and last accessed time
       await db.execute({
@@ -222,7 +222,7 @@ export async function generateEmbeddingsBatch(
       if (cached.rows.length > 0) {
         const row = cached.rows[0]
         results[i] = {
-          embedding: blobToVector(row.embedding as Buffer),
+          embedding: blobToVector(row.embedding as unknown as Buffer),
           model: row.embedding_model as string,
           tokens: 0,
           cached: true,
@@ -355,7 +355,7 @@ export async function getSearchQueryEmbedding(
   const row = result.rows[0]
   return {
     id: row.id as number,
-    embedding: blobToVector(row.embedding as Buffer),
+    embedding: blobToVector(row.embedding as unknown as Buffer),
   }
 }
 

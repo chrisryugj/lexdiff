@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { load } from "cheerio"
+import { load, type CheerioAPI, type Cheerio } from "cheerio"
+import type { Element } from "domhandler"
 import iconv from "iconv-lite"
 
 function absUrl(href: string): string {
@@ -14,7 +15,7 @@ function absUrl(href: string): string {
   }
 }
 
-function pickMainContainer($: cheerio.CheerioAPI) {
+function pickMainContainer($: CheerioAPI) {
   const candidates = ["#conScroll", "#conBody", "#concontent", ".con_box", ".conbox", ".view_wrap", "#content", "main", "body"]
   for (const sel of candidates) {
     const el = $(sel)
@@ -23,13 +24,14 @@ function pickMainContainer($: cheerio.CheerioAPI) {
   return $("body")
 }
 
-function extractRegion($: cheerio.CheerioAPI, joLabel?: string) {
+function extractRegion($: CheerioAPI, joLabel?: string) {
   const root = pickMainContainer($)
   if (!joLabel) return root
   const needle = joLabel.replace(/\s+/g, "")
-  let start: cheerio.Cheerio | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let start: any = null
   const searchSelectors = "h1, h2, h3, h4, dt, a, p, li, div, span"
-  root.find(searchSelectors).each((_, el) => {
+  root.find(searchSelectors).each((_: number, el: Element) => {
     const txt = $(el).text().replace(/\s+/g, "")
     if (!start && txt.includes(needle)) {
       start = $(el)
@@ -37,10 +39,8 @@ function extractRegion($: cheerio.CheerioAPI, joLabel?: string) {
     }
   })
   if (!start) return root
-  let container = start.closest("li")
-  if (!container.length) container = start.closest("dd")
-  if (!container.length) container = start.closest("div")
-  if (!container.length) container = start
+  const container = start.closest("li")
+  if (!container.length) return start.closest("dd").length ? start.closest("dd") : start.closest("div").length ? start.closest("div") : start
   return container
 }
 
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     const $ = load(html)
     const region = extractRegion($, joLabel)
     const links: Array<{ text: string; href: string }> = []
-    region.find('a[href]').each((_, el) => {
+    region.find('a[href]').each((_: number, el: Element) => {
       const a = $(el)
       const text = a.text().trim()
       const href = absUrl(a.attr('href') || '')

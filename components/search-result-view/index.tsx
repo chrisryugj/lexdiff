@@ -20,6 +20,7 @@ import { LawViewerSkeleton } from "@/components/law-viewer-skeleton"
 import { Icon } from "@/components/ui/icon"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import type { VerifiedCitation } from "@/lib/citation-verifier"
 
 // Dynamic imports for modals
 const ComparisonModal = dynamic(
@@ -202,7 +203,7 @@ export function SearchResultView({
           actions.setIsAiMode(true)
           actions.setAiAnswerContent(cached.aiMode.aiAnswerContent)
           actions.setAiRelatedLaws(cached.aiMode.aiRelatedLaws)
-          actions.setAiCitations(cached.aiMode.aiCitations || [])
+          actions.setAiCitations((cached.aiMode.aiCitations || []) as VerifiedCitation[])
           actions.setUserQuery(cached.aiMode.userQuery || cached.query.lawName)
           actions.setFileSearchFailed(cached.aiMode.fileSearchFailed || false)
           actions.setAiQueryType(cached.aiMode.aiQueryType || 'application')  // ✅ aiQueryType 복원
@@ -454,7 +455,7 @@ export function SearchResultView({
           ) : state.isAiMode ? (
             /* AI 모드: isSearching과 관계없이 LawViewer 표시 (ChatGPT 스타일 스트리밍) */
             <LawViewer
-              meta={{ lawId: 'ai-answer', lawTitle: 'AI 법률 어시스턴트' }}
+              meta={{ lawId: 'ai-answer', lawTitle: 'AI 법률 어시스턴트', fetchedAt: new Date().toISOString() }}
               articles={[]}
               selectedJo={undefined}
               viewMode="full"
@@ -473,7 +474,6 @@ export function SearchResultView({
               aiQueryType={state.aiQueryType}
               onAiRefresh={handlers.handleAiRefresh}
               isStreaming={state.isSearching}
-              searchStage={state.searchStage}
               searchProgress={state.searchProgress}
             />
           ) : state.isSearching && !state.isAiMode ? (
@@ -539,12 +539,12 @@ export function SearchResultView({
                       meta={state.lawData.meta}
                       articles={state.lawData.articles}
                       selectedJo={state.lawData.selectedJo}
-                      viewMode={state.lawData.viewMode}
+                      viewMode={state.lawData.viewMode || 'full'}
                       onCompare={handlers.handleCompare}
                       onSummarize={handlers.handleSummarize}
                       onToggleFavorite={handlers.handleToggleFavorite}
                       favorites={state.favorites}
-                      isOrdinance={state.lawData.isOrdinance}
+                      isOrdinance={state.lawData.isOrdinance ?? false}
                       aiAnswerMode={state.isAiMode}
                       aiAnswerContent={state.aiAnswerContent}
                       relatedArticles={state.aiRelatedLaws}
@@ -595,12 +595,12 @@ export function SearchResultView({
                   meta={state.lawData.meta}
                   articles={state.lawData.articles}
                   selectedJo={state.lawData.selectedJo}
-                  viewMode={state.lawData.viewMode}
+                  viewMode={state.lawData.viewMode || 'full'}
                   onCompare={handlers.handleCompare}
                   onSummarize={handlers.handleSummarize}
                   onToggleFavorite={handlers.handleToggleFavorite}
                   favorites={state.favorites}
-                  isOrdinance={state.lawData.isOrdinance}
+                  isOrdinance={state.lawData.isOrdinance ?? false}
                   aiAnswerMode={state.isAiMode}
                   aiAnswerContent={state.aiAnswerContent}
                   relatedArticles={state.aiRelatedLaws}

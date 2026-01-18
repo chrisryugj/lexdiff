@@ -174,8 +174,8 @@ export async function updateQualityScore(searchResultId: number): Promise<void> 
     WHERE search_result_id = ?
   `, [searchResultId])
 
-  const positive = feedback?.positive_count || 0
-  const negative = feedback?.negative_count || 0
+  const positive = Number(feedback?.positive_count) || 0
+  const negative = Number(feedback?.negative_count) || 0
 
   // 간단한 품질 점수 계산 (Wilson Score Interval의 간소화 버전)
   const total = positive + negative

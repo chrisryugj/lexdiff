@@ -87,19 +87,19 @@ export function AISearchLoading({
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-muted/20 rounded-lg text-sm">
           {meta.queryType && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full">
-              <Icon name="tag-01" className="h-3.5 w-3.5" />
+              <Icon name="bookmark" className="h-3.5 w-3.5" />
               {QUERY_TYPE_LABELS[meta.queryType] || meta.queryType}
             </span>
           )}
           {meta.domain && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full">
-              <Icon name="book-02" className="h-3.5 w-3.5" />
+              <Icon name="book-open" className="h-3.5 w-3.5" />
               {meta.domain}
             </span>
           )}
           {meta.keywords && meta.keywords.length > 0 && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full">
-              <Icon name="key-01" className="h-3.5 w-3.5" />
+              <Icon name="zap" className="h-3.5 w-3.5" />
               {meta.keywords.slice(0, 3).join(", ")}
               {meta.keywords.length > 3 && ` +${meta.keywords.length - 3}`}
             </span>
@@ -113,7 +113,7 @@ export function AISearchLoading({
         {isPreStreaming && (
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Icon name="ai-brain-04" className="h-4 w-4 text-white" />
+              <Icon name="brain" className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export function AISearchLoading({
         {streamingText && (
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Icon name="ai-brain-04" className="h-4 w-4 text-white" />
+              <Icon name="brain" className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">

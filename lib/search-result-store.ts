@@ -39,9 +39,9 @@ export interface SearchResultCache {
     }>
     selectedJo: string | null
     isOrdinance: boolean
-    viewMode: '1-tier' | '2-tier' | '3-tier'
-    searchQueryId?: string
-    searchResultId?: string
+    viewMode: 'single' | 'full'
+    searchQueryId?: number
+    searchResultId?: number
   }
   lawSelectionState?: {
     results: Array<{

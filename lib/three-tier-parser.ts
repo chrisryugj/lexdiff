@@ -208,7 +208,7 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
           : [rawArticle.시행령조문]
 
         debugLogger.debug(`조문 ${formatJoNum(jo)} 시행령 ${sihyungryung.length}개 파싱`, {
-          시행령데이터: sihyungryung.map(item => ({
+          시행령데이터: sihyungryung.map((item: any) => ({
             조번호: item.조번호,
             조가지번호: item.조가지번호,
             조제목: item.조제목,
@@ -242,7 +242,7 @@ export function parseThreeTierDelegation(jsonData: any): ThreeTierData {
           : [rawArticle.시행규칙조문]
 
         debugLogger.debug(`조문 ${formatJoNum(jo)} 시행규칙 ${sihyungkyuchik.length}개 파싱`, {
-          시행규칙데이터: sihyungkyuchik.map(item => ({
+          시행규칙데이터: sihyungkyuchik.map((item: any) => ({
             조번호: item.조번호,
             조가지번호: item.조가지번호,
             조제목: item.조제목,

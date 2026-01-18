@@ -224,7 +224,7 @@ export async function GET(request: Request) {
         // 🏛️ 조례/규칙 (자치법규)
         // - API 응답: licBylSearch.ordinbyl[]
         // - 특징: 지자체기관명 포함, PDF 링크 단일
-        const rows: OrdinanceAnnexRow[] = searchResult.ordinbyl || []
+        const rows: OrdinanceAnnexRow[] = (searchResult as any).ordinbyl || []
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",
@@ -252,7 +252,7 @@ export async function GET(request: Request) {
         // 📋 행정규칙 (훈령, 예규, 고시, 지침, 내규)
         // - API 응답: admRulBylSearch.admbyl[]
         // - 특징: 소관부처 포함, 발령일자
-        const rows: AdminRuleAnnexRow[] = searchResult.admbyl || []
+        const rows: AdminRuleAnnexRow[] = (searchResult as any).admbyl || []
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",
@@ -279,7 +279,7 @@ export async function GET(request: Request) {
         // ⚖️ 일반 법령 (법률, 대통령령, 총리령, 부령 등)
         // - API 응답: licBylSearch.licbyl[]
         // - 특징: PDF 링크 별도, 공포일자
-        const rows: LawApiAnnexRow[] = searchResult.licbyl || []
+        const rows: LawApiAnnexRow[] = (searchResult as any).licbyl || []
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",

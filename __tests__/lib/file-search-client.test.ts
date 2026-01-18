@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock 환경변수 설정
 const mockEnv = {
+  NODE_ENV: 'test' as const,
   GEMINI_API_KEY: 'test-api-key',
   GEMINI_FILE_SEARCH_STORE_ID: 'fileSearchStores/test-store-123'
 }

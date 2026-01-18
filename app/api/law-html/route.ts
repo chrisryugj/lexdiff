@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { load } from "cheerio"
+import { load, type CheerioAPI, type Cheerio } from "cheerio"
+import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 
@@ -25,7 +26,7 @@ function absUrl(href: string): string {
   }
 }
 
-function pickMainContainer($: cheerio.CheerioAPI) {
+function pickMainContainer($: CheerioAPI) {
   const candidates = ["#conScroll", "#contentBody", "#conBody", "#concontent", ".con_box", ".conbox", ".view_wrap", "#content", "main"]
   for (const sel of candidates) {
     const el = $(sel)
@@ -34,13 +35,14 @@ function pickMainContainer($: cheerio.CheerioAPI) {
   return $("body")
 }
 
-function extractArticleHtml($: cheerio.CheerioAPI, joLabel?: string) {
+function extractArticleHtml($: CheerioAPI, joLabel?: string) {
   const root = pickMainContainer($)
   if (!joLabel) return root.html() || ""
   const needle = joLabel.replace(/\s+/g, "")
-  let start: cheerio.Cheerio | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let start: any = null
   const searchSelectors = "h1, h2, h3, h4, dt, a, p, li, div, span"
-  root.find(searchSelectors).each((_, el) => {
+  root.find(searchSelectors).each((_: number, el: Element) => {
     const txt = $(el).text().replace(/\s+/g, "")
     if (!start && txt.includes(needle)) { start = $(el); return false }
   })
@@ -52,7 +54,8 @@ function extractArticleHtml($: cheerio.CheerioAPI, joLabel?: string) {
   if (!container.length) container = start
 
   const nodes: string[] = []
-  let cur: cheerio.Cheerio | null = container
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let cur: any = container
   let steps = 0
   const limit = 60
   while (cur && cur.length && steps < limit) {
@@ -72,7 +75,7 @@ function extractArticleHtml($: cheerio.CheerioAPI, joLabel?: string) {
 function sanitizeKeepAnchors(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: Array.from(new Set([
-      ...sanitizeHtml.defaults.allowedTags,
+      ...(sanitizeHtml.defaults.allowedTags || []),
       "img", "span", "table", "thead", "tbody", "tr", "td", "th", "sup", "sub", "dl", "dt", "dd",
     ])),
     allowedAttributes: {
@@ -85,7 +88,7 @@ function sanitizeKeepAnchors(html: string): string {
 
 function rewriteAnchorsKeepHref(fragmentHtml: string): string {
   const $ = load(fragmentHtml)
-  $("a").each((_, el) => {
+  $("a").each((_: number, el: Element) => {
     const a = $(el)
     let href = (a.attr("href") || "").toString()
     const onclick = (a.attr("onclick") || "").toString()
@@ -147,12 +150,12 @@ export async function GET(req: Request) {
     let raw = extractArticleHtml($, joLabel || undefined)
     raw = raw.replace(/(?:<br\s*\/?>\s*){2,}/gi, '<br/>').replace(/^\s*(<br\s*\/?>\s*)+/i, '').replace(/(<br\s*\/?>\s*)+$/i, '')
     raw = raw
-      .replace(/\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]/g, (match) => {
+      .replace(/\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]/g, (match: string) => {
         const keyword = match.match(/개정|전문개정|전부개정|신설|삭제/)?.[0] || ''
         const type = getRevisionType(keyword)
         return `<span class="rev-mark rev-mark-${type}">${match}</span>`
       })
-      .replace(/<\s*(?:개정|전문개정|전부개정|신설|삭제)[^>]*>/g, (m) => {
+      .replace(/<\s*(?:개정|전문개정|전부개정|신설|삭제)[^>]*>/g, (m: string) => {
         const keyword = m.match(/개정|전문개정|전부개정|신설|삭제/)?.[0] || ''
         const type = getRevisionType(keyword)
         return `<span class="rev-mark rev-mark-${type}">${m.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`

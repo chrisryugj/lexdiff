@@ -6,6 +6,7 @@
  */
 
 import { GoogleGenAI } from '@google/genai'
+// @ts-ignore - SDK 버전 호환성 이슈
 import type { FileSearchStore, FileMetadata } from '@google/genai'
 import { preprocessQuery } from './query-preprocessor'  // Phase 4 B4
 import { analyzeLegalQuery, type LegalQueryType } from './legal-query-analyzer'
@@ -81,7 +82,7 @@ export async function createFileSearchStore() {
 
   const genAI = new GoogleGenAI({ apiKey })
 
-  const store = await genAI.fileSearchStores.create({
+  const store = await (genAI as any).fileSearchStores.create({
     displayName: 'Korean Laws & Ordinances Database',
     chunkingConfig: {
       maxTokensPerChunk: 384,  // 512 → 384 (25% 감소, Phase 2 최적화)
@@ -148,10 +149,10 @@ export async function uploadLawToFileSearch(
   const file = new File([blob], `${metadata.law_name}_${metadata.law_id}.txt`, { type: 'text/plain' })
 
   // File Search Store에 업로드
-  const uploadedFile = await genAI.fileSearchStores.uploadFile({
+  const uploadedFile = await (genAI as any).fileSearchStores.uploadFile({
     file,
     fileSearchStoreName: STORE_ID,
-    metadata: metadata as Record<string, string>
+    metadata: metadata as unknown as Record<string, string>
   })
 
   console.log(`✅ Uploaded: ${metadata.law_name} (${uploadedFile.name})`)
@@ -180,7 +181,7 @@ export async function queryFileSearch(
 
   const genAI = new GoogleGenAI({ apiKey })
 
-  const result = await genAI.models.generateContent({
+  const result = await (genAI as any).models.generateContent({
     model: 'gemini-2.5-flash',
     contents: query,
     tools: [{
@@ -236,7 +237,7 @@ export async function* queryFileSearchStream(
     isRetry?: boolean  // Phase 2 P2: 재시도 방지 플래그
     useAIRouter?: boolean  // Phase 10: AI 라우터 사용 여부 (기본: true)
   }
-): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string; finishReason?: string; routingInfo?: any }> {
+): AsyncGenerator<{ text?: string; done: boolean; citations?: any[]; warning?: string; finishReason?: string; routingInfo?: any; queryType?: LegalQueryType }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is required')
@@ -259,9 +260,9 @@ export async function* queryFileSearchStream(
 
   const useAIRouter = options?.useAIRouter !== false  // 기본값: true
   let routingResult: RoutingResult | null = null
-  let effectiveQuery: string
-  let systemInstruction: string
-  let queryType: LegalQueryType
+  let effectiveQuery = ''
+  let systemInstruction = ''
+  let queryType: LegalQueryType = 'application'
 
   if (useAIRouter) {
     try {
@@ -710,7 +711,7 @@ export async function* queryFileSearchStream(
     chunksCount: groundingChunks.length,
     supportsCount: supports.length,
     lawsFound: [...new Set(citations.map((c: any) => c.lawName))],
-    finishReason: lastFinishReason,
+    finishReason: lastFinishReason ?? undefined,
     chunkSamples: groundingChunks.slice(0, 3).map((chunk: any, idx: number) => ({
       index: idx,
       textLength: chunk.retrievedContext?.text?.length || 0,
@@ -744,7 +745,7 @@ export async function* queryFileSearchStream(
     text: '',
     done: true,
     citations,
-    finishReason: lastFinishReason,
+    finishReason: lastFinishReason ?? undefined,
     queryType,  // ✅ 질문 유형 (AI Router 또는 규칙 기반)
     routingInfo: routingResult ? {
       primaryType: routingResult.analysis.primaryType,
@@ -777,7 +778,7 @@ export async function listFilesInStore(): Promise<any[]> {
 
   const genAI = new GoogleGenAI({ apiKey })
 
-  const files = await genAI.fileSearchStores.listFiles({
+  const files = await (genAI as any).fileSearchStores.listFiles({
     fileSearchStoreName: STORE_ID
   })
 
@@ -795,7 +796,7 @@ export async function deleteFileFromStore(fileName: string): Promise<void> {
 
   const genAI = new GoogleGenAI({ apiKey })
 
-  await genAI.fileSearchStores.deleteFile({
+  await (genAI as any).fileSearchStores.deleteFile({
     name: fileName
   })
 

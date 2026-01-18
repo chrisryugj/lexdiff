@@ -25,7 +25,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
 
     setFavoritesCount(favoritesStore.getFavorites().length)
 
-    return unsubscribe
+    return () => { unsubscribe() }
   }, [])
 
   const handleHomeClick = (e: React.MouseEvent) => {

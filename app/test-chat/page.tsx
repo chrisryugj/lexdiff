@@ -8,10 +8,12 @@ import Link from 'next/link'
 import {
   ChatContainer,
   ChatInput,
-  type ChatMessage,
-  type SearchMode,
-  type AIStage
 } from '@/components/chat'
+import type {
+  ChatMessage,
+  SearchMode,
+  AIStage
+} from '@/components/chat/types'
 
 // Mock AI response for demo
 const MOCK_AI_RESPONSES: Record<string, string> = {
@@ -268,6 +270,7 @@ export default function TestChatPage() {
               { lawName: '관세법', articleNumber: '제19조' },
             ] : undefined,
             metadata: {
+              searchMode: m.metadata?.searchMode ?? 'ai',
               ...m.metadata,
               processingTimeMs: processingTime
             }

@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
           // 마지막 청크
           citations = chunk.citations || []
           finishReason = chunk.finishReason || null
-          queryType = chunk.queryType || 'general'
+          queryType = (chunk as any).queryType || 'general'
 
           // ⚠️ 신뢰도 낮음 경고
           if (citations.length === 0) {

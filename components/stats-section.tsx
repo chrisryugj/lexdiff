@@ -4,28 +4,28 @@ import { Icon } from "@/components/ui/icon"
 
 const stats = [
   {
-    icon: "file-text",
+    icon: "file-text" as const,
     value: "30,000+",
     label: "법령 데이터베이스",
     color: "text-blue-400",
     iconBg: "bg-blue-500/10",
   },
   {
-    icon: "search",
+    icon: "search" as const,
     value: "AI 검색",
     label: "Gemini 2.5 Flash",
     color: "text-emerald-400",
     iconBg: "bg-emerald-500/10",
   },
   {
-    icon: "zap",
+    icon: "zap" as const,
     value: "실시간",
     label: "법제처 API 연동",
     color: "text-amber-400",
     iconBg: "bg-amber-500/10",
   },
   {
-    icon: "award",
+    icon: "award" as const,
     value: "무료",
     label: "개인/상업적 이용",
     color: "text-purple-400",

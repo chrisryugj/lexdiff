@@ -25,7 +25,7 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe(setFavorites)
     setFavorites(favoritesStore.getFavorites())
-    return unsubscribe
+    return () => { unsubscribe() }
   }, [])
 
   // Close when clicking outside of the panel header/content
