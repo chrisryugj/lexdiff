@@ -675,6 +675,21 @@ export function AIAnswerContent({
                         <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>
                 )}
+
+                {/* 웹 검색 버튼 - 추가 정보가 필요할 때 */}
+                {displayedContent && !isTyping && !isStreaming && userQuery && (
+                    <div className="mt-4 flex justify-center animate-in fade-in duration-500 delay-500">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-muted-foreground hover:text-foreground gap-2"
+                            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(userQuery)}`, '_blank')}
+                        >
+                            <Icon name="external-link" size={14} />
+                            <span>"{userQuery.length > 25 ? userQuery.slice(0, 25) + '...' : userQuery}" 웹 검색</span>
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* ✅ 별표 모달 */}

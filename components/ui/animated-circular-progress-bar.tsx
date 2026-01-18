@@ -145,7 +145,7 @@ export function AnimatedCircularProgressBar({
       </svg>
       <span
         data-current-value={currentPercent}
-        className="animate-in fade-in absolute inset-0 m-auto size-fit text-5xl font-bold tabular-nums delay-[var(--delay)] duration-[var(--transition-length)] ease-linear animate-shimmer bg-gradient-to-r from-white via-gray-100 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
+        className="animate-in fade-in absolute inset-0 m-auto size-fit text-5xl font-bold tabular-nums delay-[var(--delay)] duration-[var(--transition-length)] ease-linear bg-gradient-to-r from-white via-gray-100 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
       >
         <NumberTicker value={currentPercent} />
       </span>

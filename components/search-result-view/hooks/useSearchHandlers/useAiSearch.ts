@@ -154,7 +154,6 @@ export function useAiSearch(deps: HandlerDeps) {
 
           // 즉시 전체 내용 설정 (UI에서 어절 단위 타이핑 효과 적용)
           const processedContent = fullContent.replace(/\^/g, ' ')
-          actions.setAiAnswerContent(processedContent)
 
           // 프로그레스가 100%까지 도달할 때까지 대기
           await new Promise(resolve => setTimeout(resolve, 3000))
@@ -175,6 +174,7 @@ export function useAiSearch(deps: HandlerDeps) {
             citationsReceived: receivedCitations.length,
           })
 
+          // ✅ 최종 상태 설정 (한 번만 호출)
           actions.setAiAnswerContent(processedContent)
           actions.setAiRelatedLaws(relatedLaws)
           actions.setAiCitations(receivedCitations)

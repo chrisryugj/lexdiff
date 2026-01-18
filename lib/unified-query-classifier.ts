@@ -375,7 +375,11 @@ const DEFINITIVE_ENDING_PATTERNS: Array<{
   { pattern: /의\s*(정의|개념|뜻)[은는이가]?\s*[?？]?\s*$/, type: 'definition', confidence: 0.99 },
   { pattern: /(은|는)\s*무엇[인이]?[가요지]?\s*[?？]?\s*$/, type: 'definition', confidence: 0.97 },
   { pattern: /뭐(야|예요|에요|죠)\s*[?？]?\s*$/, type: 'definition', confidence: 0.95 },
-  { pattern: /뭘까\s*[?？]?\s*$/, type: 'definition', confidence: 0.95 }
+  { pattern: /뭘까\s*[?？]?\s*$/, type: 'definition', confidence: 0.95 },
+  // ✅ "궁금해", "알려줘", "설명해줘" 등 자연어 질문
+  { pattern: /궁금[해하]?\s*[?？]?\s*$/, type: 'definition', confidence: 0.95 },
+  { pattern: /(알려|설명|가르쳐)(줘|주세요|줄래|줄\s*수)\s*[?？]?\s*$/, type: 'definition', confidence: 0.95 },
+  { pattern: /에\s*대해\s*(알려|설명|궁금)/, type: 'definition', confidence: 0.95 }
 ]
 
 // 질문 종결어미 패턴

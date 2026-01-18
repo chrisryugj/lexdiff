@@ -22,7 +22,10 @@
       "Bash(ls:*)",
       "Bash(npm run lint:*)",
       "Bash(iconv:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node --experimental-vm-modules -e:*)",
+      "Skill(push)",
+      "Skill(push:*)"
     ],
     "deny": [],
     "ask": []
