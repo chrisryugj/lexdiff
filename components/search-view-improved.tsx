@@ -10,7 +10,7 @@ import { Particles } from "@/components/ui/particles"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
-import { motion, AnimatePresence } from "framer-motion"
+import { m, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 
 // Dynamic import for FavoritesDialog (reduce initial bundle)
@@ -153,7 +153,7 @@ export function SearchViewImproved({
   return (
     <div className="min-h-screen page-bg">
       {/* Floating Navigation with Dock Style */}
-      <motion.header
+      <m.header
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
@@ -216,7 +216,7 @@ export function SearchViewImproved({
             <Icon name="settings" size={16} className="text-muted-foreground hover:text-foreground" />
           </DockIcon>
         </Dock>
-      </motion.header>
+      </m.header>
 
       {/* Hero Section - 스크롤 가능 */}
       <section className="hero-section-fixed pt-32 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">
@@ -229,7 +229,7 @@ export function SearchViewImproved({
           refresh
         />
         <div className="container mx-auto max-w-4xl relative z-10">
-          <motion.div
+          <m.div
             className="flex flex-col items-center text-center"
             variants={containerVariants}
             initial="hidden"
@@ -237,22 +237,22 @@ export function SearchViewImproved({
           >
             {/* Title & Subtitle */}
             <div className="space-y-2 md:space-y-3 mb-6 md:mb-8 w-full">
-              <motion.h1
+              <m.h1
                 variants={itemVariants}
                 className="text-6xl md:text-6xl font-bold bg-gradient-to-l text-transparent bg-clip-text animate-text-gradient bg-[length:300%] from-zinc-500 via-zinc-950 to-zinc-600 dark:from-zinc-600 dark:via-zinc-100 dark:to-zinc-600 tracking-tight cursor-pointer hover:opacity-80 transition-opacity logo-glow"
                 style={{ fontFamily: "GiantsInline, sans-serif" }}
                 onClick={handleLogoClick}
               >
                 LexDiff
-              </motion.h1>
-              <motion.p
+              </m.h1>
+              <m.p
                 variants={itemVariants}
                 className="text-2xl md:text-2xl text-muted-foreground font-bold"
                 style={{ fontFamily: "ReperepointSpecialItalic, sans-serif" }}
               >
                 Legal AI Platform
-              </motion.p>
-              <motion.p
+              </m.p>
+              <m.p
                 variants={itemVariants}
                 className="text-lg md:text-base max-w-full md:max-w-2xl mx-auto leading-relaxed"
                 style={{ fontFamily: "Pretendard, sans-serif" }}
@@ -263,28 +263,28 @@ export function SearchViewImproved({
                 <AnimatedShinyText className="hidden md:inline text-muted-foreground/70">
                   법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
                 </AnimatedShinyText>
-              </motion.p>
+              </m.p>
             </div>
 
             {/* Search Bar */}
-            <motion.div variants={itemVariants} className="w-full max-w-3xl mb-6 md:mb-15 relative z-[110]">
+            <m.div variants={itemVariants} className="w-full max-w-3xl mb-6 md:mb-15 relative z-[110]">
               <SearchBar
                 onSearch={onSearch}
                 isLoading={isLoading}
                 searchMode={searchMode}
               />
-            </motion.div>
+            </m.div>
 
             {/* Scroll Indicator */}
-            <motion.button
+            <m.button
               variants={itemVariants}
               className="scroll-indicator-apple p-2 rounded-full hover:bg-white/5 transition-colors relative z-0"
               onClick={handleScrollIndicatorClick}
               aria-label="스크롤하여 다음 섹션으로 이동"
             >
               <Icon name="chevron-down" size={20} className="text-muted-foreground/40" />
-            </motion.button>
-          </motion.div>
+            </m.button>
+          </m.div>
         </div>
       </section>
 

@@ -88,13 +88,13 @@ export async function verifyCitation(citation: Citation): Promise<VerifiedCitati
         ? `조문 "${citation.articleNum}"이 존재하지 않습니다`
         : undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Citation Verifier] Error:', error)
     return {
       ...citation,
       verified: false,
       verificationMethod: 'error',
-      verificationError: error.message || '검증 중 오류 발생'
+      verificationError: error instanceof Error ? error.message : '검증 중 오류 발생'
     }
   }
 }
@@ -194,7 +194,7 @@ async function fetchLawId(lawName: string): Promise<string | null> {
 
     console.warn(`[Citation Verifier] ⚠️  Law ID not found for "${lawName}"`)
     return null
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Citation Verifier] fetchLawId error:', error)
     return null
   }
@@ -296,7 +296,7 @@ async function checkArticleExists(
     }
 
     return found
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Citation Verifier] checkArticleExists error:', error)
     return false
   }

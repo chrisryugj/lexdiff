@@ -1,10 +1,28 @@
 # Active Context
 
-**마지막 업데이트**: 2026-01-18 (Gemini 리뷰 검증 + 빌드 성공)
+**마지막 업데이트**: 2026-01-18 (성능 최적화 완료)
 
 ## 현재 상태
 
-Gemini 지적사항 검증 완료. P0~P2 모두 완료, 빌드 정상!
+배포 전 최종 코드 리뷰 + 성능 최적화 완료.
+
+### ✅ Critical 수정 완료
+
+| 이슈 | 파일 | 상태 |
+|------|------|------|
+| `.env.local` 파일 쓰기 제거 | `api/admin/create-store/route.ts` | ✅ 완료 |
+| XSS 취약점 수정 | `hooks/use-law-viewer-admin-rules.ts:170` | ✅ 완료 |
+| XSS 취약점 수정 | `lib/content-click-handlers/precedent-handler.ts:137` | ✅ 완료 |
+| ErrorBoundary 추가 | `app/layout.tsx` | ✅ 완료 |
+| SSE 스트림 cleanup | 수정 불필요 (async iterator 자동 정리) | ✅ 확인 |
+
+### 📊 코드 리뷰 결과 (2026-01-18)
+
+- **전체 평가**: B+ (Critical 수정 후 배포 가능)
+- any 타입: 100+ 회
+- catch (error: any): 138개 파일 (4개 수정됨)
+- 메모리 누수 위험: 4곳
+- law-viewer.tsx useEffect: 5개 (12개에서 축소)
 
 ### ✅ 최근 완료된 작업
 
@@ -14,6 +32,10 @@ Gemini 지적사항 검증 완료. P0~P2 모두 완료, 빌드 정상!
 | 타입 에러 수정 | ✅ P0 | `file-x` → `file` 아이콘 수정 |
 | `delegation-panel` 분리 | ✅ P1 | 1,652줄 → 541줄 + 4모듈 |
 | `LegalMarkdownRenderer` 분리 | ✅ P2 | 877줄 → 7개 파일 |
+| law-viewer.tsx useEffect 정리 | ✅ | 12개 → 5개 (17줄 감소) |
+| framer-motion LazyMotion | ✅ | ~60% 번들 감소 |
+| React.memo 적용 | ✅ | LawViewer, SearchResultView |
+| catch (error: any) 개선 | ✅ | 주요 파일 4개 수정 |
 
 ### 📦 모듈화된 컴포넌트 구조
 

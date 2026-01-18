@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo, memo } from "react"
 import dynamic from "next/dynamic"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { Card } from "@/components/ui/card"
@@ -83,7 +82,7 @@ interface LawViewerProps {
   onRefresh?: () => void
 }
 
-export function LawViewer({
+function LawViewerComponent({
   meta = { lawTitle: '', fetchedAt: new Date().toISOString() },
   articles = [],
   selectedJo,
@@ -240,14 +239,11 @@ export function LawViewer({
     collapseToBottom: collapsePrecedentPanel,
   } = useLawViewerPrecedents(activeArticleNumber || "", meta)
 
-  // Update loadedArticles when props.articles changes
+  // Update loadedArticles and reset refs when articles change
   useEffect(() => {
     setLoadedArticles(actualArticles)
+    articleRefs.current = {}
   }, [articles])
-
-  // Log when loadedArticles changes
-  useEffect(() => {
-  }, [loadedArticles, activeJo])
 
   const activeArticle = loadedArticles.find((a) => a.jo === activeJo)
 
@@ -296,11 +292,6 @@ export function LawViewer({
   // 위임법령 버튼 카운트 (시행령 + 시행규칙 + 행정규칙)
   const delegationButtonCount = validDelegations.length + (showAdminRules ? adminRules.length : 0)
 
-  // 디버깅: 현재 조문의 delegation 데이터 확인
-  useEffect(() => {
-    if (activeJo && currentArticleDelegations.length > 0) {
-    }
-  }, [activeJo, currentArticleDelegations])
 
   // Modals hook (must be after activeArticle is defined)
   const {
@@ -320,12 +311,7 @@ export function LawViewer({
     closeAnnexModal,
   } = useLawViewerModals(meta, activeArticle)
 
-  useEffect(() => {
-  }, [activeArticle])
-
-  useEffect(() => {
-  }, [activeArticle])
-
+  // Sync selectedJo → activeJo and reset related states
   useEffect(() => {
 
     // Only update activeJo if selectedJo is different from current activeJo
@@ -348,10 +334,6 @@ export function LawViewer({
       }
     }
   }, [selectedJo, isFullView])
-
-  useEffect(() => {
-    articleRefs.current = {}
-  }, [articles])
 
   // Reset admin rules state when law changes
   useEffect(() => {
@@ -1187,3 +1169,6 @@ export function LawViewer({
     </>
   )
 }
+
+// React.memo로 불필요한 리렌더링 방지
+export const LawViewer = memo(LawViewerComponent)

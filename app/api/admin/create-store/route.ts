@@ -6,8 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -64,37 +62,8 @@ export async function POST(request: NextRequest) {
 
     console.log('[Create Store API] ✅ Store created:', newStoreId)
 
-    // Automatically update .env.local
-    try {
-      const envPath = path.join(process.cwd(), '.env.local')
-      let envContent = ''
-
-      if (fs.existsSync(envPath)) {
-        envContent = fs.readFileSync(envPath, 'utf-8')
-      }
-
-      // Update or add GEMINI_FILE_SEARCH_STORE_ID
-      const storeIdPattern = /^GEMINI_FILE_SEARCH_STORE_ID=.*$/m
-      const newStoreIdLine = `GEMINI_FILE_SEARCH_STORE_ID=${newStoreId}`
-
-      if (storeIdPattern.test(envContent)) {
-        // Replace existing line
-        envContent = envContent.replace(storeIdPattern, newStoreIdLine)
-      } else {
-        // Add new line
-        envContent += `\n${newStoreIdLine}\n`
-      }
-
-      fs.writeFileSync(envPath, envContent, 'utf-8')
-
-      console.log('[Create Store API] ✅ .env.local updated with new Store ID')
-
-      // Update process.env for immediate use (note: this only affects current process)
-      process.env.GEMINI_FILE_SEARCH_STORE_ID = newStoreId
-    } catch (envError: any) {
-      console.error('[Create Store API] ⚠️ Failed to update .env.local:', envError)
-      // Don't fail the request if env update fails
-    }
+    // ⚠️ 프로덕션 환경에서는 파일 시스템 쓰기 불가 (Vercel read-only)
+    // 환경변수는 Vercel 대시보드에서 수동 설정 필요
 
     return NextResponse.json({
       success: true,
@@ -104,15 +73,16 @@ export async function POST(request: NextRequest) {
         createTime: storeData.createTime,
         updateTime: storeData.updateTime
       },
-      message: `✅ 새 Store 생성 완료!\n.env.local이 자동으로 업데이트되었습니다.\n\n⚠️ 서버 재시작이 필요합니다.`
+      message: `✅ 새 Store 생성 완료!\n\n📋 다음 단계:\n1. Vercel 대시보드 → Settings → Environment Variables\n2. GEMINI_FILE_SEARCH_STORE_ID = ${newStoreId}\n3. Redeploy 실행`,
+      envValue: `GEMINI_FILE_SEARCH_STORE_ID=${newStoreId}`
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Create Store API] ❌ Error:', error)
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Store 생성 중 오류가 발생했습니다'
+        error: error instanceof Error ? error.message : 'Store 생성 중 오류가 발생했습니다'
       },
       { status: 500 }
     )

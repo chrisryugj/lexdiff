@@ -128,13 +128,18 @@ export async function handlePrecedentRef(
   } catch (error) {
     debugLogger.error('[precedent-handler] 판례 조회 실패', error)
 
+    // XSS 방지: 에러 메시지 이스케이프
+    const escapeHtml = (s: string) => s.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#039;'}[c] || c))
+    const safeMessage = error instanceof Error ? escapeHtml(error.message) : '알 수 없는 오류'
+    const safeCaseNumber = escapeHtml(caseNumber)
+
     actions.setRefModal({
       open: true,
       title: '판례 조회 실패',
       html: `<div class="text-destructive p-4">
         <p class="font-semibold mb-2">판례를 조회할 수 없습니다</p>
-        <p class="text-sm text-muted-foreground">사건번호: ${caseNumber}</p>
-        <p class="text-sm text-muted-foreground mt-1">${error instanceof Error ? error.message : '알 수 없는 오류'}</p>
+        <p class="text-sm text-muted-foreground">사건번호: ${safeCaseNumber}</p>
+        <p class="text-sm text-muted-foreground mt-1">${safeMessage}</p>
       </div>`,
     })
   }

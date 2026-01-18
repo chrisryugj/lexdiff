@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, memo } from "react"
 import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
@@ -51,7 +51,7 @@ import type { SearchResultViewProps } from "./types"
 // Re-export types
 export type { SearchResultViewProps } from "./types"
 
-export function SearchResultView({
+function SearchResultViewComponent({
   searchId,
   onBack,
   onHomeClick,
@@ -687,3 +687,6 @@ export function SearchResultView({
     </div>
   )
 }
+
+// React.memo로 불필요한 리렌더링 방지
+export const SearchResultView = memo(SearchResultViewComponent)

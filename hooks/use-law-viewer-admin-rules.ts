@@ -165,9 +165,13 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
 
       // Cache the result to IndexedDB
       await setAdminRuleContentCache(idParam, finalTitle, finalHtml, fullContent.effectiveDate)
-    } catch (error: any) {
+    } catch (error) {
       console.error('[행정규칙] 로드 실패:', error)
-      setAdminRuleHtml(`<div style="text-align: center; padding: 2rem 0;"><p style="color: hsl(var(--destructive)); font-weight: 600; margin-bottom: 0.5rem;">전체 내용 조회 실패</p><p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">${error.message}</p></div>`)
+      // XSS 방지: 에러 메시지를 직접 HTML에 삽입하지 않음
+      const safeMessage = error instanceof Error
+        ? error.message.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#039;'}[c] || c))
+        : '알 수 없는 오류'
+      setAdminRuleHtml(`<div style="text-align: center; padding: 2rem 0;"><p style="color: hsl(var(--destructive)); font-weight: 600; margin-bottom: 0.5rem;">전체 내용 조회 실패</p><p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">${safeMessage}</p></div>`)
     }
   }
 

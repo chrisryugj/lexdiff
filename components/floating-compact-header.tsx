@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { m, AnimatePresence } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -70,7 +70,7 @@ export function FloatingCompactHeader({
   return (
     <AnimatePresence>
       {isVisible && (
-        <motion.header
+        <m.header
           initial={{ y: 0, opacity: 1 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -100, opacity: 0 }}
@@ -176,7 +176,7 @@ export function FloatingCompactHeader({
               </div>
             </div>
           </div>
-        </motion.header>
+        </m.header>
       )}
     </AnimatePresence>
   )

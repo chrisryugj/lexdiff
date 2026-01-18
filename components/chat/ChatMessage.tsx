@@ -6,7 +6,7 @@ import { StreamingText } from './StreamingText'
 import { ThinkingIndicator, ThinkingDots } from './ThinkingIndicator'
 import type { ChatMessage as ChatMessageType } from './types'
 import ReactMarkdown from 'react-markdown'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -20,7 +20,7 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
   const isComplete = message.status === 'complete'
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -159,6 +159,6 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
           </div>
         )}
       </div>
-    </motion.div>
+    </m.div>
   )
 }

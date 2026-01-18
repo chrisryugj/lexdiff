@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, type Variants } from 'framer-motion'
+import { m, type Variants } from 'framer-motion'
 import { Icon } from '@/components/ui/icon'
 
 interface WelcomeScreenProps {
@@ -63,14 +63,14 @@ const itemVariants: Variants = {
 
 export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
   return (
-    <motion.div
+    <m.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
       className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-12"
     >
       {/* Logo */}
-      <motion.div variants={itemVariants} className="flex items-center gap-3 mb-4">
+      <m.div variants={itemVariants} className="flex items-center gap-3 mb-4">
         <div className="relative">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-xl shadow-purple-500/20">
             <Icon name="scale" className="w-8 h-8 text-white" />
@@ -79,33 +79,33 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
             <Icon name="sparkles" className="w-3 h-3 text-white" />
           </div>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* Title */}
-      <motion.h1
+      <m.h1
         variants={itemVariants}
         className="text-4xl md:text-5xl font-bold text-foreground mb-2"
         style={{ fontFamily: 'GiantsInline, sans-serif' }}
       >
         LexDiff
-      </motion.h1>
+      </m.h1>
 
-      <motion.p
+      <m.p
         variants={itemVariants}
         className="text-lg text-muted-foreground mb-2"
       >
         AI Legal Platform
-      </motion.p>
+      </m.p>
 
-      <motion.p
+      <m.p
         variants={itemVariants}
         className="text-sm text-muted-foreground/70 mb-10 text-center max-w-md"
       >
         법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
-      </motion.p>
+      </m.p>
 
       {/* Example cards */}
-      <motion.div
+      <m.div
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl"
       >
@@ -153,7 +153,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
             </button>
           )
         })}
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }
