@@ -2,18 +2,10 @@
 
 import React, { useState, useEffect, useRef, useMemo, memo } from "react"
 import dynamic from "next/dynamic"
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Icon } from "@/components/ui/icon"
-import type { LawArticle, LawMeta, ThreeTierData } from "@/lib/law-types"
-import { cn } from "@/lib/utils"
-import { extractArticleText, formatDelegationContent } from "@/lib/law-xml-parser"
-import { buildJO, formatJO, formatSimpleJo, type ParsedRelatedLaw } from "@/lib/law-parser"
+import type { LawArticle, LawMeta } from "@/lib/law-types"
+import { extractArticleText } from "@/lib/law-xml-parser"
+import { buildJO, formatJO, type ParsedRelatedLaw } from "@/lib/law-parser"
 
 // Dynamic import for ReferenceModal (reduce initial bundle)
 const ReferenceModal = dynamic(
@@ -26,12 +18,8 @@ const AnnexModal = dynamic(
   () => import("@/components/annex-modal").then(m => m.AnnexModal),
   { ssr: false }
 )
-import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
-import { DelegationLoadingSkeleton } from "@/components/delegation-loading-skeleton"
-import { DelegationPanel } from "@/components/law-viewer-delegation-panel"
-import { PrecedentDetailPanel } from "@/components/precedent-section"
 import { SwipeTutorial, SwipeHint } from "@/components/swipe-tutorial"
-import { parseArticleHistoryXML, formatDate } from "@/lib/revision-parser"
+import { parseArticleHistoryXML } from "@/lib/revision-parser"
 import { clearAdminRuleContentCache } from "@/lib/admin-rule-cache"
 import { useToast } from "@/hooks/use-toast"
 import { useLawViewerAdminRules } from "@/hooks/use-law-viewer-admin-rules"
@@ -44,8 +32,7 @@ import { useSwipe } from "@/hooks/use-swipe"
 import { useRelatedPrecedentCases } from "@/hooks/use-related-precedent-cases"
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
-import { AIAnswerContent } from "@/components/law-viewer-ai-answer"
-import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerSingleArticle } from "@/components/law-viewer/index"
+import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerHeader, LawViewerMainContent } from "@/components/law-viewer/index"
 
 interface LawViewerProps {
   meta?: LawMeta
@@ -698,7 +685,65 @@ function LawViewerComponent({
 
   const { handleContentClick } = useContentClickHandlers(contentClickContext, contentClickActions)
 
+  // Props 그룹화 (LawViewerMainContent용)
+  const fontProps = useMemo(() => ({
+    fontSize,
+    setFontSize,
+    increaseFontSize,
+    decreaseFontSize,
+    resetFontSize,
+  }), [fontSize])
 
+  const aiAnswerPropsGroup = useMemo(() => ({
+    content: aiAnswerContent,
+    userQuery,
+    confidenceLevel: aiConfidenceLevel,
+    fileSearchFailed,
+    citations: aiCitations,
+    queryType: aiQueryType,
+    isTruncated: aiIsTruncated,
+    onRefresh: onAiRefresh,
+    isStreaming,
+    searchProgress,
+    onLawClick: handleLawLinkClick,
+  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress])
+
+  const delegationPropsGroup = useMemo(() => ({
+    validDelegations,
+    isLoading: isLoadingThreeTier,
+    activeTab: delegationActiveTab,
+    setActiveTab: setDelegationActiveTab,
+    panelSize: delegationPanelSize,
+    setPanelSize: setDelegationPanelSize,
+    showAdminRules,
+    setShowAdminRules,
+    loadingAdminRules,
+    loadedAdminRulesCount,
+    hasEverLoaded,
+    adminRules,
+    adminRulesProgress,
+    adminRuleViewMode,
+    setAdminRuleViewMode,
+    adminRuleHtml,
+    adminRuleTitle,
+    handleViewAdminRuleFullContent,
+  }), [validDelegations, isLoadingThreeTier, delegationActiveTab, delegationPanelSize, showAdminRules, loadingAdminRules, loadedAdminRulesCount, hasEverLoaded, adminRules, adminRulesProgress, adminRuleViewMode, adminRuleHtml, adminRuleTitle])
+
+  const precedentPropsGroup = useMemo(() => ({
+    showPrecedents,
+    viewMode: precedentViewMode,
+    panelSize: precedentPanelSize,
+    setPanelSize: setPrecedentPanelSize,
+    precedents,
+    totalCount: precedentTotalCount,
+    loading: loadingPrecedents,
+    error: precedentsError,
+    selectedPrecedent,
+    loadingDetail: loadingPrecedentDetail,
+    handleViewDetail: handleViewPrecedentDetail,
+    expandPanel: expandPrecedentPanel,
+    collapsePanel: collapsePrecedentPanel,
+  }), [showPrecedents, precedentViewMode, precedentPanelSize, precedents, precedentTotalCount, loadingPrecedents, precedentsError, selectedPrecedent, loadingPrecedentDetail])
 
   return (
     <>
@@ -739,97 +784,18 @@ function LawViewerComponent({
           <Card className="flex flex-col overflow-hidden h-auto lg:h-full p-0 gap-0">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
-              <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 sm:pb-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon name={isPrecedent ? "gavel" : "book-open"} size={20} className="text-primary" />
-                  <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
-                  {/* 심급 배지 - 제목 옆에 표시 */}
-                  {isPrecedent && hasLevelSection && currentCourtLevel && (
-                    <Badge
-                      className={cn(
-                        "text-xs px-1.5 py-0.5 font-medium",
-                        currentCourtLevel === 3 && "bg-purple-500/20 text-purple-400 border-purple-500/30",
-                        currentCourtLevel === 2 && "bg-blue-500/20 text-blue-400 border-blue-500/30",
-                        currentCourtLevel === 1 && "bg-green-500/20 text-green-400 border-green-500/30"
-                      )}
-                    >
-                      {currentCourtLevel}심
-                    </Badge>
-                  )}
-                  {!isPrecedent && !isOrdinance && viewMode === "full" && (
-                    <Badge variant="outline" className="text-xs">
-                      전체 조문
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {isPrecedent ? (
-                    // 판례 전용 배지
-                    <>
-                      {meta.caseNumber && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                          <Icon name="file-text" size={12} className="mr-1" />
-                          {meta.caseNumber}
-                        </Badge>
-                      )}
-                      {meta.promulgationDate && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                          <Icon name="calendar" size={12} className="mr-1" />
-                          선고일: {meta.promulgationDate}
-                        </Badge>
-                      )}
-                      {meta.lawType && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                          {meta.lawType}
-                        </Badge>
-                      )}
-                    </>
-                  ) : (
-                    // 법령 전용 배지
-                    <>
-                      {meta.latestEffectiveDate && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                          <Icon name="calendar" size={12} className="mr-1" />
-                          {formatDate(meta.latestEffectiveDate)}
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                        <Icon name="file-text" size={12} className="mr-1" />
-                        {articles.length}개 조문
-                      </Badge>
-
-                      {isOrdinance && (
-                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs px-1.5 py-0.5">
-                          <Icon name="building-2" size={12} className="mr-1" />
-                          자치법규
-                        </Badge>
-                      )}
-                      {meta.revisionType && (
-                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                          {meta.revisionType}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-
-                  {/* 법령 전체 즐겨찾기 개수 - 판례는 제외 */}
-                  {!isPrecedent && favoriteCount > 0 && (
-                    <Badge
-                      key={`header-fav-count-${favoriteCount}`}
-                      variant="outline"
-                      className="text-xs px-1.5 py-0.5"
-                    >
-                      <Icon name="star" size={12} className="mr-1 fill-yellow-400 text-yellow-500" />
-                      {favoriteCount}
-                    </Badge>
-                  )}
-                  {!isPrecedent && !isOrdinance && viewMode === "full" && activeArticle && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                      현재: {formatSimpleJo(activeArticle.jo)}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+              <LawViewerHeader
+                meta={meta}
+                isPrecedent={isPrecedent}
+                isOrdinance={isOrdinance}
+                viewMode={viewMode}
+                activeArticle={activeArticle}
+                hasLevelSection={hasLevelSection}
+                currentCourtLevel={currentCourtLevel}
+                favoriteCount={favoriteCount}
+                articlesLength={articles.length}
+                formatSimpleJo={formatSimpleJo}
+              />
             )}
 
             {/* Action Buttons */}
@@ -894,231 +860,32 @@ function LawViewerComponent({
               formatSimpleJo={formatSimpleJo}
             />
 
-            <div className="flex-1 min-h-0">
-              {/* ✅ Phase 11-B: AI 모드 우선 체크 (viewMode보다 우선) */}
-              {aiAnswerMode ? (
-                // ✅ Phase 8: AI 모드 - LegalMarkdownRenderer로 Markdown 직접 렌더링
-                <ScrollArea className="h-full" ref={contentRef}>
-                  <div className="pb-20">
-                    <AIAnswerContent
-                      aiAnswerContent={aiAnswerContent || ''}
-                      userQuery={userQuery}
-                      aiConfidenceLevel={aiConfidenceLevel}
-                      fileSearchFailed={fileSearchFailed}
-                      aiCitations={aiCitations}
-                      fontSize={fontSize}
-                      setFontSize={setFontSize}
-                      onLawClick={handleLawLinkClick}
-                      aiQueryType={aiQueryType}
-                      isTruncated={aiIsTruncated}
-                      onRefresh={onAiRefresh}
-                      isStreaming={isStreaming}
-                      searchProgress={searchProgress}
-                    />
-                  </div>
-                </ScrollArea>
-              ) : viewMode === "full" ? (
-                // 전문조회 모드: 자체 스크롤 관리
-                tierViewMode === "2-tier" && activeArticle ? (
-                  <DelegationPanel
-                    activeArticle={activeArticle}
-                    meta={meta}
-                    fontSize={fontSize}
-                    validDelegations={validDelegations}
-                    isLoadingThreeTier={isLoadingThreeTier}
-                    delegationActiveTab={delegationActiveTab}
-                    setDelegationActiveTab={setDelegationActiveTab}
-                    delegationPanelSize={delegationPanelSize}
-                    setDelegationPanelSize={setDelegationPanelSize}
-                    showAdminRules={showAdminRules}
-                    setShowAdminRules={setShowAdminRules}
-                    loadingAdminRules={loadingAdminRules}
-                    loadedAdminRulesCount={loadedAdminRulesCount}
-                    hasEverLoaded={hasEverLoaded}
-                    adminRules={adminRules}
-                    adminRulesProgress={adminRulesProgress}
-                    adminRuleViewMode={adminRuleViewMode}
-                    setAdminRuleViewMode={setAdminRuleViewMode}
-                    adminRuleHtml={adminRuleHtml}
-                    adminRuleTitle={adminRuleTitle}
-                    handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
-                    increaseFontSize={increaseFontSize}
-                    decreaseFontSize={decreaseFontSize}
-                    resetFontSize={resetFontSize}
-                    handleContentClick={handleContentClick}
-                    isOrdinance={isOrdinance}
-                  />
-                ) : (
-                  <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef}>
-                      <VirtualizedFullArticleView
-                        articles={actualArticles}
-                        preambles={preambles}
-                        activeJo={activeJo}
-                        fontSize={fontSize}
-                        lawTitle={meta.lawTitle}
-                        lawId={meta.lawId}
-                        mst={meta.mst}
-                        effectiveDate={meta.effectiveDate}
-                        onContentClick={handleContentClick}
-                        articleRefs={articleRefs}
-                        scrollParentRef={contentRef}
-                        isOrdinance={isOrdinance}
-                        isPrecedent={isPrecedent}
-                      />
-                    </div>
-                  </ScrollArea>
-                )
-              ) : activeArticle ? (
-                tierViewMode === "2-tier" ? (
-                  <DelegationPanel
-                    activeArticle={activeArticle}
-                    meta={meta}
-                    fontSize={fontSize}
-                    validDelegations={validDelegations}
-                    isLoadingThreeTier={isLoadingThreeTier}
-                    delegationActiveTab={delegationActiveTab}
-                    setDelegationActiveTab={setDelegationActiveTab}
-                    delegationPanelSize={delegationPanelSize}
-                    setDelegationPanelSize={setDelegationPanelSize}
-                    showAdminRules={showAdminRules}
-                    setShowAdminRules={setShowAdminRules}
-                    loadingAdminRules={loadingAdminRules}
-                    loadedAdminRulesCount={loadedAdminRulesCount}
-                    hasEverLoaded={hasEverLoaded}
-                    adminRules={adminRules}
-                    adminRulesProgress={adminRulesProgress}
-                    adminRuleViewMode={adminRuleViewMode}
-                    setAdminRuleViewMode={setAdminRuleViewMode}
-                    adminRuleHtml={adminRuleHtml}
-                    adminRuleTitle={adminRuleTitle}
-                    handleViewAdminRuleFullContent={handleViewAdminRuleFullContent}
-                    increaseFontSize={increaseFontSize}
-                    decreaseFontSize={decreaseFontSize}
-                    resetFontSize={resetFontSize}
-                    handleContentClick={handleContentClick}
-                    isOrdinance={isOrdinance}
-                  />
-                ) : showPrecedents && precedentViewMode === "side" ? (
-                  // 판례 사이드 패널 모드
-                  <PanelGroup direction="horizontal" className="h-full">
-                    {/* 좌측: 조문 본문 */}
-                    <Panel defaultSize={100 - precedentPanelSize} minSize={30}>
-                      <ScrollArea className="h-full" ref={contentRef}>
-                        <div ref={swipeRef}>
-                          <LawViewerSingleArticle
-                            activeArticle={activeArticle}
-                            activeArticleHtml={activeArticleHtml}
-                            meta={meta}
-                            revisionHistory={revisionHistory}
-                            fontSize={fontSize}
-                            isOrdinance={isOrdinance}
-                            onRefresh={onRefresh}
-                            onToggleFavorite={onToggleFavorite}
-                            isFavorite={isFavorite}
-                            increaseFontSize={increaseFontSize}
-                            decreaseFontSize={decreaseFontSize}
-                            resetFontSize={resetFontSize}
-                            handleContentClick={handleContentClick}
-                            formatSimpleJo={formatSimpleJo}
-                            showPrecedents={true}
-                            precedentViewMode="side"
-                            precedents={precedents}
-                            precedentTotalCount={precedentTotalCount}
-                            loadingPrecedents={loadingPrecedents}
-                            precedentsError={precedentsError}
-                            selectedPrecedent={selectedPrecedent}
-                            loadingPrecedentDetail={loadingPrecedentDetail}
-                            handleViewPrecedentDetail={handleViewPrecedentDetail}
-                            expandPrecedentPanel={expandPrecedentPanel}
-                            collapsePrecedentPanel={collapsePrecedentPanel}
-                          />
-                        </div>
-                      </ScrollArea>
-                    </Panel>
-
-                    {/* 리사이즈 핸들 */}
-                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
-
-                    {/* 우측: 판례 상세 패널 */}
-                    <Panel
-                      defaultSize={precedentPanelSize}
-                      minSize={25}
-                      maxSize={60}
-                      onResize={(size) => setPrecedentPanelSize(size)}
-                    >
-                      <div className="h-full border-l border-border bg-muted/10">
-                        <div className="h-full flex flex-col">
-                          {/* 패널 헤더 */}
-                          <div className="flex items-center justify-between p-3 border-b border-border">
-                            <div className="flex items-center gap-2">
-                              <Icon name="scale" size={16} className="text-primary" />
-                              <h3 className="font-semibold text-sm">판례 상세</h3>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={collapsePrecedentPanel}
-                              className="h-7 px-2"
-                            >
-                              <Icon name="x" size={14} className="mr-1" />
-                              닫기
-                            </Button>
-                          </div>
-
-                          {/* 판례 상세 내용 */}
-                          <div className="flex-1 min-h-0">
-                            <PrecedentDetailPanel
-                              detail={selectedPrecedent}
-                              loading={loadingPrecedentDetail}
-                              onClose={collapsePrecedentPanel}
-                              onContentClick={handleContentClick as (e: React.MouseEvent) => void}
-                              onViewPrecedent={handleViewPrecedentDetail}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </Panel>
-                  </PanelGroup>
-                ) : (
-                  <ScrollArea className="h-full" ref={contentRef}>
-                    <div ref={swipeRef}>
-                      <LawViewerSingleArticle
-                        activeArticle={activeArticle}
-                        activeArticleHtml={activeArticleHtml}
-                        meta={meta}
-                        revisionHistory={revisionHistory}
-                        fontSize={fontSize}
-                        isOrdinance={isOrdinance}
-                        onRefresh={onRefresh}
-                        onToggleFavorite={onToggleFavorite}
-                        isFavorite={isFavorite}
-                        increaseFontSize={increaseFontSize}
-                        decreaseFontSize={decreaseFontSize}
-                        resetFontSize={resetFontSize}
-                        handleContentClick={handleContentClick}
-                        formatSimpleJo={formatSimpleJo}
-                        showPrecedents={showPrecedents}
-                        precedentViewMode={precedentViewMode}
-                        precedents={precedents}
-                        precedentTotalCount={precedentTotalCount}
-                        loadingPrecedents={loadingPrecedents}
-                        precedentsError={precedentsError}
-                        selectedPrecedent={selectedPrecedent}
-                        loadingPrecedentDetail={loadingPrecedentDetail}
-                        handleViewPrecedentDetail={handleViewPrecedentDetail}
-                        expandPrecedentPanel={expandPrecedentPanel}
-                        collapsePrecedentPanel={collapsePrecedentPanel}
-                      />
-                    </div>
-                  </ScrollArea>
-                )
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>조문을 선택하세요</p>
-                </div>
-              )}
-            </div>
+            <LawViewerMainContent
+              contentRef={contentRef}
+              swipeRef={swipeRef}
+              aiAnswerMode={aiAnswerMode}
+              viewMode={viewMode}
+              tierViewMode={tierViewMode}
+              isOrdinance={isOrdinance}
+              isPrecedent={isPrecedent}
+              activeArticle={activeArticle}
+              activeArticleHtml={activeArticleHtml}
+              actualArticles={actualArticles}
+              preambles={preambles}
+              activeJo={activeJo}
+              articleRefs={articleRefs}
+              meta={meta}
+              revisionHistory={revisionHistory}
+              fontProps={fontProps}
+              aiAnswerProps={aiAnswerPropsGroup}
+              delegationProps={delegationPropsGroup}
+              precedentProps={precedentPropsGroup}
+              handleContentClick={handleContentClick}
+              onRefresh={onRefresh}
+              onToggleFavorite={onToggleFavorite}
+              isFavorite={isFavorite}
+              formatSimpleJo={formatSimpleJo}
+            />
           </Card >
           <ReferenceModal
             isOpen={refModal.open}

@@ -1,0 +1,538 @@
+/* ============================================
+   Animations & Keyframes
+   ============================================ */
+
+/* Aurora animation for text effects */
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+    transform: rotate(-5deg) scale(0.9);
+  }
+  25% {
+    background-position: 50% 100%;
+    transform: rotate(5deg) scale(1.1);
+  }
+  50% {
+    background-position: 100% 50%;
+    transform: rotate(-3deg) scale(0.95);
+  }
+  75% {
+    background-position: 50% 0%;
+    transform: rotate(3deg) scale(1.05);
+  }
+  100% {
+    background-position: 0% 50%;
+    transform: rotate(-5deg) scale(0.9);
+  }
+}
+
+.animate-aurora {
+  animation: aurora 8s ease-in-out infinite alternate;
+}
+
+/* Shiny text animation */
+@keyframes shiny-text {
+  0%,
+  90%,
+  100% {
+    background-position: calc(-100% - var(--shiny-width)) 0;
+  }
+  30%,
+  60% {
+    background-position: calc(100% + var(--shiny-width)) 0;
+  }
+}
+
+.animate-shiny-text {
+  animation: shiny-text 8s infinite;
+}
+
+/* Text gradient animation */
+@keyframes text-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-text-gradient {
+  animation: text-gradient 6s ease infinite alternate;
+}
+
+/* Shimmer animation for progress bars */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* AI 모드 글로우 효과 */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(168, 85, 247, 0.7);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* 에러 흔들림 효과 */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Fade in animation for homepage elements */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+/* Progress dialog animations - shimmer variant */
+@keyframes shimmer-bg {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes bounce-subtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-slide {
+  animation: slide 1.5s ease-in-out infinite;
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+.delay-75 {
+  animation-delay: 75ms;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+/* Liquid Glass Morphism Animations */
+@keyframes liquid-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30%, -30%) scale(1.1);
+  }
+  66% {
+    transform: translate(-20%, 20%) scale(0.9);
+  }
+}
+
+@keyframes liquid-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-30%, 30%) scale(0.9);
+  }
+  66% {
+    transform: translate(20%, -20%) scale(1.1);
+  }
+}
+
+@keyframes liquid-3 {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-liquid-1 {
+  animation: liquid-1 20s ease-in-out infinite;
+}
+
+.animate-liquid-2 {
+  animation: liquid-2 25s ease-in-out infinite;
+}
+
+.animate-liquid-3 {
+  animation: liquid-3 30s ease-in-out infinite;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Fade In Up Animation - 역동적이면서 깔끔한 뷰 전환 */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Swipe Tutorial Animations */
+@keyframes swipe-left {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(-30px);
+    opacity: 1;
+  }
+}
+
+@keyframes swipe-right {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(30px);
+    opacity: 1;
+  }
+}
+
+.animate-swipe-left {
+  animation: swipe-left 2s ease-in-out infinite;
+}
+
+.animate-swipe-right {
+  animation: swipe-right 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Apple-Style Scroll Reveal Animations
+   ============================================ */
+
+/* Intersection Observer based reveal */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered children animation */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-stagger.revealed > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+
+.reveal-stagger.revealed > *:nth-child(2) {
+  transition-delay: 80ms;
+}
+
+.reveal-stagger.revealed > *:nth-child(3) {
+  transition-delay: 160ms;
+}
+
+.reveal-stagger.revealed > *:nth-child(4) {
+  transition-delay: 240ms;
+}
+
+.reveal-stagger.revealed > *:nth-child(5) {
+  transition-delay: 320ms;
+}
+
+.reveal-stagger.revealed > *:nth-child(6) {
+  transition-delay: 400ms;
+}
+
+.reveal-stagger.revealed > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================
+   Apple-Style Unified Background System
+   ============================================ */
+
+/* Base page background - 테마 대응 */
+.page-bg {
+  background: var(--background);
+  min-height: 100vh;
+}
+
+/* Fixed Hero Section - Header + Search stays fixed (다크 모드) */
+.dark .hero-section-fixed {
+  background: linear-gradient(180deg,
+      oklch(0.18 0.025 250) 0%,
+      oklch(0.14 0.015 250) 40%,
+      var(--background) 100%);
+  position: relative;
+}
+
+/* Fixed Hero Section - 라이트 모드 */
+.hero-section-fixed {
+  background: linear-gradient(180deg,
+      oklch(0.96 0.015 250) 0%,
+      oklch(0.98 0.008 250) 40%,
+      var(--background) 100%);
+  position: relative;
+}
+
+/* Logo glow effect */
+.logo-glow {
+  text-shadow:
+    0 0 15px oklch(0.55 0.18 250 / 0.2),
+    0 0 30px oklch(0.55 0.18 250 / 0.1),
+    0 0 50px oklch(0.55 0.18 250 / 0.05);
+  transition: text-shadow 0.3s ease;
+}
+
+.logo-glow:hover {
+  text-shadow:
+    0 0 20px oklch(0.55 0.18 250 / 0.3),
+    0 0 40px oklch(0.55 0.18 250 / 0.15),
+    0 0 60px oklch(0.55 0.18 250 / 0.08);
+}
+
+/* Hero gradient background - seamless transition (legacy, kept for compatibility) */
+.hero-gradient {
+  background: transparent;
+  position: relative;
+}
+
+.hero-gradient::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%,
+      oklch(0.55 0.18 250 / 0.08) 0%,
+      transparent 70%);
+  pointer-events: none;
+}
+
+/* Section backgrounds - 테마 대응 */
+.section-primary {
+  background: var(--background);
+}
+
+.section-elevated {
+  background: var(--card);
+}
+
+.section-subtle {
+  background: var(--background);
+}
+
+/* Feature card hover effect - 테마 대응 */
+.feature-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  background: var(--secondary);
+  border-color: var(--ring);
+  box-shadow:
+    0 20px 40px oklch(0 0 0 / 0.15),
+    0 0 0 1px var(--ring);
+}
+
+/* Bento Grid Card - 테마 대응 */
+.bento-card {
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 50%, transparent);
+  backdrop-filter: blur(12px);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  border-color: var(--ring);
+  background: color-mix(in oklch, var(--card) 70%, transparent);
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 32px oklch(0 0 0 / 0.1),
+    0 0 0 1px var(--ring);
+}
+
+/* Stats card styling - 테마 대응 */
+.stat-card {
+  background: color-mix(in oklch, var(--card) 60%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card:hover {
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  border-color: var(--muted-foreground);
+}
+
+/* CTA Section gradient - 테마 대응 */
+.cta-gradient {
+  background: var(--secondary);
+  position: relative;
+}
+
+.cta-gradient::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(circle,
+      var(--primary) / 0.06,
+      transparent 70%);
+  pointer-events: none;
+}
+
+/* Divider line - 테마 대응 */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      var(--border) 20%,
+      var(--border) 80%,
+      transparent 100%);
+}
+
+/* Floating scroll indicator */
+.scroll-indicator-apple {
+  animation: float-down 2.5s ease-in-out infinite;
+}
+
+@keyframes float-down {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 0.8;
+  }
+}

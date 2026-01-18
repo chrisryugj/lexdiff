@@ -1,10 +1,10 @@
 # Active Context
 
-**마지막 업데이트**: 2026-01-18 (성능 최적화 완료)
+**마지막 업데이트**: 2026-01-18 (law-viewer.tsx 분리 완료)
 
 ## 현재 상태
 
-배포 전 최종 코드 리뷰 + 성능 최적화 완료.
+Phase 1~3 파일 분리 완료 (useSearchHandlers.ts 모듈화, globals.css 분리, law-viewer.tsx 분리).
 
 ### ✅ Critical 수정 완료
 
@@ -59,10 +59,54 @@
 └── visited-laws.ts
 ```
 
-### 📋 다음 할 일 (선택적)
+**useSearchHandlers** (`components/search-result-view/hooks/useSearchHandlers/`):
+```
+├── index.ts               # 205줄, 오케스트레이터
+├── types.ts               # 85줄, 공유 타입
+├── useFetchLawContent.ts  # 201줄, 법령 본문 조회
+├── useAiSearch.ts         # 270줄, AI 검색 (RAG)
+├── useBasicSearch.ts      # 271줄, 구조화 검색
+├── useBasicHandlers.ts    # 397줄, 기본 핸들러
+└── useUnifiedSearch.ts    # 734줄, 통합검색 (판례/해석례)
+```
 
-- [ ] `useSearchHandlers.ts` 분리 검토 (1,954줄) - 🔴 가장 큰 파일
-- [ ] `globals.css` 분리 (1,262줄) - ⚪ P3 낮은 우선순위
+**globals.css 분리** (`app/styles/`):
+```
+app/
+├── globals.css            # 46줄 (1,263줄 → 46줄, 96% 감소)
+└── styles/
+    ├── fonts.css          # 66줄, @font-face
+    ├── theme-variables.css # 178줄, :root/.dark/@theme
+    ├── animations.css     # 538줄, @keyframes + animate-*
+    ├── law-styles.css     # 298줄, 법령 링크/prose
+    └── button-hover.css   # 115줄, 버튼 호버 효과
+```
+
+**law-viewer 분리** (`components/law-viewer/`):
+```
+├── index.ts                    # 7개 export
+├── law-viewer-action-buttons.tsx
+├── law-viewer-header.tsx       # 125줄 (신규)
+├── law-viewer-main-content.tsx # 401줄 (신규)
+├── law-viewer-ordinance-actions.tsx
+├── law-viewer-related-cases.tsx
+├── law-viewer-sidebar.tsx
+└── law-viewer-single-article.tsx
+```
+
+### 📋 다음 할 일
+
+**✅ 대형 파일 분리 완료** (계획: `.claude/plans/file-split-plan.md`)
+
+- [x] **Phase 1**: `useSearchHandlers.ts` 분리 (1,954줄 → 7개 모듈, 최대 734줄)
+- [x] **Phase 2**: `globals.css` 분리 (1,263줄 → 46줄 + 5파일)
+- [x] **Phase 3**: `law-viewer.tsx` 분리 (1,175줄 → 941줄, 20% 감소)
+
+**남은 대형 파일** (800줄 이상):
+| 파일 | 줄 수 | 상태 |
+|------|-------|------|
+| `law-viewer.tsx` | 941 | ⚠️ 주의 (1,200→941) |
+| `file-search-client.ts` | ~800 | 현재 유지 |
 
 ## 핵심 파일
 
@@ -70,7 +114,7 @@
 |------|------|-------|
 | `lib/file-search-client.ts` | Gemini File Search 스트리밍 | ~800 |
 | `components/search-result-view/index.tsx` | 검색 결과 메인 컴포넌트 | ~500 |
-| `components/law-viewer.tsx` | 법령 뷰어 오케스트레이터 | ~1,200 |
+| `components/law-viewer.tsx` | 법령 뷰어 오케스트레이터 | 941 |
 | `components/law-viewer-delegation-panel/` | 위임법령 패널 (모듈화됨) | 903 (5개 파일) |
 
 ### ❌ 기각된 Gemini 지적사항

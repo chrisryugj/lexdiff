@@ -1,0 +1,298 @@
+/* ============================================
+   Law-Related Styles
+   ============================================ */
+
+/* 법령 링크 스타일 (전역) */
+a.law-ref,
+.prose a.law-ref {
+  color: oklch(from var(--law-link) l c h);
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, oklch(from var(--law-link) l c h) 0%, oklch(from var(--law-link) l c h) 100%);
+  background-size: 0% 1.5px;
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+a.law-ref:hover,
+.prose a.law-ref:hover {
+  color: oklch(from var(--law-link-hover) l c h);
+  background-size: 100% 2px;
+  background-color: oklch(from var(--law-link) l c h / 0.1);
+  box-shadow: 0 2px 8px oklch(from var(--law-link) l c h / 0.3);
+  transform: translateY(-1px);
+}
+
+/* 법령 링크: 기본 색상 */
+a.law-ref,
+a.law-ref:visited,
+a.law-ref:link {
+  color: oklch(0.65 0.2 250) !important;
+}
+
+/* 법령 링크: 실제 클릭한 링크 (JS로 추적) */
+a.law-ref.law-ref-visited {
+  color: oklch(0.5 0.12 280) !important;
+}
+
+a.law-ref:hover {
+  color: oklch(0.8 0.25 250) !important;
+}
+
+/* 판례 링크: 법령 링크와 동일한 스타일 */
+a.precedent-ref,
+a.precedent-ref:link,
+a.precedent-ref:visited {
+  color: oklch(0.65 0.2 250) !important;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
+  background-size: 0% 1.5px;
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+a.precedent-ref:hover {
+  color: oklch(0.8 0.25 250) !important;
+  background-size: 100% 2px;
+  background-color: oklch(0.65 0.2 250 / 0.15);
+  box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   @layer base - Law Styles
+   ============================================ */
+
+@layer base {
+  /* 개정 태그 공통 스타일 */
+  .rev-mark {
+    display: inline-block;
+    padding: 0px 2px;
+    border-radius: 2px;
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* 개정 태그 타입별 색상 */
+  .rev-mark-new {
+    background-color: var(--rev-new-bg);
+    color: var(--rev-new-fg);
+  }
+
+  .rev-mark-edit {
+    background-color: var(--rev-edit-bg);
+    color: var(--rev-edit-fg);
+  }
+
+  .rev-mark-delete {
+    background-color: var(--rev-delete-bg);
+    color: var(--rev-delete-fg);
+  }
+
+  .rev-mark-etc {
+    background-color: var(--rev-etc-bg);
+    color: var(--rev-etc-fg);
+  }
+
+  .rev-mark-move {
+    background-color: var(--rev-move-bg);
+    color: var(--rev-move-fg);
+    font-size: 12px !important;
+  }
+
+  /* prose 컨텍스트 오버라이드 */
+  .prose .rev-mark,
+  .prose .rev-mark-new,
+  .prose .rev-mark-edit,
+  .prose .rev-mark-delete,
+  .prose .rev-mark-etc,
+  .prose .rev-mark-move {
+    display: inline-block !important;
+    padding: 0px 2px !important;
+    border-radius: 2px !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+
+  /* 하위 호환성 - 기존 rev-mark만 있는 경우 */
+  .rev-mark:not(.rev-mark-new):not(.rev-mark-edit):not(.rev-mark-delete):not(.rev-mark-etc):not(.rev-mark-move) {
+    color: rgb(147, 197, 253) !important;
+    background-color: transparent !important;
+    padding: 0 !important;
+    font-size: 0.95em !important;
+  }
+
+  /* 법령 조문 내용에서 항 사이 간격 추가 */
+  .law-article-content {
+    white-space: normal !important;
+  }
+
+  /* 항 마커(①②③) 앞 간격 조절 - 첫 번째 항 제외 */
+  .para-marker {
+    display: inline-block;
+    margin-top: 0.3em;
+  }
+
+  a.law-ref {
+    color: oklch(0.65 0.2 250);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  a.law-ref:hover {
+    color: oklch(0.8 0.25 250);
+    background-size: 100% 2px;
+    background-color: oklch(0.65 0.2 250 / 0.15);
+    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
+    transform: translateY(-1px);
+  }
+
+  .prose a.law-ref {
+    color: oklch(0.65 0.2 250);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .prose a.law-ref:hover {
+    color: oklch(0.8 0.25 250);
+    background-size: 100% 2px;
+    background-color: oklch(0.65 0.2 250 / 0.15);
+    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
+    transform: translateY(-1px);
+  }
+
+  a.law-html-link,
+  .prose a.law-html-link {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  a.law-drf-link,
+  .prose a.law-drf-link {
+    color: oklch(0.7 0.18 240);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .law-html-viewer p {
+    margin: 0.5rem 0;
+  }
+
+  .law-html-viewer li {
+    margin: 0.25rem 0;
+  }
+
+  .law-html-viewer h1,
+  .law-html-viewer h2,
+  .law-html-viewer h3 {
+    margin: 0.75rem 0;
+  }
+
+  .law-html-viewer br+br {
+    display: none;
+  }
+
+  /* AI 답변 조문 발췌 - Pretendard 폰트 */
+  .prose blockquote {
+    font-family: 'Pretendard', sans-serif;
+    font-size: 1.0em;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 1rem;
+    padding-right: 0.5rem;
+    color: #000000;
+    /* 라이트 테마: 어두운 텍스트 */
+    background-color: oklch(92.797% 0.00011 271.152 / 0.959) !important;
+    /* 라이트 테마: 더 어두운 회색 배경 */
+  }
+
+  .dark .prose blockquote {
+    color: #d1d5db;
+    /* 다크 테마: 밝은 텍스트 */
+    background-color: color-mix(in oklab, var(--color-blue-950) 30%, transparent) !important;
+    /* 다크 테마: 기존 스타일 */
+  }
+
+  /* 조문 발췌 내 법령명+조문번호(조문제목) 하이라이트 */
+  .prose blockquote .quote-article-title {
+    display: inline-block;
+    background: oklch(81.933% 0.06084 234.887 / 0.3);
+    /* 라이트 테마: 연한 배경 */
+    color: oklch(0.35 0.08 250);
+    /* 라이트 테마: 어두운 텍스트 */
+    padding: 0.15em 0.5em 0.15em 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 1.0em;
+    margin-bottom: 0.3em;
+    font-weight: normal;
+  }
+
+  .dark .prose blockquote .quote-article-title {
+    background: oklch(0.7 0.12 250 / 0.15);
+    color: oklch(0.88 0.08 250);
+  }
+
+  .prose blockquote .quote-article-title strong {
+    font-weight: 700;
+  }
+
+  .prose blockquote .quote-article-subtitle {
+    font-weight: 400;
+    opacity: 0.9;
+  }
+}
+
+/* AI 답변 마크다운: 부모 font-size 상속 */
+.legal-markdown-content {
+  font-size: inherit !important;
+}
+
+.legal-markdown-content p,
+.legal-markdown-content li,
+.legal-markdown-content td,
+.legal-markdown-content th,
+.legal-markdown-content blockquote,
+.legal-markdown-content blockquote div {
+  font-size: inherit !important;
+}
+
+/* 헤더도 상대적 크기로 조절 (em 단위로 부모 font-size 기준) */
+.legal-markdown-content h2 {
+  font-size: 1.15em !important;
+}
+
+.legal-markdown-content h3 {
+  font-size: 1.05em !important;
+}
+
+.legal-markdown-content h4 {
+  font-size: 1em !important;
+}

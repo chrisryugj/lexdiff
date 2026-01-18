@@ -269,11 +269,11 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
         scrollElement.scrollTop = targetVirtualItem.start
       } else {
         // 아직 렌더링 안 되었으면 virtualizer에게 스크롤 요청
-        // ⚠️ flushSync 에러 방지: 다음 프레임으로 지연
+        // ⚠️ flushSync 에러 방지: setTimeout으로 완전히 다음 태스크로 분리
         console.log('[VirtualizedFullArticleView] Using virtualizer.scrollToIndex:', itemIndex)
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           virtualizer.scrollToIndex(itemIndex, { align: 'start' })
-        })
+        }, 0)
       }
 
       // 스크롤 후 확인
@@ -285,10 +285,10 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       }, 100)
     }
 
-    // requestAnimationFrame으로 리렌더링 완료 후 스크롤
-    requestAnimationFrame(() => {
+    // ⚠️ flushSync 에러 방지: setTimeout으로 렌더링 완료 후 스크롤
+    setTimeout(() => {
       performScroll()
-    })
+    }, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeJo])
 
