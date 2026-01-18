@@ -26,6 +26,7 @@ interface SearchBarProps {
     searchType?: SearchType
     caseNumber?: string
     classification?: UnifiedQueryClassification
+    forcedMode?: 'law' | 'ai'
   }) => void
   isLoading?: boolean
   searchMode?: 'basic' | 'rag'

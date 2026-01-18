@@ -6,6 +6,7 @@
  */
 
 import JSZip from "jszip"
+// @ts-expect-error xmldom has no type declarations
 import { DOMParser as XMLDOMParser } from "xmldom"
 
 // 서버/브라우저 환경 호환 DOMParser

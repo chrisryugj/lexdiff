@@ -4,13 +4,13 @@
  */
 
 import { ReactNode } from 'react'
-import { IconType } from '@/lib/icons'
+import { IconName } from '@/lib/icons'
 import { Icon } from '@/components/ui/icon'
 
 interface StatCardProps {
   label: string
   value: number | string
-  icon?: IconType
+  icon?: IconName
   variant?: 'default' | 'primary' | 'accent' | 'warning'
 }
 

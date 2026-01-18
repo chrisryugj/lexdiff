@@ -175,7 +175,7 @@ const SEOUL_DISTRICTS = [
 // ✅ 개선 5: 조례 판별 강화 (양방향)
 // 주의: "시행규칙"은 법령이므로 조례로 분류되지 않도록 제외
 const ORDINANCE_PATTERNS = [
-  /조례|자치법규/,
+  /조례|조레|자치법규/,  // "조레"는 "조례"의 흔한 오타
   // 지역명 + 조례/규칙 (단, 시행규칙은 제외)
   /(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(특별시|광역시|도)?\s*(?!시행)(조례|규칙)/,
   // 역순: 조례/규칙 + 지역명 (단, 시행규칙은 제외)
@@ -989,9 +989,10 @@ export function classifySearchQuery(query: string): UnifiedQueryClassification {
       matchedPatterns.push('ai')
     } else {
       searchType = isOrdinance ? 'ordinance' : 'law'
-      confidence = 0.6
-      reason = '기본 법령 검색'
-      matchedPatterns.push('law')
+      // ✅ 조례 패턴 매칭 시 confidence 상향 (다이얼로그 방지)
+      confidence = isOrdinance ? 0.75 : 0.6
+      reason = isOrdinance ? '조례 패턴 감지' : '기본 법령 검색'
+      matchedPatterns.push(isOrdinance ? 'ordinance' : 'law')
     }
   }
 

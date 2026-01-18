@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const text = response.text
 
     // JSON 파싱
-    const intent = parseIntentResponse(text)
+    const intent = parseIntentResponse(text || '')
 
     return Response.json({
       success: true,

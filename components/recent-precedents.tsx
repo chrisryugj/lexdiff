@@ -51,7 +51,7 @@ export function RecentPrecedents({ onSelect }: RecentPrecedentsProps) {
     <Card className="p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Icon name="court" className="h-4 w-4 text-muted-foreground" />
+          <Icon name="gavel" className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">최근 조회 판례</h3>
           <Badge variant="secondary" className="text-xs">
             {precedents.length}

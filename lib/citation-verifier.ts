@@ -61,7 +61,7 @@ export async function verifyCitation(citation: Citation): Promise<VerifiedCitati
 
     if (!lawId) {
       // Fallback: 법령명으로 검색
-      lawId = await fetchLawId(citation.lawName)
+      lawId = await fetchLawId(citation.lawName) ?? undefined
     } else {
       console.log(`[Citation Verifier] ✅ Using lawId from citation metadata: ${lawId}`)
     }

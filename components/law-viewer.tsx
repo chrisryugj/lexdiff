@@ -1090,7 +1090,7 @@ export function LawViewer({
                               detail={selectedPrecedent}
                               loading={loadingPrecedentDetail}
                               onClose={collapsePrecedentPanel}
-                              onContentClick={handleContentClick}
+                              onContentClick={handleContentClick as (e: React.MouseEvent) => void}
                               onViewPrecedent={handleViewPrecedentDetail}
                             />
                           </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { load } from "cheerio"
+import { load, type CheerioAPI, type Cheerio } from "cheerio"
+import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 import { buildJO } from "@/lib/law-parser"
@@ -43,7 +44,7 @@ function sanitizeKeepAnchors(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: Array.from(
       new Set([
-        ...sanitizeHtml.defaults.allowedTags,
+        ...(sanitizeHtml.defaults.allowedTags || []),
         "a",
         "span",
         "table",
@@ -80,16 +81,17 @@ function joLabelFromJoCode(jo?: string) {
 }
 
 // Extract region starting at '제n조(조문제목)' and ending right AFTER the first bracketed amendment mark like [개정 2024.12.31]
-function extractArticleRegionAfterAmend($: cheerio.CheerioAPI, jo?: string) {
+function extractArticleRegionAfterAmend($: CheerioAPI, jo?: string) {
   const label = joLabelFromJoCode(jo)
   const root = $("body")
   if (!label) return root
   const needle = label.replace(/\s+/g, "")
 
   // 1) find start node
-  let start: cheerio.Cheerio | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let start: any = null
   const sels = "h1,h2,h3,h4,dt,p,div,li,span"
-  root.find(sels).each((_, el) => {
+  root.find(sels).each((_: number, el: Element) => {
     const txt = $(el).text().replace(/\s+/g, "")
     if (!start && txt.startsWith(needle)) {
       start = $(el)
@@ -106,7 +108,8 @@ function extractArticleRegionAfterAmend($: cheerio.CheerioAPI, jo?: string) {
 
   // 3) collect until AFTER first bracketed amendment mark
   const out = $("<div></div>")
-  let cur: cheerio.Cheerio | null = container
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let cur: any = container
   let steps = 0
   // handles [개정 2024.12.31], [전문개정 2024.12.31], ＜개정 2024.12.31＞ 등
   const amendBracket = /\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]|＜\s*(?:개정|전문개정|전부개정|신설|삭제)[^＞]*＞/;
@@ -126,10 +129,10 @@ function extractArticleRegionAfterAmend($: cheerio.CheerioAPI, jo?: string) {
 }
 
 function rewriteAnchors(
-  $: cheerio.CheerioAPI,
+  $: CheerioAPI,
   ctx: { lawId?: string; lawTitle?: string } = {},
 ) {
-  $("a[href]").each((_, el) => {
+  $("a[href]").each((_: number, el: Element) => {
     const a = $(el)
     const text = a.text().trim()
     const href = (a.attr("href") || "").toString()

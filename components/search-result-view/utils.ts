@@ -116,7 +116,8 @@ export function hasLawKeyword(query: string): boolean {
 }
 
 export function hasOrdinanceKeyword(query: string): boolean {
-  return /조례|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
+  // "조레"는 "조례"의 흔한 오타
+  return /조례|조레|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
 }
 
 export function isOrdinanceQuery(query: string): boolean {

@@ -80,6 +80,8 @@ export interface IconProps {
   color?: string
   /** 선 굵기 */
   strokeWidth?: number
+  /** 접근성 타이틀 */
+  title?: string
 }
 
 /**

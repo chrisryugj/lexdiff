@@ -59,9 +59,14 @@ export interface SearchHandlers {
   // ✅ 통합검색 핸들러 (신규)
   handlePrecedentSearch: (query: SearchQuery) => void
   handlePrecedentSelect: (precedentId: string) => void
+  handlePrecedentPageChange: (page: number) => Promise<void>
+  handlePrecedentPageSizeChange: (size: number) => Promise<void>
   handleInterpretationSearch: (query: SearchQuery) => void
   handleRulingSearch: (query: SearchQuery) => void
   handleMultiSearch: (query: SearchQuery) => void
+  // ✅ 조례 페이지네이션
+  handleOrdinancePageChange: (page: number) => Promise<void>
+  handleOrdinancePageSizeChange: (size: number) => Promise<void>
 }
 
 export function useSearchHandlers({
@@ -333,8 +338,13 @@ export function useSearchHandlers({
     })
 
     // 모드 선택 다이얼로그
-    if (!forcedMode && queryDetection.confidence < 0.7) {
-      debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시')
+    // ✅ classification이 있으면 그 confidence를 사용 (search-bar에서 이미 분류됨)
+    const effectiveConfidence = classification ? classification.confidence : queryDetection.confidence
+    if (!forcedMode && effectiveConfidence < 0.7) {
+      debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', {
+        effectiveConfidence,
+        hasClassification: !!classification
+      })
       actions.setPendingQuery(query)
       actions.setIsSearching(false)
       actions.updateProgress('complete', 0)
@@ -1217,7 +1227,7 @@ export function useSearchHandlers({
 
       // ✅ 판례 검색 모드로 명시적 설정 (AI 모드 비활성화)
       actions.setIsAiMode(false)
-      actions.setSearchMode('law')
+      actions.setSearchMode('basic')
 
       // ✅ 기존 법령/조례 검색 상태 초기화
       actions.setLawSelectionState(null)
@@ -1582,7 +1592,7 @@ export function useSearchHandlers({
 
       // ✅ 해석례 검색 모드로 명시적 설정
       actions.setIsAiMode(false)
-      actions.setSearchMode('law')
+      actions.setSearchMode('basic')
 
       // ✅ 기존 법령/조례 검색 상태 초기화
       actions.setLawSelectionState(null)
@@ -1653,7 +1663,7 @@ export function useSearchHandlers({
 
       // ✅ 재결례 검색 모드로 명시적 설정
       actions.setIsAiMode(false)
-      actions.setSearchMode('law')
+      actions.setSearchMode('basic')
 
       // ✅ 기존 법령/조례 검색 상태 초기화
       actions.setLawSelectionState(null)

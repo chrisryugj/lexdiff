@@ -143,12 +143,12 @@ export default function AdminDashboard() {
         {/* Main Navigation */}
         <div className="mb-8">
           <nav className="flex gap-2 p-1.5 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 shadow-xl">
-            {[
+            {([
               { id: 'collection' as Tab, label: '데이터 수집', icon: 'download' },
               { id: 'processing' as Tab, label: '데이터 처리', icon: 'upload' },
               { id: 'management' as Tab, label: '관리', icon: 'database' },
               { id: 'statistics' as Tab, label: '통계', icon: 'bar-chart' }
-            ].map((tab) => (
+            ] as const).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {

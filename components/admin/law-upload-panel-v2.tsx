@@ -52,7 +52,7 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
       const data = await response.json()
 
       if (data.success && Array.isArray(data.files)) {
-        const serverFiles = new Set(data.files.map((f: any) => f.fileName))
+        const serverFiles = new Set<string>(data.files.map((f: any) => f.fileName))
         console.log(`✅ Loaded ${serverFiles.size} uploaded files from server log`)
 
         // Merge with localStorage (optional, but good for safety)
@@ -77,11 +77,125 @@ export function LawUploadPanelV2({ onUploadComplete, onRenderHeader }: LawUpload
 
   // ... (useEffect for onRenderHeader remains same)
 
-  // ... (checkStoreIdAndSync remains same)
+  /**
+   * ENV 스토어 ID 확인 및 동기화
+   * - 스토어 ID가 변경되었으면 localStorage 초기화
+   * - 실제 서버 상태와 동기화
+   */
+  async function checkStoreIdAndSync() {
+    try {
+      // 1. 현재 ENV 스토어 ID 가져오기
+      const response = await fetch('/api/admin/list-store-documents')
+      const data = await response.json()
 
-  // ... (syncWithServer remains same)
+      if (!data.success) {
+        console.error('❌ Failed to get store ID:', data.error)
+        return
+      }
 
-  // ... (saveUploadedFiles remains same)
+      const envStoreId = data.storeId
+      const savedStoreId = localStorage.getItem('currentStoreId')
+
+      console.log('🔍 Store ID check:', {
+        env: envStoreId,
+        saved: savedStoreId,
+        changed: envStoreId !== savedStoreId
+      })
+
+      // 2. 스토어 ID가 변경되었으면 localStorage 초기화
+      if (savedStoreId && envStoreId !== savedStoreId) {
+        console.warn('⚠️ Store ID changed! Clearing localStorage...')
+        localStorage.removeItem('uploadedLaws')
+        setUploadedFiles(new Set())
+      }
+
+      // 3. 현재 스토어 ID 저장
+      localStorage.setItem('currentStoreId', envStoreId)
+      setCurrentStoreId(envStoreId)
+
+      // 4. 서버와 동기화
+      await syncWithServer(data.documents)
+    } catch (error) {
+      console.error('❌ Failed to check store ID:', error)
+    }
+  }
+
+  async function syncWithServer(documents?: any[]) {
+    try {
+      console.log('🔄 Syncing with server...')
+
+      // Use provided documents or fetch fresh
+      let data: any
+      if (documents) {
+        data = { success: true, documents }
+      } else {
+        const response = await fetch('/api/admin/list-store-documents')
+        data = await response.json()
+      }
+
+      console.log('📊 Server response:', {
+        success: data.success,
+        documentCount: data.documents?.length || 0
+      })
+
+      if (data.success && data.documents) {
+        // Extract law file names from server
+        const serverFiles = new Set<string>()
+
+        let lawCount = 0
+        let matchedToLocalCount = 0
+
+        for (const doc of data.documents) {
+          const metadata = doc.customMetadata || []
+          const fileName = metadata.find((m: any) => m.key === 'file_name')?.stringValue
+          const lawType = metadata.find((m: any) => m.key === 'law_type')?.stringValue
+
+          // Only count laws (법률/시행령/시행규칙), skip ordinances
+          if (lawType === 'ordinance') {
+            continue
+          }
+
+          // Skip if lawType is explicitly not a law type
+          if (lawType && !['law', 'decree', 'rule'].includes(lawType)) {
+            continue
+          }
+
+          lawCount++
+
+          // Match with local files by fileName
+          if (fileName) {
+            serverFiles.add(fileName)
+            matchedToLocalCount++
+          }
+        }
+
+        const matchPercentage = lawCount > 0
+          ? ((matchedToLocalCount / lawCount) * 100).toFixed(1)
+          : '0.0'
+
+        console.log(`📊 Document analysis:`)
+        console.log(`   - Total documents: ${data.documents.length}`)
+        console.log(`   - 법률/시행령/시행규칙: ${lawCount}`)
+        console.log(`   - 로컬 파일 매칭 성공: ${matchedToLocalCount}/${lawCount} (${matchPercentage}%)`)
+        console.log(`✅ Found ${serverFiles.size} laws matched with local files`)
+
+        // Update localStorage with server state (even if empty)
+        saveUploadedFiles(serverFiles)
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync with server:', error)
+    }
+  }
+
+  // 업로드된 파일 저장
+  function saveUploadedFiles(files: Set<string>) {
+    try {
+      localStorage.setItem('uploadedLaws', JSON.stringify(Array.from(files)))
+      setUploadedFiles(files)
+    } catch (error) {
+      console.error('Failed to save uploaded files:', error)
+    }
+  }
 
   async function loadParsedLaws() {
     setLoading(true)

@@ -6,6 +6,7 @@
 
 import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
+import type { IconName } from "@/lib/icons"
 
 // ============================================================
 // API 응답 타입
@@ -55,18 +56,18 @@ export type SearchStage = LawSearchStage | AISearchStage
 export interface AIStageInfo {
   key: AISearchStage
   label: string
-  icon: string
+  icon: IconName
   range: [number, number]
 }
 
 /** AI 검색 단계 정의 */
 export const AI_STAGES: AIStageInfo[] = [
   { key: 'analyzing', label: '분석 중', icon: 'brain', range: [0, 15] },
-  { key: 'optimizing', label: '최적화', icon: 'settings-02', range: [15, 25] },
+  { key: 'optimizing', label: '최적화', icon: 'settings', range: [15, 25] },
   { key: 'searching', label: '검색 중', icon: 'search', range: [25, 40] },
-  { key: 'streaming', label: '생성 중', icon: 'ai-brain-04', range: [40, 95] },
-  { key: 'extracting', label: '인용 추출', icon: 'file-01', range: [95, 99] },
-  { key: 'complete', label: '완료', icon: 'checkmark-circle-02', range: [100, 100] },
+  { key: 'streaming', label: '생성 중', icon: 'sparkles', range: [40, 95] },
+  { key: 'extracting', label: '인용 추출', icon: 'file', range: [95, 99] },
+  { key: 'complete', label: '완료', icon: 'check-circle-2', range: [100, 100] },
 ]
 
 /** AI 검색 메타정보 */

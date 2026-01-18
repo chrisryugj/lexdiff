@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '@/components/ui/icon'
 
 interface WelcomeScreenProps {
@@ -9,28 +9,28 @@ interface WelcomeScreenProps {
 
 const EXAMPLES = [
   {
-    icon: 'file-text',
+    icon: 'file-text' as const,
     text: '관세법 제38조',
     description: '특정 조문 바로가기',
     mode: 'law' as const,
     color: 'blue'
   },
   {
-    icon: 'help-circle',
+    icon: 'help-circle' as const,
     text: '관세법 신고납부 요건이 뭐야?',
     description: '요건/조건 질문',
     mode: 'ai' as const,
     color: 'purple'
   },
   {
-    icon: 'git-compare',
+    icon: 'git-compare' as const,
     text: '징계처분과 해임의 차이',
     description: '비교 질문',
     mode: 'ai' as const,
     color: 'purple'
   },
   {
-    icon: 'sparkles',
+    icon: 'sparkles' as const,
     text: '지방세 감면 특례 대상은?',
     description: '면제/특례 질문',
     mode: 'ai' as const,
@@ -38,7 +38,7 @@ const EXAMPLES = [
   },
 ]
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -49,7 +49,7 @@ const containerVariants = {
   },
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,

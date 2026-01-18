@@ -426,7 +426,9 @@ describe('useSearchHandlers', () => {
           lawId: '001706',
           lawTitle: '민법',
           jo: '000100',
-          addedAt: new Date().toISOString()
+          lastSeenSignature: '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         })
       })
 

@@ -58,7 +58,7 @@ function parseHistoryHtml(html: string, targetLawName: string): LawHistoryEntry[
 
     const dateCells = row.match(/<td[^>]*>(\d{4}[.\-]?\d{2}[.\-]?\d{2})<\/td>/g) || []
     let ancYd = ''
-    if (dateCells.length >= 1) {
+    if (dateCells.length >= 1 && dateCells[0]) {
       const dateMatch = dateCells[0].match(/(\d{4})[.\-]?(\d{2})[.\-]?(\d{2})/)
       if (dateMatch) {
         ancYd = `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}`

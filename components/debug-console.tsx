@@ -22,7 +22,7 @@ export function DebugConsole() {
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe(setLogs)
     setLogs(debugLogger.getLogs())
-    return unsubscribe
+    return () => { unsubscribe() }
   }, [])
 
   const filteredLogs = filterLevel === "all" ? logs : logs.filter((log) => log.level === filterLevel)

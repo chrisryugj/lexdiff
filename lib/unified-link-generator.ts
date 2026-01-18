@@ -233,7 +233,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
 
     // 이미 처리된 영역인지 확인
     const isOverlap = matches.some(m =>
-      m.start <= match.index && match.index < m.end
+      m.start <= match!.index && match!.index < m.end
     )
 
     if (!isOverlap) {

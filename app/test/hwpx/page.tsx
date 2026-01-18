@@ -112,7 +112,7 @@ export default function HwpxTestPage() {
       zip.forEach((relativePath, file) => {
         files.push({
           name: relativePath,
-          size: file._data?.uncompressedSize || 0,
+          size: (file as any)._data?.uncompressedSize || 0,
         })
       })
       setZipFiles(files)

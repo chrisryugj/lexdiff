@@ -152,7 +152,7 @@ export function StageIndicator({
                   )}
                 >
                   {isCompleted ? (
-                    <Icon name="checkmark-circle-02" className="h-5 w-5 drop-shadow-sm" />
+                    <Icon name="check-circle-2" className="h-5 w-5 drop-shadow-sm" />
                   ) : isCurrent ? (
                     <Icon name={stage.icon} className="h-5 w-5 drop-shadow-sm" />
                   ) : (

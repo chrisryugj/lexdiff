@@ -33,13 +33,13 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       pageCount++
       // Note: Gemini File Search API max pageSize is 20
-      const url = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${pageToken ? `&pageToken=${pageToken}` : ''
+      const url: string = `https://generativelanguage.googleapis.com/v1beta/${storeId}/documents?pageSize=20${pageToken ? `&pageToken=${pageToken}` : ''
         }`
 
       console.log(`[List Store Documents API] Fetching page ${pageCount}...`)
       console.log(`[List Store Documents API] URL: ${url}`)
 
-      const response = await fetch(url, {
+      const response: Response = await fetch(url, {
         headers: {
           'x-goog-api-key': apiKey
         }
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      const data = await response.json()
+      const data: { documents?: any[]; nextPageToken?: string } = await response.json()
       const documents = data.documents || []
 
       allDocuments.push(...documents)

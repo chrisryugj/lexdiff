@@ -55,8 +55,9 @@ function CollapsibleBlockquote({
       return node.map(extractAllText).join('\n')
     }
     if (React.isValidElement(node) && node.props) {
-      if (node.props.children) {
-        return extractAllText(node.props.children)
+      const props = node.props as { children?: React.ReactNode }
+      if (props.children) {
+        return extractAllText(props.children)
       }
     }
     return ''
@@ -476,8 +477,9 @@ export function FileSearchAnswerDisplay({
         )
       },
       // 코드 블록 - 접기/펼치기 지원
-      code: ({ node, inline, className, children, ...props }) => {
-        if (inline) {
+      code: ({ node, className, children, ...props }: any) => {
+        // react-markdown v9+: inline은 className 없음으로 판단
+        if (!className) {
           return <code className="px-1 py-0.5 bg-gray-700 rounded text-cyan-300 text-xs">{children}</code>
         }
 

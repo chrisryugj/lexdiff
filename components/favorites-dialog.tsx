@@ -25,7 +25,7 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe(setFavorites)
     setFavorites(favoritesStore.getFavorites())
-    return unsubscribe
+    return () => { unsubscribe() }
   }, [])
 
   const handleRemove = (id: string, e: React.MouseEvent) => {
