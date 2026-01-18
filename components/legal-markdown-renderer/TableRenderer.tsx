@@ -1,0 +1,77 @@
+import React from 'react'
+
+// 짧은 컬럼으로 취급할 헤더 키워드
+const SHORT_COLUMN_KEYWORDS = [
+  '순번', 'no', 'no.', '#', '번호',
+  '구분', '분류', '유형', '종류',
+  '단계', 'step',
+  '항목', '비고', '선택', '결과',
+  '날짜', '일시',
+  '✅', '❌'
+]
+
+interface TableProps {
+  children: React.ReactNode
+}
+
+interface ThProps {
+  children: React.ReactNode
+  [key: string]: any
+}
+
+interface TdProps {
+  children: React.ReactNode
+}
+
+export function TableRenderer({ children }: TableProps) {
+  return (
+    <div className="overflow-x-auto my-4 mx-3 rounded-md border border-border/50 bg-card/50">
+      <table className="w-full border-collapse table-auto" style={{ fontSize: 'inherit' }}>
+        {children}
+      </table>
+    </div>
+  )
+}
+
+export function TheadRenderer({ children }: TableProps) {
+  return (
+    <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground">
+      {children}
+    </thead>
+  )
+}
+
+export function ThRenderer({ children, ...props }: ThProps) {
+  // 텍스트 내용 확인
+  const textContent = typeof children === 'string'
+    ? children.toLowerCase().trim()
+    : Array.isArray(children) && typeof children[0] === 'string'
+      ? children[0].toLowerCase().trim()
+      : ''
+
+  const isShortColumn = SHORT_COLUMN_KEYWORDS.some(k => textContent === k || textContent.includes(k))
+
+  return (
+    <th
+      className={`
+        px-4 py-2.5 text-left font-semibold text-foreground/80 align-middle
+        ${isShortColumn
+          ? 'w-[1%] whitespace-nowrap text-center'
+          : 'min-w-[120px]'
+        }
+      `}
+      style={{ fontSize: 'inherit' }}
+      {...props}
+    >
+      {children}
+    </th>
+  )
+}
+
+export function TdRenderer({ children }: TdProps) {
+  return (
+    <td className="px-4 py-2.5 border-b border-border/50 text-foreground/90 align-top leading-relaxed break-keep" style={{ fontSize: 'inherit' }}>
+      {children}
+    </td>
+  )
+}
