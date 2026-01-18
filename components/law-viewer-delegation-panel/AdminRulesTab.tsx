@@ -184,7 +184,7 @@ export function AdminRulesTab({
     // Empty state
     return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <Icon name="file-x" size={48} className="mb-4 opacity-30" />
+            <Icon name="file" size={48} className="mb-4 opacity-30" />
             <p className="text-sm">관련 행정규칙이 없습니다</p>
         </div>
     )
