@@ -232,7 +232,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-2xl p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl sm:rounded-xl"
+        className="max-w-2xl p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl sm:rounded-xl top-[12vh] translate-y-0"
         showCloseButton={true}
       >
         {/* 접근성을 위한 숨겨진 타이틀 */}

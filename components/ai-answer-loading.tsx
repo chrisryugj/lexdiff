@@ -260,7 +260,7 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
       </div>
 
       {/* 중앙: 원형 프로그레스 스피너 (화면 중앙 고정) - 항상 표시 */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 min-w-[220px]">
+      <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 w-[320px]">
         <AnimatedCircularProgressBar
           value={searchProgress}
           min={0}
@@ -277,11 +277,11 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
               loop={false}
               showCursor={false}
               startOnView={false}
-              className="inline-block animate-shimmer bg-gradient-to-r from-white via-gray-200 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
+              className="block w-full bg-gradient-to-r from-white via-gray-200 to-white bg-[length:200%_100%] bg-clip-text text-transparent"
               key={currentRealStage.key}
             />
           </div>
-          <div className="text-xs text-muted-foreground min-h-[20px] animate-shimmer bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-[length:200%_100%] bg-clip-text text-transparent">
+          <div className="text-xs text-muted-foreground min-h-[20px] block w-full bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-[length:200%_100%] bg-clip-text text-transparent">
             {currentRealStage.key === "init" && "잠시만 기다려 주세요"}
             {currentRealStage.key === "analyzing" && "질문 의도를 파악 중입니다"}
             {currentRealStage.key === "optimizing" && "더 나은 검색을 위해 준비 중"}

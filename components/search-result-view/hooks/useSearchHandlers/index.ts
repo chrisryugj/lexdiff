@@ -122,11 +122,15 @@ export function useSearchHandlers({
     })
 
     // 모드 선택 다이얼로그
+    // ✅ 수정: classification이 'ai'이거나 queryDetection이 'natural'이면 다이얼로그 안 띄움
     const effectiveConfidence = classification ? classification.confidence : queryDetection.confidence
-    if (!forcedMode && effectiveConfidence < 0.7) {
+    const isAiClassified = classification?.searchType === 'ai' || queryDetection.type === 'natural'
+
+    if (!forcedMode && !isAiClassified && effectiveConfidence < 0.7) {
       debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', {
         effectiveConfidence,
-        hasClassification: !!classification
+        hasClassification: !!classification,
+        isAiClassified
       })
       actions.setPendingQuery(query)
       actions.setIsSearching(false)
@@ -135,7 +139,16 @@ export function useSearchHandlers({
       return
     }
 
-    const isAiSearch = forcedMode === 'ai' || (!forcedMode && queryDetection.type === 'natural')
+    // ✅ 수정: classification.searchType도 고려 (기존에는 queryDetection만 체크)
+    const isAiSearch = forcedMode === 'ai' || (!forcedMode && isAiClassified)
+
+    debugLogger.info('🔍 최종 검색 모드 결정', {
+      isAiSearch,
+      forcedMode,
+      isAiClassified,
+      classificationSearchType: classification?.searchType,
+      queryDetectionType: queryDetection.type
+    })
 
     // AI 검색 vs 기본 검색 분기
     if (isAiSearch) {

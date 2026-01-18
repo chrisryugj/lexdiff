@@ -269,23 +269,26 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
       }
 
       // 자동 감지로 AI 모드가 확실한 경우
-      if (classification.searchType === 'ai' && classification.confidence >= 0.75) {
-        debugLogger.info("AI 검색 실행 (자동 감지)", { query: searchQuery })
+      // ✅ 수정: confidence 0.7 이상이거나, searchType이 ai면 바로 AI 검색 실행
+      if (classification.searchType === 'ai' && classification.confidence >= 0.7) {
+        debugLogger.info("AI 검색 실행 (자동 감지)", { query: searchQuery, confidence: classification.confidence })
         saveRecentSearch(searchQuery)
         onSearch({
           lawName: searchQuery,
           article: undefined,
           jo: undefined,
           searchType: 'ai',
-          classification: classification
+          classification: classification,
+          forcedMode: 'ai'  // ✅ AI 검색 확정 (handleSearchInternal에서 재분류 방지)
         })
         setShowDropdown(false)
         return
       }
 
-      // 애매한 경우 판별 (기존 로직 유지)
+      // 애매한 경우 판별 - AI로 분류된 경우는 제외
+      // ✅ 수정: searchType === 'ai'면 다이얼로그 안 띄움
       const hasArticleNumber = /제?\s*\d+\s*조(?:의\s*\d+)?/.test(searchQuery)
-      if (hasArticleNumber && classification.confidence >= 0.6 && classification.confidence < 0.95) {
+      if (hasArticleNumber && classification.searchType !== 'ai' && classification.confidence >= 0.6 && classification.confidence < 0.95) {
         setPendingQuery(searchQuery)
         setShowChoiceDialog(true)
         return

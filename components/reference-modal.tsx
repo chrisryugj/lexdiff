@@ -181,7 +181,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+      <DialogContent className="sm:max-w-3xl w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
         <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30 flex-shrink-0">
           <div className="flex items-center justify-between gap-2 flex-wrap pr-6">
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -300,18 +300,18 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             <iframe src={originalUrl} className="w-full h-[65vh] border-0" />
           </div>
         ) : (
-          <ScrollArea className="max-h-[65vh]">
+          <ScrollArea className="max-h-[65vh] overflow-x-hidden">
             <style>{LAW_CONTENT_STYLES}</style>
             <div
               ref={contentRef}
-              className={`law-article-content prose prose-sm max-w-none break-words overflow-wrap-anywhere px-4 sm:px-6 pt-2 pb-4 sm:pb-6 ${forceWhiteTheme
+              className={`law-article-content prose prose-sm max-w-none break-words px-4 sm:px-6 pt-2 pb-4 sm:pb-6 overflow-x-hidden ${forceWhiteTheme
                 ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
                 : "dark:prose-invert"
                 }`}
               style={
                 forceWhiteTheme
-                  ? { backgroundColor: '#ffffff', color: '#111827', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }
-                  : { overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap' }
+                  ? { backgroundColor: '#ffffff', color: '#111827', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap', maxWidth: '100%' }
+                  : { overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: `${fontSize}px`, lineHeight: '1.8', whiteSpace: 'pre-wrap', maxWidth: '100%' }
               }
               dangerouslySetInnerHTML={{ __html: processedHtml }}
             />

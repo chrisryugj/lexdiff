@@ -90,9 +90,9 @@ export function StageIndicator({
           <span className="text-muted-foreground">
             {current?.label || "처리 중"}
           </span>
-          <span className="ml-auto font-medium">{Math.round(progress)}%</span>
+          <span className="ml-auto font-medium tabular-nums min-w-[3ch] text-right">{Math.round(progress)}%</span>
           {currentStage !== 'complete' && (
-            <span className="text-xs text-muted-foreground/70 tabular-nums">
+            <span className="text-xs text-muted-foreground/70 tabular-nums min-w-[4.5ch] text-right">
               {stageElapsedTime.toFixed(1)}초
             </span>
           )}
@@ -174,7 +174,7 @@ export function StageIndicator({
 
                 {/* 타이머 - 활성 단계만 */}
                 {isCurrent && currentStage !== 'complete' && (
-                  <span className="text-xs text-muted-foreground/70 tabular-nums">
+                  <span className="text-xs text-muted-foreground/70 tabular-nums min-w-[4.5ch] text-center">
                     {stageElapsedTime.toFixed(1)}초
                   </span>
                 )}
@@ -190,7 +190,7 @@ export function StageIndicator({
           <span className="text-muted-foreground font-medium">
             {STAGE_MESSAGES[currentStage]}
           </span>
-          <span className="font-bold text-primary tabular-nums">
+          <span className="font-bold text-primary tabular-nums min-w-[4ch] text-right">
             {Math.round(progress)}%
           </span>
         </div>

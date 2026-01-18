@@ -719,26 +719,11 @@ export async function* queryFileSearchStream(
     }))
   })
 
-  // ✅ Phase 2 P2: Citation 0개이고 첫 시도인 경우 재시도
-  if (groundingChunks.length === 0 && !options?.isRetry) {
-    console.log('[File Search] ⚠️ No citations found, attempting query reformulation...')
-
-    // 쿼리 재구성
-    const reformulatedQuery = reformulateQuery(query)
-
-    if (reformulatedQuery !== query) {
-      console.log('[File Search] Reformulated query:', reformulatedQuery)
-      console.log('[File Search] Original query:', query)
-
-      // 재귀 호출 (1회만)
-      yield* queryFileSearchStream(reformulatedQuery, {
-        ...options,
-        isRetry: true
-      })
-      return  // 원래 결과 대신 재시도 결과 반환
-    } else {
-      console.log('[File Search] Query reformulation did not change query, skipping retry')
-    }
+  // ✅ Phase 2 P2: Citation 0개 재시도 로직 비활성화
+  // ⚠️ 문제: 스트리밍 완료 후 재시도하면 첫 번째 응답 텍스트가 이미 yield 된 상태라
+  // 두 응답이 합쳐져서 중복 발생함. 재시도가 필요하면 API route에서 처리해야 함.
+  if (groundingChunks.length === 0) {
+    console.log('[File Search] ⚠️ No citations found, but skipping retry to prevent duplicate responses')
   }
 
   yield {
