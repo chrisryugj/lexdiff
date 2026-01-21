@@ -1,10 +1,52 @@
 # Active Context
 
-**마지막 업데이트**: 2026-01-18 (AI 답변 중복 버그 + 모바일 모달 수정)
+**마지막 업데이트**: 2026-01-22 (클린 아키텍처 리팩토링 Phase 1-2-4 완료)
 
 ## 현재 상태
 
-Phase 1~3 파일 분리 완료. AI 답변 중복 버그 수정 및 모바일 UX 개선.
+**클린 아키텍처 도입 완료** - Domain Layer + Facade Layer + Presentation Layer 완료.
+- `unified-query-classifier.ts` 1,273줄 → 45줄 Facade + 20개 분리 모듈
+- `search-bar.tsx` 725줄 → 11줄 Facade + 7개 분리 모듈
+
+### 🏗️ 클린 아키텍처 리팩토링 (2026-01-22)
+
+| Phase | 상태 | 내용 |
+|-------|------|------|
+| Phase 1: Domain Layer | ✅ 완료 | 20개 모듈 분리 (value-objects, entities, patterns, services) |
+| Phase 2: Facade Layer | ✅ 완료 | `unified-query-classifier.ts` 1,273줄 → 45줄 |
+| Phase 3: Application Layer | ⏸️ 보류 | UseCase 패턴 (선택적) |
+| Phase 4: Presentation Layer | ✅ 완료 | `search-bar.tsx` 725줄 → 11줄 Facade + 7개 모듈 |
+
+**SearchBar 모듈 구조** (`components/search-bar/`):
+```
+components/search-bar/
+├── index.tsx                    # 187줄, 메인 오케스트레이터
+├── SearchBarDropdown.tsx        # 183줄, 드롭다운 UI
+├── SearchBarChoiceDialog.tsx    # 74줄, 모드 선택 다이얼로그
+├── types.ts                     # 공유 타입
+└── hooks/
+    ├── useSearchBarState.ts     # 153줄, 상태 관리
+    └── useSearchBarHandlers.ts  # 206줄, 핸들러 로직
+```
+
+**생성된 폴더 구조** (`src/domain/`):
+```
+src/domain/
+├── search/
+│   ├── value-objects/     # SearchType, LegalQueryType, Confidence 등
+│   ├── entities/          # Classification
+│   └── services/          # QueryClassifier, EntityExtractor 등
+└── patterns/              # PrecedentPattern, OrdinancePattern 등
+```
+
+**핵심 서비스 파일**:
+| 파일 | 역할 | 줄 수 |
+|------|------|-------|
+| `QueryClassifier.ts` | 메인 분류 로직 | 173 |
+| `EntityExtractor.ts` | 법령명/조문 추출 | ~80 |
+| `PatternDetector.ts` | 판례/재결례/해석례 패턴 | ~100 |
+| `DomainDetector.ts` | 도메인 감지 | ~100 |
+| `CompatibilityLayer.ts` | 하위 호환 함수 | ~120 |
 
 ### ✅ Critical 수정 완료
 
@@ -98,17 +140,25 @@ app/
 
 ### 📋 다음 할 일
 
-**✅ 대형 파일 분리 완료** (계획: `.claude/plans/file-split-plan.md`)
+**✅ 클린 아키텍처 Phase 1-2-4 완료**
 
-- [x] **Phase 1**: `useSearchHandlers.ts` 분리 (1,954줄 → 7개 모듈, 최대 734줄)
-- [x] **Phase 2**: `globals.css` 분리 (1,263줄 → 46줄 + 5파일)
-- [x] **Phase 3**: `law-viewer.tsx` 분리 (1,175줄 → 941줄, 20% 감소)
+- [x] **Phase 1**: Domain Layer 구축 (20개 모듈)
+- [x] **Phase 2**: Facade Layer 구축 (1,273줄 → 45줄)
+- [ ] **Phase 3**: Application Layer (UseCase) - 선택적
+- [x] **Phase 4**: Presentation Layer (SearchBar 분리) - 725줄 → 11줄 + 7개 모듈
+
+**배포 전 추가 점검 가능 항목**:
+- [ ] 검색 UX 엣지 케이스 테스트
+- [ ] AI vs 법령 분기 정확도 검증
+- [ ] 검색 결과 없음 시 대안 제시 개선
 
 **남은 대형 파일** (800줄 이상):
 | 파일 | 줄 수 | 상태 |
 |------|-------|------|
-| `law-viewer.tsx` | 941 | ⚠️ 주의 (1,200→941) |
+| `law-viewer.tsx` | 941 | ⚠️ 주의 |
 | `file-search-client.ts` | ~800 | 현재 유지 |
+| `unified-query-classifier.ts` | ~~1,273~~ → **45** | ✅ Facade로 교체 |
+| `search-bar.tsx` | ~~725~~ → **11** | ✅ Facade로 교체 |
 
 ## 핵심 파일
 
