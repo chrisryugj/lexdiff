@@ -50,9 +50,11 @@ interface ReferenceModalProps {
   loading?: boolean
   /** 판례용 메타 정보 (헤더에 배지로 표시) */
   precedentMeta?: PrecedentMeta
+  /** 법령 전체보기 콜백 (제1조인 경우 모달 내에서 전체 조문 로딩) */
+  onViewFullLaw?: () => void
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false, precedentMeta }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false, precedentMeta, onViewFullLaw }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const contentRef = useRef<HTMLDivElement>(null)
@@ -84,6 +86,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     /조례/.test(lawName) ||
     (/(특별시|광역시|[가-힣]+도|[가-힣]+(시|군|구))\s+[가-힣]/.test(lawName) && !/시행규칙|시행령/.test(lawName))
   )
+
+  // 제1조 여부 판단 (제1조, 제1조의2 등)
+  // 하위법령 제1조는 주로 "목적" 조항으로 내용이 단순하므로 전체보기 버튼 제공
+  const isFirstArticle = articleNumber && /^제1조(의\d+)?$/.test(articleNumber)
 
   // 법제처 링크 생성 (조례와 법령 자동 구분)
   const molegUrl = lawName && articleNumber
@@ -315,6 +321,20 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               }
               dangerouslySetInnerHTML={{ __html: processedHtml }}
             />
+            {/* 법령 전체보기 버튼 (제1조인 경우 - 목적 조항은 내용이 단순하므로) */}
+            {isFirstArticle && onViewFullLaw && (
+              <div className="px-4 sm:px-6 pb-4 pt-2 border-t border-border/50 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onViewFullLaw}
+                  className="w-full gap-2 h-9 text-sm hover:bg-primary/10"
+                >
+                  <Icon name="book-open" className="w-4 h-4" />
+                  <span>{lawName} 전체 조문 보기</span>
+                </Button>
+              </div>
+            )}
           </ScrollArea>
         )}
       </DialogContent>

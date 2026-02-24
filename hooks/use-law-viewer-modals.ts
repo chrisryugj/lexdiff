@@ -1041,6 +1041,15 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     }
   }
 
+  // Handler: 법령 전체보기 (제1조 모달에서 전체 조문 로딩)
+  const handleViewFullLaw = useCallback(() => {
+    const currentLawName = refModal.lawName
+    if (!currentLawName) return
+
+    // 빈 articleLabel로 호출하면 전체 조문 표시
+    openExternalLawArticleModal(currentLawName, '')
+  }, [refModal.lawName])
+
   // Handler: 별표 모달 열기
   const openAnnexModal = useCallback((annexNumber: string, lawName: string, lawId?: string) => {
     debugLogger.info('[modal] 별표 모달 열기', { annexNumber, lawName, lawId })
@@ -1079,6 +1088,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     openRelatedLawModal,
     openLawHierarchyModal,
     handleRefModalBack,
+    handleViewFullLaw,
 
     // 별표 모달 핸들러
     openAnnexModal,

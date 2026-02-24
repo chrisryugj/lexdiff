@@ -292,6 +292,7 @@ function LawViewerComponent({
     openRelatedLawModal,
     openLawHierarchyModal,
     handleRefModalBack,
+    handleViewFullLaw,
     // 별표 모달
     annexModal,
     openAnnexModal,
@@ -903,6 +904,7 @@ function LawViewerComponent({
             onBack={handleRefModalBack}
             loading={refModal.loading}
             precedentMeta={refModal.precedentMeta}
+            onViewFullLaw={handleViewFullLaw}
           />
           <AnnexModal
             isOpen={annexModal.open}
