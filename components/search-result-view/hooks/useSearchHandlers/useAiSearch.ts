@@ -1,7 +1,8 @@
 /**
  * useSearchHandlers/useAiSearch.ts
  *
- * AI 검색 (RAG) 로직
+ * AI 검색 (FC-RAG SSE 스트리밍) 로직
+ * 도구 호출 과정을 실시간으로 수신하여 UI에 표시
  */
 
 import { useCallback } from "react"
@@ -9,7 +10,10 @@ import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse } from "@/lib/rag-response-cache"
 import { detectSearchFailed } from "../../utils"
-import type { HandlerDeps, SearchQuery, LawDataState } from "./types"
+import type { HandlerDeps, LawDataState } from "./types"
+import type { ToolCallLogEntry } from "../../types"
+
+let logIdCounter = 0
 
 export function useAiSearch(deps: HandlerDeps) {
   const { actions, toast } = deps
@@ -19,35 +23,27 @@ export function useAiSearch(deps: HandlerDeps) {
     signal?: AbortSignal,
     skipCache?: boolean
   ) => {
-    debugLogger.success('✨ 자연어 검색 감지 → AI 답변 모드', { query: fullQuery, skipCache })
+    debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache })
 
-    // RAG 캐시 확인 (skipCache가 true면 캐시 무시)
+    // RAG 캐시 확인
     const cached = skipCache ? null : await getCachedResponse(fullQuery)
     if (cached) {
-      debugLogger.success('✅ RAG 캐시 히트 - API 호출 스킵')
-
+      debugLogger.success('RAG 캐시 히트 - API 호출 스킵')
       actions.setIsAiMode(true)
       actions.setSearchMode('rag')
-
       const relatedLaws = extractRelatedLaws(cached.response)
       actions.setAiAnswerContent(cached.response)
       actions.setAiRelatedLaws(relatedLaws)
       actions.setAiCitations(cached.citations || [])
       actions.setAiQueryType((cached.queryType || 'application') as any)
       actions.setFileSearchFailed(false)
-
       const aiLawData: LawDataState = {
         meta: {
-          lawId: 'ai-answer',
-          lawTitle: 'AI 답변',
+          lawId: 'ai-answer', lawTitle: 'AI 답변',
           promulgationDate: new Date().toISOString().split('T')[0],
-          lawType: 'AI',
-          isOrdinance: false,
-          fetchedAt: new Date().toISOString()
+          lawType: 'AI', isOrdinance: false, fetchedAt: new Date().toISOString()
         },
-        articles: [],
-        selectedJo: undefined,
-        isOrdinance: false
+        articles: [], selectedJo: undefined, isOrdinance: false
       }
       actions.setLawData(aiLawData)
       actions.setMobileView("content")
@@ -56,7 +52,7 @@ export function useAiSearch(deps: HandlerDeps) {
       return
     }
 
-    // AI 검색 시작 - 4단계 프로그레스 UI용
+    // ── 검색 시작 ──
     actions.setIsSearching(true)
     actions.setIsAiMode(true)
     actions.setSearchMode('rag')
@@ -65,219 +61,219 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.setAiCitations([])
     actions.setFileSearchFailed(false)
     actions.setUserQuery(fullQuery)
+    actions.clearToolCallLogs()
     actions.updateProgress('analyzing', 5)
 
-    // AI 뷰를 즉시 표시하기 위해 빈 lawData 설정
+    // AI 뷰 즉시 표시
     const aiLawData: LawDataState = {
       meta: {
-        lawId: 'ai-answer',
-        lawTitle: 'AI 법률 어시스턴트',
+        lawId: 'ai-answer', lawTitle: 'AI 법률 어시스턴트',
         promulgationDate: new Date().toISOString().split('T')[0],
-        lawType: 'AI',
-        isOrdinance: false,
-        fetchedAt: new Date().toISOString()
+        lawType: 'AI', isOrdinance: false, fetchedAt: new Date().toISOString()
       },
-      articles: [],
-      selectedJo: undefined,
-      isOrdinance: false
+      articles: [], selectedJo: undefined, isOrdinance: false
     }
     actions.setLawData(aiLawData)
     actions.setMobileView("content")
 
     try {
-      // 1단계: 질문 분석 (0-25%) - 1.5초 유지
-      actions.updateProgress('analyzing', 5)
-      if (signal?.aborted) {
-        debugLogger.info('🚫 AI 검색 취소됨')
-        return
-      }
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      if (signal?.aborted) return
-
-      // 2단계: 법령 검색 (25-40%) - 1.5초 유지
-      actions.updateProgress('searching', 25)
-      if (signal?.aborted) return
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      if (signal?.aborted) return
-
+      // BYO-Key
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       try {
-        // 3단계: 답변 생성 시작 (40%)
-        actions.updateProgress('streaming', 40)
-        if (signal?.aborted) return
+        const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')
+        if (userKey) headers['X-User-API-Key'] = userKey
+      } catch { /* SSR or private browsing */ }
 
-        // 3단계 진행 중 프로그레스 시뮬레이션 (40% → 70%, API 응답 대기 중)
-        // 복합 질문(위임/개정/해석 등)은 멀티턴으로 더 오래 걸리므로 타이머 느리게
-        const isLikelyComplex = /(?:하고|와\s*함께|판례도|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/.test(fullQuery)
-          || fullQuery.length > 100
-          || (fullQuery.match(/「([^」]+)」/g) || []).length > 1
-        const isLikelyModerate = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조)/.test(fullQuery)
-          || fullQuery.length > 50
-        const progressInterval = isLikelyComplex ? 400 : isLikelyModerate ? 300 : 200
+      const response = await fetch('/api/fc-rag', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: fullQuery }),
+        signal
+      })
 
-        let waitProgress = 40
-        const waitProgressInterval = setInterval(() => {
-          if (waitProgress < 70) {
-            waitProgress += 1
-            actions.updateProgress('streaming', waitProgress)
+      if (signal?.aborted) return
+
+      if (!response.ok) {
+        throw new Error(`API 오류: ${response.status}`)
+      }
+
+      // ── SSE 스트림 읽기 ──
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        if (signal?.aborted) break
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || '' // 마지막 미완성 라인 보존
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            handleSSEEvent(event, fullQuery)
+          } catch {
+            debugLogger.error('SSE 파싱 오류', line)
           }
-        }, progressInterval)
+        }
+      }
 
+      // 잔여 버퍼 처리
+      if (buffer.startsWith('data: ')) {
         try {
-          // BYO-Key: sessionStorage에서 읽기 (있으면 헤더에 포함)
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-          try {
-            const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')
-            if (userKey) headers['X-User-API-Key'] = userKey
-          } catch { /* SSR or private browsing */ }
+          const event = JSON.parse(buffer.slice(6))
+          handleSSEEvent(event, fullQuery)
+        } catch { /* ignore */ }
+      }
 
-          const response = await fetch('/api/fc-rag', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ query: fullQuery }),
-            signal
-          })
-
-          if (signal?.aborted) {
-            clearInterval(waitProgressInterval)
-            return
-          }
-
-          if (!response.ok) {
-            clearInterval(waitProgressInterval)
-            throw new Error('AI 검색 API 호출 실패')
-          }
-
-          // 전체 응답 파싱
-          const data = await response.json()
-          clearInterval(waitProgressInterval)
-          if (signal?.aborted) return
-
-          const fullContent = data.answer || ''
-          const receivedCitations = data.citations || []
-          const receivedConfidenceLevel = data.confidenceLevel || 'high'
-          const receivedQueryType = data.queryType || 'application'
-
-          // 프로그레스 70% → 100% 점진적 증가
-          let typingProgress = 70
-          const typingProgressInterval = setInterval(() => {
-            if (typingProgress < 100) {
-              typingProgress += 1
-              actions.updateProgress('streaming', typingProgress)
-            }
-          }, 100)
-
-          // 즉시 전체 내용 설정 (UI에서 어절 단위 타이핑 효과 적용)
-          const processedContent = fullContent.replace(/\^/g, ' ')
-
-          // 프로그레스가 100%까지 도달할 때까지 대기
-          await new Promise(resolve => setTimeout(resolve, 3000))
-          clearInterval(typingProgressInterval)
-          if (signal?.aborted) return
-
-          // 4단계: 최종 검토 (100%)
-          actions.updateProgress('extracting', 100)
-
-          const searchFailed = detectSearchFailed(processedContent)
-          actions.setFileSearchFailed(searchFailed)
-
-          const relatedLaws = extractRelatedLaws(processedContent)
-
-          debugLogger.success('✅ AI 답변 완료', {
-            contentLength: processedContent.length,
-            relatedLaws: relatedLaws.length,
-            citationsReceived: receivedCitations.length,
-          })
-
-          // ✅ 최종 상태 설정 (한 번만 호출)
-          actions.setAiAnswerContent(processedContent)
-          actions.setAiRelatedLaws(relatedLaws)
-          actions.setAiCitations(receivedCitations)
-          actions.setAiQueryType(receivedQueryType as any)
-
-          const finalAiLawData: LawDataState = {
-            meta: {
-              lawId: 'ai-answer',
-              lawTitle: 'AI 답변',
-              promulgationDate: new Date().toISOString().split('T')[0],
-              lawType: 'AI',
-              isOrdinance: false,
-              fetchedAt: new Date().toISOString()
-            },
-            articles: [],
-            selectedJo: undefined,
-            isOrdinance: false
-          }
-
-          actions.setLawData(finalAiLawData)
-          actions.setMobileView("content")
-
-          // IndexedDB 캐시 저장 (백그라운드)
-          try {
-            const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
-            const currentState = window.history.state
-            const currentSearchId = currentState?.searchId
-
-            if (currentSearchId) {
-              const existingCache = await getSearchResult(currentSearchId)
-              if (existingCache) {
-                await saveSearchResult({
-                  ...existingCache,
-                  aiMode: {
-                    aiAnswerContent: processedContent,
-                    aiRelatedLaws: relatedLaws,
-                    aiCitations: receivedCitations,
-                    userQuery: fullQuery,
-                    fileSearchFailed: searchFailed,
-                    aiQueryType: receivedQueryType
-                  }
-                })
-              }
-            }
-          } catch (cacheError) {
-            debugLogger.error('⚠️ AI 답변 캐시 저장 실패', cacheError)
-          }
-
-          // RAG 캐시에도 저장 (백그라운드)
-          try {
-            await cacheResponse(fullQuery, processedContent, receivedCitations, receivedConfidenceLevel, receivedQueryType)
-          } catch (ragCacheError) {
-            debugLogger.error('⚠️ RAG 캐시 저장 실패', ragCacheError)
-          }
-
-          // 100% 완료 상태 1.5초 대기 → 로딩 UI 숨김
-          await new Promise(resolve => setTimeout(resolve, 1500))
-          actions.setIsSearching(false)
-
-        } catch (parseError) {
-          clearInterval(waitProgressInterval)
-          throw parseError
-        }
-
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          debugLogger.info('🚫 AI 검색이 사용자에 의해 취소되었습니다')
-          actions.setIsSearching(false)
-          actions.updateProgress('complete', 0)
-          actions.setIsAiMode(false)
-          return
-        }
-
-        debugLogger.error('❌ File Search API 오류', error)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        debugLogger.info('AI 검색 취소됨')
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
         actions.setIsAiMode(false)
-        toast({
-          title: "AI 검색 실패",
-          description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
-          variant: "destructive"
-        })
+        return
       }
-    } catch (outerError) {
-      debugLogger.error('❌ AI 검색 최상위 오류', outerError)
+
+      debugLogger.error('FC-RAG SSE 오류', error)
       actions.setIsSearching(false)
       actions.updateProgress('complete', 0)
       actions.setIsAiMode(false)
+      toast({
+        title: "AI 검색 실패",
+        description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
+        variant: "destructive"
+      })
     }
+
+    // ── SSE 이벤트 핸들러 ──
+    function handleSSEEvent(event: any, query: string) {
+      switch (event.type) {
+        case 'status': {
+          actions.updateProgress('streaming', event.progress)
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'status',
+            displayName: event.message,
+            message: event.message,
+            timestamp: Date.now(),
+          })
+          break
+        }
+        case 'tool_call': {
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'call',
+            name: event.name,
+            displayName: event.displayName,
+            query: event.query,
+            timestamp: Date.now(),
+          })
+          break
+        }
+        case 'tool_result': {
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'result',
+            name: event.name,
+            displayName: event.displayName,
+            success: event.success,
+            summary: event.summary,
+            timestamp: Date.now(),
+          })
+          break
+        }
+        case 'answer': {
+          const data = event.data
+          const processedContent = (data.answer || '').replace(/\^/g, ' ')
+          const searchFailed = detectSearchFailed(processedContent)
+          const relatedLaws = extractRelatedLaws(processedContent)
+
+          actions.setFileSearchFailed(searchFailed)
+          actions.setAiAnswerContent(processedContent)
+          actions.setAiRelatedLaws(relatedLaws)
+          actions.setAiCitations(data.citations || [])
+          actions.setAiQueryType((data.queryType || 'application') as any)
+          actions.updateProgress('complete', 100)
+
+          debugLogger.success('AI 답변 완료', {
+            contentLength: processedContent.length,
+            citations: (data.citations || []).length,
+            complexity: data.complexity,
+            confidenceLevel: data.confidenceLevel,
+          })
+
+          // lawData 업데이트
+          actions.setLawData({
+            meta: {
+              lawId: 'ai-answer', lawTitle: 'AI 답변',
+              promulgationDate: new Date().toISOString().split('T')[0],
+              lawType: 'AI', isOrdinance: false, fetchedAt: new Date().toISOString()
+            },
+            articles: [], selectedJo: undefined, isOrdinance: false
+          })
+
+          // 검색 완료 (약간의 딜레이 후)
+          setTimeout(() => {
+            actions.setIsSearching(false)
+          }, 500)
+
+          // 캐시 저장 (백그라운드)
+          saveCaches(query, processedContent, data, relatedLaws, searchFailed)
+          break
+        }
+        case 'error': {
+          debugLogger.error('FC-RAG 서버 오류', event.message)
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'status',
+            displayName: `오류: ${event.message}`,
+            message: event.message,
+            timestamp: Date.now(),
+          })
+          break
+        }
+      }
+    }
+
+    async function saveCaches(
+      query: string,
+      processedContent: string,
+      data: any,
+      relatedLaws: any[],
+      searchFailed: boolean
+    ) {
+      try {
+        const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+        const currentState = window.history.state
+        const currentSearchId = currentState?.searchId
+        if (currentSearchId) {
+          const existingCache = await getSearchResult(currentSearchId)
+          if (existingCache) {
+            await saveSearchResult({
+              ...existingCache,
+              aiMode: {
+                aiAnswerContent: processedContent,
+                aiRelatedLaws: relatedLaws,
+                aiCitations: data.citations || [],
+                userQuery: query,
+                fileSearchFailed: searchFailed,
+                aiQueryType: data.queryType || 'application'
+              }
+            })
+          }
+        }
+      } catch (e) { debugLogger.error('캐시 저장 실패', e) }
+
+      try {
+        await cacheResponse(query, processedContent, data.citations, data.confidenceLevel, data.queryType)
+      } catch (e) { debugLogger.error('RAG 캐시 저장 실패', e) }
+    }
+
   }, [actions, toast])
 
   return { handleAiSearch }
