@@ -16,14 +16,30 @@ import type { ToolCallLogEntry } from "../../types"
 let logIdCounter = 0
 
 export function useAiSearch(deps: HandlerDeps) {
-  const { actions, toast } = deps
+  const { state, actions, toast } = deps
+
+  /** 현재 답변을 대화 히스토리에 저장 */
+  const saveCurrentToHistory = useCallback(() => {
+    if (state.aiAnswerContent && state.userQuery) {
+      actions.addConversationEntry({
+        id: `conv-${Date.now()}`,
+        query: state.userQuery,
+        answer: state.aiAnswerContent,
+        citations: state.aiCitations,
+        queryType: state.aiQueryType,
+        confidenceLevel: state.aiConfidenceLevel,
+        timestamp: Date.now(),
+      })
+    }
+  }, [state.aiAnswerContent, state.userQuery, state.aiCitations, state.aiQueryType, state.aiConfidenceLevel, actions])
 
   const handleAiSearch = useCallback(async (
     fullQuery: string,
     signal?: AbortSignal,
-    skipCache?: boolean
+    skipCache?: boolean,
+    conversationId?: string | null
   ) => {
-    debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache })
+    debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
 
     // RAG 캐시 확인
     const cached = skipCache ? null : await getCachedResponse(fullQuery)
@@ -87,7 +103,10 @@ export function useAiSearch(deps: HandlerDeps) {
       const response = await fetch('/api/fc-rag', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ query: fullQuery }),
+        body: JSON.stringify({
+          query: fullQuery,
+          ...(conversationId ? { conversationId } : {}),
+        }),
         signal
       })
 
@@ -288,5 +307,31 @@ export function useAiSearch(deps: HandlerDeps) {
 
   }, [actions, toast])
 
-  return { handleAiSearch }
+  /** 연속 대화 추가 질문 */
+  const handleFollowUp = useCallback((followUpQuery: string) => {
+    // 현재 답변을 히스토리에 저장
+    saveCurrentToHistory()
+
+    // conversationId 생성 (첫 follow-up 시)
+    let convId = state.conversationId
+    if (!convId) {
+      convId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      actions.setConversationId(convId)
+    }
+
+    // userQuery 업데이트 + AI 검색 실행
+    actions.setUserQuery(followUpQuery)
+    handleAiSearch(followUpQuery, undefined, true, convId)
+  }, [saveCurrentToHistory, state.conversationId, actions, handleAiSearch])
+
+  /** 새 대화 시작 */
+  const handleNewConversation = useCallback(() => {
+    actions.clearConversation()
+    actions.setAiAnswerContent('')
+    actions.setAiCitations([])
+    actions.setAiRelatedLaws([])
+    actions.setUserQuery('')
+  }, [actions])
+
+  return { handleAiSearch, handleFollowUp, handleNewConversation }
 }

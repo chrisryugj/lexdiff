@@ -10,7 +10,7 @@ import { AIAnswerContent } from "@/components/law-viewer-ai-answer"
 import { LawViewerSingleArticle } from "./law-viewer-single-article"
 import type { LawMeta, LawArticle } from "@/lib/law-types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
-import type { ToolCallLogEntry } from "@/components/search-result-view/types"
+import type { ToolCallLogEntry, ConversationEntry } from "@/components/search-result-view/types"
 
 // Props 그룹화
 interface AIAnswerProps {
@@ -26,6 +26,9 @@ interface AIAnswerProps {
   searchProgress: number
   onLawClick: (lawName: string, article?: string) => void
   toolCallLogs?: ToolCallLogEntry[]
+  conversationHistory?: ConversationEntry[]
+  onFollowUp?: (query: string) => void
+  onNewConversation?: () => void
 }
 
 type DelegationTabType = "law" | "decree" | "rule" | "admin"
@@ -164,6 +167,9 @@ export function LawViewerMainContent({
               isStreaming={aiAnswerProps.isStreaming}
               searchProgress={aiAnswerProps.searchProgress}
               toolCallLogs={aiAnswerProps.toolCallLogs}
+              conversationHistory={aiAnswerProps.conversationHistory}
+              onFollowUp={aiAnswerProps.onFollowUp}
+              onNewConversation={aiAnswerProps.onNewConversation}
             />
           </div>
         </ScrollArea>

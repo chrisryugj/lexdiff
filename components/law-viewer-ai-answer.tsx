@@ -12,7 +12,7 @@ import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 
-import type { ToolCallLogEntry } from "@/components/search-result-view/types"
+import type { ToolCallLogEntry, ConversationEntry } from "@/components/search-result-view/types"
 
 // Dynamic import for AnnexModal (별표 모달)
 const AnnexModal = dynamic(
@@ -332,6 +332,11 @@ interface AIAnswerContentProps {
 
     // 별표 모달
     currentLawName?: string
+
+    // 연속 대화
+    conversationHistory?: ConversationEntry[]
+    onFollowUp?: (query: string) => void
+    onNewConversation?: () => void
 }
 
 
@@ -352,10 +357,16 @@ export function AIAnswerContent({
     searchProgress = 0,
     toolCallLogs = [],
     currentLawName,
+    conversationHistory = [],
+    onFollowUp,
+    onNewConversation,
 }: AIAnswerContentProps) {
     // 어절 단위 타이핑 효과
     const [displayedContent, setDisplayedContent] = useState('')
     const [isTyping, setIsTyping] = useState(false)
+
+    // follow-up 입력
+    const [followUpInput, setFollowUpInput] = useState('')
 
     // 도구 로그 접힘 애니메이션
     const [isCollapsing, setIsCollapsing] = useState(false)
@@ -595,6 +606,38 @@ export function AIAnswerContent({
 
             {/* 본문 영역 */}
             <div className="flex-1 min-h-0 px-3 sm:px-4 pt-2 pb-4 overflow-y-auto overflow-x-hidden">
+                {/* 연속 대화 히스토리 */}
+                {conversationHistory.length > 0 && (
+                    <div className="mb-4 space-y-3">
+                        {conversationHistory.map((entry) => (
+                            <div key={entry.id} className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
+                                {/* 이전 질문 */}
+                                <div className="flex items-start gap-2 px-3 py-2 bg-primary/5 border-b border-border/30">
+                                    <Icon name="message-circle-question" size={14} className="text-primary/60 mt-0.5 flex-shrink-0" />
+                                    <span className="text-sm text-foreground/80 break-words">{entry.query}</span>
+                                </div>
+                                {/* 이전 답변 (축약) */}
+                                <div className="px-3 py-2 text-sm text-muted-foreground">
+                                    <div className="line-clamp-3" style={{ fontSize: `${Math.max(12, fontSize - 2)}px` }}>
+                                        <LegalMarkdownRenderer
+                                            content={entry.answer.slice(0, 500)}
+                                            onLawClick={onLawClick}
+                                        />
+                                    </div>
+                                    {entry.answer.length > 500 && (
+                                        <span className="text-xs text-muted-foreground/50 mt-1 block">... 더 보기</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
+                            <div className="flex-1 h-px bg-border/30" />
+                            <span>현재 답변</span>
+                            <div className="flex-1 h-px bg-border/30" />
+                        </div>
+                    </div>
+                )}
+
                 {/* ✅ Phase 7: 신뢰도 경고 배너 (low일 때) */}
                 {aiConfidenceLevel === 'low' && !fileSearchFailed && (
                     <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
@@ -765,9 +808,9 @@ export function AIAnswerContent({
                     </div>
                 )}
 
-                {/* 웹 검색 버튼 - 추가 정보가 필요할 때 */}
+                {/* 웹 검색 + 추가 질문 버튼 영역 */}
                 {displayedContent && !isTyping && !isStreaming && userQuery && (
-                    <div className="mt-4 flex justify-center animate-in fade-in duration-500 delay-500">
+                    <div className="mt-4 flex flex-wrap justify-center gap-2 animate-in fade-in duration-500 delay-500">
                         <Button
                             variant="outline"
                             size="sm"
@@ -777,6 +820,54 @@ export function AIAnswerContent({
                             <Icon name="external-link" size={14} />
                             <span>"{userQuery.length > 25 ? userQuery.slice(0, 25) + '...' : userQuery}" 웹 검색</span>
                         </Button>
+                        {onNewConversation && conversationHistory.length > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground gap-2"
+                                onClick={onNewConversation}
+                            >
+                                <Icon name="plus" size={14} />
+                                <span>새 대화</span>
+                            </Button>
+                        )}
+                    </div>
+                )}
+
+                {/* 추가 질문 입력 */}
+                {onFollowUp && displayedContent && !isTyping && !isStreaming && (
+                    <div className="mt-5 animate-in fade-in duration-500 delay-700">
+                        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+                            <Icon name="corner-down-right" size={16} className="text-muted-foreground/50 flex-shrink-0 ml-1" />
+                            <input
+                                type="text"
+                                value={followUpInput}
+                                onChange={(e) => setFollowUpInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && followUpInput.trim()) {
+                                        onFollowUp(followUpInput.trim())
+                                        setFollowUpInput('')
+                                    }
+                                }}
+                                placeholder="추가 질문을 입력하세요..."
+                                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 outline-none"
+                            />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-primary hover:bg-primary/10 flex-shrink-0"
+                                disabled={!followUpInput.trim()}
+                                onClick={() => {
+                                    if (followUpInput.trim()) {
+                                        onFollowUp(followUpInput.trim())
+                                        setFollowUpInput('')
+                                    }
+                                }}
+                            >
+                                <Icon name="send" size={14} />
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground/40 mt-1 ml-1">이전 대화 맥락을 유지하며 추가 질문합니다</p>
                     </div>
                 )}
             </div>

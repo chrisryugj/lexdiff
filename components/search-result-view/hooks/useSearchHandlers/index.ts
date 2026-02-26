@@ -47,8 +47,8 @@ export function useSearchHandlers({
   // 1. 법령 본문 조회
   const { fetchLawContent } = useFetchLawContent(deps)
 
-  // 2. AI 검색
-  const { handleAiSearch } = useAiSearch(deps)
+  // 2. AI 검색 + 연속 대화
+  const { handleAiSearch, handleFollowUp, handleNewConversation } = useAiSearch(deps)
 
   // 3. 기본 구조화 검색
   const { handleBasicSearch } = useBasicSearch({ ...deps, fetchLawContent })
@@ -195,6 +195,10 @@ export function useSearchHandlers({
     handleReset: basicHandlers.handleReset,
     handleFavoritesClick: basicHandlers.handleFavoritesClick,
     handleSettingsClick: basicHandlers.handleSettingsClick,
+
+    // AI 연속 대화
+    handleAiFollowUp: handleFollowUp,
+    handleNewConversation,
 
     // 새로고침 핸들러
     handleAiRefresh: basicHandlers.handleAiRefresh,

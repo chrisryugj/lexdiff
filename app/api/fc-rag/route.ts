@@ -13,6 +13,7 @@
  */
 
 import { executeRAGStream } from '@/lib/fc-rag/engine'
+import { isOpenClawHealthy, fetchFromOpenClaw } from '@/lib/openclaw-client'
 import { recordAIUsage, isQuotaExceeded, getUsageHeaders, getUsageWarningMessage } from '@/lib/usage-tracker'
 import { NextRequest } from 'next/server'
 
@@ -37,9 +38,11 @@ export async function POST(request: NextRequest) {
   }
 
   let query: string
+  let conversationId: string | undefined
   try {
     const body = await request.json()
     query = body.query
+    conversationId = body.conversationId || undefined
   } catch {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
@@ -57,18 +60,32 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        for await (const event of executeRAGStream(query, userApiKey)) {
-          // answer 이벤트에 사용량 경고 추가
-          if (event.type === 'answer' && !userApiKey) {
-            const usageStats = recordAIUsage(clientIP, event.data.answer.length)
-            const warningMessage = getUsageWarningMessage(usageStats)
-            if (warningMessage) {
-              const warnings = [...(event.data.warnings || []), warningMessage]
-              send({ ...event, data: { ...event.data, warnings } })
-              continue
-            }
+        // OpenClaw 우선 시도 (활성화 + 건강 상태 확인)
+        let openClawHandled = false
+        if (process.env.OPENCLAW_ENABLED === 'true' && await isOpenClawHealthy()) {
+          send({ type: 'status', message: 'AI 엔진 연결 중...', progress: 2 })
+          openClawHandled = await fetchFromOpenClaw(query, send, { conversationId })
+        }
+
+        // OpenClaw 실패/비활성 → 기존 Gemini fallback
+        if (!openClawHandled) {
+          if (process.env.OPENCLAW_ENABLED === 'true') {
+            send({ type: 'status', message: 'AI 엔진 전환 중...', progress: 3 })
           }
-          send(event)
+
+          for await (const event of executeRAGStream(query, userApiKey)) {
+            // answer 이벤트에 사용량 경고 추가
+            if (event.type === 'answer' && !userApiKey) {
+              const usageStats = recordAIUsage(clientIP, event.data.answer.length)
+              const warningMessage = getUsageWarningMessage(usageStats)
+              if (warningMessage) {
+                const warnings = [...(event.data.warnings || []), warningMessage]
+                send({ ...event, data: { ...event.data, warnings } })
+                continue
+              }
+            }
+            send(event)
+          }
         }
       } catch (error) {
         send({

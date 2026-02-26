@@ -233,3 +233,17 @@ export interface ToolCallLogEntry {
   outputTokens?: number
   totalTokens?: number
 }
+
+// ============================================================
+// 연속 대화 (채팅형 AI)
+// ============================================================
+
+export interface ConversationEntry {
+  id: string
+  query: string
+  answer: string
+  citations: import('@/lib/citation-verifier').VerifiedCitation[]
+  queryType: string
+  confidenceLevel: string
+  timestamp: number
+}

@@ -24,6 +24,7 @@ import type {
   RagState,
   RagAnswer,
   ToolCallLogEntry,
+  ConversationEntry,
 } from "../types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 
@@ -85,6 +86,10 @@ export interface SearchState {
 
   // SSE 도구 호출 로그
   toolCallLogs: ToolCallLogEntry[]
+
+  // 연속 대화 상태
+  conversationId: string | null
+  conversationHistory: ConversationEntry[]
 
   // 판례/해석례/재결례 상태
   precedentResults: any[] | null
@@ -153,6 +158,11 @@ export interface SearchStateActions {
   // SSE 도구 호출 로그 업데이트
   addToolCallLog: (entry: ToolCallLogEntry) => void
   clearToolCallLogs: () => void
+
+  // 연속 대화 액션
+  setConversationId: (id: string | null) => void
+  addConversationEntry: (entry: ConversationEntry) => void
+  clearConversation: () => void
 
   // 판례/해석례/재결례 상태 업데이트
   setPrecedentResults: (results: any[] | null) => void
@@ -243,6 +253,10 @@ export function useSearchState({
   // SSE 도구 호출 로그
   const [toolCallLogs, setToolCallLogs] = useState<ToolCallLogEntry[]>([])
 
+  // 연속 대화
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversationHistory, setConversationHistory] = useState<ConversationEntry[]>([])
+
   // ============================================================
   // 판례/해석례/재결례 상태
   // ============================================================
@@ -324,6 +338,15 @@ export function useSearchState({
     setToolCallLogs([])
   }, [])
 
+  const addConversationEntry = useCallback((entry: ConversationEntry) => {
+    setConversationHistory(prev => [...prev, entry])
+  }, [])
+
+  const clearConversation = useCallback(() => {
+    setConversationId(null)
+    setConversationHistory([])
+  }, [])
+
   const resetSearchState = useCallback(() => {
     setLawData(null)
     setLawSelectionState(null)
@@ -334,6 +357,8 @@ export function useSearchState({
     setAiRelatedLaws([])
     setIsAiMode(false)
     setFileSearchFailed(false)
+    setConversationId(null)
+    setConversationHistory([])
   }, [])
 
   const resetToHome = useCallback(() => {
@@ -386,6 +411,8 @@ export function useSearchState({
     ragProgress,
     ragAnswer,
     toolCallLogs,
+    conversationId,
+    conversationHistory,
     precedentResults,
     precedentTotalCount,
     precedentPage,
@@ -437,6 +464,9 @@ export function useSearchState({
     setRagAnswer,
     addToolCallLog,
     clearToolCallLogs,
+    setConversationId,
+    addConversationEntry,
+    clearConversation,
     setPrecedentResults,
     setPrecedentTotalCount,
     setPrecedentPage,

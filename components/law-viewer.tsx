@@ -63,6 +63,11 @@ interface LawViewerProps {
   searchProgress?: number
   toolCallLogs?: import("@/components/search-result-view/types").ToolCallLogEntry[]
 
+  // 연속 대화
+  conversationHistory?: import("@/components/search-result-view/types").ConversationEntry[]
+  onFollowUp?: (query: string) => void
+  onNewConversation?: () => void
+
   // ✅ 판례 모드
   isPrecedent?: boolean  // 판례 뷰 여부
 
@@ -94,6 +99,9 @@ function LawViewerComponent({
   isStreaming = false,
   searchProgress = 0,
   toolCallLogs = [],
+  conversationHistory = [],
+  onFollowUp,
+  onNewConversation,
   isPrecedent = false,
   onRefresh,
 }: LawViewerProps) {
@@ -710,7 +718,10 @@ function LawViewerComponent({
     searchProgress,
     onLawClick: handleLawLinkClick,
     toolCallLogs,
-  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress, toolCallLogs])
+    conversationHistory,
+    onFollowUp,
+    onNewConversation,
+  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress, toolCallLogs, conversationHistory, onFollowUp, onNewConversation])
 
   const delegationPropsGroup = useMemo(() => ({
     validDelegations,
