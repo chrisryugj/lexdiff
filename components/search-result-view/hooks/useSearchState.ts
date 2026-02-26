@@ -23,6 +23,7 @@ import type {
   AiModeState,
   RagState,
   RagAnswer,
+  ToolCallLogEntry,
 } from "../types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 
@@ -79,6 +80,9 @@ export interface SearchState {
   ragError: string | null
   ragProgress: number
   ragAnswer: RagAnswer | null
+
+  // SSE 도구 호출 로그
+  toolCallLogs: ToolCallLogEntry[]
 
   // 판례/해석례/재결례 상태
   precedentResults: any[] | null
@@ -141,6 +145,10 @@ export interface SearchStateActions {
   setRagError: (error: string | null) => void
   setRagProgress: (progress: number) => void
   setRagAnswer: (answer: RagAnswer | null) => void
+
+  // SSE 도구 호출 로그 업데이트
+  addToolCallLog: (entry: ToolCallLogEntry) => void
+  clearToolCallLogs: () => void
 
   // 판례/해석례/재결례 상태 업데이트
   setPrecedentResults: (results: any[] | null) => void
@@ -226,6 +234,9 @@ export function useSearchState({
   const [ragProgress, setRagProgress] = useState(0)
   const [ragAnswer, setRagAnswer] = useState<RagAnswer | null>(null)
 
+  // SSE 도구 호출 로그
+  const [toolCallLogs, setToolCallLogs] = useState<ToolCallLogEntry[]>([])
+
   // ============================================================
   // 판례/해석례/재결례 상태
   // ============================================================
@@ -299,6 +310,14 @@ export function useSearchState({
     onModeChange?.(mode)
   }, [onModeChange])
 
+  const addToolCallLog = useCallback((entry: ToolCallLogEntry) => {
+    setToolCallLogs(prev => [...prev, entry])
+  }, [])
+
+  const clearToolCallLogs = useCallback(() => {
+    setToolCallLogs([])
+  }, [])
+
   const resetSearchState = useCallback(() => {
     setLawData(null)
     setLawSelectionState(null)
@@ -358,6 +377,7 @@ export function useSearchState({
     ragError,
     ragProgress,
     ragAnswer,
+    toolCallLogs,
     precedentResults,
     precedentTotalCount,
     precedentPage,
@@ -405,6 +425,8 @@ export function useSearchState({
     setRagError,
     setRagProgress,
     setRagAnswer,
+    addToolCallLog,
+    clearToolCallLogs,
     setPrecedentResults,
     setPrecedentTotalCount,
     setPrecedentPage,

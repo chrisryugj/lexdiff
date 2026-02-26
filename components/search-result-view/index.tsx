@@ -475,6 +475,7 @@ function SearchResultViewComponent({
               onAiRefresh={handlers.handleAiRefresh}
               isStreaming={state.isSearching}
               searchProgress={state.searchProgress}
+              toolCallLogs={state.toolCallLogs}
             />
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */

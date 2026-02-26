@@ -12,7 +12,7 @@ import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 
-import { AIAnswerLoading } from "@/components/ai-answer-loading"
+import type { ToolCallLogEntry } from "@/components/search-result-view/types"
 
 // Dynamic import for AnnexModal (별표 모달)
 const AnnexModal = dynamic(
@@ -325,12 +325,13 @@ interface AIAnswerContentProps {
     isTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
     onRefresh?: () => void  // ✅ 강제 새로고침 (캐시 무시)
 
-    // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
-    isStreaming?: boolean  // 스트리밍 중 여부
-    searchProgress?: number  // 진행률 (0-100)
+    // SSE 스트리밍
+    isStreaming?: boolean
+    searchProgress?: number
+    toolCallLogs?: ToolCallLogEntry[]
 
-    // ✅ 별표 모달 (신규)
-    currentLawName?: string  // 현재 법령명 (AI 답변의 컨텍스트)
+    // 별표 모달
+    currentLawName?: string
 }
 
 
@@ -349,13 +350,36 @@ export function AIAnswerContent({
     onRefresh,
     isStreaming = false,
     searchProgress = 0,
+    toolCallLogs = [],
     currentLawName,
 }: AIAnswerContentProps) {
-    // ✅ ChatGPT 스타일 어절 단위 타이핑 효과
+    // 어절 단위 타이핑 효과
     const [displayedContent, setDisplayedContent] = useState('')
     const [isTyping, setIsTyping] = useState(false)
 
-    // ✅ 별표 모달 상태
+    // 도구 로그 접힘 애니메이션
+    const [isCollapsing, setIsCollapsing] = useState(false)
+    const [showLogs, setShowLogs] = useState(false)
+    const logPanelRef = useRef<HTMLDivElement>(null)
+    const prevStreamingRef = useRef(isStreaming)
+
+    // isStreaming이 true→false 전환 시 접힘 애니메이션 시작
+    useEffect(() => {
+      if (prevStreamingRef.current && !isStreaming && toolCallLogs.length > 0) {
+        setIsCollapsing(true)
+        const timer = setTimeout(() => {
+          setShowLogs(false)
+          setIsCollapsing(false)
+        }, 600)
+        return () => clearTimeout(timer)
+      }
+      if (isStreaming) {
+        setShowLogs(true)
+      }
+      prevStreamingRef.current = isStreaming
+    }, [isStreaming, toolCallLogs.length])
+
+    // 별표 모달 상태
     const [annexModal, setAnnexModal] = useState<{
         open: boolean
         annexNumber: string
@@ -613,13 +637,79 @@ export function AIAnswerContent({
                     </div>
                 )}
 
-                {/* ✅ 4단계 프로그레스 UI */}
-                {/* Slides down from top when starting, collapses upward when done. */}
-                {isStreaming && (
+                {/* SSE 도구 호출 로그 패널 */}
+                {(showLogs || isStreaming) && (
                     <div
-                        className="overflow-hidden transition-all duration-700 ease-out mb-6 animate-in slide-in-from-top-4"
+                        ref={logPanelRef}
+                        className={`overflow-hidden mb-4 transition-all duration-600 ease-out ${
+                            isCollapsing ? 'max-h-0 opacity-0 -translate-y-4' : 'max-h-[600px] opacity-100'
+                        }`}
                     >
-                        <AIAnswerLoading searchProgress={searchProgress} />
+                        <div className="rounded-lg bg-slate-950/90 dark:bg-slate-950/95 border border-slate-800/60 p-3 sm:p-4">
+                            {/* 프로그레스 바 */}
+                            <div className="mb-3 flex items-center gap-3">
+                                <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-500 ease-out"
+                                        style={{ width: `${searchProgress}%` }}
+                                    />
+                                </div>
+                                <span className="text-[11px] font-mono text-slate-500 tabular-nums w-8 text-right">
+                                    {searchProgress}%
+                                </span>
+                            </div>
+
+                            {/* 도구 호출 로그 */}
+                            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                                {toolCallLogs.map((log, idx) => (
+                                    <div
+                                        key={log.id}
+                                        className="flex items-start gap-2 text-[12px] font-mono animate-in slide-in-from-left-2 fade-in duration-300"
+                                        style={{ animationDelay: `${idx * 30}ms` }}
+                                    >
+                                        {log.type === 'status' && (
+                                            <>
+                                                <Icon name="info" size={13} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                                                <span className="text-slate-400">{log.displayName}</span>
+                                            </>
+                                        )}
+                                        {log.type === 'call' && (
+                                            <>
+                                                <Icon name="arrow-right" size={13} className="text-yellow-500/80 mt-0.5 flex-shrink-0" />
+                                                <span className="text-yellow-400/90">
+                                                    {log.displayName}
+                                                    {log.query && <span className="text-slate-500 ml-1">: {log.query}</span>}
+                                                </span>
+                                                <span className="inline-block w-1 h-3 bg-yellow-400/60 animate-pulse ml-1 flex-shrink-0" />
+                                            </>
+                                        )}
+                                        {log.type === 'result' && (
+                                            <>
+                                                {log.success ? (
+                                                    <Icon name="check" size={13} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                                                ) : (
+                                                    <Icon name="x" size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
+                                                )}
+                                                <span className={log.success ? 'text-emerald-400/90' : 'text-red-400/80'}>
+                                                    {log.displayName}
+                                                    {log.summary && <span className="text-slate-500 ml-1">→ {log.summary}</span>}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {/* 마지막 줄: 현재 상태 표시 */}
+                                {isStreaming && !isCollapsing && (
+                                    <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 pt-1">
+                                        <div className="w-3 h-3 flex-shrink-0">
+                                            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mx-auto" />
+                                        </div>
+                                        <span>대기 중...</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -650,7 +740,7 @@ export function AIAnswerContent({
                     </>
                 )}
 
-                {/* ✅ 답변 내용 렌더링 - Gemini 스타일 타이핑 효과 */}
+                {/* 답변 내용 렌더링 - 타이핑 효과 */}
                 {displayedContent && !isStreaming && (
                     <div
                         style={{ fontSize: `${fontSize}px` }}

@@ -58,9 +58,10 @@ interface LawViewerProps {
   aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
   onAiRefresh?: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
 
-  // ✅ Phase 11-B: ChatGPT 스타일 스트리밍 (신규)
-  isStreaming?: boolean  // 스트리밍 중 여부
-  searchProgress?: number  // 진행률 (0-100)
+  // SSE 스트리밍
+  isStreaming?: boolean
+  searchProgress?: number
+  toolCallLogs?: import("@/components/search-result-view/types").ToolCallLogEntry[]
 
   // ✅ 판례 모드
   isPrecedent?: boolean  // 판례 뷰 여부
@@ -92,6 +93,7 @@ function LawViewerComponent({
   onAiRefresh,
   isStreaming = false,
   searchProgress = 0,
+  toolCallLogs = [],
   isPrecedent = false,
   onRefresh,
 }: LawViewerProps) {
@@ -707,7 +709,8 @@ function LawViewerComponent({
     isStreaming,
     searchProgress,
     onLawClick: handleLawLinkClick,
-  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress])
+    toolCallLogs,
+  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress, toolCallLogs])
 
   const delegationPropsGroup = useMemo(() => ({
     validDelegations,

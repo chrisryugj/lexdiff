@@ -214,3 +214,19 @@ export interface RagAnswer {
   }>
   confidence: 'high' | 'medium' | 'low'
 }
+
+// ============================================================
+// SSE 도구 호출 로그 타입
+// ============================================================
+
+export interface ToolCallLogEntry {
+  id: string
+  type: 'call' | 'result' | 'status'
+  name?: string
+  displayName: string
+  query?: string
+  success?: boolean
+  summary?: string
+  message?: string
+  timestamp: number
+}
