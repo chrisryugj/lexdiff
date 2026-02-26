@@ -60,7 +60,7 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.setAiRelatedLaws([])
     actions.setAiCitations([])
     actions.setFileSearchFailed(false)
-    actions.setUserQuery(fullQuery)
+    // userQuery는 handleSearchInternal에서 rawQuery로 이미 설정됨
     actions.clearToolCallLogs()
     actions.updateProgress('analyzing', 5)
 
@@ -187,6 +187,18 @@ export function useAiSearch(deps: HandlerDeps) {
           })
           break
         }
+        case 'token_usage': {
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'token_usage',
+            displayName: `토큰: ${event.inputTokens?.toLocaleString()} in / ${event.outputTokens?.toLocaleString()} out`,
+            timestamp: Date.now(),
+            inputTokens: event.inputTokens,
+            outputTokens: event.outputTokens,
+            totalTokens: event.totalTokens,
+          })
+          break
+        }
         case 'answer': {
           const data = event.data
           const processedContent = (data.answer || '').replace(/\^/g, ' ')
@@ -198,6 +210,8 @@ export function useAiSearch(deps: HandlerDeps) {
           actions.setAiRelatedLaws(relatedLaws)
           actions.setAiCitations(data.citations || [])
           actions.setAiQueryType((data.queryType || 'application') as any)
+          actions.setAiConfidenceLevel(data.confidenceLevel || 'high')
+          actions.setAiIsTruncated(data.isTruncated || false)
           actions.updateProgress('complete', 100)
 
           debugLogger.success('AI 답변 완료', {
@@ -217,10 +231,8 @@ export function useAiSearch(deps: HandlerDeps) {
             articles: [], selectedJo: undefined, isOrdinance: false
           })
 
-          // 검색 완료 (약간의 딜레이 후)
-          setTimeout(() => {
-            actions.setIsSearching(false)
-          }, 500)
+          // 검색 완료 즉시 (isStreaming=false → 깜빡임 커서 즉시 제거)
+          actions.setIsSearching(false)
 
           // 캐시 저장 (백그라운드)
           saveCaches(query, processedContent, data, relatedLaws, searchFailed)

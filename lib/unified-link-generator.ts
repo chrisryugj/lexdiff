@@ -960,10 +960,11 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
 
   let result = markdown
 
-  // 패턴 1: 「법령명」 제N조, 제M조 (쉼표로 연결된 복수 조문)
+  // 패턴 1: 「법령명」 제N조, 제M조 또는 제N조 및 제M조 (쉼표/및/과/와로 연결된 복수 조문)
   // 예: 「민법」 제390조, 제393조 → 각각 개별 링크
+  // 예: 「조례」 제3조 및 제6조 → 각각 개별 링크
   result = result.replace(
-    /(?<!\[)「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)((?:\s*,\s*제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)*)/g,
+    /(?<!\[)「([^」]+)」\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)((?:\s*(?:,|및|과|와)\s*제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)*)/g,
     (match, lawName, firstArticle, restArticles) => {
       const encodedLaw = encodeURIComponent(lawName.trim())
 
@@ -971,14 +972,16 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
       const normalizedFirst = firstArticle.replace(/\s+/g, '')
       let result = `[「${lawName}」 ${firstArticle}](law://${encodedLaw}/${encodeURIComponent(normalizedFirst)})`
 
-      // 나머지 조문들 (쉼표로 구분)
+      // 나머지 조문들 (쉼표/및/과/와로 구분)
       if (restArticles) {
-        const additionalArticles = restArticles.match(/제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?/g)
-        if (additionalArticles) {
-          for (const article of additionalArticles) {
-            const normalizedArticle = article.replace(/\s+/g, '')
-            result += `, [${article}](law://${encodedLaw}/${encodeURIComponent(normalizedArticle)})`
-          }
+        const pairRegex = /\s*(,|및|과|와)\s*(제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제\s*\d+\s*항)?(?:\s*제\s*\d+\s*호)?)/g
+        let pair: RegExpExecArray | null
+        while ((pair = pairRegex.exec(restArticles)) !== null) {
+          const connector = pair[1]
+          const article = pair[2]
+          const normalizedArticle = article.replace(/\s+/g, '')
+          const sep = connector === ',' ? ',' : ` ${connector}`
+          result += `${sep} [${article}](law://${encodedLaw}/${encodeURIComponent(normalizedArticle)})`
         }
       }
 

@@ -45,7 +45,7 @@ interface LawViewerProps {
   isOrdinance: boolean
   viewMode: "single" | "full"
 
-  // AI 답변 모드 (File Search RAG)
+  // AI 답변 모드 (Real-time Legal AI)
   aiAnswerMode?: boolean
   aiAnswerContent?: string
   relatedArticles?: ParsedRelatedLaw[]

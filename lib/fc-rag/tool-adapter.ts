@@ -19,6 +19,10 @@ import { getThreeTier, GetThreeTierSchema } from 'korean-law-mcp/build/tools/thr
 import { compareOldNew, CompareOldNewSchema } from 'korean-law-mcp/build/tools/comparison.js'
 import { getArticleHistory, ArticleHistorySchema } from 'korean-law-mcp/build/tools/article-history.js'
 
+// Tier 2 도구: 자치법규(조례)
+import { searchOrdinance, SearchOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance-search.js'
+import { getOrdinance, GetOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance.js'
+
 import type { FunctionDeclaration } from '@google/genai'
 import type { ZodSchema } from 'zod'
 
@@ -89,6 +93,18 @@ const TOOLS: ToolDef[] = [
     description: '특정 조문의 개정 이력을 조회합니다. search_law 결과에서 얻은 lawId와 조문번호(jo)를 사용하세요. 예: lawId="001556", jo="38".',
     schema: ArticleHistorySchema,
     handler: getArticleHistory,
+  },
+  {
+    name: 'search_ordinance',
+    description: '자치법규(조례·규칙)를 키워드로 검색합니다. 시·도/시·군·구 조례가 필요할 때 사용합니다. 결과에 자치법규일련번호(ordinSeq)가 포함됩니다. 예: query="광진구 복무".',
+    schema: SearchOrdinanceSchema,
+    handler: searchOrdinance,
+  },
+  {
+    name: 'get_ordinance',
+    description: '자치법규(조례) 전문을 조회합니다. search_ordinance 결과에서 얻은 자치법규일련번호(ordinSeq)를 사용하세요.',
+    schema: GetOrdinanceSchema,
+    handler: getOrdinance,
   },
 ]
 

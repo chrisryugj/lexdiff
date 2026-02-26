@@ -363,21 +363,13 @@ export function AIAnswerContent({
     const logPanelRef = useRef<HTMLDivElement>(null)
     const prevStreamingRef = useRef(isStreaming)
 
-    // isStreaming이 true→false 전환 시 접힘 애니메이션 시작
+    // 스트리밍 시작 시 로그 표시 (접기 비활성화 - 디버깅용)
     useEffect(() => {
-      if (prevStreamingRef.current && !isStreaming && toolCallLogs.length > 0) {
-        setIsCollapsing(true)
-        const timer = setTimeout(() => {
-          setShowLogs(false)
-          setIsCollapsing(false)
-        }, 600)
-        return () => clearTimeout(timer)
-      }
       if (isStreaming) {
         setShowLogs(true)
       }
       prevStreamingRef.current = isStreaming
-    }, [isStreaming, toolCallLogs.length])
+    }, [isStreaming])
 
     // 별표 모달 상태
     const [annexModal, setAnnexModal] = useState<{
@@ -513,7 +505,7 @@ export function AIAnswerContent({
                     <Icon name="sparkles" size={20} className="text-primary flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
-                        File Search RAG
+                        Real-time Legal AI
                     </Badge>
                     {/* 신뢰도 배지 - RAG 배지 바로 옆 */}
                     <ConfidenceBadge />
@@ -525,7 +517,7 @@ export function AIAnswerContent({
                         <Icon name="message-circle-question" size={20} className="text-muted-foreground/60 flex-shrink-0 mt-0.5" />
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                            <span className="break-words line-clamp-2">{userQuery}</span>
+                            <span className="break-words line-clamp-3">{userQuery}</span>
                             {/* 쿼리 타입 배지 (7가지 법률 질문 유형) */}
                             {(() => {
                                 const typeConfigs: Record<string, { icon: IconType, label: string, bgColor: string, borderColor: string, textColor: string }> = {
@@ -535,7 +527,8 @@ export function AIAnswerContent({
                                     comparison: { icon: ICON_REGISTRY['git-compare'], label: '비교', bgColor: 'bg-purple-500/10', borderColor: 'border-purple-500/30', textColor: 'text-purple-500' },
                                     application: { icon: ICON_REGISTRY['scale'], label: '적용 판단', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', textColor: 'text-blue-500' },
                                     consequence: { icon: ICON_REGISTRY['zap'], label: '효과/결과', bgColor: 'bg-rose-500/10', borderColor: 'border-rose-500/30', textColor: 'text-rose-500' },
-                                    scope: { icon: ICON_REGISTRY['ruler'], label: '범위/금액', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', textColor: 'text-amber-500' }
+                                    scope: { icon: ICON_REGISTRY['ruler'], label: '범위/금액', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', textColor: 'text-amber-500' },
+                                    exemption: { icon: ICON_REGISTRY['shield'], label: '면제/특례', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', textColor: 'text-emerald-500' }
                                 }
                                 const config = typeConfigs[aiQueryType] || typeConfigs.application
 
@@ -694,6 +687,12 @@ export function AIAnswerContent({
                                                     {log.displayName}
                                                     {log.summary && <span className="text-slate-500 ml-1">→ {log.summary}</span>}
                                                 </span>
+                                            </>
+                                        )}
+                                        {log.type === 'token_usage' && (
+                                            <>
+                                                <Icon name="info" size={13} className="text-cyan-400/80 mt-0.5 flex-shrink-0" />
+                                                <span className="text-cyan-400/80">{log.displayName}</span>
                                             </>
                                         )}
                                     </div>

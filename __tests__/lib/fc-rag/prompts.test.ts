@@ -1,0 +1,104 @@
+import { describe, test, expect } from 'vitest'
+import { buildSystemPrompt } from '@/lib/fc-rag/prompts'
+
+describe('buildSystemPrompt', () => {
+  describe('complexity별 길이 힌트', () => {
+    test('simple → 500자', () => {
+      const prompt = buildSystemPrompt('simple', 'definition')
+      expect(prompt).toContain('500자 이내')
+    })
+
+    test('moderate → 1000자', () => {
+      const prompt = buildSystemPrompt('moderate', 'application')
+      expect(prompt).toContain('1000자 이내')
+    })
+
+    test('complex → 2000자', () => {
+      const prompt = buildSystemPrompt('complex', 'comparison')
+      expect(prompt).toContain('2000자 이내')
+    })
+  })
+
+  describe('queryType별 specialist 지침 포함', () => {
+    test('definition → 개념/정의 질문 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'definition')
+      expect(prompt).toContain('개념/정의 질문')
+      expect(prompt).toContain('[헷갈리는 개념]')
+    })
+
+    test('requirement → 요건/자격 질문 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'requirement')
+      expect(prompt).toContain('요건/자격 질문')
+      expect(prompt).toContain('[결격사유]')
+    })
+
+    test('procedure → 절차/방법 질문 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'procedure')
+      expect(prompt).toContain('절차/방법 질문')
+      expect(prompt).toContain('로드맵')
+    })
+
+    test('comparison → 비교/구분 질문 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'comparison')
+      expect(prompt).toContain('비교/구분 질문')
+      expect(prompt).toContain('[비교표]')
+    })
+
+    test('application → 적용/해당 판단 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'application')
+      expect(prompt).toContain('적용/해당 판단')
+      expect(prompt).toContain('확신도')
+    })
+
+    test('consequence → 효과/위반/처벌 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'consequence')
+      expect(prompt).toContain('효과/위반/처벌')
+      expect(prompt).toContain('[구제 방법]')
+    })
+
+    test('scope → 범위/금액/기한 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'scope')
+      expect(prompt).toContain('범위/금액/기한')
+      expect(prompt).toContain('[시뮬레이션]')
+    })
+
+    test('exemption → 면제/감면/특례 구조', () => {
+      const prompt = buildSystemPrompt('moderate', 'exemption')
+      expect(prompt).toContain('면제/감면/특례')
+      expect(prompt).toContain('[요건 체크]')
+    })
+  })
+
+  describe('공통 규칙 포함', () => {
+    test('범용 독자 (하드코딩 없음)', () => {
+      const prompt = buildSystemPrompt('simple', 'application')
+      expect(prompt).not.toContain('무역')
+      expect(prompt).not.toContain('관세 실무자')
+      expect(prompt).not.toContain('지자체 공무원')
+      expect(prompt).toContain('비전문가')
+    })
+
+    test('간결체 지시', () => {
+      const prompt = buildSystemPrompt('moderate', 'definition')
+      expect(prompt).toContain('간결체')
+      expect(prompt).toContain('"합니다/해요" 금지')
+    })
+
+    test('괄호 풀이 지시', () => {
+      const prompt = buildSystemPrompt('moderate', 'definition')
+      expect(prompt).toContain('괄호 풀이')
+    })
+
+    test('도구 사용 가이드 포함', () => {
+      const prompt = buildSystemPrompt('moderate', 'procedure')
+      expect(prompt).toContain('search_ordinance')
+      expect(prompt).toContain('지역명 포함')
+    })
+
+    test('"위반 시 답변 무효" 강압적 표현 없음', () => {
+      const prompt = buildSystemPrompt('complex', 'comparison')
+      expect(prompt).not.toContain('무효')
+      expect(prompt).not.toContain('절대 필수')
+    })
+  })
+})
