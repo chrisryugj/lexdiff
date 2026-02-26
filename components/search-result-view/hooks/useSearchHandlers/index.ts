@@ -64,7 +64,7 @@ export function useSearchHandlers({
   ) => {
     const fullQuery = buildFullQuery(query.lawName, query.article)
     actions.setSearchQuery(fullQuery)
-    actions.setUserQuery(fullQuery)
+    actions.setUserQuery((query as any).rawQuery || fullQuery)
     debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode })
 
     // 통합검색: classification이 있으면 재감지 스킵
@@ -152,7 +152,9 @@ export function useSearchHandlers({
 
     // AI 검색 vs 기본 검색 분기
     if (isAiSearch) {
-      await handleAiSearch(fullQuery, signal, skipCache)
+      // AI 검색에는 원본 쿼리 전달 (파싱으로 자연어 부분 잘리지 않도록)
+      const aiQuery = (query as any).rawQuery || fullQuery
+      await handleAiSearch(aiQuery, signal, skipCache)
     } else {
       await handleBasicSearch(query, fullQuery)
     }

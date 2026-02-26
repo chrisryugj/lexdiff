@@ -25,6 +25,7 @@ interface CommandSearchModalProps {
     searchType?: SearchType  // ✅ 신규
     caseNumber?: string  // ✅ 신규
     classification?: UnifiedQueryClassification  // ✅ 신규
+    rawQuery?: string
   }) => void
   isAiMode?: boolean // AI 모드 여부
 }
@@ -190,7 +191,8 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         jo: classification.entities.articleNumber,
         searchType: classification.searchType,
         caseNumber: classification.entities.caseNumber,
-        classification: classification
+        classification: classification,
+        rawQuery: query,
       })
       onClose()
       return
@@ -205,14 +207,16 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         jo: classification.entities.articleNumber || parsed.jo,
         searchType: classification.searchType,
         caseNumber: classification.entities.caseNumber,
-        classification: classification
+        classification: classification,
+        rawQuery: query,
       })
     } catch (error) {
       debugLogger.error('검색 파싱 실패 (Fallback)', error)
       onSearch({
         lawName: classification.entities.lawName || query,
         searchType: classification.searchType,
-        classification: classification
+        classification: classification,
+        rawQuery: query,
       })
     }
     onClose()

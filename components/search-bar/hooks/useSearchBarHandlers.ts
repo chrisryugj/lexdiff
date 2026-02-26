@@ -58,7 +58,8 @@ export function useSearchBarHandlers({
           article: undefined,
           jo: undefined,
           searchType: 'ai',
-          classification
+          classification,
+          rawQuery: searchQuery,
         })
         actions.setShowDropdown(false)
         return
@@ -90,7 +91,8 @@ export function useSearchBarHandlers({
           jo: undefined,
           searchType: 'ai',
           classification,
-          forcedMode: 'ai'
+          forcedMode: 'ai',
+          rawQuery: searchQuery,
         })
         actions.setShowDropdown(false)
         return
@@ -112,7 +114,8 @@ export function useSearchBarHandlers({
       onSearch({
         ...parsed,
         searchType: classification.searchType,
-        classification
+        classification,
+        rawQuery: searchQuery,
       })
       actions.setShowDropdown(false)
     } catch (error) {
@@ -145,7 +148,8 @@ export function useSearchBarHandlers({
         jo: undefined,
         searchType: 'ai',
         classification,
-        forcedMode: 'ai'
+        forcedMode: 'ai',
+        rawQuery: state.pendingQuery,
       })
     } else {
       try {
@@ -155,7 +159,8 @@ export function useSearchBarHandlers({
           ...parsed,
           searchType: classification.searchType,
           classification,
-          forcedMode: 'law'
+          forcedMode: 'law',
+          rawQuery: state.pendingQuery,
         })
       } catch (error) {
         debugLogger.error("법령 검색 파싱 실패", error)

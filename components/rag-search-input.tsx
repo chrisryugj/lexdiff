@@ -46,7 +46,7 @@ export function RagSearchInput({ onSearch, isLoading }: RagSearchInputProps) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground mt-2">
-        💡 File Search RAG를 사용하여 업로드된 법령에서 답변을 찾습니다
+        💡 법제처 API를 실시간 조회하여 법령 기반 답변을 생성합니다
       </p>
     </form>
   )

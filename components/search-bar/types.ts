@@ -8,6 +8,7 @@ export interface SearchQuery {
   caseNumber?: string
   classification?: UnifiedQueryClassification
   forcedMode?: 'law' | 'ai'
+  rawQuery?: string  // 사용자 원본 입력 (파싱 전)
 }
 
 export interface SearchBarProps {

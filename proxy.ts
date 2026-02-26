@@ -21,7 +21,6 @@ const RATE_LIMITS = {
 const AI_ENDPOINTS = [
   '/api/fc-rag',
   '/api/summarize',
-  '/api/analyze-intent',
 ]
 
 // IP별 요청 카운트 저장소 (Node.js 런타임 메모리)

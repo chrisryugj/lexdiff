@@ -472,6 +472,8 @@ function SearchResultViewComponent({
               aiCitations={state.aiCitations}
               userQuery={state.userQuery || state.searchQuery}
               aiQueryType={state.aiQueryType}
+              aiConfidenceLevel={state.aiConfidenceLevel}
+              aiIsTruncated={state.aiIsTruncated}
               onAiRefresh={handlers.handleAiRefresh}
               isStreaming={state.isSearching}
               searchProgress={state.searchProgress}
@@ -554,6 +556,8 @@ function SearchResultViewComponent({
                       aiCitations={state.aiCitations}
                       userQuery={state.userQuery}
                       aiQueryType={state.aiQueryType}
+                      aiConfidenceLevel={state.aiConfidenceLevel}
+                      aiIsTruncated={state.aiIsTruncated}
                       onAiRefresh={handlers.handleAiRefresh}
                       isPrecedent={state.lawData.isPrecedent}
                       onRefresh={handlers.handleRefresh}
@@ -610,6 +614,8 @@ function SearchResultViewComponent({
                   aiCitations={state.aiCitations}
                   userQuery={state.userQuery}
                   aiQueryType={state.aiQueryType}
+                  aiConfidenceLevel={state.aiConfidenceLevel}
+                  aiIsTruncated={state.aiIsTruncated}
                   onAiRefresh={handlers.handleAiRefresh}
                   isPrecedent={state.lawData.isPrecedent}
                   onRefresh={handlers.handleRefresh}

@@ -73,6 +73,8 @@ export interface SearchState {
   userQuery: string
   fileSearchFailed: boolean
   aiQueryType: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'
+  aiConfidenceLevel: 'high' | 'medium' | 'low'
+  aiIsTruncated: boolean
   aiSearchMeta: AISearchMeta | null
 
   // RAG 상태
@@ -138,6 +140,8 @@ export interface SearchStateActions {
   setUserQuery: (query: string) => void
   setFileSearchFailed: (value: boolean) => void
   setAiQueryType: (type: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption') => void
+  setAiConfidenceLevel: (level: 'high' | 'medium' | 'low') => void
+  setAiIsTruncated: (value: boolean) => void
   setAiSearchMeta: (meta: AISearchMeta | null) => void
 
   // RAG 상태 업데이트
@@ -224,6 +228,8 @@ export function useSearchState({
   const [userQuery, setUserQuery] = useState<string>('')
   const [fileSearchFailed, setFileSearchFailed] = useState(false)
   const [aiQueryType, setAiQueryType] = useState<'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'>('application')
+  const [aiConfidenceLevel, setAiConfidenceLevel] = useState<'high' | 'medium' | 'low'>('high')
+  const [aiIsTruncated, setAiIsTruncated] = useState(false)
   const [aiSearchMeta, setAiSearchMeta] = useState<AISearchMeta | null>(null)
 
   // ============================================================
@@ -372,6 +378,8 @@ export function useSearchState({
     userQuery,
     fileSearchFailed,
     aiQueryType,
+    aiConfidenceLevel,
+    aiIsTruncated,
     aiSearchMeta,
     ragLoading,
     ragError,
@@ -420,6 +428,8 @@ export function useSearchState({
     setUserQuery,
     setFileSearchFailed,
     setAiQueryType,
+    setAiConfidenceLevel,
+    setAiIsTruncated,
     setAiSearchMeta,
     setRagLoading,
     setRagError,

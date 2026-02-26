@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     !/시행규칙|시행령/.test(lawName)
 
   if (isOrdinance) {
-    return NextResponse.json({ title: null, unsupported: "ordinance" }, { status: 200 })
+    return await handleOrdinanceTitle(origin, lawName, articleLabel)
   }
 
   try {
@@ -118,3 +118,73 @@ export async function GET(request: Request) {
   }
 }
 
+/** 조례 조문 제목 조회 */
+async function handleOrdinanceTitle(origin: string, lawName: string, articleLabel: string) {
+  try {
+    // 1. 조례 검색 → ordinSeq 확보
+    const searchRes = await fetch(`${origin}/api/ordin-search?query=${encodeURIComponent(lawName)}`)
+    if (!searchRes.ok) return NextResponse.json({ title: null }, { status: 200 })
+
+    const searchXml = await searchRes.text()
+
+    // XML에서 자치법규일련번호 추출 (이름 매칭)
+    const lawBlocks = searchXml.match(/<law\s[^>]*>[\s\S]*?<\/law>/g) || []
+    let bestSeq: string | null = null
+    const normalized = lawName.replace(/\s+/g, "")
+
+    for (const block of lawBlocks) {
+      const nameMatch = block.match(/<자치법규명>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/자치법규명>/)
+      const seqMatch = block.match(/<자치법규일련번호>(\d+)<\/자치법규일련번호>/)
+      if (nameMatch && seqMatch) {
+        const blockName = nameMatch[1].trim().replace(/\s+/g, "")
+        if (blockName === normalized) {
+          bestSeq = seqMatch[1]
+          break
+        }
+        if (!bestSeq) bestSeq = seqMatch[1] // 첫 번째 결과 폴백
+      }
+    }
+
+    if (!bestSeq) return NextResponse.json({ title: null }, { status: 200 })
+
+    // 2. 조례 본문 조회
+    const ordinRes = await fetch(`${origin}/api/ordin?ordinSeq=${bestSeq}`)
+    if (!ordinRes.ok) return NextResponse.json({ title: null }, { status: 200 })
+
+    const ordinXml = await ordinRes.text()
+
+    // 3. 조문 제목 파싱 - 제N조 매칭
+    const targetNum = articleLabel.replace(/\D/g, "")
+    if (!targetNum) return NextResponse.json({ title: null }, { status: 200 })
+
+    // 조문단위/조문/조 블록에서 조문번호 일치하는 것 찾기
+    // (법제처 XML은 태그명이 다양: 조문단위, 조문, 조 / 조문번호, 조번호 / 조문제목, 조제목, 제목)
+    // ✅ 조문번호 태그 값이 "3" 또는 "제3조" 형태 모두 대응
+    // NOTE: \b 사용 금지 - 한글은 JS regex에서 \W이므로 \b가 매칭 불가. (?=[\s>\/]) 사용
+    const articleBlocks = ordinXml.match(/<(?:조문단위|조문|조)(?=[\s>\/])[\s\S]*?<\/(?:조문단위|조문|조)>/g) || []
+    for (const block of articleBlocks) {
+      const numMatch = block.match(/<(?:조문번호|조번호|조문호수)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/(?:조문번호|조번호|조문호수)>/)
+      const titleMatch = block.match(/<(?:조문제목|조제목|제목)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/(?:조문제목|조제목|제목)>/)
+      if (numMatch && titleMatch) {
+        // 조문번호 값에서 숫자만 추출하여 비교 (예: "제3조" → "3", "3" → "3")
+        const blockNum = numMatch[1].trim().replace(/\D/g, "")
+        if (blockNum === targetNum) {
+          const title = titleMatch[1].trim().replace(/^\(|\)$/g, "")
+          return NextResponse.json({ title: title || null }, { status: 200 })
+        }
+      }
+    }
+
+    // Fallback: XML 태그 파싱 실패 시, 원문에서 "제N조(제목)" 패턴 직접 추출
+    const textPattern = new RegExp(`제${targetNum}조(?:의\\d+)?\\s*[\\(\\(]([^\\)\\)]+)[\\)\\)]`)
+    const textMatch = ordinXml.match(textPattern)
+    if (textMatch) {
+      return NextResponse.json({ title: textMatch[1].trim() }, { status: 200 })
+    }
+
+    return NextResponse.json({ title: null }, { status: 200 })
+  } catch (error) {
+    debugLogger.error("[article-title] ordinance failed", error)
+    return NextResponse.json({ title: null }, { status: 200 })
+  }
+}

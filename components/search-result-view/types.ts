@@ -221,7 +221,7 @@ export interface RagAnswer {
 
 export interface ToolCallLogEntry {
   id: string
-  type: 'call' | 'result' | 'status'
+  type: 'call' | 'result' | 'status' | 'token_usage'
   name?: string
   displayName: string
   query?: string
@@ -229,4 +229,7 @@ export interface ToolCallLogEntry {
   summary?: string
   message?: string
   timestamp: number
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
 }

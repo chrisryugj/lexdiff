@@ -9,10 +9,13 @@
 
 import { GoogleGenAI } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
+import { buildSystemPrompt, type LegalQueryType } from './prompts'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
 // ─── 타입 ───
+
+export type { LegalQueryType } from './prompts'
 
 export interface FCRAGCitation {
   lawName: string
@@ -26,6 +29,7 @@ export interface FCRAGResult {
   citations: FCRAGCitation[]
   confidenceLevel: 'high' | 'medium' | 'low'
   complexity: QueryComplexity
+  queryType: LegalQueryType
   warnings?: string[]
 }
 
@@ -35,6 +39,7 @@ export type FCRAGStreamEvent =
   | { type: 'status'; message: string; progress: number }
   | { type: 'tool_call'; name: string; displayName: string; query?: string }
   | { type: 'tool_result'; name: string; displayName: string; success: boolean; summary: string }
+  | { type: 'token_usage'; inputTokens: number; outputTokens: number; totalTokens: number }
   | { type: 'answer'; data: FCRAGResult }
   | { type: 'error'; message: string }
 
@@ -48,12 +53,6 @@ const MAX_TOKENS: Record<QueryComplexity, number> = {
   complex: 6144,
 }
 
-const LENGTH_HINT: Record<QueryComplexity, string> = {
-  simple: '800자 이내로 간결하게',
-  moderate: '1500자 이내',
-  complex: '2500자 이내',
-}
-
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   search_law: '법령 검색',
   get_law_text: '법령 본문 조회',
@@ -64,33 +63,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_three_tier: '위임법령 조회',
   compare_old_new: '신구법 대조',
   get_article_history: '조문 이력 조회',
-}
-
-// ─── 프롬프트 ───
-
-function buildSystemPrompt(complexity: QueryComplexity): string {
-  return `한국 법령 전문가. 도구로 조회한 법령 데이터만 참고하여 정확하게 답변하세요.
-
-## 답변 형식 (공문 스타일)
-1. **결론 먼저** (두괄식): 핵심 답변을 첫 1-2문장으로 명확히 요약
-2. **본문 개조식**: 세부 내용은 번호로 구조화
-   - 대항목: 1., 2., 3.
-   - 소항목: 가., 나., 다.
-3. **근거 법령**: 각 항목에 「법령명」 제N조 형식으로 인용
-4. **참고사항**: 주의점이나 예외사항은 마지막에 별도 기재
-
-## 문체 규칙
-- 해요체 사용
-- 법률용어 첫 등장시 괄호 풀이 (예: "선의(사정을 모르는 것)")
-- 핵심 항만 부분 인용 (전문 복사 금지)
-- 도구로 확인되지 않은 조문번호를 추측하여 인용하지 마세요
-- ${LENGTH_HINT[complexity]}
-
-## 도구 사용
-1. 사용자 질문에 언급된 법령명을 정확히 search_law의 query로 사용하세요.
-2. search_law 결과의 MST 값으로 get_law_text를 호출하세요.
-3. 특정 조문이 필요하면 jo 파라미터를 사용하세요.
-4. 판례가 필요하면 search_precedents로 검색하세요.`
+  search_ordinance: '자치법규 검색',
+  get_ordinance: '자치법규 조회',
 }
 
 /** complexity 기반 최대 도구 턴 수 */
@@ -120,6 +94,8 @@ function parseLawEntries(text: string): LawEntry[] {
 /** 검색 결과에서 질문에 가장 맞는 법령의 MST 찾기 */
 function findBestMST(entries: LawEntry[], query: string): string | null {
   if (entries.length === 0) return null
+
+  // 1. 「법령명」 또는 ~법 패턴으로 정확 매칭
   const nameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+법)/)
   const target = nameMatch?.[1]
   if (target) {
@@ -130,7 +106,71 @@ function findBestMST(entries: LawEntry[], query: string): string | null {
       .sort((a, b) => a.name.length - b.name.length)
     if (prefixed.length > 0) return prefixed[0].mst
   }
+
+  // 2. 자연어 질문: 키워드 매칭 점수로 선택
+  if (entries.length > 1) {
+    const cleaned = query.replace(/(?:법|에\s*대해|알려줘|궁금|설명|관련|조문|내용)/g, '').trim()
+    const keywords = cleaned.split(/\s+/).filter(w => w.length >= 2)
+    if (keywords.length > 0) {
+      const scored = entries.map(e => {
+        let score = 0
+        for (const kw of keywords) {
+          if (e.name.includes(kw)) score += kw.length
+        }
+        return { ...e, score }
+      }).sort((a, b) => b.score - a.score)
+      if (scored[0].score > 0) return scored[0].mst
+    }
+  }
+
   return entries[0].mst
+}
+
+// ─── 조례 검색 결과 파싱 유틸 ───
+
+interface OrdinEntry { seq: string; name: string }
+
+/** search_ordinance 결과에서 [일련번호] 자치법규명 쌍 추출 */
+function parseOrdinEntries(text: string): OrdinEntry[] {
+  const entries: OrdinEntry[] = []
+  const regex = /\[(\d+)\]\s+(.+)/g
+  let m
+  while ((m = regex.exec(text)) !== null) {
+    entries.push({ seq: m[1], name: m[2].trim() })
+  }
+  return entries
+}
+
+/** 조례 검색 결과에서 쿼리에 가장 맞는 자치법규 일련번호 찾기 */
+function findBestOrdinanceSeq(text: string, query: string): string | null {
+  const entries = parseOrdinEntries(text)
+  if (entries.length === 0) return null
+  if (entries.length === 1) return entries[0].seq
+
+  // 쿼리에서 핵심 키워드 추출 (조례/규칙/에 대해/알려줘 등 제거)
+  const cleaned = query.replace(/(?:조례|규칙|에\s*대해|알려줘|궁금|설명|관련|내용|전반|주요)/g, '').trim()
+  const keywords = cleaned.split(/\s+/).filter(w => w.length >= 2)
+
+  // 키워드 매칭: matchCount(매칭된 키워드 수) 우선, 동점이면 totalScore(길이합) 순
+  const scored = entries.map(e => {
+    let matchCount = 0
+    let totalScore = 0
+    for (const kw of keywords) {
+      if (e.name.includes(kw)) {
+        matchCount++
+        totalScore += kw.length
+      }
+    }
+    // 이름 길이가 짧을수록 정확 매칭 가능성 높음 (보너스)
+    const brevityBonus = 100 - Math.min(e.name.length, 100)
+    return { ...e, matchCount, totalScore, brevityBonus }
+  }).sort((a, b) =>
+    b.matchCount - a.matchCount ||
+    b.totalScore - a.totalScore ||
+    b.brevityBonus - a.brevityBonus
+  )
+
+  return scored[0].seq
 }
 
 // ─── 도구 결과 요약 유틸 (SSE용) ───
@@ -167,6 +207,15 @@ function summarizeToolResult(name: string, result: ToolCallResult): string {
     case 'get_three_tier': return '위임법령 구조 조회 완료'
     case 'compare_old_new': return '신구법 대조표 조회 완료'
     case 'get_article_history': return '조문 이력 조회 완료'
+    case 'search_ordinance': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      const firstName = text.match(/\]\s+(.+)/)?.[1]?.trim()
+      return count ? `${firstName || '자치법규'} 외 ${count}건` : '자치법규 검색 완료'
+    }
+    case 'get_ordinance': {
+      const name = text.match(/자치법규명:\s*(.+)/)?.[1]?.trim()
+      return name || '자치법규 조회 완료'
+    }
     default: return '완료'
   }
 }
@@ -177,6 +226,8 @@ function getToolCallQuery(name: string, args: Record<string, unknown>): string |
     case 'get_law_text': return args.jo ? `${args.jo}` : undefined
     case 'search_precedents': return args.query as string
     case 'search_interpretations': return args.query as string
+    case 'search_ordinance': return args.query as string
+    case 'get_ordinance': return args.ordinSeq ? `#${args.ordinSeq}` : undefined
     default: return undefined
   }
 }
@@ -223,12 +274,13 @@ export async function* executeRAGStream(
 
   const warnings: string[] = []
   const complexity = inferComplexity(query)
+  const queryType = inferQueryType(query)
   const maxToolTurns = getMaxToolTurns(complexity)
   const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
-  const systemPrompt = buildSystemPrompt(complexity)
+  const systemPrompt = buildSystemPrompt(complexity, queryType)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const toolDeclarations = getToolDeclarations()
 
@@ -240,6 +292,8 @@ export async function* executeRAGStream(
   let turnCount = 0
   let latestSearchEntries: LawEntry[] = []
   const failureCount = new Map<string, number>()
+  let totalInputTokens = 0
+  let totalOutputTokens = 0
 
   // 프로그레스: 8% → 88% 범위를 턴 수에 따라 분배
   const progressRange = 80
@@ -270,6 +324,15 @@ export async function* executeRAGStream(
       })
 
       const candidate = response.candidates?.[0]
+
+      // 토큰 사용량 추적
+      const usage = (response as any).usageMetadata
+      if (usage) {
+        totalInputTokens += usage.promptTokenCount || 0
+        totalOutputTokens += usage.candidatesTokenCount || 0
+        yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
+      }
+
       if (!candidate?.content?.parts) {
         warnings.push('Gemini 응답이 비어있습니다.')
         break
@@ -289,6 +352,7 @@ export async function* executeRAGStream(
             citations: buildCitations(allToolResults, answer),
             confidenceLevel: calcConfidence(allToolResults),
             complexity,
+            queryType,
             warnings: warnings.length > 0 ? warnings : undefined,
           },
         }
@@ -308,6 +372,7 @@ export async function* executeRAGStream(
               citations: buildCitations(allToolResults, answer),
               confidenceLevel: calcConfidence(allToolResults),
               complexity,
+              queryType,
               warnings: warnings.length > 0 ? warnings : undefined,
             },
           }
@@ -324,6 +389,12 @@ export async function* executeRAGStream(
           contents: messages,
           config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
         })
+        const retryUsage = (retry as any).usageMetadata
+        if (retryUsage) {
+          totalInputTokens += retryUsage.promptTokenCount || 0
+          totalOutputTokens += retryUsage.candidatesTokenCount || 0
+          yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
+        }
         const retryText = (retry.candidates?.[0]?.content?.parts || [])
           .filter((p: any) => p.text).map((p: any) => p.text).join('')
         yield {
@@ -333,6 +404,7 @@ export async function* executeRAGStream(
             citations: buildCitations(allToolResults, retryText),
             confidenceLevel: calcConfidence(allToolResults),
             complexity,
+            queryType,
             warnings: warnings.length > 0 ? warnings : undefined,
           },
         }
@@ -407,6 +479,14 @@ export async function* executeRAGStream(
         if (idMatch) autoChains.push({ name: 'get_interpretation_text', args: { id: idMatch[1] } })
       }
 
+      // 자치법규 auto-chain: search_ordinance → get_ordinance (가장 관련 높은 결과 선택)
+      const ordinSearchOK = results.filter(r => r.name === 'search_ordinance' && !r.isError)
+      const alreadyGotOrdinance = results.some(r => r.name === 'get_ordinance')
+      if (ordinSearchOK.length > 0 && !alreadyGotOrdinance) {
+        const bestSeq = findBestOrdinanceSeq(ordinSearchOK[0].result, query)
+        if (bestSeq) autoChains.push({ name: 'get_ordinance', args: { ordinSeq: bestSeq } })
+      }
+
       const alreadyCompared = results.some(r => r.name === 'compare_old_new')
       if (searchOK.length > 0 && !alreadyCompared && /(?:개정|변경|바뀐|신구|대조)/.test(query)) {
         const bestMST = findBestMST(latestSearchEntries, query)
@@ -471,6 +551,7 @@ export async function* executeRAGStream(
       citations: buildCitations(allToolResults),
       confidenceLevel: 'low',
       complexity,
+      queryType,
       warnings: warnings.length > 0 ? warnings : undefined,
     },
   }
@@ -509,6 +590,26 @@ function inferComplexity(query: string): QueryComplexity {
     return 'moderate'
   }
   return 'simple'
+}
+
+/** @internal 테스트용 export */
+export function inferQueryType(query: string): LegalQueryType {
+  // 좁은 패턴(consequence, exemption) 우선, 넓은 범용 패턴(알려줘/설명) 마지막
+  const patterns: [RegExp, LegalQueryType][] = [
+    [/(?:면제|감면|특례|예외|비과세|영세율|감경)/,                     'exemption'],
+    [/(?:벌칙|과태료|처벌|위반|제재|벌금|징역|형사)/,                  'consequence'],
+    [/(?:절차|방법|신청|신고|등록|제출|처리|납부|환급|경정청구|어떻게)/, 'procedure'],
+    [/(?:비교|차이|구별|구분|다른\s*점|vs|대비)/,                     'comparison'],
+    [/(?:요건|조건|자격|충족|해당.*경우|갖추|필요.*서류|하려면)/,        'requirement'],
+    [/(?:범위|적용.*범위|해당.*대상|포함|제외.*범위|얼마|세율|금액|기한|산정|계산)/, 'scope'],
+    [/(?:정의|뜻|의미|개념|무엇|이란\??$)/,                           'definition'],
+    [/(?:적용|해당|판단|가능|여부|할\s*수)/,                          'application'],
+    [/(?:알려|궁금|설명|내용|전반|개요|현황|주요|핵심|요약|정리)/,       'definition'],
+  ]
+  for (const [pattern, type] of patterns) {
+    if (pattern.test(query)) return type
+  }
+  return 'application'
 }
 
 /**
@@ -606,6 +707,28 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
             chunkText: text.slice(Math.max(0, text.indexOf(match[0])), Math.min(text.length, text.indexOf(match[0]) + 200)),
             source: 'get_article_history',
           })
+        }
+      }
+    }
+
+    if (result.name === 'get_ordinance') {
+      const ordinName = text.match(/자치법규명:\s*(.+)/)?.[1]?.trim()
+      if (ordinName) {
+        for (const match of Array.from(text.matchAll(/제(\d+)조(?:의(\d+))?(?:\(([^)]+)\))?/g))) {
+          const articleNum = match[2] ? `제${match[1]}조의${match[2]}` : `제${match[1]}조`
+          if (mentionedArticles && !mentionedArticles.has(articleNum)) continue
+          const key = `${ordinName}:${articleNum}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            const idx = text.indexOf(match[0])
+            citations.push({ lawName: ordinName, articleNumber: articleNum, chunkText: text.slice(Math.max(0, idx), Math.min(text.length, idx + 200)), source: 'get_ordinance' })
+          }
+        }
+        // 조문 매칭이 없어도 조례 자체는 citation으로 등록
+        const baseKey = `조례:${ordinName}`
+        if (!seen.has(baseKey)) {
+          seen.add(baseKey)
+          citations.push({ lawName: ordinName, articleNumber: '자치법규', chunkText: text.slice(0, 200), source: 'get_ordinance' })
         }
       }
     }

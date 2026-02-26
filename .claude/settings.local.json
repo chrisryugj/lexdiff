@@ -30,5 +30,10 @@
     "deny": [],
     "ask": []
   },
-  "outputStyle": "chris-v2"
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7",
+    "sequential-thinking"
+  ],
+  "outputStyle": "chris-v3"
 }

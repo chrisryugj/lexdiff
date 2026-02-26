@@ -33,7 +33,6 @@ describe('Rate Limiting 로직', () => {
     const AI_ENDPOINTS = [
       '/api/fc-rag',
       '/api/summarize',
-      '/api/analyze-intent',
     ]
 
     const isAIEndpoint = (pathname: string) =>
