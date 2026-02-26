@@ -19,10 +19,9 @@ const RATE_LIMITS = {
 
 // AI 관련 엔드포인트
 const AI_ENDPOINTS = [
-  '/api/file-search-rag',
+  '/api/fc-rag',
   '/api/summarize',
   '/api/analyze-intent',
-  '/api/intelligent-search',
 ]
 
 // IP별 요청 카운트 저장소 (Node.js 런타임 메모리)

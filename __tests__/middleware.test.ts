@@ -31,18 +31,16 @@ describe('Rate Limiting 로직', () => {
   // AI 엔드포인트 판별 테스트
   describe('AI 엔드포인트 판별', () => {
     const AI_ENDPOINTS = [
-      '/api/file-search-rag',
+      '/api/fc-rag',
       '/api/summarize',
       '/api/analyze-intent',
-      '/api/intelligent-search',
     ]
 
     const isAIEndpoint = (pathname: string) =>
       AI_ENDPOINTS.some(e => pathname.startsWith(e))
 
-    it('/api/file-search-rag는 AI 엔드포인트', () => {
-      expect(isAIEndpoint('/api/file-search-rag')).toBe(true)
-      expect(isAIEndpoint('/api/file-search-rag/stream')).toBe(true)
+    it('/api/fc-rag는 AI 엔드포인트', () => {
+      expect(isAIEndpoint('/api/fc-rag')).toBe(true)
     })
 
     it('/api/summarize는 AI 엔드포인트', () => {
