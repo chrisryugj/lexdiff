@@ -10,6 +10,8 @@ import { useSearchBarState } from "./hooks/useSearchBarState"
 import { useSearchBarHandlers } from "./hooks/useSearchBarHandlers"
 import { SearchBarDropdown } from "./SearchBarDropdown"
 import { SearchBarChoiceDialog } from "./SearchBarChoiceDialog"
+import { ApiKeyInput } from "@/components/settings/api-key-input"
+import { useApiKey } from "@/hooks/use-api-key"
 import type { SearchBarProps } from "./types"
 
 // Re-export types
@@ -17,6 +19,7 @@ export type { SearchBarProps, SearchQuery, Suggestion } from "./types"
 
 export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchBarProps) {
   const { state, actions, isAiMode } = useSearchBarState(searchMode)
+  const { apiKey, saveKey, clearKey } = useApiKey()
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -172,6 +175,9 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
               </>
             )}
           </Button>
+
+          {/* BYO-Key 입력 */}
+          <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} />
         </div>
       </form>
 

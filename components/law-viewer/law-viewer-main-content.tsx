@@ -26,11 +26,13 @@ interface AIAnswerProps {
   onLawClick: (lawName: string, article?: string) => void
 }
 
+type DelegationTabType = "law" | "decree" | "rule" | "admin"
+
 interface DelegationProps {
   validDelegations: any[]
   isLoading: boolean
-  activeTab: string
-  setActiveTab: (tab: string) => void
+  activeTab: DelegationTabType
+  setActiveTab: React.Dispatch<React.SetStateAction<DelegationTabType>>
   panelSize: number
   setPanelSize: (size: number) => void
   showAdminRules: boolean
@@ -39,17 +41,17 @@ interface DelegationProps {
   loadedAdminRulesCount: number
   hasEverLoaded: boolean
   adminRules: any[]
-  adminRulesProgress: number
-  adminRuleViewMode: string
-  setAdminRuleViewMode: (mode: string) => void
+  adminRulesProgress: { current: number; total: number } | null
+  adminRuleViewMode: "list" | "detail"
+  setAdminRuleViewMode: React.Dispatch<React.SetStateAction<"list" | "detail">>
   adminRuleHtml: string | null
-  adminRuleTitle: string
-  handleViewAdminRuleFullContent: (rule: any) => void
+  adminRuleTitle: string | null
+  handleViewAdminRuleFullContent: (rule: any) => Promise<void>
 }
 
 interface PrecedentProps {
   showPrecedents: boolean
-  viewMode: string
+  viewMode: "bottom" | "side"
   panelSize: number
   setPanelSize: (size: number) => void
   precedents: any[]
@@ -65,7 +67,7 @@ interface PrecedentProps {
 
 interface FontProps {
   fontSize: number
-  setFontSize: (size: number) => void
+  setFontSize: React.Dispatch<React.SetStateAction<number>>
   increaseFontSize: () => void
   decreaseFontSize: () => void
   resetFontSize: () => void
@@ -74,7 +76,7 @@ interface FontProps {
 interface LawViewerMainContentProps {
   // Refs
   contentRef: React.RefObject<HTMLDivElement | null>
-  swipeRef: React.RefObject<HTMLDivElement>
+  swipeRef: React.RefObject<HTMLDivElement | null>
 
   // Mode flags
   aiAnswerMode: boolean
@@ -104,7 +106,7 @@ interface LawViewerMainContentProps {
   precedentProps: PrecedentProps
 
   // Handlers
-  handleContentClick: (e: React.MouseEvent) => void
+  handleContentClick: React.MouseEventHandler<HTMLDivElement>
   onRefresh?: () => void
   onToggleFavorite?: (jo: string) => void
   isFavorite: (jo: string) => boolean

@@ -1,0 +1,176 @@
+/**
+ * korean-law-mcp 도구 → Gemini Function Calling 어댑터
+ *
+ * korean-law-mcp의 개별 도구를 직접 import하여
+ * Gemini FunctionDeclaration으로 변환 + 실행하는 얇은 브릿지 레이어
+ */
+
+import { LawApiClient } from 'korean-law-mcp/build/lib/api-client.js'
+import { zodToJsonSchema } from 'zod-to-json-schema'
+
+// Tier 1 도구: 항상 제공
+import { searchLaw, SearchLawSchema } from 'korean-law-mcp/build/tools/search.js'
+import { getLawText, GetLawTextSchema } from 'korean-law-mcp/build/tools/law-text.js'
+import { searchPrecedents, searchPrecedentsSchema, getPrecedentText, getPrecedentTextSchema } from 'korean-law-mcp/build/tools/precedents.js'
+import { searchInterpretations, searchInterpretationsSchema } from 'korean-law-mcp/build/tools/interpretations.js'
+
+import type { FunctionDeclaration } from '@google/genai'
+import type { ZodSchema } from 'zod'
+
+// ─── API 클라이언트 (모듈 레벨 싱글턴) ───
+
+const apiClient = new LawApiClient({ apiKey: process.env.LAW_OC || '' })
+
+// ─── 도구 정의 ───
+
+interface ToolDef {
+  name: string
+  description: string
+  schema: ZodSchema
+  handler: (client: LawApiClient, input: any) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
+}
+
+const TOOLS: ToolDef[] = [
+  {
+    name: 'search_law',
+    description: '한국 법령을 키워드로 검색합니다. 약칭 자동 인식(예: 화관법→화학물질관리법). 결과에 법령ID와 MST(법령일련번호)가 포함됩니다. 반드시 이 도구를 먼저 호출하여 MST를 확인한 후 get_law_text를 호출하세요.',
+    schema: SearchLawSchema,
+    handler: searchLaw,
+  },
+  {
+    name: 'get_law_text',
+    description: '특정 법령의 조문 전문을 조회합니다. 반드시 search_law 결과에서 얻은 mst(법령일련번호) 값을 사용하세요. 예: mst="268725". jo 파라미터로 특정 조문만 조회 가능(예: jo="38").',
+    schema: GetLawTextSchema,
+    handler: getLawText,
+  },
+  {
+    name: 'search_precedents',
+    description: '법원 판례를 키워드로 검색합니다. 법원명/사건번호 필터 가능. 결과에 판례 id가 포함됩니다.',
+    schema: searchPrecedentsSchema,
+    handler: searchPrecedents,
+  },
+  {
+    name: 'get_precedent_text',
+    description: '특정 판례의 전문(판시사항, 판결요지, 전문)을 조회합니다. search_precedents 결과에서 얻은 id를 사용하세요.',
+    schema: getPrecedentTextSchema,
+    handler: getPrecedentText,
+  },
+  {
+    name: 'search_interpretations',
+    description: '법제처 유권해석(법령해석례)을 키워드로 검색합니다.',
+    schema: searchInterpretationsSchema,
+    handler: searchInterpretations,
+  },
+]
+
+// ─── Gemini FunctionDeclaration 변환 ───
+
+let _cachedDeclarations: FunctionDeclaration[] | null = null
+
+/**
+ * 도구 스키마를 Gemini FunctionDeclaration 배열로 변환
+ * 결과는 캐시되어 재사용
+ */
+export function getToolDeclarations(): FunctionDeclaration[] {
+  if (_cachedDeclarations) return _cachedDeclarations
+
+  _cachedDeclarations = TOOLS.map(tool => {
+    const jsonSchema = zodToJsonSchema(tool.schema, { target: 'openApi3' })
+
+    // zodToJsonSchema는 최상위에 $schema, additionalProperties 등을 포함하는데
+    // Gemini는 순수 properties/required/type만 원함
+    const params: Record<string, unknown> = {
+      type: 'OBJECT' as const,
+      properties: (jsonSchema as any).properties || {},
+    }
+    if ((jsonSchema as any).required?.length) {
+      params.required = (jsonSchema as any).required
+    }
+
+    return {
+      name: tool.name,
+      description: tool.description,
+      parameters: params,
+    } as FunctionDeclaration
+  })
+
+  return _cachedDeclarations
+}
+
+// ─── 도구 실행 ───
+
+export interface ToolCallResult {
+  name: string
+  result: string
+  isError: boolean
+}
+
+/**
+ * 단일 도구 실행
+ */
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>
+): Promise<ToolCallResult> {
+  const tool = TOOLS.find(t => t.name === name)
+  if (!tool) {
+    return { name, result: `알 수 없는 도구: ${name}`, isError: true }
+  }
+
+  try {
+    // Zod parse로 기본값 적용 (Gemini가 optional 파라미터 생략 시)
+    const parsedArgs = tool.schema.parse(args)
+    const response = await tool.handler(apiClient, parsedArgs)
+    const text = response.content.map(c => c.text).join('\n')
+    const truncated = truncateForContext(text)
+    return {
+      name,
+      result: name === 'search_law' ? compressSearchResult(truncated) : truncated,
+      isError: response.isError || false,
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { name, result: `도구 실행 오류: ${message}`, isError: true }
+  }
+}
+
+/**
+ * 여러 도구 병렬 실행
+ */
+export async function executeToolsParallel(
+  calls: Array<{ name: string; args: Record<string, unknown> }>
+): Promise<ToolCallResult[]> {
+  return Promise.all(calls.map(c => executeTool(c.name, c.args)))
+}
+
+// ─── 유틸 ───
+
+const MAX_RESULT_LENGTH = 3000
+
+/**
+ * 도구 결과가 너무 길면 잘라서 컨텍스트 윈도우 절약
+ */
+function truncateForContext(text: string): string {
+  if (text.length <= MAX_RESULT_LENGTH) return text
+  return text.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과가 너무 길어 일부만 표시)'
+}
+
+/**
+ * search_law 결과를 압축 포맷으로 변환
+ * "1. 관세법\n   - 법령ID: 001556\n   - MST: 268725\n   - 공포일: ...\n   - 구분: 법률"
+ *  → "1. 관세법 (MST:268725, 법률)"
+ */
+function compressSearchResult(text: string): string {
+  const headerMatch = text.match(/^검색 결과 \(총 \d+건\):/)
+  const header = headerMatch ? headerMatch[0] + '\n\n' : ''
+
+  const entries: string[] = []
+  const regex = /(\d+)\.\s+(.+?)\n\s+- 법령ID:\s*\S+\n\s+- MST:\s*(\d+)\n\s+- 공포일:\s*\S+\n\s+- 구분:\s*(\S+)/g
+  let m
+  while ((m = regex.exec(text)) !== null) {
+    entries.push(`${m[1]}. ${m[2].trim()} (MST:${m[3]}, ${m[4]})`)
+  }
+
+  if (entries.length === 0) return text  // 파싱 실패시 원본 반환
+  return header + entries.join('\n')
+}

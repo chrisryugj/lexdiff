@@ -115,10 +115,16 @@ export function useAiSearch(deps: HandlerDeps) {
         }, 200)
 
         try {
-          // JSON 응답 받기
-          const response = await fetch('/api/file-search-rag', {
+          // BYO-Key: sessionStorage에서 읽기 (있으면 헤더에 포함)
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+          try {
+            const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')
+            if (userKey) headers['X-User-API-Key'] = userKey
+          } catch { /* SSR or private browsing */ }
+
+          const response = await fetch('/api/fc-rag', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ query: fullQuery }),
             signal
           })
@@ -130,7 +136,7 @@ export function useAiSearch(deps: HandlerDeps) {
 
           if (!response.ok) {
             clearInterval(waitProgressInterval)
-            throw new Error('File Search API 호출 실패')
+            throw new Error('AI 검색 API 호출 실패')
           }
 
           // 전체 응답 파싱
