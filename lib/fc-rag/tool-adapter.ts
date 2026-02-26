@@ -12,7 +12,12 @@ import { zodToJsonSchema } from 'zod-to-json-schema'
 import { searchLaw, SearchLawSchema } from 'korean-law-mcp/build/tools/search.js'
 import { getLawText, GetLawTextSchema } from 'korean-law-mcp/build/tools/law-text.js'
 import { searchPrecedents, searchPrecedentsSchema, getPrecedentText, getPrecedentTextSchema } from 'korean-law-mcp/build/tools/precedents.js'
-import { searchInterpretations, searchInterpretationsSchema } from 'korean-law-mcp/build/tools/interpretations.js'
+import { searchInterpretations, searchInterpretationsSchema, getInterpretationText, getInterpretationTextSchema } from 'korean-law-mcp/build/tools/interpretations.js'
+
+// Tier 2 도구: 위임법령/신구법비교/조문이력
+import { getThreeTier, GetThreeTierSchema } from 'korean-law-mcp/build/tools/three-tier.js'
+import { compareOldNew, CompareOldNewSchema } from 'korean-law-mcp/build/tools/comparison.js'
+import { getArticleHistory, ArticleHistorySchema } from 'korean-law-mcp/build/tools/article-history.js'
 
 import type { FunctionDeclaration } from '@google/genai'
 import type { ZodSchema } from 'zod'
@@ -60,6 +65,30 @@ const TOOLS: ToolDef[] = [
     description: '법제처 유권해석(법령해석례)을 키워드로 검색합니다.',
     schema: searchInterpretationsSchema,
     handler: searchInterpretations,
+  },
+  {
+    name: 'get_interpretation_text',
+    description: '특정 해석례의 전문(회신내용, 이유)을 조회합니다. search_interpretations 결과에서 얻은 id를 사용하세요.',
+    schema: getInterpretationTextSchema,
+    handler: getInterpretationText,
+  },
+  {
+    name: 'get_three_tier',
+    description: '법률→시행령→시행규칙 위임법령 3단비교를 조회합니다. search_law 결과에서 얻은 mst와 lawId를 사용하세요. knd: "2"(법률→시행령, 기본값), "3"(시행령→시행규칙).',
+    schema: GetThreeTierSchema,
+    handler: getThreeTier,
+  },
+  {
+    name: 'compare_old_new',
+    description: '법령의 신구법 대조표(개정 전후 비교)를 조회합니다. search_law 결과에서 얻은 mst, lawId를 사용하세요. 최근 개정 내역을 확인할 때 사용합니다.',
+    schema: CompareOldNewSchema,
+    handler: compareOldNew,
+  },
+  {
+    name: 'get_article_history',
+    description: '특정 조문의 개정 이력을 조회합니다. search_law 결과에서 얻은 lawId와 조문번호(jo)를 사용하세요. 예: lawId="001556", jo="38".',
+    schema: ArticleHistorySchema,
+    handler: getArticleHistory,
   },
 ]
 

@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         citations: result.citations,
         confidenceLevel: result.confidenceLevel,
         queryType: result.queryType,
+        complexity: result.complexity,
         warnings: warnings.length > 0 ? warnings : undefined,
       },
       { headers: usageHeaders }

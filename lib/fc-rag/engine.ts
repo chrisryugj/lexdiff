@@ -26,13 +26,22 @@ export interface FCRAGResult {
   citations: FCRAGCitation[]
   confidenceLevel: 'high' | 'medium' | 'low'
   queryType: QueryType
+  complexity: QueryComplexity
   warnings?: string[]
 }
 
 // ─── 설정 ───
 
-const MAX_TOOL_TURNS = 1  // 최대 추가 턴 (총 2턴: 도구+답변)
 const MODEL = 'gemini-2.5-flash'
+
+/** complexity 기반 최대 도구 턴 수 */
+function getMaxToolTurns(complexity: QueryComplexity): number {
+  switch (complexity) {
+    case 'simple': return 1    // 총 2턴 (기존과 동일)
+    case 'moderate': return 2  // 총 3턴
+    case 'complex': return 4   // 총 5턴
+  }
+}
 
 // ─── search_law 결과 파싱 유틸 ───
 
@@ -115,17 +124,26 @@ export async function executeRAG(
   let allToolResults: ToolCallResult[] = []
   let turnCount = 0
   let latestSearchEntries: LawEntry[] = []
+  const failureCount = new Map<string, number>()
+
+  const maxToolTurns = getMaxToolTurns(complexity)
 
   // 4. 멀티턴 Function Calling 루프
-  while (turnCount <= MAX_TOOL_TURNS) {
+  while (turnCount <= maxToolTurns) {
     try {
-      const isLastTurn = turnCount === MAX_TOOL_TURNS
+      const isLastTurn = turnCount === maxToolTurns
+
+      // 연속 2회 실패 도구 제외
+      const activeDeclarations = toolDeclarations.filter(
+        d => (failureCount.get(d.name!) || 0) < 2
+      )
+
       const response = await ai.models.generateContent({
         model: MODEL,
         contents: messages,
         config: {
           systemInstruction: systemPrompt,
-          tools: [{ functionDeclarations: toolDeclarations }],
+          tools: [{ functionDeclarations: activeDeclarations }],
           temperature: 0,
           maxOutputTokens: MAX_TOKENS_BY_COMPLEXITY[complexity],
         },
@@ -149,6 +167,7 @@ export async function executeRAG(
           citations: buildCitations(allToolResults, answer),
           confidenceLevel: calcConfidence(allToolResults),
           queryType,
+          complexity,
           warnings: warnings.length > 0 ? warnings : undefined,
         }
       }
@@ -163,6 +182,7 @@ export async function executeRAG(
             citations: buildCitations(allToolResults, answer),
             confidenceLevel: calcConfidence(allToolResults),
             queryType,
+            complexity,
             warnings: warnings.length > 0 ? warnings : undefined,
           }
         }
@@ -184,6 +204,7 @@ export async function executeRAG(
           citations: buildCitations(allToolResults, retryText),
           confidenceLevel: calcConfidence(allToolResults),
           queryType,
+          complexity,
           warnings: warnings.length > 0 ? warnings : undefined,
         }
       }
@@ -222,6 +243,15 @@ export async function executeRAG(
       const results = await executeToolsParallel(calls)
       allToolResults.push(...results)
 
+      // 도구 실패 카운트 (연속 2회 실패 시 다음 턴에서 제외)
+      for (const r of results) {
+        if (r.isError) {
+          failureCount.set(r.name, (failureCount.get(r.name) || 0) + 1)
+        } else {
+          failureCount.delete(r.name) // 성공하면 리셋
+        }
+      }
+
       // search_law 결과 추적 (MST 보정용)
       for (const r of results) {
         if (r.name === 'search_law' && !r.isError) {
@@ -229,28 +259,55 @@ export async function executeRAG(
         }
       }
 
-      // Auto-chain: search_law 성공 시 자동으로 get_law_text 실행
+      // Auto-chain: 검색 도구 성공 시 자동으로 상세 도구 실행
+      // (Gemini가 2턴에 걸쳐 해야 할 일을 1턴에서 미리 실행)
+      const autoChains: Array<{ name: string; args: Record<string, unknown> }> = []
+
+      // 1) search_law → get_law_text
       const searchOK = results.filter(r => r.name === 'search_law' && !r.isError)
       const alreadyGotLawText = results.some(r => r.name === 'get_law_text' && !r.isError)
-      let autoChainArgs: Record<string, unknown> | null = null
 
       if (searchOK.length > 0 && !alreadyGotLawText) {
         const bestMST = findBestMST(latestSearchEntries, query)
         if (bestMST) {
           const joMatch = query.match(/제(\d+)조(?:의(\d+))?/)
-          autoChainArgs = { mst: bestMST }
+          const args: Record<string, unknown> = { mst: bestMST }
           if (joMatch) {
-            autoChainArgs.jo = joMatch[2]
+            args.jo = joMatch[2]
               ? `제${joMatch[1]}조의${joMatch[2]}`
               : `제${joMatch[1]}조`
           }
+          autoChains.push({ name: 'get_law_text', args })
+        }
+      }
 
-          const autoResult = await executeTool('get_law_text', autoChainArgs)
-          allToolResults.push(autoResult)
+      // 2) search_interpretations → get_interpretation_text
+      const interpSearchOK = results.filter(r => r.name === 'search_interpretations' && !r.isError)
+      const alreadyGotInterpText = results.some(r => r.name === 'get_interpretation_text')
 
-          if (!autoResult.isError) {
-            results.push(autoResult)
-          }
+      if (interpSearchOK.length > 0 && !alreadyGotInterpText) {
+        // 첫 번째 해석례 id 추출
+        const idMatch = interpSearchOK[0].result.match(/(?:ID|id)[:\s]+(\S+)/)
+        if (idMatch) {
+          autoChains.push({ name: 'get_interpretation_text', args: { id: idMatch[1] } })
+        }
+      }
+
+      // 3) search_law 성공 + 개정/변경 키워드 → compare_old_new
+      const alreadyCompared = results.some(r => r.name === 'compare_old_new')
+      if (searchOK.length > 0 && !alreadyCompared && /(?:개정|변경|바뀐|신구|대조)/.test(query)) {
+        const bestMST = findBestMST(latestSearchEntries, query)
+        if (bestMST) {
+          autoChains.push({ name: 'compare_old_new', args: { mst: bestMST } })
+        }
+      }
+
+      // auto-chain 실행
+      for (const chain of autoChains) {
+        const autoResult = await executeTool(chain.name, chain.args)
+        allToolResults.push(autoResult)
+        if (!autoResult.isError) {
+          results.push(autoResult)
         }
       }
 
@@ -264,11 +321,11 @@ export async function executeRAG(
       // auto-chain 실행 시, 합성 functionCall을 model parts에 추가
       // (Gemini는 functionResponse마다 대응하는 functionCall을 요구)
       const modelParts = [...parts]
-      if (autoChainArgs) {
+      for (const chain of autoChains) {
         modelParts.push({
           functionCall: {
-            name: 'get_law_text',
-            args: autoChainArgs,
+            name: chain.name,
+            args: chain.args,
           },
         } as any)
       }
@@ -298,7 +355,7 @@ export async function executeRAG(
 
   // 루프 종료 (정상적으로는 위에서 텍스트 답변이 생성됨)
   // 여기에 도달하면 에러 또는 예외 상황
-  if (turnCount > MAX_TOOL_TURNS) {
+  if (turnCount > maxToolTurns) {
     warnings.push('도구 호출 횟수 제한에 도달했습니다.')
   }
 
@@ -307,6 +364,7 @@ export async function executeRAG(
     citations: buildCitations(allToolResults),
     confidenceLevel: 'low',
     queryType,
+    complexity,
     warnings: warnings.length > 0 ? warnings : undefined,
   }
 }
@@ -314,16 +372,21 @@ export async function executeRAG(
 // ─── 유틸 ───
 
 /**
- * 질문 길이/엔티티 수 기반 복잡도 추론
+ * 질문 길이/엔티티 수/키워드 기반 복잡도 추론
  */
 function inferComplexity(query: string): QueryComplexity {
   const lawMatches = query.match(/「([^」]+)」/g) || []
   const articleMatches = query.match(/제\d+조(?:의\d+)?/g) || []
 
-  if (lawMatches.length > 1 || articleMatches.length > 2 || query.length > 100) {
+  // complex 패턴: AND 접속사로 복합 요구, 비교+시점, 변경+판례
+  const complexPatterns = /(?:하고|와\s*함께|에\s*대한\s*판례|판례도|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
+  // moderate 패턴: 위임/이력/해석 관련 키워드
+  const moderatePatterns = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조)/
+
+  if (lawMatches.length > 1 || articleMatches.length > 2 || query.length > 100 || complexPatterns.test(query)) {
     return 'complex'
   }
-  if (query.length > 50 || articleMatches.length > 0) {
+  if (query.length > 50 || articleMatches.length > 0 || moderatePatterns.test(query)) {
     return 'moderate'
   }
   return 'simple'
@@ -394,9 +457,9 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
       }
     }
 
-    // search_interpretations
-    if (result.name === 'search_interpretations') {
-      for (const match of Array.from(text.matchAll(/(?:해석례|회신번호)[:\s]+(\S+)/g))) {
+    // search_interpretations / get_interpretation_text
+    if (result.name === 'search_interpretations' || result.name === 'get_interpretation_text') {
+      for (const match of Array.from(text.matchAll(/(?:해석례|회신번호|ID)[:\s]+(\S+)/g))) {
         const interpNo = match[1]
         if (!seen.has(interpNo)) {
           seen.add(interpNo)
@@ -404,7 +467,57 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
             lawName: '법령해석례',
             articleNumber: interpNo,
             chunkText: text.slice(0, 200),
-            source: 'search_interpretations',
+            source: result.name,
+          })
+        }
+      }
+    }
+
+    // get_three_tier → 위임법령 구조
+    if (result.name === 'get_three_tier') {
+      const lawNames = Array.from(text.matchAll(/(?:법률|시행령|시행규칙)[:\s]+(.+?)(?:\n|$)/g))
+      for (const match of lawNames) {
+        const name = match[1].trim()
+        const key = `위임:${name}`
+        if (name && !seen.has(key)) {
+          seen.add(key)
+          citations.push({
+            lawName: name,
+            articleNumber: '위임법령',
+            chunkText: text.slice(0, 200),
+            source: 'get_three_tier',
+          })
+        }
+      }
+    }
+
+    // compare_old_new → 신구법 대조
+    if (result.name === 'compare_old_new') {
+      const key = '신구법대조'
+      if (!seen.has(key)) {
+        seen.add(key)
+        const lawNameMatch = text.match(/(?:법령명|법률명)[:\s]+(.+?)(?:\n|$)/)
+        citations.push({
+          lawName: lawNameMatch?.[1]?.trim() || '신구법 대조',
+          articleNumber: '신구법 대조표',
+          chunkText: text.slice(0, 200),
+          source: 'compare_old_new',
+        })
+      }
+    }
+
+    // get_article_history → 조문 개정 이력
+    if (result.name === 'get_article_history') {
+      for (const match of Array.from(text.matchAll(/(\d{4}[-./]\d{2}[-./]\d{2})\s*(?:개정|신설|삭제)/g))) {
+        const date = match[1]
+        const key = `이력:${date}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          citations.push({
+            lawName: '조문 개정이력',
+            articleNumber: date,
+            chunkText: text.slice(Math.max(0, text.indexOf(match[0])), Math.min(text.length, text.indexOf(match[0]) + 200)),
+            source: 'get_article_history',
           })
         }
       }

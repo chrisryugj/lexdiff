@@ -106,13 +106,21 @@ export function useAiSearch(deps: HandlerDeps) {
         if (signal?.aborted) return
 
         // 3단계 진행 중 프로그레스 시뮬레이션 (40% → 70%, API 응답 대기 중)
+        // 복합 질문(위임/개정/해석 등)은 멀티턴으로 더 오래 걸리므로 타이머 느리게
+        const isLikelyComplex = /(?:하고|와\s*함께|판례도|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/.test(fullQuery)
+          || fullQuery.length > 100
+          || (fullQuery.match(/「([^」]+)」/g) || []).length > 1
+        const isLikelyModerate = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조)/.test(fullQuery)
+          || fullQuery.length > 50
+        const progressInterval = isLikelyComplex ? 400 : isLikelyModerate ? 300 : 200
+
         let waitProgress = 40
         const waitProgressInterval = setInterval(() => {
           if (waitProgress < 70) {
             waitProgress += 1
             actions.updateProgress('streaming', waitProgress)
           }
-        }, 200)
+        }, progressInterval)
 
         try {
           // BYO-Key: sessionStorage에서 읽기 (있으면 헤더에 포함)
