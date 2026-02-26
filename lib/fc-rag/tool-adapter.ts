@@ -13,6 +13,8 @@ import { searchLaw, SearchLawSchema } from 'korean-law-mcp/build/tools/search.js
 import { getLawText, GetLawTextSchema } from 'korean-law-mcp/build/tools/law-text.js'
 import { searchPrecedents, searchPrecedentsSchema, getPrecedentText, getPrecedentTextSchema } from 'korean-law-mcp/build/tools/precedents.js'
 import { searchInterpretations, searchInterpretationsSchema, getInterpretationText, getInterpretationTextSchema } from 'korean-law-mcp/build/tools/interpretations.js'
+import { searchAiLaw, searchAiLawSchema } from 'korean-law-mcp/build/tools/life-law.js'
+import { getBatchArticles, GetBatchArticlesSchema } from 'korean-law-mcp/build/tools/batch-articles.js'
 
 // Tier 2 도구: 위임법령/신구법비교/조문이력
 import { getThreeTier, GetThreeTierSchema } from 'korean-law-mcp/build/tools/three-tier.js'
@@ -41,16 +43,28 @@ interface ToolDef {
 
 const TOOLS: ToolDef[] = [
   {
+    name: 'search_ai_law',
+    description: '자연어 질문으로 관련 법령 조문을 검색합니다. 법령명을 몰라도 "관세 신고납부 요건", "음주운전 처벌" 같은 자연어로 관련 조문을 찾을 수 있습니다. 조문 내용 기반 의미 검색이므로 search_law보다 먼저 사용하세요. search: 0=법령조문(기본), 2=행정규칙 조문.',
+    schema: searchAiLawSchema,
+    handler: searchAiLaw,
+  },
+  {
     name: 'search_law',
-    description: '한국 법령을 키워드로 검색합니다. 약칭 자동 인식(예: 화관법→화학물질관리법). 결과에 법령ID와 MST(법령일련번호)가 포함됩니다. 반드시 이 도구를 먼저 호출하여 MST를 확인한 후 get_law_text를 호출하세요.',
+    description: '한국 법령을 키워드로 검색합니다. 약칭 자동 인식(예: 화관법→화학물질관리법). 결과에 법령ID와 MST(법령일련번호)가 포함됩니다. 법령명을 알 때 MST를 확인하는 용도. 조문 내용 검색은 search_ai_law를 사용하세요.',
     schema: SearchLawSchema,
     handler: searchLaw,
   },
   {
     name: 'get_law_text',
-    description: '특정 법령의 조문 전문을 조회합니다. 반드시 search_law 결과에서 얻은 mst(법령일련번호) 값을 사용하세요. 예: mst="268725". jo 파라미터로 특정 조문만 조회 가능(예: jo="38").',
+    description: '특정 법령의 조문 전문을 조회합니다. search_law 결과에서 얻은 mst 값을 사용하세요. jo 파라미터로 특정 조문만 조회 가능(예: jo="제38조"). 여러 조문이 필요하면 get_batch_articles를 사용하세요.',
     schema: GetLawTextSchema,
     handler: getLawText,
+  },
+  {
+    name: 'get_batch_articles',
+    description: '여러 조문을 한번에 조회합니다. search_law 결과에서 얻은 mst와 조문번호 배열을 사용하세요. 예: mst="268725", articles=["제38조", "제39조", "제9조"]. 관련 조문을 정밀 조회할 때 사용.',
+    schema: GetBatchArticlesSchema,
+    handler: getBatchArticles,
   },
   {
     name: 'search_precedents',

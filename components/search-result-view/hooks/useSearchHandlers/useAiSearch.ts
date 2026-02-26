@@ -191,7 +191,7 @@ export function useAiSearch(deps: HandlerDeps) {
           actions.addToolCallLog({
             id: `log-${++logIdCounter}`,
             type: 'token_usage',
-            displayName: `토큰: ${event.inputTokens?.toLocaleString()} in / ${event.outputTokens?.toLocaleString()} out`,
+            displayName: `토큰(누적): ${event.inputTokens?.toLocaleString()} in / ${event.outputTokens?.toLocaleString()} out`,
             timestamp: Date.now(),
             inputTokens: event.inputTokens,
             outputTokens: event.outputTokens,

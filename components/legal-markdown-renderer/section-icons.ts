@@ -13,7 +13,14 @@ export const SECTION_ICON_MAP: Array<{ pattern: RegExp; icon: IconName }> = [
   { pattern: /^구성\s*요건/, icon: 'list-checks' },
   { pattern: /^(유사\s*개념|헷갈리는\s*개념)/, icon: 'git-compare' },
   { pattern: /^(예시|이해를\s*돕는\s*예시)/, icon: 'lightbulb' },
-  { pattern: /^관계\s*법령/, icon: 'book-open' },
+  { pattern: /^(관계\s*법령|근거\s*법령)/, icon: 'book-open' },
+  { pattern: /^주요\s*내용/, icon: 'file-text' },
+  { pattern: /^(비교표|상세\s*비교표)/, icon: 'git-compare' },
+  { pattern: /^(보완\s*방법|보완책)/, icon: 'lightbulb' },
+  { pattern: /^(필수\s*요건|가산\s*요건)/, icon: 'list-checks' },
+  { pattern: /^(신청\s*방법|혜택\s*받는\s*방법)/, icon: 'file-text' },
+  { pattern: /^상황별\s*추천/, icon: 'help-circle' },
+  { pattern: /^요건\s*체크/, icon: 'list-checks' },
 
   // requirement (요건) 섹션
   { pattern: /^(결론|핵심\s*결론)/, icon: 'check-circle-2' },

@@ -12,6 +12,7 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
 import { Icon } from '@/components/ui/icon'
@@ -104,7 +105,7 @@ export function LegalMarkdownRenderer({
         }
       `}</style>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
         urlTransform={(url) => {
           if (url?.startsWith('law://')) return url

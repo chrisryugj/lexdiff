@@ -54,8 +54,10 @@ const MAX_TOKENS: Record<QueryComplexity, number> = {
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  search_ai_law: '지능형 법령 검색',
   search_law: '법령 검색',
   get_law_text: '법령 본문 조회',
+  get_batch_articles: '조문 일괄 조회',
   search_precedents: '판례 검색',
   get_precedent_text: '판례 본문 조회',
   search_interpretations: '해석례 검색',
@@ -70,8 +72,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 /** complexity 기반 최대 도구 턴 수 */
 function getMaxToolTurns(complexity: QueryComplexity): number {
   switch (complexity) {
-    case 'simple': return 1
-    case 'moderate': return 2
+    case 'simple': return 2
+    case 'moderate': return 3
     case 'complex': return 4
   }
 }
@@ -180,6 +182,10 @@ function summarizeToolResult(name: string, result: ToolCallResult): string {
 
   const text = result.result
   switch (name) {
+    case 'search_ai_law': {
+      const countMatch = text.match(/(\d+)건/)
+      return countMatch ? `${countMatch[1]}건 조문 검색됨` : '지능형 검색 완료'
+    }
     case 'search_law': {
       const countMatch = text.match(/총 (\d+)건/)
       const entries = parseLawEntries(text)
@@ -188,6 +194,11 @@ function summarizeToolResult(name: string, result: ToolCallResult): string {
         return entries.length > 1 ? `${firstName} 외 ${entries.length - 1}건` : firstName
       }
       return firstName || '검색 완료'
+    }
+    case 'get_batch_articles': {
+      const lawName = text.match(/법령명:\s*(.+?)(?:\n|$)/)?.[1]?.trim()
+      const articleCount = new Set(Array.from(text.matchAll(/제(\d+)조/g)).map(m => m[1])).size
+      return lawName ? `${lawName} ${articleCount}개 조문` : `${articleCount}개 조문 조회`
     }
     case 'get_law_text': {
       const articleCount = new Set(Array.from(text.matchAll(/제(\d+)조/g)).map(m => m[1])).size
@@ -222,8 +233,13 @@ function summarizeToolResult(name: string, result: ToolCallResult): string {
 
 function getToolCallQuery(name: string, args: Record<string, unknown>): string | undefined {
   switch (name) {
+    case 'search_ai_law': return args.query as string
     case 'search_law': return args.query as string
     case 'get_law_text': return args.jo ? `${args.jo}` : undefined
+    case 'get_batch_articles': {
+      const articles = args.articles as string[] | undefined
+      return articles?.join(', ')
+    }
     case 'search_precedents': return args.query as string
     case 'search_interpretations': return args.query as string
     case 'search_ordinance': return args.query as string
@@ -239,7 +255,8 @@ function correctToolArgs(
   query: string
 ) {
   for (const call of calls) {
-    if (call.name === 'get_law_text') {
+    // get_law_text / get_batch_articles 공통: MST 보정
+    if (call.name === 'get_law_text' || call.name === 'get_batch_articles') {
       if (call.args.mst && latestSearchEntries.length > 0) {
         const knownMSTs = new Set(latestSearchEntries.map(e => e.mst))
         if (!knownMSTs.has(call.args.mst as string)) {
@@ -247,11 +264,22 @@ function correctToolArgs(
           if (corrected) call.args.mst = corrected
         }
       }
+    }
+    // get_law_text: jo 형식 보정
+    if (call.name === 'get_law_text') {
       if (call.args.jo) {
         const jo = String(call.args.jo)
         if (/^\d+$/.test(jo)) call.args.jo = `제${jo}조`
         else if (/^\d+의\d+$/.test(jo)) call.args.jo = `제${jo.replace(/(\d+)의(\d+)/, '$1조의$2')}`
       }
+    }
+    // get_batch_articles: articles 내 조문번호 형식 보정
+    if (call.name === 'get_batch_articles' && Array.isArray(call.args.articles)) {
+      call.args.articles = (call.args.articles as string[]).map(a => {
+        if (/^\d+$/.test(a)) return `제${a}조`
+        if (/^\d+의\d+$/.test(a)) return `제${a.replace(/(\d+)의(\d+)/, '$1조의$2')}`
+        return a
+      })
     }
   }
 }
@@ -454,23 +482,13 @@ export async function* executeRAGStream(
         }
       }
 
-      // ── Auto-chain ──
+      // ── Auto-chain (검색→상세 자동 연결, 법령 조문은 Gemini에게 위임) ──
       const autoChains: Array<{ name: string; args: Record<string, unknown> }> = []
 
-      const searchOK = results.filter(r => r.name === 'search_law' && !r.isError)
-      const alreadyGotLawText = results.some(r => r.name === 'get_law_text' && !r.isError)
+      // search_law → get_law_text 전체 fetch 제거됨
+      // Gemini가 search_law/search_ai_law 결과를 보고 get_batch_articles/get_law_text(jo지정)를 직접 호출
 
-      if (searchOK.length > 0 && !alreadyGotLawText) {
-        const bestMST = findBestMST(latestSearchEntries, query)
-        if (bestMST) {
-          const joMatch = query.match(/제(\d+)조(?:의(\d+))?/)
-          const args: Record<string, unknown> = { mst: bestMST }
-          if (joMatch) {
-            args.jo = joMatch[2] ? `제${joMatch[1]}조의${joMatch[2]}` : `제${joMatch[1]}조`
-          }
-          autoChains.push({ name: 'get_law_text', args })
-        }
-      }
+      const searchOK = results.filter(r => r.name === 'search_law' && !r.isError)
 
       const interpSearchOK = results.filter(r => r.name === 'search_interpretations' && !r.isError)
       const alreadyGotInterpText = results.some(r => r.name === 'get_interpretation_text')
@@ -631,7 +649,7 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
 
     const text = result.result
 
-    if (result.name === 'get_law_text') {
+    if (result.name === 'get_law_text' || result.name === 'get_batch_articles') {
       const lawNameMatch = text.match(/(?:##\s+|법령명:\s*)(.+?)(?:\n|$)/)
       const lawName = lawNameMatch?.[1]?.trim() || ''
 
@@ -644,7 +662,22 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
           seen.add(key)
           const idx = text.indexOf(match[0])
           const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 200))
-          citations.push({ lawName, articleNumber: articleNum, chunkText, source: 'get_law_text' })
+          citations.push({ lawName, articleNumber: articleNum, chunkText, source: result.name })
+        }
+      }
+    }
+
+    if (result.name === 'search_ai_law') {
+      // search_ai_law 결과에서 법령명 + 조문번호 추출
+      for (const match of Array.from(text.matchAll(/📜\s+(.+)\n\s+제(\d+)조(?:의(\d+))?/g))) {
+        const lawName = match[1].trim()
+        const articleNum = match[3] ? `제${match[2]}조의${match[3]}` : `제${match[2]}조`
+        const key = `ai:${lawName}:${articleNum}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          const idx = text.indexOf(match[0])
+          const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 200))
+          citations.push({ lawName, articleNumber: articleNum, chunkText, source: 'search_ai_law' })
         }
       }
     }
