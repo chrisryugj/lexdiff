@@ -191,13 +191,23 @@ export async function fetchFromOpenClaw(
 
     // 방어: 브릿지가 JSON 래퍼 그대로 넘긴 경우 answer 추출
     let finalAnswer = result.answer
-    if (typeof finalAnswer === 'string' && finalAnswer.startsWith('{')) {
+    if (typeof finalAnswer === 'string' && finalAnswer.startsWith('{') && finalAnswer.includes('"answer"')) {
+      // 1차: 줄바꿈 이스케이프 후 JSON.parse
       try {
-        const parsed = JSON.parse(finalAnswer)
-        if (parsed && typeof parsed.answer === 'string') {
-          finalAnswer = parsed.answer
+        const sanitized = finalAnswer.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+        const parsed = JSON.parse(sanitized)
+        if (parsed?.answer) finalAnswer = parsed.answer
+      } catch {
+        // 2차: regex 폴백
+        const m = finalAnswer.match(/"answer"\s*:\s*"([\s\S]+?)"\s*,\s*"(?:citations|confidenceLevel|complexity|queryType|toolsUsed)"/)
+        if (m) {
+          finalAnswer = m[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
         }
-      } catch { /* JSON 아님, 원문 사용 */ }
+      }
     }
 
     // 최종 답변 전송
