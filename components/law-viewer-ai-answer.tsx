@@ -630,25 +630,7 @@ export function AIAnswerContent({
                 {conversationHistory.length > 0 && (
                     <div className="mb-4 space-y-3">
                         {conversationHistory.map((entry) => (
-                            <div key={entry.id} className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
-                                {/* 이전 질문 */}
-                                <div className="flex items-start gap-2 px-3 py-2 bg-primary/5 border-b border-border/30">
-                                    <Icon name="message-circle-question" size={14} className="text-primary/60 mt-0.5 flex-shrink-0" />
-                                    <span className="text-sm text-foreground/80 break-words">{entry.query}</span>
-                                </div>
-                                {/* 이전 답변 (축약) */}
-                                <div className="px-3 py-2 text-sm text-muted-foreground">
-                                    <div className="line-clamp-3" style={{ fontSize: `${Math.max(12, fontSize - 2)}px` }}>
-                                        <LegalMarkdownRenderer
-                                            content={entry.answer.slice(0, 500)}
-                                            onLawClick={onLawClick}
-                                        />
-                                    </div>
-                                    {entry.answer.length > 500 && (
-                                        <span className="text-xs text-muted-foreground/50 mt-1 block">... 더 보기</span>
-                                    )}
-                                </div>
-                            </div>
+                            <HistoryEntry key={entry.id} entry={entry} fontSize={fontSize} onLawClick={onLawClick} />
                         ))}
                         <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
                             <div className="flex-1 h-px bg-border/30" />
@@ -911,6 +893,44 @@ export function AIAnswerContent({
                     }
                 }}
             />
+        </div>
+    )
+}
+
+/** 대화 히스토리 개별 엔트리 (더보기 토글) */
+function HistoryEntry({ entry, fontSize, onLawClick }: {
+    entry: ConversationEntry
+    fontSize: number
+    onLawClick?: (lawName: string, article?: string) => void
+}) {
+    const [expanded, setExpanded] = useState(false)
+    const isLong = entry.answer.length > 500
+
+    return (
+        <div className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
+            {/* 이전 질문 */}
+            <div className="flex items-start gap-2 px-3 py-2 bg-primary/5 border-b border-border/30">
+                <Icon name="message-circle-question" size={14} className="text-primary/60 mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-foreground/80 break-words">{entry.query}</span>
+            </div>
+            {/* 이전 답변 */}
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+                <div className={expanded ? '' : 'line-clamp-3'} style={{ fontSize: `${Math.max(12, fontSize - 2)}px` }}>
+                    <LegalMarkdownRenderer
+                        content={expanded ? entry.answer : entry.answer.slice(0, 500)}
+                        onLawClick={onLawClick}
+                    />
+                </div>
+                {isLong && (
+                    <button
+                        type="button"
+                        className="text-xs text-primary/60 hover:text-primary mt-1 block cursor-pointer"
+                        onClick={() => setExpanded(v => !v)}
+                    >
+                        {expanded ? '접기' : '... 더 보기'}
+                    </button>
+                )}
+            </div>
         </div>
     )
 }

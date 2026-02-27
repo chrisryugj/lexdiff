@@ -100,12 +100,18 @@ export function useAiSearch(deps: HandlerDeps) {
         if (userKey) headers['X-User-API-Key'] = userKey
       } catch { /* SSR or private browsing */ }
 
+      // conversationId 확정 및 state 저장 (follow-up에서 재사용)
+      const actualConvId = conversationId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      if (!conversationId) {
+        actions.setConversationId(actualConvId)
+      }
+
       const response = await fetch('/api/fc-rag', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           query: fullQuery,
-          conversationId: conversationId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          conversationId: actualConvId,
         }),
         signal
       })
