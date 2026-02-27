@@ -18,9 +18,11 @@ interface ApiKeyInputProps {
   apiKey: string | null
   onSave: (key: string) => void
   onClear: () => void
+  /** "default" = 검색바용 큰 버튼, "dock" = 네비바 독 아이콘 스타일 */
+  variant?: "default" | "dock"
 }
 
-export function ApiKeyInput({ apiKey, onSave, onClear }: ApiKeyInputProps) {
+export function ApiKeyInput({ apiKey, onSave, onClear, variant = "default" }: ApiKeyInputProps) {
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState("")
   const [validating, setValidating] = useState(false)
@@ -73,18 +75,31 @@ export function ApiKeyInput({ apiKey, onSave, onClear }: ApiKeyInputProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className={cn(
-            "h-12 w-12 transition-all duration-300",
-            apiKey && "border-green-500 text-green-600 hover:border-green-600"
-          )}
-          title={apiKey ? "내 API 키 사용 중 (무제한)" : "내 Gemini API 키 등록"}
-        >
-          <Icon name="lock" className="h-5 w-5" />
-        </Button>
+        {variant === "dock" ? (
+          <button
+            type="button"
+            className="cursor-pointer flex items-center justify-center"
+            title={apiKey ? "내 API 키 사용 중 (무제한)" : "설정 / API 키 등록"}
+          >
+            <Icon name="settings" size={16} className={cn(
+              "transition-colors",
+              apiKey ? "text-green-500 hover:text-green-400" : "text-muted-foreground hover:text-foreground"
+            )} />
+          </button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className={cn(
+              "h-12 w-12 transition-all duration-300",
+              apiKey && "border-green-500 text-green-600 hover:border-green-600"
+            )}
+            title={apiKey ? "내 API 키 사용 중 (무제한)" : "내 Gemini API 키 등록"}
+          >
+            <Icon name="lock" className="h-5 w-5" />
+          </Button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent className="w-80" align="start">

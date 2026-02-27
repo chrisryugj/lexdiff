@@ -391,20 +391,18 @@
   position: relative;
 }
 
-/* Logo glow effect */
+/* Logo glow effect - subtle */
 .logo-glow {
   text-shadow:
-    0 0 15px oklch(0.55 0.18 250 / 0.2),
-    0 0 30px oklch(0.55 0.18 250 / 0.1),
-    0 0 50px oklch(0.55 0.18 250 / 0.05);
+    0 0 8px oklch(0.55 0.18 250 / 0.08),
+    0 0 20px oklch(0.55 0.18 250 / 0.04);
   transition: text-shadow 0.3s ease;
 }
 
 .logo-glow:hover {
   text-shadow:
-    0 0 20px oklch(0.55 0.18 250 / 0.3),
-    0 0 40px oklch(0.55 0.18 250 / 0.15),
-    0 0 60px oklch(0.55 0.18 250 / 0.08);
+    0 0 10px oklch(0.55 0.18 250 / 0.12),
+    0 0 25px oklch(0.55 0.18 250 / 0.06);
 }
 
 /* Hero gradient background - seamless transition (legacy, kept for compatibility) */
