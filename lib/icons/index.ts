@@ -68,6 +68,7 @@ import {
   // Communication
   Chat01Icon,
   MessageQuestionIcon,
+  MailSend02Icon,
 
   // Special
   Brain01Icon,
@@ -236,6 +237,7 @@ export const ICON_REGISTRY = {
   // Communication
   'message-square': Chat01Icon,
   'message-circle-question': MessageQuestionIcon,
+  'send': MailSend02Icon,
 
   // Special
   'brain': Brain01Icon,
