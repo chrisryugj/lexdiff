@@ -16,6 +16,12 @@ function ScrollArea({
       className={cn('relative', className)}
       {...props}
     >
+      <style>{`
+        [data-slot="scroll-area-viewport"] > div {
+          display: block !important;
+          min-width: 0 !important;
+        }
+      `}</style>
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
         className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"

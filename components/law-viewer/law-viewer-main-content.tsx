@@ -149,9 +149,9 @@ export function LawViewerMainContent({
   // AI 모드
   if (aiAnswerMode) {
     return (
-      <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full" ref={contentRef}>
-          <div className="pb-20 overflow-x-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        <ScrollArea className="h-full w-full" ref={contentRef}>
+          <div className="pb-20 w-full max-w-full overflow-x-hidden">
             <AIAnswerContent
               aiAnswerContent={aiAnswerProps.content || ''}
               userQuery={aiAnswerProps.userQuery}
