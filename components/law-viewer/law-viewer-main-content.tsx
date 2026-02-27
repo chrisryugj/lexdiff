@@ -151,7 +151,7 @@ export function LawViewerMainContent({
     return (
       <div className="flex-1 min-h-0">
         <ScrollArea className="h-full" ref={contentRef}>
-          <div className="pb-20">
+          <div className="pb-20 overflow-x-hidden">
             <AIAnswerContent
               aiAnswerContent={aiAnswerProps.content || ''}
               userQuery={aiAnswerProps.userQuery}

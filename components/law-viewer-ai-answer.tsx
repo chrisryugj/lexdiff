@@ -382,6 +382,27 @@ export function AIAnswerContent({
       prevStreamingRef.current = isStreaming
     }, [isStreaming])
 
+    // 스트리밍 경과 시간 타이머
+    const [streamElapsed, setStreamElapsed] = useState(0)
+    const streamStartRef = useRef<number | null>(null)
+
+    useEffect(() => {
+      if (isStreaming) {
+        if (!streamStartRef.current) {
+          streamStartRef.current = Date.now()
+          setStreamElapsed(0)
+        }
+        const interval = setInterval(() => {
+          if (streamStartRef.current) {
+            setStreamElapsed((Date.now() - streamStartRef.current) / 1000)
+          }
+        }, 100)
+        return () => clearInterval(interval)
+      } else {
+        streamStartRef.current = null
+      }
+    }, [isStreaming])
+
     // 별표 모달 상태
     const [annexModal, setAnnexModal] = useState<{
         open: boolean
@@ -510,7 +531,7 @@ export function AIAnswerContent({
     return (
         <>
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
+            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2 overflow-hidden">
                 {/* 1줄: 타이틀+배지+신뢰도 */}
                 <div className="flex items-center gap-2">
                     <Icon name="sparkles" size={20} className="text-primary flex-shrink-0" />
@@ -524,7 +545,7 @@ export function AIAnswerContent({
 
                 {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}
                 {userQuery && (
-                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium">
+                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium min-w-0 overflow-hidden">
                         <Icon name="message-circle-question" size={20} className="text-muted-foreground/60 flex-shrink-0 mt-0.5" />
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
@@ -682,7 +703,7 @@ export function AIAnswerContent({
                         }`}
                     >
                         <div className="rounded-lg bg-slate-950/90 dark:bg-slate-950/95 border border-slate-800/60 p-3 sm:p-4">
-                            {/* 프로그레스 바 */}
+                            {/* 프로그레스 바 + 경과 시간 */}
                             <div className="mb-3 flex items-center gap-3">
                                 <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                     <div
@@ -693,6 +714,11 @@ export function AIAnswerContent({
                                 <span className="text-[11px] font-mono text-slate-500 tabular-nums w-8 text-right">
                                     {searchProgress}%
                                 </span>
+                                {isStreaming && (
+                                    <span className="text-[11px] font-mono text-slate-400 tabular-nums whitespace-nowrap">
+                                        {streamElapsed.toFixed(1)}s
+                                    </span>
+                                )}
                             </div>
 
                             {/* 도구 호출 로그 */}
@@ -700,19 +726,19 @@ export function AIAnswerContent({
                                 {toolCallLogs.map((log, idx) => (
                                     <div
                                         key={log.id}
-                                        className="flex items-start gap-2 text-[12px] font-mono animate-in slide-in-from-left-2 fade-in duration-300"
+                                        className="flex items-start gap-2 text-[12px] font-mono animate-in slide-in-from-left-2 fade-in duration-300 min-w-0"
                                         style={{ animationDelay: `${idx * 30}ms` }}
                                     >
                                         {log.type === 'status' && (
                                             <>
                                                 <Icon name="info" size={13} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                                                <span className="text-slate-400">{log.displayName}</span>
+                                                <span className="text-slate-400 truncate">{log.displayName}</span>
                                             </>
                                         )}
                                         {log.type === 'call' && (
                                             <>
                                                 <Icon name="arrow-right" size={13} className="text-yellow-500/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-yellow-400/90">
+                                                <span className="text-yellow-400/90 truncate min-w-0">
                                                     {log.displayName}
                                                     {log.query && <span className="text-slate-500 ml-1">: {log.query}</span>}
                                                 </span>
@@ -726,7 +752,7 @@ export function AIAnswerContent({
                                                 ) : (
                                                     <Icon name="x" size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
                                                 )}
-                                                <span className={log.success ? 'text-emerald-400/90' : 'text-red-400/80'}>
+                                                <span className={`truncate min-w-0 ${log.success ? 'text-emerald-400/90' : 'text-red-400/80'}`}>
                                                     {log.displayName}
                                                     {log.summary && <span className="text-slate-500 ml-1">→ {log.summary}</span>}
                                                 </span>
@@ -735,7 +761,7 @@ export function AIAnswerContent({
                                         {log.type === 'token_usage' && (
                                             <>
                                                 <Icon name="info" size={13} className="text-cyan-400/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-cyan-400/80">{log.displayName}</span>
+                                                <span className="text-cyan-400/80 truncate">{log.displayName}</span>
                                             </>
                                         )}
                                     </div>

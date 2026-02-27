@@ -68,7 +68,7 @@ export function LegalMarkdownRenderer({
 
 
   return (
-    <div className={`legal-markdown-content prose dark:prose-invert max-w-none ${className}`}>
+    <div className={`legal-markdown-content prose dark:prose-invert max-w-none overflow-x-hidden break-words ${className}`}>
       <style>{`
         .hwpx-num-item {
           font-weight: 600;
