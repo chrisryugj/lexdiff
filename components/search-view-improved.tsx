@@ -25,6 +25,8 @@ const HelpGuideSheet = dynamic(
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { favoritesStore } from "@/lib/favorites-store"
+import { ApiKeyInput } from "@/components/settings/api-key-input"
+import { useApiKey } from "@/hooks/use-api-key"
 
 export interface SearchViewProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => Promise<void>
@@ -44,6 +46,7 @@ export function SearchViewImproved({
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
+  const { apiKey, saveKey, clearKey } = useApiKey()
   const [scrolled, setScrolled] = useState(false)
   const { resolvedTheme } = useTheme()
   const [particleColor, setParticleColor] = useState("#ffffff")
@@ -99,10 +102,6 @@ export function SearchViewImproved({
 
   const handleFavoritesClick = () => {
     setFavoritesDialogOpen(true)
-  }
-
-  const handleSettingsClick = () => {
-    window.location.href = '/admin/settings'
   }
 
   const handleHelpClick = () => {
@@ -174,12 +173,12 @@ export function SearchViewImproved({
               <Icon name="scale" size={16} className="text-white" />
               <style jsx>{`
                 @keyframes glow {
-                  0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
-                  50% { box-shadow: 0 0 25px rgba(168, 85, 247, 0.6); }
+                  0%, 100% { box-shadow: 0 0 6px rgba(168, 85, 247, 0.15); }
+                  50% { box-shadow: 0 0 12px rgba(168, 85, 247, 0.25); }
                 }
                 @keyframes glow-hover {
-                  0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
-                  50% { box-shadow: 0 0 35px rgba(168, 85, 247, 0.8); }
+                  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.2); }
+                  50% { box-shadow: 0 0 16px rgba(168, 85, 247, 0.35); }
                 }
               `}</style>
             </div>
@@ -211,9 +210,9 @@ export function SearchViewImproved({
             <Icon name="help-circle" size={16} className="text-muted-foreground hover:text-foreground" />
           </DockIcon>
 
-          {/* Settings */}
-          <DockIcon onClick={handleSettingsClick} className="cursor-pointer">
-            <Icon name="settings" size={16} className="text-muted-foreground hover:text-foreground" />
+          {/* Settings + API Key */}
+          <DockIcon className="cursor-pointer">
+            <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} variant="dock" />
           </DockIcon>
         </Dock>
       </m.header>
