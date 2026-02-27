@@ -690,7 +690,7 @@ function SearchResultViewComponent({
       {!state.lawData && !state.lawSelectionState && !state.ordinanceSelectionState && (
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-6">
-            <p className="text-center text-sm text-muted-foreground">© 2025 Chris ryu. All rights reserved.</p>
+            <p className="text-center text-xs text-muted-foreground/40">© 2025–2026 Chris ryu. All rights reserved.</p>
           </div>
         </footer>
       )}

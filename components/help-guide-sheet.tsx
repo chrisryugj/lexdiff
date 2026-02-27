@@ -31,13 +31,22 @@ export function HelpGuideSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md overflow-y-auto p-0"
+        className="w-[85vw] sm:max-w-md overflow-y-auto p-0"
       >
         <SheetHeader className="sticky top-0 z-10 bg-background border-b px-4 py-3">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <Icon name="help-circle" size={18} className="text-blue-500" />
-            사용 가이드
-          </SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <Icon name="help-circle" size={18} className="text-blue-500" />
+              사용 가이드
+            </SheetTitle>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-1.5 rounded-md hover:bg-muted transition-colors"
+              aria-label="닫기"
+            >
+              <Icon name="x" size={18} className="text-muted-foreground" />
+            </button>
+          </div>
           <SheetDescription className="sr-only">
             LexDiff 사용 방법 안내
           </SheetDescription>

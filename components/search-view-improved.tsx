@@ -311,23 +311,19 @@ export function SearchViewImproved({
       {/* Footer */}
       <footer className="border-t border-border/50 py-8 section-subtle">
         <div className="container mx-auto max-w-4xl px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground/60" style={{ fontFamily: "Pretendard, sans-serif" }}>
-              © 2025 Chris ryu. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground/60" style={{ fontFamily: "Pretendard, sans-serif" }}>
-              <button onClick={handleHelpClick} className="hover:text-foreground transition-colors">
+          <div className="flex flex-col items-center gap-3 text-center" style={{ fontFamily: "Pretendard, sans-serif" }}>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground/60">
+              <button onClick={handleHelpClick} className="hover:text-foreground transition-colors whitespace-nowrap">
                 사용 가이드
               </button>
-              <span className="text-border">|</span>
-              <a href="/admin/settings" className="hover:text-foreground transition-colors">
-                설정
-              </a>
-              <span className="text-border">|</span>
-              <span>법제처 API 연동</span>
-              <span className="text-border">|</span>
-              <span>Powered by Gemini AI</span>
+              <span className="text-border hidden sm:inline">|</span>
+              <span className="whitespace-nowrap">법제처 API 연동</span>
+              <span className="text-border hidden sm:inline">|</span>
+              <span className="whitespace-nowrap">Powered by OpenClaw AI</span>
             </div>
+            <p className="text-xs text-muted-foreground/40">
+              © 2025–2026 Chris ryu. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
