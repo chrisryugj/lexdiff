@@ -68,7 +68,7 @@ export function LegalMarkdownRenderer({
 
 
   return (
-    <div className={`legal-markdown-content prose dark:prose-invert max-w-none overflow-x-hidden break-words ${className}`}>
+    <div className={`legal-markdown-content prose dark:prose-invert max-w-full w-full overflow-hidden [overflow-wrap:anywhere] [word-break:break-word] ${className}`}>
       <style>{`
         .hwpx-num-item {
           font-weight: 600;
@@ -144,9 +144,9 @@ export function LegalMarkdownRenderer({
             const iconInfo = getSectionIcon(text)
 
             return (
-              <h2 className="text-base font-bold mt-3 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2">
+              <h2 className="text-base font-bold mt-3 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2 min-w-0 flex-wrap">
                 {iconInfo && <Icon name={iconInfo.iconName} className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
-                {children}
+                <span className="min-w-0 break-words">{children}</span>
               </h2>
             )
           },
@@ -156,9 +156,9 @@ export function LegalMarkdownRenderer({
             const iconInfo = getSectionIcon(text)
 
             return (
-              <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 flex items-center gap-1.5 min-w-0 flex-wrap">
                 {iconInfo && <Icon name={iconInfo.iconName} className={`h-3.5 w-3.5 ${iconInfo.color} shrink-0`} />}
-                {children}
+                <span className="min-w-0 break-words">{children}</span>
               </h3>
             )
           },

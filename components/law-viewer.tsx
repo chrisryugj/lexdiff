@@ -762,7 +762,7 @@ function LawViewerComponent({
 
   return (
     <>
-      <div className="w-full mx-auto lg:max-w-[1280px]">
+      <div className="w-full max-w-full mx-auto lg:max-w-[1280px] overflow-hidden">
         <div
           className={`relative grid gap-0 sm:gap-4 min-h-0 lg:h-[calc(100vh-80px)] ${
             isArticleListCollapsed
@@ -796,7 +796,7 @@ function LawViewerComponent({
           />
 
           {/* Right panel - Article content */}
-          <Card className="flex flex-col overflow-hidden h-auto lg:h-full p-0 gap-0">
+          <Card className="flex flex-col overflow-hidden h-auto lg:h-full p-0 gap-0 min-w-0 max-w-full">
             {/* Header - Hidden in AI Answer Mode */}
             {!aiAnswerMode && (
               <LawViewerHeader
