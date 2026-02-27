@@ -105,7 +105,7 @@ export function useAiSearch(deps: HandlerDeps) {
         headers,
         body: JSON.stringify({
           query: fullQuery,
-          ...(conversationId ? { conversationId } : {}),
+          conversationId: conversationId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         }),
         signal
       })
@@ -220,7 +220,23 @@ export function useAiSearch(deps: HandlerDeps) {
         }
         case 'answer': {
           const data = event.data
-          const processedContent = (data.answer || '').replace(/\^/g, ' ')
+          let processedContent = (data.answer || '').replace(/\^/g, ' ')
+
+          // 방어: LLM이 JSON 래퍼로 출력한 경우 answer 필드만 추출
+          if (processedContent.startsWith('{') && processedContent.includes('"answer"')) {
+            try {
+              const sanitized = processedContent.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+              const parsed = JSON.parse(sanitized)
+              if (parsed?.answer) processedContent = String(parsed.answer)
+            } catch {
+              const m = processedContent.match(/"answer"\s*:\s*"([\s\S]+?)"\s*,\s*"(?:citations|confidenceLevel|complexity|queryType|toolsUsed)"/)
+              if (m) {
+                processedContent = m[1]
+                  .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+                  .replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+              }
+            }
+          }
           const searchFailed = detectSearchFailed(processedContent)
           const relatedLaws = extractRelatedLaws(processedContent)
 
