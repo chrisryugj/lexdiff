@@ -436,26 +436,25 @@ export function AIAnswerContent({
     useEffect(() => {
         if (!isStreaming && aiAnswerContent) {
             setIsTyping(true)
-            setDisplayedContent('') // 리셋
+            setDisplayedContent('')
 
-            // 어절 단위로 나누기 (공백 기준)
+            // 청크 기반: 16ms(1프레임)마다 20어절씩 → ~60fps, 재렌더 횟수 대폭 감소
             const words = aiAnswerContent.split(' ')
-            let currentWordIndex = 0
+            let pos = 0
+            const CHUNK = 20
 
-            const interval = setInterval(() => {
-                if (currentWordIndex < words.length) {
-                    const displayText = words
-                        .slice(0, currentWordIndex + 1)
-                        .join(' ')
-                    setDisplayedContent(displayText)
-                    currentWordIndex++
+            const tick = () => {
+                pos = Math.min(pos + CHUNK, words.length)
+                setDisplayedContent(words.slice(0, pos).join(' '))
+                if (pos < words.length) {
+                    rafId = requestAnimationFrame(tick)
                 } else {
                     setIsTyping(false)
-                    clearInterval(interval)
                 }
-            }, 3) // 3ms마다 1어절 (거의 즉시)
+            }
 
-            return () => clearInterval(interval)
+            let rafId = requestAnimationFrame(tick)
+            return () => cancelAnimationFrame(rafId)
         }
     }, [isStreaming, aiAnswerContent])
 

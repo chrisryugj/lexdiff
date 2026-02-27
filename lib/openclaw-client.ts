@@ -189,11 +189,22 @@ export async function fetchFromOpenClaw(
       }
     }
 
+    // 방어: 브릿지가 JSON 래퍼 그대로 넘긴 경우 answer 추출
+    let finalAnswer = result.answer
+    if (typeof finalAnswer === 'string' && finalAnswer.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(finalAnswer)
+        if (parsed && typeof parsed.answer === 'string') {
+          finalAnswer = parsed.answer
+        }
+      } catch { /* JSON 아님, 원문 사용 */ }
+    }
+
     // 최종 답변 전송
     send({
       type: 'answer',
       data: {
-        answer: result.answer,
+        answer: finalAnswer,
         citations: result.citations || [],
         confidenceLevel: result.confidenceLevel || 'medium',
         complexity: result.complexity || 'moderate',
