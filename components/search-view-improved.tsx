@@ -190,7 +190,7 @@ export function SearchViewImproved({
           opacity: isHeaderVisible ? 1 : 0,
         }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-1 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+        className="fixed top-0 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
       >
         <Dock
           iconSize={32}
