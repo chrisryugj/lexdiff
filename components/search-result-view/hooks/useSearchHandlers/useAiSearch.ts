@@ -5,7 +5,7 @@
  * 도구 호출 과정을 실시간으로 수신하여 UI에 표시
  */
 
-import { useCallback } from "react"
+import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse } from "@/lib/rag-response-cache"
@@ -17,6 +17,7 @@ let logIdCounter = 0
 
 export function useAiSearch(deps: HandlerDeps) {
   const { state, actions, toast } = deps
+  const abortRef = useRef<AbortController | null>(null)
 
   /** 현재 답변을 대화 히스토리에 저장 */
   const saveCurrentToHistory = useCallback(() => {
@@ -41,12 +42,29 @@ export function useAiSearch(deps: HandlerDeps) {
   ) => {
     debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
 
+    // 이전 검색 진행 중이면 abort
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortRef.current = controller
+    // 외부 signal과 내부 controller 병합
+    const mergedSignal = signal
+      ? AbortSignal.any([signal, controller.signal])
+      : controller.signal
+
     // RAG 캐시 확인
     const cached = skipCache ? null : await getCachedResponse(fullQuery)
     if (cached) {
       debugLogger.success('RAG 캐시 히트 - API 호출 스킵')
+      actions.setIsSearching(true)
       actions.setIsAiMode(true)
       actions.setSearchMode('rag')
+      actions.updateProgress('analyzing', 50)
+
+      // 캐시 로딩 피드백 (너무 즉시 표시되면 UX 어색)
+      await new Promise(r => setTimeout(r, 250))
+
       const relatedLaws = extractRelatedLaws(cached.response)
       actions.setAiAnswerContent(cached.response)
       actions.setAiRelatedLaws(relatedLaws)
@@ -113,10 +131,10 @@ export function useAiSearch(deps: HandlerDeps) {
           query: fullQuery,
           conversationId: actualConvId,
         }),
-        signal
+        signal: mergedSignal
       })
 
-      if (signal?.aborted) return
+      if (mergedSignal.aborted) return
 
       if (!response.ok) {
         throw new Error(`API 오류: ${response.status}`)
@@ -128,7 +146,7 @@ export function useAiSearch(deps: HandlerDeps) {
       let buffer = ''
 
       while (true) {
-        if (signal?.aborted) break
+        if (mergedSignal.aborted) break
         const { done, value } = await reader.read()
         if (done) break
 
@@ -354,6 +372,7 @@ export function useAiSearch(deps: HandlerDeps) {
 
   /** 새 대화 시작 */
   const handleNewConversation = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort()
     actions.clearConversation()
     actions.setConversationId(null)
     actions.setAiAnswerContent('')
