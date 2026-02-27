@@ -317,9 +317,7 @@ export function SearchViewImproved({
                 사용 가이드
               </button>
               <span className="text-border hidden sm:inline">|</span>
-              <span className="whitespace-nowrap">법제처 API 연동</span>
-              <span className="text-border hidden sm:inline">|</span>
-              <span className="whitespace-nowrap">Powered by OpenClaw AI</span>
+              <span className="whitespace-nowrap">Built with 법제처 Open API</span>
             </div>
             <p className="text-xs text-muted-foreground/40">
               © 2025–2026 Chris ryu. All rights reserved.
