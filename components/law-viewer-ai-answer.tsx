@@ -722,7 +722,7 @@ export function AIAnswerContent({
                             </div>
 
                             {/* 도구 호출 로그 */}
-                            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                            <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden">
                                 {toolCallLogs.map((log, idx) => (
                                     <div
                                         key={log.id}
