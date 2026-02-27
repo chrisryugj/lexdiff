@@ -9,7 +9,6 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Icon } from "@/components/ui/icon"
 import { StageIndicator } from "./stage-indicator"
@@ -50,15 +49,6 @@ export function AISearchLoading({
   userQuery,
   className,
 }: AISearchLoadingProps) {
-  const [isMobile, setIsMobile] = useState(false)
-
-  // 모바일 감지
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
 
   // 스트리밍 시작 전 로딩 상태
   const isPreStreaming = !streamingText && stage !== "complete"
@@ -78,7 +68,6 @@ export function AISearchLoading({
         <StageIndicator
           currentStage={stage}
           progress={progress}
-          compact={isMobile}
         />
       </div>
 
