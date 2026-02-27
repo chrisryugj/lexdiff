@@ -203,7 +203,7 @@ export function BlockquoteRenderer({ children }: BlockquoteRendererProps) {
     const finalContentNodes = isOmitted ? replaceOmittedWithBadge(processedContentNodes) : processedContentNodes
 
     return (
-      <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-2 rounded-r-md !ml-3 !mr-3 not-italic overflow-visible">
+      <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-2 rounded-r-md !ml-3 !mr-3 not-italic overflow-hidden max-w-full box-border">
         <div className="flex flex-col gap-0 [&_p]:my-0 [&_p]:leading-relaxed">
           {/* 조문 제목 Group */}
           <div className="text-[#a0a0a0] font-normal text-sm break-words flex items-center gap-1.5 flex-wrap [&_strong]:font-normal [&_b]:font-normal">
@@ -228,7 +228,7 @@ export function BlockquoteRenderer({ children }: BlockquoteRendererProps) {
 
   // 기본 렌더링
   return (
-    <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-visible [&_p]:my-0 [&_p:first-of-type]:text-muted-foreground [&_p:first-of-type]:mb-1 [&_p:not(:first-of-type)]:text-foreground dark:[&_p:not(:first-of-type)]:text-white">
+    <blockquote className="border-l-4 border-primary/40 bg-muted/30 pl-3 !pr-4 py-0.5 my-1 rounded-r-md !ml-0 !mr-0 not-italic overflow-hidden max-w-full box-border [&_p]:my-0 [&_p:first-of-type]:text-muted-foreground [&_p:first-of-type]:mb-1 [&_p:not(:first-of-type)]:text-foreground dark:[&_p:not(:first-of-type)]:text-white">
       <div className="leading-relaxed">
         {children}
       </div>
