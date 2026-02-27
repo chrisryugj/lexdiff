@@ -48,11 +48,14 @@ export function SearchViewImproved({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [scrolled, setScrolled] = useState(false)
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
   const { resolvedTheme } = useTheme()
   const [particleColor, setParticleColor] = useState("#ffffff")
 
   // Refs for scrolling to sections
   const featuresRef = useRef<HTMLElement>(null)
+  const lastScrollY = useRef(0)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Scroll reveal state - Features는 스크롤 시 페이드인
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
@@ -72,13 +75,41 @@ export function SearchViewImproved({
     setFavoritesCount(favoritesStore.getFavorites().length)
 
     const handleScroll = () => {
-      setScrolled(window.scrollY > 100)
+      const y = window.scrollY
+      setScrolled(y > 100)
+
+      // 최상단이면 항상 표시
+      if (y < 30) {
+        setIsHeaderVisible(true)
+        lastScrollY.current = y
+        return
+      }
+
+      // 스크롤 방향 감지
+      const delta = y - lastScrollY.current
+      if (Math.abs(delta) > 8) {
+        if (delta > 0) {
+          // 아래로 스크롤 → 숨김
+          setIsHeaderVisible(false)
+        } else {
+          // 위로 스크롤 → 즉시 표시
+          setIsHeaderVisible(true)
+        }
+        lastScrollY.current = y
+      }
+
+      // 스크롤 멈추면 200ms 후 복귀
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+      scrollTimer.current = setTimeout(() => {
+        setIsHeaderVisible(true)
+      }, 200)
     }
-    window.addEventListener("scroll", handleScroll)
+    window.addEventListener("scroll", handleScroll, { passive: true })
 
     return () => {
       unsubscribe()
       window.removeEventListener("scroll", handleScroll)
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
     }
   }, [])
 
@@ -154,9 +185,12 @@ export function SearchViewImproved({
       {/* Floating Navigation with Dock Style */}
       <m.header
         initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-3 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+        animate={{
+          y: isHeaderVisible ? 0 : -80,
+          opacity: isHeaderVisible ? 1 : 0,
+        }}
+        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed top-1 md:top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
       >
         <Dock
           iconSize={32}
