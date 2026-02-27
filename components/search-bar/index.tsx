@@ -10,8 +10,6 @@ import { useSearchBarState } from "./hooks/useSearchBarState"
 import { useSearchBarHandlers } from "./hooks/useSearchBarHandlers"
 import { SearchBarDropdown } from "./SearchBarDropdown"
 import { SearchBarChoiceDialog } from "./SearchBarChoiceDialog"
-import { ApiKeyInput } from "@/components/settings/api-key-input"
-import { useApiKey } from "@/hooks/use-api-key"
 import type { SearchBarProps } from "./types"
 
 // Re-export types
@@ -19,7 +17,6 @@ export type { SearchBarProps, SearchQuery, Suggestion } from "./types"
 
 export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchBarProps) {
   const { state, actions, isAiMode } = useSearchBarState(searchMode)
-  const { apiKey, saveKey, clearKey } = useApiKey()
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -58,16 +55,16 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="w-full max-w-3xl relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
+      <form onSubmit={handleSubmit} className="w-full relative" style={{ fontFamily: "Pretendard, sans-serif" }}>
         <div className="flex gap-2">
-          {/* AI 모드 전환 버튼 */}
+          {/* AI 모드 전환 버튼 - PC만 표시 */}
           <Button
             type="button"
             variant={forceAiMode ? "default" : "outline"}
             size="icon"
             onClick={() => actions.setForceAiMode(!forceAiMode)}
             className={cn(
-              "h-12 w-12 transition-all duration-300",
+              "h-12 w-12 transition-all duration-300 hidden sm:flex",
               forceAiMode && "bg-gradient-to-br from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600"
             )}
             title={forceAiMode ? "기본 검색으로 전환" : "AI 검색으로 전환"}
@@ -157,27 +154,27 @@ export function SearchBar({ onSearch, isLoading, searchMode = 'basic' }: SearchB
             size="lg"
             disabled={isLoading || !query.trim()}
             className={cn(
-              "h-12 px-6 sm:px-8 transition-all duration-300",
+              "h-12 transition-all duration-300",
+              "px-3 sm:px-8",
               isAiMode && ["bg-purple-700", "hover:bg-purple-600", "border-purple-500/50", "dark:bg-purple-600/80"]
             )}
           >
             {isLoading ? (
               <>
-                <Icon name="loader" className="mr-2 h-4 w-4 animate-spin" />
+                <Icon name="loader" className="h-4 w-4 animate-spin sm:mr-2" />
                 <span className="hidden sm:inline">{isAiMode ? 'AI 검색 중' : '검색 중'}</span>
-                <span className="sm:hidden">검색</span>
               </>
             ) : (
               <>
-                {isAiMode && <Icon name="brain" className="mr-2 h-4 w-4" />}
+                {isAiMode ? (
+                  <Icon name="brain" className="h-4 w-4 sm:mr-2" />
+                ) : (
+                  <Icon name="search" className="h-4 w-4 sm:mr-2 sm:hidden" />
+                )}
                 <span className="hidden sm:inline">{isAiMode ? 'AI 검색' : '검색'}</span>
-                <span className="sm:hidden">검색</span>
               </>
             )}
           </Button>
-
-          {/* BYO-Key 입력 */}
-          <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} />
         </div>
       </form>
 
