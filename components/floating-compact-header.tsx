@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { m, AnimatePresence } from "framer-motion"
+import { useState, useEffect, useRef } from "react"
+import { m } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -54,32 +54,61 @@ export function FloatingCompactHeader({
     }
   }, [])
 
-  // 스크롤 감지 (모바일/PC 모두 항상 표시, 깜빡임 방지)
+  // 스크롤 감지 — 스크롤 중 숨김, 멈추면 복귀
+  const lastScrollY = useRef(0)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      setScrolled(currentScrollY > 20)
-      // 항상 표시 (깜빡임 방지)
-      setIsVisible(true)
+      const y = window.scrollY
+      setScrolled(y > 20)
+
+      // 최상단이면 항상 표시
+      if (y < 30) {
+        setIsVisible(true)
+        lastScrollY.current = y
+        return
+      }
+
+      // 스크롤 방향 감지: 아래로 일정 이상 움직이면 숨김
+      const delta = y - lastScrollY.current
+      if (Math.abs(delta) > 8) {
+        if (delta > 0) {
+          // 아래로 스크롤 → 숨김
+          setIsVisible(false)
+        } else {
+          // 위로 스크롤 → 즉시 표시
+          setIsVisible(true)
+        }
+        lastScrollY.current = y
+      }
+
+      // 스크롤 멈춤 감지 (200ms 무반응 → 복귀)
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+      scrollTimer.current = setTimeout(() => {
+        setIsVisible(true)
+      }, 200)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+    }
   }, [])
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <m.header
-          initial={{ y: 0, opacity: 1 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -100, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className={`sticky top-0 z-50 ${scrolled ? 'shadow-lg' : ''}`}
-        >
-          <div className="bg-background/95 backdrop-blur-xl border-b border-border">
-            <div className="container mx-auto max-w-[1280px] px-4 lg:px-6">
-              <div className="flex items-center justify-between h-16 lg:h-20 gap-4">
+    <m.header
+      animate={{
+        y: isVisible ? 0 : -100,
+        opacity: isVisible ? 1 : 0,
+      }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className={`sticky top-0 z-50 ${scrolled ? 'shadow-lg' : ''}`}
+    >
+      <div className="bg-background/95 backdrop-blur-xl border-b border-border">
+        <div className="container mx-auto max-w-[1280px] px-4 lg:px-6">
+          <div className="flex items-center justify-between h-12 lg:h-16 gap-3">
                 {/* 왼쪽: 로고 + 뒤로가기 + 법령명 */}
                 <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
                   {showBackButton && (
@@ -176,8 +205,6 @@ export function FloatingCompactHeader({
               </div>
             </div>
           </div>
-        </m.header>
-      )}
-    </AnimatePresence>
+    </m.header>
   )
 }
