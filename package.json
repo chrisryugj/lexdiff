@@ -71,7 +71,7 @@
     "immer": "latest",
     "input-otp": "latest",
     "jszip": "^3.10.1",
-    "korean-law-mcp": "file:../korean-law-mcp/korean-law-mcp-1.7.0.tgz",
+    "korean-law-mcp": "latest",
     "motion": "^12.23.26",
     "next": "^16.0.7",
     "next-themes": "latest",
