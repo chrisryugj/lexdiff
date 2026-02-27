@@ -22,7 +22,7 @@ export function useAiSearch(deps: HandlerDeps) {
   const saveCurrentToHistory = useCallback(() => {
     if (state.aiAnswerContent && state.userQuery) {
       actions.addConversationEntry({
-        id: `conv-${Date.now()}`,
+        id: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         query: state.userQuery,
         answer: state.aiAnswerContent,
         citations: state.aiCitations,
@@ -153,6 +153,12 @@ export function useAiSearch(deps: HandlerDeps) {
           const event = JSON.parse(buffer.slice(6))
           handleSSEEvent(event, fullQuery)
         } catch { /* ignore */ }
+      }
+
+      // 안전장치: answer 이벤트 없이 스트림 종료된 경우 isSearching 해제
+      if (state.isSearching) {
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 100)
       }
 
     } catch (error) {
@@ -327,7 +333,7 @@ export function useAiSearch(deps: HandlerDeps) {
       } catch (e) { debugLogger.error('RAG 캐시 저장 실패', e) }
     }
 
-  }, [actions, toast])
+  }, [actions, toast, state.isSearching])
 
   /** 연속 대화 추가 질문 */
   const handleFollowUp = useCallback((followUpQuery: string) => {
@@ -349,10 +355,15 @@ export function useAiSearch(deps: HandlerDeps) {
   /** 새 대화 시작 */
   const handleNewConversation = useCallback(() => {
     actions.clearConversation()
+    actions.setConversationId(null)
     actions.setAiAnswerContent('')
     actions.setAiCitations([])
     actions.setAiRelatedLaws([])
     actions.setUserQuery('')
+    actions.setIsSearching(false)
+    actions.updateProgress('complete', 0)
+    actions.clearToolCallLogs()
+    actions.setFileSearchFailed(false)
   }, [actions])
 
   return { handleAiSearch, handleFollowUp, handleNewConversation }

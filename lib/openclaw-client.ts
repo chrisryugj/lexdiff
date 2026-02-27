@@ -127,6 +127,9 @@ export async function fetchFromOpenClaw(
   send: (data: unknown) => void,
   options?: { abortSignal?: AbortSignal; userId?: string; conversationId?: string },
 ): Promise<boolean> {
+  const timers: ReturnType<typeof setTimeout>[] = []
+  const clearTimers = () => { for (const t of timers) clearTimeout(t) }
+
   try {
     // 진행 UX: 분석 시작
     send({ type: 'status', message: '법률 AI 분석 중...', progress: 10 })
@@ -143,10 +146,11 @@ export async function fetchFromOpenClaw(
       { delay: 12000, message: '답변 구성 중...', progress: 65 },
       { delay: 20000, message: '최종 검토 중...', progress: 80 },
     ]
-    const timers: ReturnType<typeof setTimeout>[] = []
     for (const step of progressSteps) {
       timers.push(setTimeout(() => {
-        send({ type: 'status', message: step.message, progress: step.progress })
+        if (!signals.aborted) {
+          send({ type: 'status', message: step.message, progress: step.progress })
+        }
       }, step.delay))
     }
 
@@ -161,8 +165,7 @@ export async function fetchFromOpenClaw(
       signal: signals,
     })
 
-    // 타이머 정리
-    for (const t of timers) clearTimeout(t)
+    clearTimers()
 
     if (!response.ok) {
       recordFailure()
@@ -226,6 +229,7 @@ export async function fetchFromOpenClaw(
     recordSuccess()
     return true
   } catch {
+    clearTimers()
     recordFailure()
     return false
   }
