@@ -838,7 +838,7 @@ export function AIAnswerContent({
                 {onFollowUp && displayedContent && !isTyping && !isStreaming && (
                     <div className="mt-5 animate-in fade-in duration-500 delay-700">
                         <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-                            <Icon name="corner-down-right" size={16} className="text-muted-foreground/50 flex-shrink-0 ml-1" />
+                            <Icon name="arrow-right" size={16} className="text-muted-foreground/50 flex-shrink-0 ml-1" />
                             <input
                                 type="text"
                                 value={followUpInput}
