@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { load, type CheerioAPI, type Cheerio, type Element } from "cheerio"
+import { load, type CheerioAPI, type Cheerio } from "cheerio"
+import type { Element } from "domhandler"
 import iconv from "iconv-lite"
 
 function absUrl(href: string): string {

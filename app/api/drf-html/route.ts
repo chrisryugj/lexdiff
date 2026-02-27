@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { load, type CheerioAPI, type Cheerio, type Element } from "cheerio"
+import { load, type CheerioAPI, type Cheerio } from "cheerio"
+import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 import { buildJO } from "@/lib/law-parser"
