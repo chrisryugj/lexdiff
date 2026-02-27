@@ -529,11 +529,11 @@ export function AIAnswerContent({
     }
 
     return (
-        <>
+        <div className="w-full max-w-full min-w-0 overflow-hidden">
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
-            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2 overflow-hidden">
+            <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도 */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     <Icon name="sparkles" size={20} className="text-primary flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
@@ -545,7 +545,7 @@ export function AIAnswerContent({
 
                 {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}
                 {userQuery && (
-                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium min-w-0 overflow-hidden">
+                    <div className="flex items-start gap-1.5 text-md text-muted-foreground font-medium min-w-0 max-w-full">
                         <Icon name="message-circle-question" size={20} className="text-muted-foreground/60 flex-shrink-0 mt-0.5" />
                         {/* 질의 + 쿼리 타입 배지 (바로 옆에) */}
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
@@ -626,7 +626,7 @@ export function AIAnswerContent({
             </div>
 
             {/* 본문 영역 */}
-            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-2 pb-4 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-0 px-3 sm:px-4 pt-2 pb-4 overflow-y-auto overflow-x-hidden w-full max-w-full">
                 {/* 연속 대화 히스토리 */}
                 {conversationHistory.length > 0 && (
                     <div className="mb-4 space-y-3">
@@ -912,6 +912,6 @@ export function AIAnswerContent({
                     }
                 }}
             />
-        </>
+        </div>
     )
 }
