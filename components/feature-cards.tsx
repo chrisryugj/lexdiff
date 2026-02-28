@@ -13,12 +13,16 @@ const rows = [
       title: "AI 자연어 검색",
       description: "일상 언어로 질문하면 AI가 관련 법령을 찾아 실시간으로 답변합니다.",
       icon: "search" as const,
+      iconColor: "text-blue-500 dark:text-blue-400",
+      iconBg: "bg-blue-500/10",
       colSpan: "col-span-1 md:col-span-2",
     },
     {
       title: "AI 법률 분석",
       description: "법률 문맥을 이해하는 고성능 AI가 핵심 내용을 요약합니다.",
       icon: "brain" as const,
+      iconColor: "text-violet-500 dark:text-violet-400",
+      iconBg: "bg-violet-500/10",
       colSpan: "col-span-1",
     },
   ],
@@ -28,12 +32,16 @@ const rows = [
       title: "신구법 비교",
       description: "개정 전후의 법령 변화를 시각적으로 비교하고 분석합니다.",
       icon: "git-compare" as const,
+      iconColor: "text-emerald-500 dark:text-emerald-400",
+      iconBg: "bg-emerald-500/10",
       colSpan: "col-span-1",
     },
     {
       title: "3단 비교 시스템",
       description: "법률-시행령-시행규칙을 한눈에 비교하고 위임관계를 파악합니다.",
       icon: "scale" as const,
+      iconColor: "text-amber-500 dark:text-amber-400",
+      iconBg: "bg-amber-500/10",
       colSpan: "col-span-1 md:col-span-2",
     },
   ],
@@ -43,12 +51,16 @@ const rows = [
       title: "실시간 업데이트",
       description: "법제처 API와 실시간 연동하여 항상 최신 법령 정보를 제공합니다.",
       icon: "zap" as const,
+      iconColor: "text-yellow-500 dark:text-yellow-400",
+      iconBg: "bg-yellow-500/10",
       colSpan: "col-span-1",
     },
     {
       title: "위임법령 검색",
       description: "법률과 연관된 시행령, 시행규칙, 행정규칙(고시, 훈령, 예규)을 자동으로 찾아드립니다.",
       icon: "shield-check" as const,
+      iconColor: "text-sky-500 dark:text-sky-400",
+      iconBg: "bg-sky-500/10",
       colSpan: "col-span-1 md:col-span-2",
     },
   ],
@@ -129,10 +141,12 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
                   <div className="relative flex flex-col justify-between p-5 md:p-6 h-full">
                     {/* Content */}
                     <div className="flex flex-col gap-3">
-                      <Icon
-                        name={feature.icon}
-                        className="h-10 w-10 text-muted-foreground"
-                      />
+                      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", feature.iconBg)}>
+                        <Icon
+                          name={feature.icon}
+                          className={cn("h-5 w-5", feature.iconColor)}
+                        />
+                      </div>
                       <h4 className="text-base font-semibold text-foreground">
                         {feature.title}
                       </h4>
