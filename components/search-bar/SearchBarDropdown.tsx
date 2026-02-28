@@ -103,7 +103,7 @@ export const SearchBarDropdown = forwardRef<HTMLDivElement, SearchBarDropdownPro
                     <div className="border-t border-border my-1.5" />
                   )}
                   <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium sticky top-0 bg-background z-10">
-                    <Icon name="sparkles" className="h-3 w-3 text-purple-500" />
+                    <Icon name="sparkles" className="h-3 w-3 text-primary" />
                     <span>AI 질문</span>
                   </div>
                   {aiSuggestions.map((suggestion, index) => {
@@ -116,11 +116,11 @@ export const SearchBarDropdown = forwardRef<HTMLDivElement, SearchBarDropdownPro
                         onClick={() => onSuggestionClick(suggestion.text)}
                         className={cn(
                           "w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center gap-2 group",
-                          selectedIndex === globalIndex ? "bg-purple-50 dark:bg-purple-950/30" : "hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
+                          selectedIndex === globalIndex ? "bg-primary/10 dark:bg-primary/10" : "hover:bg-primary/5 dark:hover:bg-primary/5"
                         )}
                       >
-                        <Icon name="brain" className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
-                        <span className="truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
+                        <Icon name="brain" className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                        <span className="truncate text-primary dark:text-primary">{suggestion.text}</span>
                       </button>
                     )
                   })}

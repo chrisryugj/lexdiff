@@ -323,7 +323,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                       <div className="border-t border-border my-2" />
                     )}
                     <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
-                      <Icon name="sparkles" className="h-3.5 w-3.5 text-purple-500" />
+                      <Icon name="sparkles" className="h-3.5 w-3.5 text-primary" />
                       <span>AI 질문</span>
                     </div>
                     {suggestions
@@ -340,17 +340,17 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                             className={cn(
                               "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
                               isSelected
-                                ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500/40"
-                                : "border-transparent hover:bg-purple-50/50 dark:hover:bg-purple-950/20 hover:border-purple-500/20"
+                                ? "bg-primary/10 dark:bg-primary/10 border-primary/40"
+                                : "border-transparent hover:bg-primary/5 dark:hover:bg-primary/5 hover:border-primary/20"
                             )}
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <Icon name="brain" className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                              <span className="text-sm font-medium truncate text-purple-700 dark:text-purple-300">{suggestion.text}</span>
+                              <Icon name="brain" className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-sm font-medium truncate text-primary dark:text-primary">{suggestion.text}</span>
                             </div>
                             <Icon name="arrow-right" className={cn(
                               "h-4 w-4 transition-all flex-shrink-0",
-                              isSelected ? "opacity-100 text-purple-500" : "opacity-0 group-hover:opacity-100 text-muted-foreground group-hover:text-purple-500"
+                              isSelected ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 text-muted-foreground group-hover:text-primary"
                             )} />
                           </button>
                         )

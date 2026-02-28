@@ -1,79 +1,65 @@
 /* ============================================
-   Law-Related Styles
-   ============================================ */
-
-/* 법령 링크 스타일 (전역) */
-a.law-ref,
-.prose a.law-ref {
-  color: oklch(from var(--law-link) l c h);
-  text-decoration: none;
-  cursor: pointer;
-  font-weight: 500;
-  padding: 1px 3px;
-  border-radius: 2px;
-  background: linear-gradient(to right, oklch(from var(--law-link) l c h) 0%, oklch(from var(--law-link) l c h) 100%);
-  background-size: 0% 1.5px;
-  background-position: left bottom;
-  background-repeat: no-repeat;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-a.law-ref:hover,
-.prose a.law-ref:hover {
-  color: oklch(from var(--law-link-hover) l c h);
-  background-size: 100% 2px;
-  background-color: oklch(from var(--law-link) l c h / 0.1);
-  box-shadow: 0 2px 8px oklch(from var(--law-link) l c h / 0.3);
-  transform: translateY(-1px);
-}
-
-/* 법령 링크: 기본 색상 */
-a.law-ref,
-a.law-ref:visited,
-a.law-ref:link {
-  color: oklch(0.65 0.2 250) !important;
-}
-
-/* 법령 링크: 실제 클릭한 링크 (JS로 추적) */
-a.law-ref.law-ref-visited {
-  color: oklch(0.5 0.12 280) !important;
-}
-
-a.law-ref:hover {
-  color: oklch(0.8 0.25 250) !important;
-}
-
-/* 판례 링크: 법령 링크와 동일한 스타일 */
-a.precedent-ref,
-a.precedent-ref:link,
-a.precedent-ref:visited {
-  color: oklch(0.65 0.2 250) !important;
-  text-decoration: none;
-  cursor: pointer;
-  font-weight: 500;
-  padding: 1px 3px;
-  border-radius: 2px;
-  background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
-  background-size: 0% 1.5px;
-  background-position: left bottom;
-  background-repeat: no-repeat;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-a.precedent-ref:hover {
-  color: oklch(0.8 0.25 250) !important;
-  background-size: 100% 2px;
-  background-color: oklch(0.65 0.2 250 / 0.15);
-  box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
-  transform: translateY(-1px);
-}
-
-/* ============================================
-   @layer base - Law Styles
+   Law-Related Styles — 정리됨
    ============================================ */
 
 @layer base {
-  /* 개정 태그 공통 스타일 */
+  /* ── 법령 링크 (통합) ── */
+  a.law-ref,
+  .prose a.law-ref {
+    color: var(--law-link);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--law-link) 0%, var(--law-link) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  a.law-ref:hover,
+  .prose a.law-ref:hover {
+    color: var(--law-link-hover);
+    background-size: 100% 2px;
+    background-color: oklch(from var(--law-link) l c h / 0.1);
+    box-shadow: 0 2px 8px oklch(from var(--law-link) l c h / 0.3);
+    transform: translateY(-1px);
+  }
+
+  /* 실제 클릭한 링크 (JS로 추적) */
+  a.law-ref.law-ref-visited {
+    color: oklch(0.5 0.12 280);
+  }
+
+  /* ── 판례 링크 ── */
+  a.precedent-ref,
+  a.precedent-ref:link,
+  a.precedent-ref:visited,
+  .prose a.precedent-ref {
+    color: var(--law-link);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--law-link) 0%, var(--law-link) 100%);
+    background-size: 0% 1.5px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  a.precedent-ref:hover {
+    color: var(--law-link-hover);
+    background-size: 100% 2px;
+    background-color: oklch(from var(--law-link) l c h / 0.1);
+    box-shadow: 0 2px 8px oklch(from var(--law-link) l c h / 0.3);
+    transform: translateY(-1px);
+  }
+
+  /* ── 개정 태그 공통 스타일 ── */
   .rev-mark {
     display: inline-block;
     padding: 0px 2px;
@@ -83,7 +69,6 @@ a.precedent-ref:hover {
     white-space: nowrap;
   }
 
-  /* 개정 태그 타입별 색상 */
   .rev-mark-new {
     background-color: var(--rev-new-bg);
     color: var(--rev-new-fg);
@@ -107,7 +92,7 @@ a.precedent-ref:hover {
   .rev-mark-move {
     background-color: var(--rev-move-bg);
     color: var(--rev-move-fg);
-    font-size: 12px !important;
+    font-size: 12px;
   }
 
   /* prose 컨텍스트 오버라이드 */
@@ -133,9 +118,12 @@ a.precedent-ref:hover {
     font-size: 0.95em !important;
   }
 
-  /* 법령 조문 내용에서 항 사이 간격 추가 */
+  /* ── 조문 본문 가독성 ── */
   .law-article-content {
     white-space: normal !important;
+    line-height: 1.8;
+    word-break: keep-all;
+    letter-spacing: -0.01em;
   }
 
   /* 항 마커(①②③) 앞 간격 조절 - 첫 번째 항 제외 */
@@ -144,60 +132,17 @@ a.precedent-ref:hover {
     margin-top: 0.3em;
   }
 
-  a.law-ref {
-    color: oklch(0.65 0.2 250);
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 500;
-    padding: 1px 3px;
-    border-radius: 2px;
-    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
-    background-size: 0% 1.5px;
-    background-position: left bottom;
-    background-repeat: no-repeat;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  a.law-ref:hover {
-    color: oklch(0.8 0.25 250);
-    background-size: 100% 2px;
-    background-color: oklch(0.65 0.2 250 / 0.15);
-    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
-    transform: translateY(-1px);
-  }
-
-  .prose a.law-ref {
-    color: oklch(0.65 0.2 250);
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 500;
-    padding: 1px 3px;
-    border-radius: 2px;
-    background: linear-gradient(to right, oklch(0.65 0.2 250) 0%, oklch(0.65 0.2 250) 100%);
-    background-size: 0% 1.5px;
-    background-position: left bottom;
-    background-repeat: no-repeat;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .prose a.law-ref:hover {
-    color: oklch(0.8 0.25 250);
-    background-size: 100% 2px;
-    background-color: oklch(0.65 0.2 250 / 0.15);
-    box-shadow: 0 2px 8px oklch(0.65 0.2 250 / 0.5);
-    transform: translateY(-1px);
-  }
-
+  /* ── 기타 법령 링크 ── */
   a.law-html-link,
   .prose a.law-html-link {
-    color: oklch(0.7 0.18 240);
+    color: var(--law-link);
     text-decoration: underline;
     cursor: pointer;
   }
 
   a.law-drf-link,
   .prose a.law-drf-link {
-    color: oklch(0.7 0.18 240);
+    color: var(--law-link);
     text-decoration: underline;
     cursor: pointer;
   }
@@ -220,7 +165,7 @@ a.precedent-ref:hover {
     display: none;
   }
 
-  /* AI 답변 조문 발췌 - Pretendard 폰트 */
+  /* ── AI 답변 조문 발췌 ── */
   .prose blockquote {
     font-family: 'Pretendard', sans-serif;
     font-size: 1.0em;
@@ -228,26 +173,17 @@ a.precedent-ref:hover {
     margin-right: 0;
     padding-left: 1rem;
     padding-right: 0.5rem;
-    color: #000000;
-    /* 라이트 테마: 어두운 텍스트 */
-    background-color: oklch(92.797% 0.00011 271.152 / 0.959) !important;
-    /* 라이트 테마: 더 어두운 회색 배경 */
-  }
-
-  .dark .prose blockquote {
-    color: #d1d5db;
-    /* 다크 테마: 밝은 텍스트 */
-    background-color: color-mix(in oklab, var(--color-blue-950) 30%, transparent) !important;
-    /* 다크 테마: 기존 스타일 */
+    color: var(--foreground);
+    background-color: var(--muted);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
 
   /* 조문 발췌 내 법령명+조문번호(조문제목) 하이라이트 */
   .prose blockquote .quote-article-title {
     display: inline-block;
-    background: oklch(81.933% 0.06084 234.887 / 0.3);
-    /* 라이트 테마: 연한 배경 */
-    color: oklch(0.35 0.08 250);
-    /* 라이트 테마: 어두운 텍스트 */
+    background: oklch(from var(--primary) l c h / 0.12);
+    color: oklch(from var(--primary) l c h);
     padding: 0.15em 0.5em 0.15em 0;
     border-radius: 0 4px 4px 0;
     font-size: 1.0em;
@@ -256,8 +192,8 @@ a.precedent-ref:hover {
   }
 
   .dark .prose blockquote .quote-article-title {
-    background: oklch(0.7 0.12 250 / 0.15);
-    color: oklch(0.88 0.08 250);
+    background: oklch(from var(--primary) l c h / 0.15);
+    color: oklch(from var(--accent) l c h);
   }
 
   .prose blockquote .quote-article-title strong {
@@ -284,7 +220,7 @@ a.precedent-ref:hover {
   font-size: inherit !important;
 }
 
-/* 헤더도 상대적 크기로 조절 (em 단위로 부모 font-size 기준) */
+/* 헤더도 상대적 크기로 조절 */
 .legal-markdown-content h2 {
   font-size: 1.15em !important;
 }

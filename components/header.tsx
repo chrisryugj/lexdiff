@@ -45,15 +45,15 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
           onClick={handleHomeClick}
           className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Icon name="scale" size={24} className="text-primary-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+            <Icon name="scale" size={20} className="text-primary-foreground" />
           </div>
-          <div className="flex flex-col items-start">
-            <h1 className="text-lg font-bold text-foreground mb-0" style={{ fontFamily: "GiantsInline, sans-serif" }}>
-              LexDiff
-            </h1>
-            <p className="text-sm text-muted-foreground font-bold -mt-1" style={{ fontFamily: "ReperepointSpecialItalic, sans-serif" }}>Legal AI Platform</p>
-          </div>
+          <span
+            className="text-lg font-bold text-foreground tracking-tight"
+            style={{ fontFamily: "'Noto Serif KR', serif" }}
+          >
+            LexDiff
+          </span>
         </button>
 
         {/* 우측 버튼들 */}

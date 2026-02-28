@@ -57,13 +57,13 @@ export function SearchView({
             <div className="w-full max-w-3xl text-center">
               <h2
                 className="text-5xl font-bold text-foreground mb-4"
-                style={{ fontFamily: "GiantsInline, sans-serif" }}
+                style={{ fontFamily: "'Noto Serif KR', serif" }}
               >
                 LexDiff
               </h2>
-              <p className="text-lg text-muted-foreground mb-2">Your AI-Powered Legal Companion</p>
+              <p className="text-sm text-muted-foreground font-medium mb-2 tracking-wide">AI 법률 검색 플랫폼</p>
               <p className="text-muted-foreground max-w-2xl mb-8 mx-auto">
-                Intelligent Legal Platform
+                법령 검색부터 AI 분석까지, 대한민국 법률 정보를 가장 쉽고 빠르게
               </p>
             </div>
 

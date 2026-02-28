@@ -28,6 +28,8 @@
   --chart-3: oklch(0.5 0.15 280);
   --chart-4: oklch(0.65 0.16 150);
   --chart-5: oklch(0.55 0.18 50);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'Noto Serif KR', 'Georgia', serif;
   --radius: 0.5rem;
   --sidebar: oklch(0.97 0.005 240);
   --sidebar-foreground: oklch(0.15 0.02 240);
