@@ -685,18 +685,18 @@ export function AIAnswerContent({
                     >
                         <div className="rounded-lg bg-slate-950/90 dark:bg-slate-950/95 border border-slate-800/60 p-3 sm:p-4">
                             {/* 프로그레스 바 + 경과 시간 */}
-                            <div className="mb-3 flex items-center gap-3">
+                            <div className="mb-3 flex items-center gap-2">
                                 <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-500 ease-out"
-                                        style={{ width: `${searchProgress}%` }}
+                                        style={{ width: `${Math.round(searchProgress)}%` }}
                                     />
                                 </div>
-                                <span className="text-[11px] font-mono text-slate-500 tabular-nums w-8 text-right">
-                                    {searchProgress}%
+                                <span className="text-[11px] font-mono text-slate-500 tabular-nums flex-shrink-0">
+                                    {Math.round(searchProgress)}%
                                 </span>
                                 {isStreaming && (
-                                    <span className="text-[11px] font-mono text-slate-400 tabular-nums whitespace-nowrap">
+                                    <span className="text-[11px] font-mono text-slate-400/60 tabular-nums flex-shrink-0">
                                         {streamElapsed.toFixed(1)}s
                                     </span>
                                 )}
