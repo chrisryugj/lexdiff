@@ -252,7 +252,7 @@ export function SearchViewImproved({
       </m.header>
 
       {/* Hero Section - 스크롤 가능 */}
-      <section className="hero-section-fixed pt-20 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">
+      <section className="hero-section-fixed pt-34 pb-12 md:pt-64 md:pb-5 flex flex-col items-center justify-center px-6 relative z-20">
         {/* Particles Background */}
         <Particles
           className="absolute inset-0 z-0"
