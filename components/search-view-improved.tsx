@@ -184,27 +184,52 @@ export function SearchViewImproved({
       </m.header>
 
       {/* Hero Section */}
-      <section className="pt-16 pb-8 md:pt-32 md:pb-12 flex flex-col items-center px-4 md:px-6">
-        <div className="container mx-auto max-w-4xl">
+      <section className="relative pt-16 pb-8 md:pt-32 md:pb-12 flex flex-col items-center px-4 md:px-6 overflow-hidden">
+        {/* Subtle background gradient */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: 'radial-gradient(ellipse 80% 60% at 50% 0%, oklch(from var(--primary) l c h / 0.04) 0%, transparent 70%)',
+          }}
+        />
+
+        <div className="container mx-auto max-w-4xl relative">
           <m.div
             className="flex flex-col items-center text-center"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
           >
+            {/* Accent badge */}
+            <m.div variants={itemVariants} className="mb-5 md:mb-6">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-border/60 text-muted-foreground bg-card/80 backdrop-blur-sm">
+                <Icon name="scale" size={12} className="text-primary" />
+                AI Legal Search Platform
+              </span>
+            </m.div>
+
             {/* Title */}
             <m.h1
               variants={itemVariants}
-              className="text-5xl md:text-6xl font-bold text-foreground tracking-tight"
+              className="text-5xl md:text-7xl font-bold text-foreground tracking-tighter"
               style={{ fontFamily: "'Noto Serif KR', serif" }}
             >
               LexDiff
             </m.h1>
 
+            {/* Decorative accent line */}
+            <m.div
+              variants={itemVariants}
+              className="mt-4 mb-3 w-12 h-0.5 rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, transparent, var(--primary), transparent)',
+              }}
+            />
+
             {/* Subtitle */}
             <m.p
               variants={itemVariants}
-              className="text-sm md:text-base text-muted-foreground font-medium mt-2 tracking-wide"
+              className="text-sm md:text-base text-muted-foreground font-medium tracking-wide"
             >
               AI 법률 검색 플랫폼
             </m.p>
@@ -223,7 +248,7 @@ export function SearchViewImproved({
             </m.p>
 
             {/* Search Bar */}
-            <m.div variants={itemVariants} className="w-full max-w-3xl relative z-[110]">
+            <m.div variants={itemVariants} className="w-full max-w-3xl relative z-40">
               <SearchBar
                 onSearch={onSearch}
                 isLoading={isLoading}
@@ -236,6 +261,9 @@ export function SearchViewImproved({
 
       {/* Scrollable Content */}
       <main className="flex-1">
+        {/* Section divider */}
+        <div className="section-divider" />
+
         {/* Features Section */}
         <section
           ref={featuresRef}
