@@ -80,7 +80,7 @@ export function ChatInput({
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
               mode === 'ai'
-                ? "bg-purple-500 text-white shadow-lg shadow-purple-500/25"
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                 : "bg-muted text-muted-foreground hover:bg-muted/80",
               isStreaming && "opacity-50 cursor-not-allowed"
             )}
@@ -111,7 +111,7 @@ export function ChatInput({
                 "placeholder:text-muted-foreground/50",
                 mode === 'law'
                   ? "border-blue-500/20 focus:border-blue-500/50"
-                  : "border-purple-500/20 focus:border-purple-500/50",
+                  : "border-primary/20 focus:border-primary/50",
                 (isStreaming || disabled) && "opacity-50 cursor-not-allowed"
               )}
               rows={1}
@@ -130,7 +130,7 @@ export function ChatInput({
                 ? "bg-red-500 hover:bg-red-600 text-white"
                 : mode === 'law'
                   ? "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                  : "bg-purple-500 hover:bg-purple-600 text-white shadow-lg shadow-purple-500/25"
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25"
             )}
           >
             {isStreaming ? (

@@ -101,7 +101,7 @@ export function AISearchLoading({
         {/* 스트리밍 전: 로딩 애니메이션 */}
         {isPreStreaming && (
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
               <Icon name="brain" className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 space-y-3">
@@ -125,7 +125,7 @@ export function AISearchLoading({
         {/* 스트리밍 중: 타이핑 효과 */}
         {streamingText && (
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
               <Icon name="brain" className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">

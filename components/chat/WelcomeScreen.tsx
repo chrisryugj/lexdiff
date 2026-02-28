@@ -72,8 +72,8 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
       {/* Logo */}
       <m.div variants={itemVariants} className="flex items-center gap-3 mb-4">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-xl shadow-purple-500/20">
-            <Icon name="scale" className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20">
+            <Icon name="scale" className="w-8 h-8 text-primary-foreground" />
           </div>
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center border-2 border-background">
             <Icon name="sparkles" className="w-3 h-3 text-white" />
@@ -85,7 +85,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
       <m.h1
         variants={itemVariants}
         className="text-4xl md:text-5xl font-bold text-foreground mb-2"
-        style={{ fontFamily: 'GiantsInline, sans-serif' }}
+        style={{ fontFamily: "'Noto Serif KR', serif" }}
       >
         LexDiff
       </m.h1>
@@ -120,7 +120,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
                 hover:scale-[1.02] active:scale-[0.98]
                 ${example.color === 'blue'
                   ? 'border-blue-500/20 hover:border-blue-500/50 hover:bg-blue-500/5'
-                  : 'border-purple-500/20 hover:border-purple-500/50 hover:bg-purple-500/5'
+                  : 'border-primary/20 hover:border-primary/50 hover:bg-primary/5'
                 }
               `}
             >
@@ -128,7 +128,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
                 flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center
                 ${example.color === 'blue'
                   ? 'bg-blue-500/10 text-blue-500'
-                  : 'bg-purple-500/10 text-purple-500'
+                  : 'bg-primary/10 text-primary'
                 }
               `}>
                 <Icon name={example.icon} className="w-5 h-5" />
@@ -145,7 +145,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
                 text-xs px-2 py-1 rounded-full
                 ${example.color === 'blue'
                   ? 'bg-blue-500/10 text-blue-500'
-                  : 'bg-purple-500/10 text-purple-500'
+                  : 'bg-primary/10 text-primary'
                 }
               `}>
                 {example.mode === 'law' ? '법령' : 'AI'}

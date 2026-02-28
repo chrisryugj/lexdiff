@@ -54,9 +54,9 @@ export function SearchBarChoiceDialog({
           <Button
             onClick={() => onChoice('ai')}
             variant="outline"
-            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+            className="h-auto p-4 flex flex-col items-center gap-2 hover:bg-primary/5 dark:hover:bg-primary/10"
           >
-            <Icon name="brain" className="h-8 w-8 text-purple-500" />
+            <Icon name="brain" className="h-8 w-8 text-primary" />
             <div className="text-center">
               <div className="font-semibold">AI 검색</div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -66,7 +66,7 @@ export function SearchBarChoiceDialog({
           </Button>
         </div>
         <div className="text-xs text-muted-foreground text-center mt-3">
-          Tip: 왼쪽 보라색 버튼으로 AI 모드를 고정할 수 있습니다
+          Tip: 왼쪽 AI 버튼으로 AI 모드를 고정할 수 있습니다
         </div>
       </DialogContent>
     </Dialog>

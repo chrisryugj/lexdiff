@@ -34,7 +34,7 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
         "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
         isUser
           ? "bg-gradient-to-br from-blue-500 to-cyan-500"
-          : "bg-gradient-to-br from-purple-500 to-pink-500"
+          : "bg-primary"
       )}>
         {isUser ? (
           <Icon name="user" className="w-4 h-4 text-white" />

@@ -128,12 +128,12 @@ export function FloatingCompactHeader({
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
                     title="홈으로 이동"
                   >
-                    <div className="relative flex h-8 w-8 lg:h-10 lg:w-10 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-shadow duration-300">
-                      <Icon name="scale" size={20} className="text-white" />
+                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-lg bg-primary">
+                      <Icon name="scale" size={18} className="text-primary-foreground" />
                     </div>
                     <span
-                      className="hidden md:block text-lg lg:text-xl font-bold bg-gradient-to-l text-transparent bg-clip-text animate-text-gradient bg-[length:300%] from-zinc-500 via-zinc-950 to-zinc-600 dark:from-zinc-600 dark:via-zinc-100 dark:to-zinc-600"
-                      style={{ fontFamily: "GiantsInline, sans-serif" }}
+                      className="hidden md:block text-lg lg:text-xl font-bold text-foreground tracking-tight"
+                      style={{ fontFamily: "'Noto Serif KR', serif" }}
                     >
                       LexDiff
                     </span>

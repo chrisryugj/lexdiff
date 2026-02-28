@@ -316,7 +316,7 @@ export default function TestChatPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-lg font-bold" style={{ fontFamily: 'GiantsInline, sans-serif' }}>
+            <h1 className="text-lg font-bold" style={{ fontFamily: "'Noto Serif KR', serif" }}>
               LexDiff
             </h1>
             <p className="text-xs text-muted-foreground">Chat UI Demo</p>

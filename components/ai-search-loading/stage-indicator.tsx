@@ -78,7 +78,7 @@ export function StageIndicator({
 
         {/* 진행된 연결선 */}
         <div
-          className="absolute top-4 md:top-5 left-6 md:left-8 h-0.5 md:h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out shadow-lg shadow-primary/20"
+          className="absolute top-4 md:top-5 left-6 md:left-8 h-0.5 md:h-1 bg-primary rounded-full transition-all duration-700 ease-out shadow-lg shadow-primary/20"
           style={{
             width: currentStageIndex > 0
               ? `calc(${(currentStageIndex / (AI_STAGES.length - 2)) * 100}% - 3rem)`
@@ -98,11 +98,11 @@ export function StageIndicator({
                 {isCurrent && (
                   <>
                     <div
-                      className="absolute top-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-violet-500/30 to-purple-500/30"
+                      className="absolute top-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/30"
                       style={{ animation: 'pulse-wave 2s ease-out infinite' }}
                     />
                     <div
-                      className="absolute top-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20"
+                      className="absolute top-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/20"
                       style={{ animation: 'pulse-wave 2s ease-out infinite 0.5s' }}
                     />
                   </>
@@ -113,7 +113,7 @@ export function StageIndicator({
                   className={cn(
                     "relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full transition-all duration-500 border-2",
                     isCompleted && "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white shadow-lg shadow-green-500/30",
-                    isCurrent && "bg-gradient-to-br from-violet-500 via-purple-500 to-blue-500 border-violet-400 text-white shadow-xl shadow-primary/40 scale-110",
+                    isCurrent && "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/40 scale-110",
                     isPending && "bg-card border-muted-foreground/20 text-muted-foreground"
                   )}
                 >
@@ -162,7 +162,7 @@ export function StageIndicator({
         </div>
         <div className="h-2.5 md:h-3 bg-muted/50 rounded-full overflow-hidden shadow-inner">
           <div
-            className="h-full bg-gradient-to-r from-violet-500 via-purple-500 to-blue-500 rounded-full transition-all duration-500 ease-out shadow-sm"
+            className="h-full bg-primary rounded-full transition-all duration-500 ease-out shadow-sm"
             style={{ width: `${progress}%` }}
           />
         </div>
