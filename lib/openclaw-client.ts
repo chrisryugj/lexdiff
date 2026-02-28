@@ -118,8 +118,8 @@ interface OpenClawResponse {
 }
 
 /**
- * OpenClaw Bridge에 법률 질문 전송 → 완성된 JSON 답변 수신.
- * 대기 중 가짜 진행 이벤트를 send()로 전송하여 UX 유지.
+ * OpenClaw Bridge에 법률 질문 전송 → SSE 스트리밍으로 실시간 답변 수신.
+ * Bridge가 token 이벤트를 실시간으로 전송하여 즉각 UX 제공.
  * 성공하면 true, 실패하면 false (→ Gemini fallback).
  */
 export async function fetchFromOpenClaw(
@@ -127,11 +127,7 @@ export async function fetchFromOpenClaw(
   send: (data: unknown) => void,
   options?: { abortSignal?: AbortSignal; userId?: string; conversationId?: string },
 ): Promise<boolean> {
-  const timers: ReturnType<typeof setTimeout>[] = []
-  const clearTimers = () => { for (const t of timers) clearTimeout(t) }
-
   try {
-    // 진행 UX: 분석 시작
     send({ type: 'status', message: '법률 AI 분석 중...', progress: 10 })
 
     const timeoutSignal = AbortSignal.timeout(OPENCLAW_TIMEOUT)
@@ -139,22 +135,7 @@ export async function fetchFromOpenClaw(
       ? AbortSignal.any([options.abortSignal, timeoutSignal])
       : timeoutSignal
 
-    // 가짜 진행 이벤트 (대기 중 UX)
-    const progressSteps = [
-      { delay: 3000, message: '관련 법령 검색 중...', progress: 25 },
-      { delay: 7000, message: '조문 분석 중...', progress: 45 },
-      { delay: 12000, message: '답변 구성 중...', progress: 65 },
-      { delay: 20000, message: '최종 검토 중...', progress: 80 },
-    ]
-    for (const step of progressSteps) {
-      timers.push(setTimeout(() => {
-        if (!signals.aborted) {
-          send({ type: 'status', message: step.message, progress: step.progress })
-        }
-      }, step.delay))
-    }
-
-    const response = await fetch(`${OPENCLAW_URL}/api/legal-query`, {
+    const response = await fetch(`${OPENCLAW_URL}/api/legal-query?stream=1`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -165,71 +146,124 @@ export async function fetchFromOpenClaw(
       signal: signals,
     })
 
-    clearTimers()
-
     if (!response.ok) {
       recordFailure()
       return false
     }
 
-    const result: OpenClawResponse = await response.json()
-
-    if (!result.ok || !result.answer) {
+    // SSE 스트림 파싱
+    const reader = response.body?.getReader()
+    if (!reader) {
       recordFailure()
       return false
     }
 
-    // 도구 사용 내역이 있으면 이벤트로 전송 (UI에 표시)
-    if (result.toolsUsed) {
-      for (const tool of result.toolsUsed) {
-        send({
-          type: 'tool_result',
-          name: tool.name,
-          displayName: tool.displayName || tool.name,
-          success: tool.success,
-          summary: tool.summary || '',
-        })
-      }
-    }
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let gotDone = false
 
-    // 방어: 브릿지가 JSON 래퍼 그대로 넘긴 경우 answer 추출
-    let finalAnswer = result.answer
-    if (typeof finalAnswer === 'string' && finalAnswer.startsWith('{') && finalAnswer.includes('"answer"')) {
-      // 1차: 줄바꿈 이스케이프 후 JSON.parse
-      try {
-        const sanitized = finalAnswer.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
-        const parsed = JSON.parse(sanitized)
-        if (parsed?.answer) finalAnswer = parsed.answer
-      } catch {
-        // 2차: regex 폴백
-        const m = finalAnswer.match(/"answer"\s*:\s*"([\s\S]+?)"\s*,\s*"(?:citations|confidenceLevel|complexity|queryType|toolsUsed)"/)
-        if (m) {
-          finalAnswer = m[1]
-            .replace(/\\n/g, '\n')
-            .replace(/\\t/g, '\t')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\')
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const chunks = buffer.split('\n\n')
+      buffer = chunks.pop() || ''
+
+      for (const chunk of chunks) {
+        const lines = chunk.split('\n')
+        let eventType = ''
+        let eventData = ''
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+          else if (line.startsWith('data: ')) eventData = line.slice(6)
+        }
+
+        if (!eventType || !eventData) continue
+
+        try {
+          const parsed = JSON.parse(eventData)
+
+          switch (eventType) {
+            case 'status':
+              send({
+                type: 'status',
+                message: parsed.message || '',
+                progress: parsed.phase === 'searching' ? 25 : parsed.phase === 'analyzing' ? 45 : parsed.phase === 'generating' ? 65 : 50,
+              })
+              break
+
+            case 'tool_result':
+              send({
+                type: 'tool_result',
+                name: parsed.name,
+                displayName: parsed.displayName || parsed.name,
+                success: parsed.success,
+                summary: parsed.summary || '',
+              })
+              break
+
+            case 'token':
+              send({
+                type: 'answer_token',
+                data: { text: parsed.text },
+              })
+              break
+
+            case 'done': {
+              gotDone = true
+              let finalAnswer = String(parsed.answer || '').trim()
+              // 방어: JSON 래퍼 추출
+              if (finalAnswer.startsWith('{') && finalAnswer.includes('"answer"')) {
+                try {
+                  const sanitized = finalAnswer.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+                  const obj = JSON.parse(sanitized)
+                  if (obj?.answer) finalAnswer = obj.answer
+                } catch {
+                  const m = finalAnswer.match(/"answer"\s*:\s*"([\s\S]+?)"\s*,\s*"(?:citations|confidenceLevel|complexity|queryType|toolsUsed)"/)
+                  if (m) {
+                    finalAnswer = m[1]
+                      .replace(/\\n/g, '\n')
+                      .replace(/\\t/g, '\t')
+                      .replace(/\\"/g, '"')
+                      .replace(/\\\\/g, '\\')
+                  }
+                }
+              }
+
+              send({
+                type: 'answer',
+                data: {
+                  answer: finalAnswer,
+                  citations: parsed.citations || [],
+                  confidenceLevel: parsed.confidenceLevel || 'medium',
+                  complexity: parsed.complexity || 'moderate',
+                  queryType: (parsed.queryType || 'definition') as LegalQueryType,
+                  warnings: parsed.warnings,
+                } satisfies FCRAGResult,
+              })
+              break
+            }
+
+            case 'error':
+              console.error('[openclaw-client] bridge SSE error:', parsed.error)
+              break
+          }
+        } catch {
+          // malformed SSE data, skip
         }
       }
     }
 
-    // 최종 답변 전송
-    send({
-      type: 'answer',
-      data: {
-        answer: finalAnswer,
-        citations: result.citations || [],
-        confidenceLevel: result.confidenceLevel || 'medium',
-        complexity: result.complexity || 'moderate',
-        queryType: (result.queryType || 'definition') as LegalQueryType,
-        warnings: result.warnings,
-      } satisfies FCRAGResult,
-    })
+    if (!gotDone) {
+      recordFailure()
+      return false
+    }
 
     recordSuccess()
     return true
   } catch {
-    clearTimers()
     recordFailure()
     return false
   }

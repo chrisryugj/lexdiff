@@ -18,6 +18,7 @@ let logIdCounter = 0
 export function useAiSearch(deps: HandlerDeps) {
   const { state, actions, toast } = deps
   const abortRef = useRef<AbortController | null>(null)
+  const streamBufferRef = useRef<string>('')  // 스트리밍 토큰 누적 버퍼
 
   /** 현재 답변을 대화 히스토리에 저장 */
   const saveCurrentToHistory = useCallback(() => {
@@ -97,6 +98,7 @@ export function useAiSearch(deps: HandlerDeps) {
     // userQuery는 handleSearchInternal에서 rawQuery로 이미 설정됨
     actions.clearToolCallLogs()
     actions.updateProgress('analyzing', 5)
+    streamBufferRef.current = '' // 스트리밍 버퍼 초기화
 
     // AI 뷰 즉시 표시
     const aiLawData: LawDataState = {
@@ -248,6 +250,16 @@ export function useAiSearch(deps: HandlerDeps) {
           })
           break
         }
+        case 'answer_token': {
+          // 스트리밍 토큰: 답변을 실시간으로 누적 표시
+          const tokenText = event.data?.text || ''
+          if (tokenText) {
+            streamBufferRef.current += tokenText
+            actions.setAiAnswerContent(streamBufferRef.current)
+            actions.updateProgress('streaming', 75)
+          }
+          break
+        }
         case 'answer': {
           const data = event.data
           let processedContent = (data.answer || '').replace(/\^/g, ' ')
@@ -271,6 +283,7 @@ export function useAiSearch(deps: HandlerDeps) {
           const relatedLaws = extractRelatedLaws(processedContent)
 
           actions.setFileSearchFailed(searchFailed)
+          // 스트리밍 완료 후 최종 답변으로 교체 (JSON 추출 등 방어 로직 적용된 버전)
           actions.setAiAnswerContent(processedContent)
           actions.setAiRelatedLaws(relatedLaws)
           actions.setAiCitations(data.citations || [])

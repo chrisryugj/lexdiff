@@ -8,6 +8,7 @@
  *   data: {"type":"status","message":"...","progress":10}
  *   data: {"type":"tool_call","name":"search_law","displayName":"법령 검색","query":"..."}
  *   data: {"type":"tool_result","name":"search_law","displayName":"법령 검색","success":true,"summary":"..."}
+ *   data: {"type":"answer_token","data":{"text":"..."}}    ← 스트리밍 토큰 (OpenClaw)
  *   data: {"type":"answer","data":{answer,citations,confidenceLevel,complexity,warnings}}
  *   data: {"type":"error","message":"..."}
  */
