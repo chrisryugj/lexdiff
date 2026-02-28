@@ -45,6 +45,7 @@ export function SearchViewImproved({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
+  const [lawStats, setLawStats] = useState<{ laws: number; adminRules: number; ordinances: number; precedents: number } | null>(null)
 
   // Refs for scrolling to sections
   const featuresRef = useRef<HTMLElement>(null)
@@ -90,6 +91,16 @@ export function SearchViewImproved({
       window.removeEventListener("scroll", handleScroll)
       if (scrollTimer.current) clearTimeout(scrollTimer.current)
     }
+  }, [])
+
+  // Fetch law stats for footer
+  useEffect(() => {
+    fetch("/api/law-stats")
+      .then(r => r.json())
+      .then(data => {
+        if (data.laws || data.ordinances) setLawStats(data)
+      })
+      .catch(() => {})
   }, [])
 
   // Intersection Observer for scroll reveals
@@ -278,7 +289,37 @@ export function SearchViewImproved({
       {/* Footer */}
       <footer className="border-t border-border/50 py-8">
         <div className="container mx-auto max-w-4xl px-4 md:px-6">
-          <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex flex-col items-center gap-4 text-center">
+            {/* Live stats */}
+            {lawStats && (
+              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground/70">
+                {lawStats.laws > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="scale" size={12} className="text-primary/60" />
+                    법령 {lawStats.laws.toLocaleString()}건
+                  </span>
+                )}
+                {lawStats.adminRules > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="file-text" size={12} className="text-primary/60" />
+                    행정규칙 {lawStats.adminRules.toLocaleString()}건
+                  </span>
+                )}
+                {lawStats.ordinances > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="building-2" size={12} className="text-primary/60" />
+                    자치법규 {lawStats.ordinances.toLocaleString()}건
+                  </span>
+                )}
+                {lawStats.precedents > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="gavel" size={12} className="text-primary/60" />
+                    판례 {lawStats.precedents.toLocaleString()}건
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground/60">
               <button onClick={handleHelpClick} className="hover:text-foreground transition-colors whitespace-nowrap">
                 사용 가이드
