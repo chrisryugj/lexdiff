@@ -195,7 +195,7 @@ export function SearchViewImproved({
       </m.header>
 
       {/* Hero Section */}
-      <section className="relative pt-16 pb-8 md:pt-32 md:pb-12 flex flex-col items-center px-4 md:px-6 overflow-hidden">
+      <section className="relative pt-16 pb-8 md:pt-32 md:pb-12 flex flex-col items-center px-4 md:px-6">
         {/* Subtle background gradient */}
         <div
           className="pointer-events-none absolute inset-0"

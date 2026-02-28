@@ -190,7 +190,7 @@ export async function fetchFromOpenClaw(
               send({
                 type: 'status',
                 message: parsed.message || '',
-                progress: parsed.phase === 'searching' ? 25 : parsed.phase === 'analyzing' ? 45 : parsed.phase === 'generating' ? 65 : 50,
+                progress: parsed.phase === 'cached' ? 90 : parsed.phase === 'searching' ? 25 : parsed.phase === 'analyzing' ? 45 : parsed.phase === 'generating' ? 65 : 50,
               })
               break
 
@@ -235,6 +235,40 @@ export async function fetchFromOpenClaw(
         } catch {
           // malformed SSE data, skip
         }
+      }
+    }
+
+    // ── 잔여 버퍼 처리 (캐시 경로에서 done 이벤트가 마지막 청크에 남을 수 있음) ──
+    if (buffer.trim()) {
+      const chunks = buffer.split('\n\n')
+      for (const chunk of chunks) {
+        const lines = chunk.split('\n')
+        let eventType = ''
+        let eventData = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+          else if (line.startsWith('data: ')) eventData = line.slice(6)
+        }
+        if (!eventType || !eventData) continue
+        try {
+          const parsed = JSON.parse(eventData)
+          if (eventType === 'done') {
+            gotDone = true
+            send({
+              type: 'answer',
+              data: {
+                answer: String(parsed.answer || '').trim(),
+                citations: parsed.citations || [],
+                confidenceLevel: parsed.confidenceLevel || 'medium',
+                complexity: parsed.complexity || 'moderate',
+                queryType: (parsed.queryType || 'definition') as LegalQueryType,
+                warnings: parsed.warnings,
+              } satisfies FCRAGResult,
+            })
+          } else if (eventType === 'token') {
+            send({ type: 'answer_token', data: { text: parsed.text } })
+          }
+        } catch { /* malformed residue, skip */ }
       }
     }
 
