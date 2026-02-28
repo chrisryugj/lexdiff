@@ -67,6 +67,17 @@ export function LawViewerSidebar({
   formatSimpleJo,
   isFavorite,
 }: LawViewerSidebarProps) {
+  // FAB 카운트: AIAnswerSidebar와 동일한 필터링+중복제거 적용
+  const aiRelatedCount = (() => {
+    const seen = new Set<string>()
+    for (const law of mergedRelatedArticles) {
+      if (law.lawName && law.lawName !== '알 수 없음' && law.lawName.length <= 50) {
+        seen.add(`${law.lawName}|${law.jo || 'all'}`)
+      }
+    }
+    return seen.size
+  })()
+
   return (
     <>
       {/* Mobile overlay backdrop */}
@@ -257,7 +268,7 @@ export function LawViewerSidebar({
       <FloatingActionButton
         onClick={() => setIsArticleListExpanded(true)}
         icon={<Icon name="list-ordered" size={20} />}
-        count={aiAnswerMode ? relatedArticles.length : actualArticles.length}
+        count={aiAnswerMode ? aiRelatedCount : actualArticles.length}
         label={aiAnswerMode ? "관련 법령 목록 열기" : isPrecedent ? "목차 열기" : "조문 목록 열기"}
       />
     </>
