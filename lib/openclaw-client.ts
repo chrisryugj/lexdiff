@@ -213,29 +213,11 @@ export async function fetchFromOpenClaw(
 
             case 'done': {
               gotDone = true
-              let finalAnswer = String(parsed.answer || '').trim()
-              // 방어: JSON 래퍼 추출
-              if (finalAnswer.startsWith('{') && finalAnswer.includes('"answer"')) {
-                try {
-                  const sanitized = finalAnswer.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
-                  const obj = JSON.parse(sanitized)
-                  if (obj?.answer) finalAnswer = obj.answer
-                } catch {
-                  const m = finalAnswer.match(/"answer"\s*:\s*"([\s\S]+?)"\s*,\s*"(?:citations|confidenceLevel|complexity|queryType|toolsUsed)"/)
-                  if (m) {
-                    finalAnswer = m[1]
-                      .replace(/\\n/g, '\n')
-                      .replace(/\\t/g, '\t')
-                      .replace(/\\"/g, '"')
-                      .replace(/\\\\/g, '\\')
-                  }
-                }
-              }
-
+              // Bridge에서 이미 extractAnswerFromJson 처리됨 — 중복 추출 불필요
               send({
                 type: 'answer',
                 data: {
-                  answer: finalAnswer,
+                  answer: String(parsed.answer || '').trim(),
                   citations: parsed.citations || [],
                   confidenceLevel: parsed.confidenceLevel || 'medium',
                   complexity: parsed.complexity || 'moderate',
