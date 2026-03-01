@@ -78,6 +78,53 @@ function getMaxToolTurns(complexity: QueryComplexity): number {
   }
 }
 
+// ─── KNOWN_MST 런타임 캐시 ───
+// search_law 호출 결과에서 자동 축적. 서버 프로세스 수명 동안 유지.
+const KNOWN_MST = new Map<string, string>()
+
+/** search_law 결과를 KNOWN_MST에 저장 */
+function cacheMSTEntries(entries: LawEntry[]) {
+  for (const e of entries) {
+    if (e.name && e.mst) KNOWN_MST.set(e.name, e.mst)
+  }
+}
+
+// ─── Fast Path: 단순 조문 질문 바이패스 ───
+
+interface FastPathDetection {
+  type: 'hit' | 'resolve' | 'none'
+  lawName?: string
+  articles?: string[]
+  mst?: string
+}
+
+/** 복잡한 키워드가 없고 법명+조문번호가 명확한 단순 질문인지 판단 */
+function detectFastPath(query: string): FastPathDetection {
+  // 복잡한 질문은 full pipeline으로
+  if (/(?:비교|판례|해석례|개정|위임|시행령|시행규칙|신구|대조|이력|조례|자치법규|처벌|벌칙|과태료|면제|감면|특례|예외)/.test(query)) {
+    return { type: 'none' }
+  }
+  // 120자 초과면 복잡 질문으로 간주
+  if (query.length > 120) return { type: 'none' }
+
+  // 법명 추출: 「법명」 > ~법 패턴
+  const lawNameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+(?:법|령|규칙))(?:\s|$|의|에|을|를|이|가|은|는)/)
+  if (!lawNameMatch) return { type: 'none' }
+  const lawName = lawNameMatch[1].trim()
+
+  // 조문번호 추출
+  const articleMatches = Array.from(query.matchAll(/제(\d+)조(?:의(\d+))?/g))
+  if (articleMatches.length === 0) return { type: 'none' }
+  const articles = articleMatches.map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
+
+  // KNOWN_MST 조회
+  const mst = KNOWN_MST.get(lawName)
+  if (mst) {
+    return { type: 'hit', lawName, articles, mst }
+  }
+  return { type: 'resolve', lawName, articles }
+}
+
 // ─── search_law 결과 파싱 유틸 ───
 
 interface LawEntry { name: string; mst: string }
@@ -249,19 +296,37 @@ function getToolCallQuery(name: string, args: Record<string, unknown>): string |
 }
 
 /** 파라미터 보정: Gemini가 잘못 보낸 MST/jo를 엔진에서 교정 */
-function correctToolArgs(
+async function correctToolArgs(
   calls: Array<{ name: string; args: Record<string, unknown> }>,
   latestSearchEntries: LawEntry[],
-  query: string
+  query: string,
+  onSearchFallback?: (entries: LawEntry[], toolResult: ToolCallResult) => void
 ) {
   for (const call of calls) {
-    // get_law_text / get_batch_articles 공통: MST 보정
-    if (call.name === 'get_law_text' || call.name === 'get_batch_articles') {
-      if (call.args.mst && latestSearchEntries.length > 0) {
-        const knownMSTs = new Set(latestSearchEntries.map(e => e.mst))
-        if (!knownMSTs.has(call.args.mst as string)) {
-          const corrected = findBestMST(latestSearchEntries, query)
-          if (corrected) call.args.mst = corrected
+    // get_law_text / get_batch_articles / get_three_tier / compare_old_new / get_article_history: MST 보정
+    if (['get_law_text', 'get_batch_articles', 'get_three_tier', 'compare_old_new', 'get_article_history'].includes(call.name)) {
+      if (call.args.mst) {
+        if (latestSearchEntries.length > 0) {
+          // 빠른 경로: known MST에서 보정
+          const knownMSTs = new Set(latestSearchEntries.map(e => e.mst))
+          if (!knownMSTs.has(call.args.mst as string)) {
+            const corrected = findBestMST(latestSearchEntries, query)
+            if (corrected) call.args.mst = corrected
+          }
+        } else {
+          // known MST 없음 → search_law 자동 호출하여 수집
+          const lawNameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+법)/)
+          const searchQuery = lawNameMatch?.[1] || query.slice(0, 30)
+          const searchResult = await executeTool('search_law', { query: searchQuery })
+          if (!searchResult.isError) {
+            const entries = parseLawEntries(searchResult.result)
+            if (entries.length > 0) {
+              latestSearchEntries.push(...entries)
+              onSearchFallback?.(entries, searchResult)
+              const corrected = findBestMST(entries, query)
+              if (corrected) call.args.mst = corrected
+            }
+          }
         }
       }
     }
@@ -294,12 +359,6 @@ export async function* executeRAGStream(
   query: string,
   geminiApiKey?: string
 ): AsyncGenerator<FCRAGStreamEvent> {
-  const effectiveKey = geminiApiKey || process.env.GEMINI_API_KEY
-  if (!effectiveKey) {
-    yield { type: 'error', message: 'Gemini API 키가 설정되지 않았습니다.' }
-    return
-  }
-
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
@@ -307,6 +366,64 @@ export async function* executeRAGStream(
   const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
+
+  // ── Fast Path: 단순 조문 조회는 Gemini 없이 직접 처리 ──
+  const fastPath = detectFastPath(query)
+  if (fastPath.type !== 'none') {
+    let mst = fastPath.mst
+    const articles = fastPath.articles!
+
+    if (fastPath.type === 'resolve') {
+      // KNOWN_MST에 없음 → search_law로 MST 탐색
+      yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
+      yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
+      const searchResult = await executeTool('search_law', { query: fastPath.lawName })
+      if (searchResult.isError) {
+        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
+        // fast path 실패 → full pipeline으로 폴백 (아래로 계속)
+      } else {
+        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
+        const entries = parseLawEntries(searchResult.result)
+        cacheMSTEntries(entries)
+        mst = findBestMST(entries, query) || undefined
+      }
+    }
+
+    if (mst) {
+      // MST 확보 → get_batch_articles 직접 호출
+      yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
+      yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
+      const articlesResult = await executeTool('get_batch_articles', { mst, articles })
+      yield {
+        type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
+        success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
+      }
+
+      if (!articlesResult.isError) {
+        yield { type: 'status', message: '완료', progress: 100 }
+        yield {
+          type: 'answer',
+          data: {
+            answer: articlesResult.result,
+            citations: buildCitations([articlesResult]),
+            confidenceLevel: 'high',
+            complexity: 'simple',
+            queryType,
+          },
+        }
+        return
+      }
+      // get_batch_articles 실패 → full pipeline으로 폴백
+    }
+    // fast path 실패 시 아래 full pipeline으로 자연스럽게 진행
+  }
+
+  // ── Full Pipeline: Gemini 멀티턴 ──
+  const effectiveKey = geminiApiKey || process.env.GEMINI_API_KEY
+  if (!effectiveKey) {
+    yield { type: 'error', message: 'Gemini API 키가 설정되지 않았습니다.' }
+    return
+  }
 
   const systemPrompt = buildSystemPrompt(complexity, queryType)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
@@ -445,7 +562,26 @@ export async function* executeRAGStream(
         args: (p.functionCall.args || {}) as Record<string, unknown>,
       }))
 
-      correctToolArgs(calls, latestSearchEntries, query)
+      // MST 보정 (unknown MST면 search_law 자동 호출)
+      const fallbackEvents: FCRAGStreamEvent[] = []
+      await correctToolArgs(calls, latestSearchEntries, query, (entries, searchResult) => {
+        // fallback search_law 호출을 SSE로 알림
+        fallbackEvents.push({
+          type: 'tool_call', name: 'search_law',
+          displayName: '법령 검색 (MST 자동 확인)',
+          query: entries[0]?.name,
+        })
+        fallbackEvents.push({
+          type: 'tool_result', name: 'search_law',
+          displayName: '법령 검색 (MST 자동 확인)',
+          success: true,
+          summary: summarizeToolResult('search_law', searchResult),
+        })
+        allToolResults.push(searchResult)
+      })
+
+      // fallback 이벤트 전송
+      for (const evt of fallbackEvents) yield evt
 
       // 도구 호출 이벤트
       for (const call of calls) {
@@ -475,10 +611,11 @@ export async function* executeRAGStream(
         else failureCount.delete(r.name)
       }
 
-      // search_law 결과 추적 (MST 보정용)
+      // search_law 결과 추적 (MST 보정 + KNOWN_MST 캐시 축적)
       for (const r of results) {
         if (r.name === 'search_law' && !r.isError) {
           latestSearchEntries = parseLawEntries(r.result)
+          cacheMSTEntries(latestSearchEntries)
         }
       }
 
