@@ -192,7 +192,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         className="max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0"
         style={{ fontFamily: 'Pretendard, sans-serif', maxWidth: 'min(calc(100vw - 2rem), 48rem)', overflow: 'hidden', boxSizing: 'border-box' }}
       >
-        <DialogHeader className="border-b border-border bg-muted/30" style={{ padding: '10px 12px', flexShrink: 0 }}>
+        <DialogHeader className="border-b border-border bg-muted/30 text-left" style={{ padding: '10px 12px', flexShrink: 0 }}>
           {/* 행 1: 제목 + 닫기 */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
             {/* 뒤로가기 버튼 */}
