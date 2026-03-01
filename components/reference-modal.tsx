@@ -192,7 +192,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
         className="max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0"
         style={{ fontFamily: 'Pretendard, sans-serif', maxWidth: 'min(calc(100vw - 2rem), 48rem)', overflow: 'hidden', boxSizing: 'border-box' }}
       >
-        <DialogHeader className="border-b border-border bg-muted/30 text-left" style={{ padding: '10px 12px', flexShrink: 0 }}>
+        <DialogHeader className="border-b border-border bg-muted/30 text-left gap-0" style={{ padding: '10px 12px', flexShrink: 0 }}>
           {/* 행 1: 제목 + 닫기 */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
             {/* 뒤로가기 버튼 */}
@@ -254,7 +254,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             </DialogDescription>
           </div>
           {/* 행 2: 컨트롤 (줌 + 복사 + 원문) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
             {/* 폰트 크기 조절 */}
             <div className="bg-background/50 rounded-md border border-border/50" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 4px' }}>
               <Button
