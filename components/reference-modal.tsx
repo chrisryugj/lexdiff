@@ -187,17 +187,18 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
         <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30 flex-shrink-0">
-          <div className="flex items-center justify-between gap-2 flex-wrap pr-6">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex flex-col gap-2 pr-6">
+            {/* 제목 행 */}
+            <div className="flex items-start gap-2 min-w-0">
               {/* 뒤로가기 버튼 (히스토리가 있을 때만 표시) */}
               {hasHistory && onBack && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
-                  className="p-1 h-7 w-7 flex-shrink-0"
+                  className="p-1 h-7 w-7 flex-shrink-0 mt-0.5"
                   title="이전 법령으로"
                 >
                   <Icon name="arrow-left" className="w-4 h-4" />
@@ -205,9 +206,9 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               )}
               {/* 판례인 경우 아이콘 표시 */}
               {precedentMeta && (
-                <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400" />
+                <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400 mt-0.5" />
               )}
-              <DialogTitle className="text-base font-bold truncate text-primary max-w-[calc(100%-100px)] sm:max-w-[600px]" title={title}>
+              <DialogTitle className="text-base font-bold text-primary break-words" title={title}>
                 {parsedTitle ? (
                   <>
                     {parsedTitle.main}
@@ -217,7 +218,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               </DialogTitle>
               {/* 심급 배지 (법원명 기반) */}
               {precedentMeta?.court && (
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 mt-0.5 ${
                   precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
                   precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
                   "bg-green-500/20 text-green-400"
@@ -230,6 +231,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                 {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
               </DialogDescription>
             </div>
+            {/* 컨트롤 행 (글씨 크기 + 복사 + 원문 링크) */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* 폰트 크기 조절 */}
               <div className="flex items-center gap-1 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
@@ -243,7 +245,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                 >
                   <Icon name="zoom-out" className="w-3.5 h-3.5" />
                 </Button>
-                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums hidden sm:inline">{fontSize}</span>
+                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums">{fontSize}</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -273,7 +275,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                 >
                   <a href={molegUrl || precedentUrl || ''} target="_blank" rel="noopener noreferrer">
                     <Icon name="external-link" className="w-3 h-3" />
-                    <span className="text-xs hidden sm:inline">원문</span>
+                    <span className="text-xs">원문</span>
                   </a>
                 </Button>
               )}

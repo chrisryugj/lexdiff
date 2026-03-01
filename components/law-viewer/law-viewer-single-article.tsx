@@ -75,10 +75,10 @@ export function LawViewerSingleArticle({
     <div className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
       {/* 헤더: 제목 + 배지 + 버튼들 */}
       <div className="mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-border">
-        <div className="flex items-center justify-between gap-1 lg:gap-2">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           {/* 제목 + 배지 */}
-          <div className="flex items-center gap-1 lg:gap-2 min-w-0 flex-1">
-            <h2 className="text-lg lg:text-xl font-bold text-foreground truncate">
+          <div className="flex items-center gap-1 lg:gap-2 min-w-0 sm:flex-1">
+            <h2 className="text-lg lg:text-xl font-bold text-foreground break-words sm:truncate">
               {formatSimpleJo(activeArticle.jo, isOrdinance)}
               {activeArticle.title && (
                 <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
