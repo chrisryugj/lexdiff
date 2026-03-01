@@ -187,28 +187,38 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent showCloseButton={false} className="sm:max-w-3xl max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
-        <DialogHeader className="px-3 py-2.5 sm:px-4 sm:py-3 border-b border-border bg-muted/30 flex-shrink-0">
-          <div className="flex flex-col gap-1.5">
-            {/* 제목 행: [← 뒤로] [제목(래핑)] [X 닫기] */}
-            <div className="flex items-start gap-1.5">
-              {/* 뒤로가기 버튼 (히스토리가 있을 때만 표시) */}
-              {hasHistory && onBack && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onBack}
-                  className="p-1 h-7 w-7 shrink-0"
-                  title="이전 법령으로"
-                >
-                  <Icon name="arrow-left" className="w-4 h-4" />
-                </Button>
-              )}
-              {/* 판례인 경우 아이콘 표시 */}
-              {precedentMeta && (
-                <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400 mt-0.5" />
-              )}
-              <DialogTitle className="text-sm sm:text-base font-bold text-primary flex-1 min-w-0 break-words leading-snug" title={title}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0"
+        style={{ fontFamily: 'Pretendard, sans-serif', maxWidth: 'min(calc(100vw - 2rem), 48rem)', overflow: 'hidden', boxSizing: 'border-box' }}
+      >
+        <DialogHeader className="border-b border-border bg-muted/30" style={{ padding: '10px 12px', flexShrink: 0 }}>
+          {/* 행 1: 제목 + 닫기 */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+            {/* 뒤로가기 버튼 */}
+            {hasHistory && onBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                className="p-1 h-7 w-7"
+                style={{ flexShrink: 0 }}
+                title="이전 법령으로"
+              >
+                <Icon name="arrow-left" className="w-4 h-4" />
+              </Button>
+            )}
+            {/* 판례 아이콘 */}
+            {precedentMeta && (
+              <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400 mt-0.5" />
+            )}
+            {/* 제목: div 래퍼로 flex 사이징 보장 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <DialogTitle
+                className="text-sm sm:text-base font-bold text-primary"
+                style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.4 }}
+                title={title}
+              >
                 {parsedTitle ? (
                   <>
                     {parsedTitle.main}
@@ -216,87 +226,88 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   </>
                 ) : title}
               </DialogTitle>
-              {/* 심급 배지 (법원명 기반) */}
-              {precedentMeta?.court && (
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                  precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
-                  precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
-                  "bg-green-500/20 text-green-400"
-                }`}>
-                  {precedentMeta.court.includes("대법원") ? "3심" :
-                   precedentMeta.court.includes("고등") ? "2심" : "1심"}
-                </span>
-              )}
-              {/* 닫기 버튼 — absolute 대신 flow 내 배치 */}
+            </div>
+            {/* 심급 배지 */}
+            {precedentMeta?.court && (
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
+                precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
+                "bg-green-500/20 text-green-400"
+              }`} style={{ flexShrink: 0 }}>
+                {precedentMeta.court.includes("대법원") ? "3심" :
+                 precedentMeta.court.includes("고등") ? "2심" : "1심"}
+              </span>
+            )}
+            {/* 닫기 버튼 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="p-1 h-7 w-7 opacity-70 hover:opacity-100"
+              style={{ flexShrink: 0 }}
+              title="닫기"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </Button>
+            <DialogDescription className="sr-only">
+              {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
+            </DialogDescription>
+          </div>
+          {/* 행 2: 컨트롤 (줌 + 복사 + 원문) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+            {/* 폰트 크기 조절 */}
+            <div className="bg-background/50 rounded-md border border-border/50" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 4px' }}>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onClose}
-                className="p-1 h-7 w-7 shrink-0 opacity-70 hover:opacity-100"
-                title="닫기"
+                onClick={decreaseFontSize}
+                disabled={fontSize <= 11}
+                className="p-0.5 h-6 w-6"
+                title="글자 작게"
               >
-                <Icon name="x" className="w-4 h-4" />
+                <Icon name="zoom-out" className="w-3.5 h-3.5" />
               </Button>
-              <DialogDescription className="sr-only">
-                {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
-              </DialogDescription>
+              <span className="text-xs text-muted-foreground" style={{ minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={increaseFontSize}
+                disabled={fontSize >= 28}
+                className="p-0.5 h-6 w-6"
+                title="글자 크게"
+              >
+                <Icon name="zoom-in" className="w-3.5 h-3.5" />
+              </Button>
             </div>
-            {/* 컨트롤 행 (글씨 크기 + 복사 + 원문 링크) */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* 폰트 크기 조절 */}
-              <div className="flex items-center gap-0.5 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={decreaseFontSize}
-                  disabled={fontSize <= 11}
-                  className="p-0.5 h-6 w-6"
-                  title="글자 작게"
-                >
-                  <Icon name="zoom-out" className="w-3.5 h-3.5" />
-                </Button>
-                <span className="text-xs text-muted-foreground min-w-[20px] text-center tabular-nums">{fontSize}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={increaseFontSize}
-                  disabled={fontSize >= 28}
-                  className="p-0.5 h-6 w-6"
-                  title="글자 크게"
-                >
-                  <Icon name="zoom-in" className="w-3.5 h-3.5" />
-                </Button>
-              </div>
 
-              {/* 복사 버튼 */}
-              <CopyButton
-                getText={getCopyText}
-                message="복사됨"
-                className="p-1 h-7 w-7"
-              />
+            {/* 복사 버튼 */}
+            <CopyButton
+              getText={getCopyText}
+              message="복사됨"
+              className="p-1 h-7 w-7"
+            />
 
-              {/* 법제처 원문 링크 (법령 또는 판례) */}
-              {(molegUrl || precedentUrl) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="h-7 gap-1 px-2"
-                >
-                  <a href={molegUrl || precedentUrl || ''} target="_blank" rel="noopener noreferrer">
-                    <Icon name="external-link" className="w-3 h-3" />
-                    <span className="text-xs">원문</span>
-                  </a>
-                </Button>
-              )}
+            {/* 법제처 원문 링크 */}
+            {(molegUrl || precedentUrl) && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="h-7 gap-1 px-2"
+              >
+                <a href={molegUrl || precedentUrl || ''} target="_blank" rel="noopener noreferrer">
+                  <Icon name="external-link" className="w-3 h-3" />
+                  <span className="text-xs">원문</span>
+                </a>
+              </Button>
+            )}
 
-              {/* 기존 원문 열기 버튼 */}
-              {canShowOriginal && (
-                <Button size="sm" variant={showOriginal ? "secondary" : "default"} onClick={() => setShowOriginal((v) => !v)} className="h-7 px-2 text-xs">
-                  {showOriginal ? "미리보기" : "원문 열기"}
-                </Button>
-              )}
-            </div>
+            {/* 원문 열기 버튼 */}
+            {canShowOriginal && (
+              <Button size="sm" variant={showOriginal ? "secondary" : "default"} onClick={() => setShowOriginal((v) => !v)} className="h-7 px-2 text-xs">
+                {showOriginal ? "미리보기" : "원문 열기"}
+              </Button>
+            )}
           </div>
           {/* 판례 메타 정보 배지 (헤더 내 제목 아래) */}
           {precedentMeta && (
