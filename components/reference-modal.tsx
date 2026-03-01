@@ -187,18 +187,18 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
-        <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30 flex-shrink-0">
-          <div className="flex flex-col gap-2 pr-6">
-            {/* 제목 행 */}
-            <div className="flex items-start gap-2 min-w-0">
+      <DialogContent showCloseButton={false} className="sm:max-w-3xl max-h-[90vh] border-primary/20 shadow-2xl shadow-primary/10 p-0 gap-0 overflow-hidden" style={{ fontFamily: 'Pretendard, sans-serif' }}>
+        <DialogHeader className="px-3 py-2.5 sm:px-4 sm:py-3 border-b border-border bg-muted/30 flex-shrink-0">
+          <div className="flex flex-col gap-1.5">
+            {/* 제목 행: [← 뒤로] [제목(래핑)] [X 닫기] */}
+            <div className="flex items-start gap-1.5">
               {/* 뒤로가기 버튼 (히스토리가 있을 때만 표시) */}
               {hasHistory && onBack && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
-                  className="p-1 h-7 w-7 flex-shrink-0 mt-0.5"
+                  className="p-1 h-7 w-7 shrink-0"
                   title="이전 법령으로"
                 >
                   <Icon name="arrow-left" className="w-4 h-4" />
@@ -208,7 +208,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               {precedentMeta && (
                 <Icon name="gavel" className="w-5 h-5 shrink-0 text-orange-400 mt-0.5" />
               )}
-              <DialogTitle className="text-base font-bold text-primary break-words" title={title}>
+              <DialogTitle className="text-sm sm:text-base font-bold text-primary flex-1 min-w-0 break-words leading-snug" title={title}>
                 {parsedTitle ? (
                   <>
                     {parsedTitle.main}
@@ -218,7 +218,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
               </DialogTitle>
               {/* 심급 배지 (법원명 기반) */}
               {precedentMeta?.court && (
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 mt-0.5 ${
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
                   precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
                   precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
                   "bg-green-500/20 text-green-400"
@@ -227,20 +227,30 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                    precedentMeta.court.includes("고등") ? "2심" : "1심"}
                 </span>
               )}
+              {/* 닫기 버튼 — absolute 대신 flow 내 배치 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="p-1 h-7 w-7 shrink-0 opacity-70 hover:opacity-100"
+                title="닫기"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </Button>
               <DialogDescription className="sr-only">
                 {lawName ? `${lawName} ${articleNumber || ''}`.trim() : title} 조문 내용
               </DialogDescription>
             </div>
             {/* 컨트롤 행 (글씨 크기 + 복사 + 원문 링크) */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {/* 폰트 크기 조절 */}
-              <div className="flex items-center gap-1 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
+              <div className="flex items-center gap-0.5 bg-background/50 rounded-md border border-border/50 px-1 py-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={decreaseFontSize}
                   disabled={fontSize <= 11}
-                  className="p-1 h-6 w-6"
+                  className="p-0.5 h-6 w-6"
                   title="글자 작게"
                 >
                   <Icon name="zoom-out" className="w-3.5 h-3.5" />
@@ -251,7 +261,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
                   size="sm"
                   onClick={increaseFontSize}
                   disabled={fontSize >= 28}
-                  className="p-1 h-6 w-6"
+                  className="p-0.5 h-6 w-6"
                   title="글자 크게"
                 >
                   <Icon name="zoom-in" className="w-3.5 h-3.5" />
