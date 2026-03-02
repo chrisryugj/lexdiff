@@ -70,7 +70,7 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 font-bold text-base">
             {isPrecedent && <span className="text-primary">•</span>}
-            {article.joNum || formatSimpleJo(article.jo, isOrdinance)}
+            <span className="whitespace-nowrap">{article.joNum || formatSimpleJo(article.jo, isOrdinance)}</span>
             {isDeleted && (
               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded">
                 삭제된 조문
