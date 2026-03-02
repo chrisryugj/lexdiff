@@ -748,13 +748,18 @@ export function AIAnswerContent({
                                     </div>
                                 ))}
 
-                                {/* 마지막 줄: 현재 상태 표시 */}
+                                {/* 마지막 줄: 현재 상태 표시 - 마지막 status 메시지 또는 대기 중 */}
                                 {isStreaming && !isCollapsing && (
                                     <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 pt-1">
                                         <div className="w-3 h-3 flex-shrink-0">
                                             <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mx-auto" />
                                         </div>
-                                        <span>대기 중...</span>
+                                        <span className="truncate">
+                                            {(() => {
+                                                const lastStatus = [...toolCallLogs].reverse().find(l => l.type === 'status')
+                                                return lastStatus ? lastStatus.message : '대기 중...'
+                                            })()}
+                                        </span>
                                     </div>
                                 )}
                             </div>
