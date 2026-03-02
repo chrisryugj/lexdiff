@@ -15,10 +15,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import rehypeRaw from 'rehype-raw'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
-import { Icon } from '@/components/ui/icon'
-
 // 분리된 컴포넌트들
-import { getSectionIcon } from './section-icons'
 import { getVisitedLaws } from './visited-laws'
 import { SimpleFlowchartRenderer } from './SimpleFlowchartRenderer'
 import { BlockquoteRenderer } from './BlockquoteRenderer'
@@ -68,7 +65,7 @@ export function LegalMarkdownRenderer({
 
 
   return (
-    <div className={`legal-markdown-content prose dark:prose-invert max-w-full w-full overflow-hidden [overflow-wrap:anywhere] [word-break:break-word] ${className}`}>
+    <div className={`legal-markdown-content prose-sm dark:prose-invert max-w-full w-full overflow-x-hidden [overflow-wrap:anywhere] [word-break:break-word] ${className}`}>
       <style>{`
         .hwpx-num-item {
           font-weight: 600;
@@ -137,31 +134,17 @@ export function LegalMarkdownRenderer({
           th: ({ children, ...props }) => <ThRenderer {...props}>{children}</ThRenderer>,
           td: ({ children }) => <TdRenderer>{children}</TdRenderer>,
 
-          // 헤더 스타일링 (섹션 아이콘 포함)
-          h2: ({ children }) => {
-            const text = typeof children === 'string' ? children :
-              React.Children.toArray(children).map(c => typeof c === 'string' ? c : '').join('')
-            const iconInfo = getSectionIcon(text)
-
-            return (
-              <h2 className="text-base font-bold mt-3 mb-2 pb-2 border-b border-border text-foreground flex items-center gap-2 min-w-0 flex-wrap">
-                {iconInfo && <Icon name={iconInfo.iconName} className={`h-4 w-4 ${iconInfo.color} shrink-0`} />}
-                <span className="min-w-0 break-words">{children}</span>
-              </h2>
-            )
-          },
-          h3: ({ children }) => {
-            const text = typeof children === 'string' ? children :
-              React.Children.toArray(children).map(c => typeof c === 'string' ? c : '').join('')
-            const iconInfo = getSectionIcon(text)
-
-            return (
-              <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 flex items-center gap-1.5 min-w-0 flex-wrap">
-                {iconInfo && <Icon name={iconInfo.iconName} className={`h-3.5 w-3.5 ${iconInfo.color} shrink-0`} />}
-                <span className="min-w-0 break-words">{children}</span>
-              </h3>
-            )
-          },
+          // 헤더 스타일링
+          h2: ({ children }) => (
+            <h2 className="text-base font-bold mt-3 mb-2 pb-2 border-b border-border text-foreground min-w-0 break-words">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-sm font-bold mt-4 mb-2 text-foreground/90 min-w-0 break-words">
+              {children}
+            </h3>
+          ),
 
           // 리스트 스타일링
           ul: ({ children }) => (
