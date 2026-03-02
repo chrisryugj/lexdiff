@@ -186,13 +186,18 @@ export async function fetchFromOpenClaw(
           const parsed = JSON.parse(eventData)
 
           switch (eventType) {
-            case 'status':
+            case 'status': {
+              const BRIDGE_PHASE_PROGRESS: Record<string, number> = {
+                cached: 90, fetching: 20, analyzing: 45,
+                tools: 35, reasoning: 60, finalizing: 80,
+              }
               send({
                 type: 'status',
                 message: parsed.message || '',
-                progress: parsed.phase === 'cached' ? 90 : parsed.phase === 'searching' ? 25 : parsed.phase === 'analyzing' ? 45 : parsed.phase === 'generating' ? 65 : 50,
+                progress: BRIDGE_PHASE_PROGRESS[parsed.phase] ?? 50,
               })
               break
+            }
 
             case 'tool_result':
               send({

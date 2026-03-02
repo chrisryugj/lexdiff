@@ -480,6 +480,10 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
     const articleNum = unquotedMatch[2] + (unquotedMatch[4] ? `의${unquotedMatch[4]}` : '')
     const jo = buildJO(articleNum)
 
+    // 단독 '시행령', '시행규칙' 등 부모 법령명 없이 불완전한 법령명 제외
+    // 예: "관세법 시행령 제20조"에서 "시행령" 위치를 별도 추출하는 오매칭 방지
+    if (/^시행(령|규칙)$/.test(lawName)) continue
+
     // 중복 체크: 같은 법령+조문이 이미 있는지 확인
     const isDuplicate = laws.some(l =>
       l.lawName === lawName && l.article === `제${articleNum}조`
