@@ -1,11 +1,10 @@
 import React from 'react'
 
-// 짧은 컬럼으로 취급할 헤더 키워드
+// 짧은 컬럼으로 취급할 헤더 키워드 (숫자/기호성 컬럼만)
 const SHORT_COLUMN_KEYWORDS = [
   '순번', 'no', 'no.', '#', '번호',
-  '구분', '분류', '유형', '종류',
   '단계', 'step',
-  '항목', '비고', '선택', '결과',
+  '선택',
   '날짜', '일시',
   '✅', '❌'
 ]
@@ -56,8 +55,8 @@ export function ThRenderer({ children, ...props }: ThProps) {
       className={`
         px-4 py-2.5 text-left font-semibold text-foreground/80 align-middle
         ${isShortColumn
-          ? 'w-[1%] whitespace-nowrap text-center'
-          : 'min-w-[120px]'
+          ? 'whitespace-nowrap text-center w-px'
+          : 'min-w-[100px]'
         }
       `}
       style={{ fontSize: 'inherit' }}
