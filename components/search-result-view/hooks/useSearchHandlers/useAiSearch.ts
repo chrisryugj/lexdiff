@@ -205,7 +205,19 @@ export function useAiSearch(deps: HandlerDeps) {
     function handleSSEEvent(event: any, query: string) {
       switch (event.type) {
         case 'status': {
-          actions.updateProgress('streaming', event.progress)
+          // Bridge는 phase/message만 보내고 progress 숫자를 포함하지 않으므로 phase → progress 매핑
+          const PHASE_PROGRESS: Record<string, number> = {
+            cached:     50,
+            fetching:   20,
+            analyzing:  15,
+            tools:      35,
+            reasoning:  60,
+            finalizing: 80,
+          }
+          const resolvedProgress = typeof event.progress === 'number'
+            ? event.progress
+            : (PHASE_PROGRESS[event.phase] ?? 30)
+          actions.updateProgress('streaming', resolvedProgress)
           actions.addToolCallLog({
             id: `log-${++logIdCounter}`,
             type: 'status',
