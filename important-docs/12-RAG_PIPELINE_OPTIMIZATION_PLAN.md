@@ -351,7 +351,218 @@ Phase 4 (선택, 장기): 방안 3 — 벡터DB
 
 ---
 
-## 7. 관련 파일 참조
+## 7. GraphRAG / LangGraph / Obsidian MCP 기반 대안 검토
+
+### 7.1 Microsoft GraphRAG — 지식 그래프 기반 RAG
+
+**핵심 원리**: 문서에서 엔터티·관계를 LLM으로 추출 → 지식 그래프 구축 → 커뮤니티 탐지(Leiden) → 계층적 요약 → 쿼리 시 그래프 탐색
+
+```
+문서 청킹 → LLM 엔터티 추출 → LLM 관계 추출 → 그래프 구축
+    → Leiden 커뮤니티 탐지 → LLM 커뮤니티 요약
+    → 쿼리: Local Search (엔터티 중심) / Global Search (커뮤니티 요약)
+```
+
+**법률 도메인 적합성**: 매우 높음
+
+법률 데이터는 본질적으로 관계형 데이터:
+- 법률 → 시행령 → 시행규칙 (위임 관계)
+- 조문 간 참조 ("제38조에 따른~", "민법 제750조를 준용")
+- 판례 → 조문 인용, 판례 → 판례 인용
+- 이 관계들이 벡터 유사도로는 포착 불가 → 그래프가 자연스럽게 포착
+
+**성능**: 복잡 multi-hop 쿼리에서 벡터 RAG 대비 **3.2배 정확도** (80-85% vs 45-50%)
+
+| 변형 | 인덱싱 비용 | 쿼리 비용 | 특성 |
+|------|-----------|----------|------|
+| **Full GraphRAG** | 매우 높음 ($120/1000페이지 PDF) | ~$0.40/쿼리 | LLM으로 모든 단계 처리. 최고 품질 |
+| **LazyGraphRAG** | Full의 **0.1%** (벡터 RAG와 동일) | Full의 **0.14%** | NLP noun phrase로 인덱싱, LLM은 쿼리 시에만. **비용 대비 최고** |
+| **FastGraphRAG** | 저렴 | 유사 | NLP 기반 추출. 예산 제약 시 |
+
+**Gemini 지원**: v2.2.0+부터 LiteLLM 통합으로 공식 지원
+```yaml
+models:
+  default:
+    model_provider: gemini
+    model: gemini-2.5-flash-lite
+    api_key: ${GEMINI_API_KEY}
+  embeddings:
+    model_provider: gemini
+    model: gemini-embedding-001
+```
+
+**한국어 주의사항**:
+- 영어 중심 설계 → 추출 프롬프트 한국어 번역/적응 필요
+- 한국어 형태소 분석(NER)은 영어보다 어려움 → Gemini의 한국어 능력 활용 권장
+- LazyGraphRAG는 NLP noun phrase 기반이므로 한국어 noun phrase 추출기 필요 (KoNLPy 등)
+
+**LexDiff 적용 시 권장**: **LazyGraphRAG**
+- 인덱싱 비용이 벡터 RAG 수준 (사실상 무료)
+- 쿼리 시에만 LLM 호출 → Gemini Flash로 처리 가능
+- 법률 4,000개 인덱싱도 몇 시간 + 수 달러 수준
+
+---
+
+### 7.2 LangGraph — 에이전트 워크플로우 오케스트레이션
+
+**핵심**: LangGraph ≠ GraphRAG. 완전히 다른 도구.
+
+| | **LangGraph** | **GraphRAG** |
+|---|---|---|
+| "그래프" 의미 | 실행 흐름 그래프 (노드=단계, 엣지=전환) | 지식 그래프 (노드=엔터티, 엣지=관계) |
+| 목적 | 멀티스텝 AI 에이전트 워크플로우 조율 | 관계 기반 지식 검색 |
+| 경쟁 제품 | CrewAI, AutoGen, OpenAI Agents SDK | 벡터 RAG, 전통적 검색 |
+
+**둘은 보완 관계**: LangGraph로 워크플로우 조율 + GraphRAG로 지식 검색 = 조합 가능
+
+**현재 FC-RAG 엔진 대체 가능 여부**:
+
+| 장점 | 단점 |
+|------|------|
+| 표준화된 상태 관리 | LangChain 생태계 종속 (잦은 breaking change 이력) |
+| 조건 분기, 루프, human-in-the-loop 내장 | 추상화 오버헤드 (현재 커스텀 엔진이 더 가볍고 맞춤형) |
+| 디버깅, 모니터링 도구 | 프로덕션 배포 시 추가 인프라 필요 |
+
+**LexDiff 판단**: **현 단계에서 불필요**
+- 현재 `engine.ts`의 커스텀 FC-RAG가 법률 도메인에 더 최적화
+- LangGraph는 멀티에이전트 시스템(예: 법령검색 에이전트 + 판례분석 에이전트 + 비교생성 에이전트 분리)이 필요할 때 재검토
+- 오버엔지니어링 위험 높음
+
+---
+
+### 7.3 Obsidian MCP — 지식 그래프 프론트엔드
+
+**생태계 현황**: 24+ Obsidian MCP 서버 존재 (2025년 기준)
+
+| MCP 서버 | 핵심 기능 |
+|----------|----------|
+| [cyanheads/obsidian-mcp-server](https://github.com/cyanheads/obsidian-mcp-server) | CRUD + 전문검색 + JsonLogic 쿼리 + YAML frontmatter |
+| [aaronsb/obsidian-mcp-plugin](https://github.com/aaronsb/obsidian-mcp-plugin) | **그래프 탐색** + 시맨틱 검색 + 개념 발견 |
+| [smart-connections-mcp](https://github.com/msdanyg/smart-connections-mcp) | 384차원 임베딩 시맨틱 검색 + 연결 그래프 |
+| [obsidian-graph-mcp](https://github.com/drewburchfield/obsidian-graph-mcp) | Voyage 임베딩 + pgvector + multi-hop BFS 그래프 탐색 |
+| [graph-rag-mcp-server](https://deepwiki.com/ferparra/graph-rag-mcp-server) | 벡터 + 그래프 하이브리드 검색 + 자동 전략 라우팅 |
+
+**법률 도메인 매핑**:
+
+| Obsidian 기능 | 법률 도메인 매핑 |
+|--------------|----------------|
+| `[[WikiLinks]]` | 법령 간 참조 (「관세법」→「관세법 시행령」) |
+| Backlinks | "이 조문을 참조하는 다른 법령은?" |
+| Graph View | 위임법령 체계(법률→시행령→시행규칙) 시각화 |
+| Tags (`#판례`, `#해석례`) | 문서 유형 분류 |
+| YAML Frontmatter | 법령ID, MST, 공포일, 시행일 등 구조화 메타데이터 |
+| Dataview 플러그인 | "관세법 제38조를 인용하는 모든 판례" 쿼리 |
+
+**실제 GraphRAG + Obsidian 구현 사례**:
+- [obsidianGraphRAG](https://github.com/Jinstronda/obsidianGraphRAG): Obsidian 노트 → 지식그래프 → 하이브리드 검색(벡터+그래프) → LLM 답변
+- [Neural Composer](https://forum.obsidian.md/t/neural-composer-local-graph-rag-made-easy-lightrag-integration/109891): LightRAG 통합 Obsidian 플러그인
+
+**LexDiff 판단**: **시각화/탐색 도구로는 우수, 프로덕션 백엔드로는 부적합**
+- 프로토타이핑과 법령 관계 시각화에 활용 가치 있음
+- 프로덕션 데이터 저장소로는 Neo4j가 더 적합
+- Obsidian vault를 "법령 위키"로 만들고, MCP로 AI에 노출하는 보조 활용은 가능
+
+---
+
+### 7.4 Neo4j — 프로덕션급 법령 그래프 데이터베이스
+
+**무료 옵션**:
+
+| 옵션 | 비용 | 제약 |
+|------|------|------|
+| Community Edition | 무료 (GPLv3) | 단일 인스턴스, 벡터 검색 포함 |
+| AuraDB Free (클라우드) | 무료 | 50K 노드, 175K 관계 |
+| Desktop (개발용) | 무료 | Enterprise 전체 기능, 로컬 전용 |
+
+**법령 Cypher 쿼리 예시**:
+
+```cypher
+-- 위임법령 체계 탐색 (법률 → 시행령 → 시행규칙)
+MATCH path = (law:Law)-[:DELEGATES_TO]->(decree:Decree)-[:DELEGATES_TO]->(rule:Rule)
+WHERE law.name CONTAINS "개인정보"
+RETURN path
+
+-- 특정 조문을 인용하는 모든 판례
+MATCH (p:Precedent)-[:CITES]->(a:Article {jo_code: "003800"})<-[:HAS_ARTICLE]-(l:Law)
+RETURN p.case_number, p.date, a.title
+
+-- 법령 간 참조 네트워크 (가장 많이 참조되는 법령)
+MATCH (a:Article)-[:REFERENCES]->(b:Article)<-[:HAS_ARTICLE]-(other:Law)
+WHERE a.law_name = "민법"
+RETURN DISTINCT other.name, count(*) AS ref_count
+ORDER BY ref_count DESC
+
+-- 하이브리드: 시맨틱 검색 + 그래프 탐색
+CALL db.index.vector.queryNodes('article_embeddings', 5, $queryVector)
+YIELD node, score
+MATCH (node)-[:DELEGATED_BY]->(parent:Law)
+MATCH (node)<-[:CITES]-(p:Precedent)
+RETURN node.text, parent.name, collect(p.case_number) AS cases
+```
+
+**neo4j-graphrag-python 하이브리드 검색**:
+- `VectorRetriever`: 순수 시맨틱 검색
+- `HybridRetriever`: 벡터 + 전문검색 결합 (조문번호 같은 정확 매칭 포착)
+- `HybridCypherRetriever`: 하이브리드 검색 → 그래프 탐색 (관련 시행령, 판례 자동 수집)
+- `Text2Cypher`: 자연어 → Cypher 쿼리 자동 생성
+
+**LexDiff 판단**: 장기적으로 **가장 강력한 옵션**
+- Community Edition 무료, 미니PC Docker로 운행 가능
+- 벡터 검색 + 그래프 탐색 네이티브 지원
+- 법률 도메인의 관계형 특성과 완벽 매칭
+
+---
+
+### 7.5 종합 비교 — 어떤 그래프 RAG를 선택할 것인가
+
+| 기준 | LazyGraphRAG | Neo4j + 벡터 | Obsidian + MCP | LangGraph |
+|------|-------------|-------------|---------------|-----------|
+| **법률 적합성** | 높음 | **최고** | 중간 | 해당없음 (오케스트레이션) |
+| **인덱싱 비용** | **최저** (NLP) | 중간 (임베딩) | 낮음 (WikiLink) | - |
+| **쿼리 비용** | 중간 (LLM) | **낮음** (Cypher) | 낮음 | - |
+| **한국어** | 주의 필요 | **좋음** | 좋음 | 좋음 |
+| **유지보수** | 중간 | 중간 | **낮음** | 높음 |
+| **프로덕션 적합** | 중간 | **높음** | 낮음 | 높음 |
+| **초기 투자** | 낮음 | 중간 | **최저** | 높음 |
+| **현재 엔진 호환** | 별도 파이프라인 | 도구 추가로 통합 가능 | 보조 도구 | 엔진 교체 필요 |
+
+### 7.6 권장 아키텍처 — 단계적 도입
+
+```
+현재 (유지)
+├─ FC-RAG 엔진 (Gemini Function Calling)
+└─ 법제처 API 실시간 호출
+
+Phase A: Obsidian 법령 위키 (1~2주)
+├─ 주요 법령 500개를 Obsidian vault로 구조화
+├─ [[WikiLinks]]로 위임법령 / 참조 관계 인코딩
+├─ YAML frontmatter에 MST, lawId, 시행일 등 메타데이터
+├─ MCP 서버(graph-rag-mcp-server)로 AI 접근 제공
+└─ 효과: 법령 관계 시각화 + 보조 검색 채널
+
+Phase B: Neo4j 그래프 DB (2~4주)
+├─ Community Edition (무료) Docker로 미니PC에 배포
+├─ 법제처 API 크롤링 → Neo4j 노드/관계 생성 파이프라인
+│   ├─ Law, Decree, Rule 노드 (4,000+)
+│   ├─ Article 노드 (400,000+)
+│   ├─ DELEGATES_TO, REFERENCES, HAS_ARTICLE 관계
+│   └─ Gemini text-embedding-004로 조문 임베딩 (무료)
+├─ FC-RAG 엔진에 'graph_search' 도구 추가
+│   └─ 기존 13개 도구에 Neo4j Cypher 검색 도구 1개 추가
+└─ 효과: multi-hop 질문 정확도 3x 향상, 참조법령 자동 탐색
+
+Phase C: LazyGraphRAG 통합 (선택, 4~6주)
+├─ 전체 법령 텍스트에 LazyGraphRAG 인덱싱 (NLP 기반, 저비용)
+├─ Global query 지원 ("한국 개인정보보호 법체계 전반을 설명해줘")
+├─ Gemini Flash로 쿼리 시 커뮤니티 요약 생성
+└─ 효과: 광역 질문 답변 품질 대폭 향상
+```
+
+**핵심 원칙**: 현재 실시간 API 호출 방식을 완전 대체하지 않고, **그래프 검색을 추가 도구로 병합**. 기존 `search_ai_law`, `search_law` 등은 유지하되, 그래프 기반 관계 탐색이 추가되는 구조.
+
+---
+
+## 8. 관련 파일 참조
 
 | 파일 | 내용 |
 |------|------|
@@ -365,4 +576,4 @@ Phase 4 (선택, 장기): 방안 3 — 벡터DB
 
 ---
 
-**버전**: 1.0 | **작성**: 2026-03-04
+**버전**: 1.1 | **작성**: 2026-03-04 | **업데이트**: GraphRAG/LangGraph/Obsidian MCP 검토 추가
