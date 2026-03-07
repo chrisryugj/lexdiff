@@ -25,12 +25,68 @@ import { getArticleHistory, ArticleHistorySchema } from 'korean-law-mcp/build/to
 import { searchOrdinance, SearchOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance-search.js'
 import { getOrdinance, GetOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance.js'
 
+// Tier 3 도구: 확장 (고급검색, 별표, 유사판례, 체계도, 통합검색)
+import { advancedSearch, AdvancedSearchSchema } from 'korean-law-mcp/build/tools/advanced-search.js'
+import { getAnnexes, GetAnnexesSchema } from 'korean-law-mcp/build/tools/annex.js'
+import { findSimilarPrecedents, FindSimilarPrecedentsSchema } from 'korean-law-mcp/build/tools/similar-precedents.js'
+import { getLawTree, GetLawTreeSchema } from 'korean-law-mcp/build/tools/law-tree.js'
+import { searchAll, SearchAllSchema } from 'korean-law-mcp/build/tools/search-all.js'
+
 import type { FunctionDeclaration } from '@google/genai'
 import type { ZodSchema } from 'zod'
 
 // ─── API 클라이언트 (모듈 레벨 싱글턴) ───
 
 const apiClient = new LawApiClient({ apiKey: process.env.LAW_OC || '' })
+
+// ─── API 결과 캐시 ───
+
+interface CacheEntry {
+  result: ToolCallResult
+  expiry: number
+}
+
+const apiCache = new Map<string, CacheEntry>()
+
+const CACHE_TTL: Record<string, number> = {
+  get_law_text: 24 * 3600_000,
+  get_batch_articles: 24 * 3600_000,
+  get_precedent_text: 24 * 3600_000,
+  get_interpretation_text: 24 * 3600_000,
+  get_ordinance: 24 * 3600_000,
+  get_three_tier: 24 * 3600_000,
+  compare_old_new: 24 * 3600_000,
+  get_article_history: 24 * 3600_000,
+  get_annexes: 24 * 3600_000,
+  get_law_tree: 24 * 3600_000,
+  search_law: 6 * 3600_000,
+  search_precedents: 12 * 3600_000,
+  search_interpretations: 12 * 3600_000,
+  search_ordinance: 12 * 3600_000,
+  search_ai_law: 3 * 3600_000,
+  advanced_search: 6 * 3600_000,
+  search_all: 6 * 3600_000,
+  find_similar_precedents: 12 * 3600_000,
+}
+
+const CACHE_MAX_SIZE = 2000
+
+function evictOldest() {
+  if (apiCache.size <= CACHE_MAX_SIZE) return
+  let oldestKey: string | null = null
+  let oldestExpiry = Infinity
+  for (const [key, entry] of apiCache) {
+    if (entry.expiry < oldestExpiry) {
+      oldestExpiry = entry.expiry
+      oldestKey = key
+    }
+  }
+  if (oldestKey) apiCache.delete(oldestKey)
+}
+
+function stableStringify(obj: Record<string, unknown>): string {
+  return JSON.stringify(obj, Object.keys(obj).sort())
+}
 
 // ─── 도구 정의 ───
 
@@ -120,6 +176,37 @@ const TOOLS: ToolDef[] = [
     schema: GetOrdinanceSchema,
     handler: getOrdinance,
   },
+  // Tier 3: 확장 도구
+  {
+    name: 'advanced_search',
+    description: '고급 법령 검색. 법령종류(법률/시행령/시행규칙), 소관부처, 시행일 등 필터로 정밀 검색합니다. search_ai_law나 search_law로 부족할 때 사용.',
+    schema: AdvancedSearchSchema,
+    handler: advancedSearch,
+  },
+  {
+    name: 'get_annexes',
+    description: '법령의 별표·서식을 조회합니다. "관세법 별표 1", "부가가치세법 서식" 등 별표/서식이 필요할 때 사용. mst 필요.',
+    schema: GetAnnexesSchema,
+    handler: getAnnexes,
+  },
+  {
+    name: 'find_similar_precedents',
+    description: '특정 판례와 유사한 판례를 찾습니다. 판례 id를 입력하면 유사 판례 목록을 반환합니다.',
+    schema: FindSimilarPrecedentsSchema,
+    handler: findSimilarPrecedents,
+  },
+  {
+    name: 'get_law_tree',
+    description: '법령의 체계도(목차 구조)를 조회합니다. 법령의 편/장/절/조 구조를 한눈에 파악할 때 사용. mst 필요.',
+    schema: GetLawTreeSchema,
+    handler: getLawTree,
+  },
+  {
+    name: 'search_all',
+    description: '법령·판례·해석례·행정규칙을 통합 검색합니다. 도메인이 불명확할 때 한 번에 검색. 결과에 각 카테고리별 건수와 상위 항목이 포함됩니다.',
+    schema: SearchAllSchema,
+    handler: searchAll,
+  },
 ]
 
 // ─── Gemini FunctionDeclaration 변환 ───
@@ -165,7 +252,7 @@ export interface ToolCallResult {
 }
 
 /**
- * 단일 도구 실행
+ * 단일 도구 실행 (API 캐시 적용)
  */
 export async function executeTool(
   name: string,
@@ -176,17 +263,33 @@ export async function executeTool(
     return { name, result: `알 수 없는 도구: ${name}`, isError: true }
   }
 
+  // 캐시 조회
+  const cacheKey = `${name}:${stableStringify(args)}`
+  const cached = apiCache.get(cacheKey)
+  if (cached && Date.now() < cached.expiry) {
+    return cached.result
+  }
+
   try {
     // Zod parse로 기본값 적용 (Gemini가 optional 파라미터 생략 시)
     const parsedArgs = tool.schema.parse(args)
     const response = await tool.handler(apiClient, parsedArgs)
     const text = response.content.map(c => c.text).join('\n')
     const truncated = truncateForContext(text)
-    return {
+    const result: ToolCallResult = {
       name,
       result: name === 'search_law' ? compressSearchResult(truncated) : truncated,
       isError: response.isError || false,
     }
+
+    // 성공 시 캐시 저장
+    const ttl = CACHE_TTL[name]
+    if (ttl && !result.isError) {
+      apiCache.set(cacheKey, { result, expiry: Date.now() + ttl })
+      evictOldest()
+    }
+
+    return result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { name, result: `도구 실행 오류: ${message}`, isError: true }
