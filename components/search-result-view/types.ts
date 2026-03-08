@@ -31,6 +31,25 @@ export interface OrdinanceSearchResult {
   ordinKind?: string
 }
 
+export interface InterpretationSearchResult {
+  id: string           // 법령해석례일련번호
+  name: string         // 안건명
+  number: string       // 안건번호
+  date: string         // 회신일자
+  agency: string       // 해석기관명
+  link: string         // 상세링크
+}
+
+export interface RulingSearchResult {
+  id: string
+  name: string
+  claimNumber: string
+  decisionDate: string
+  tribunal: string
+  decisionType: string
+  link: string
+}
+
 // ============================================================
 // 검색 모드 타입
 // ============================================================

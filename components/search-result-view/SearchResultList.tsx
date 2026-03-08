@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatDate } from "@/lib/revision-parser"
 import { getLawTypeBadgeClass } from "./utils"
-import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery } from "./types"
+import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery, InterpretationSearchResult, RulingSearchResult } from "./types"
 
 // ============================================================
 // 헬퍼 함수
@@ -205,12 +205,12 @@ const LawResultCard = memo(function LawResultCard({
           {String(law.lawType)}
         </Badge>
         {law.promulgationDate && (
-          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
             공포 {formatDate(String(law.promulgationDate))}
           </Badge>
         )}
         {law.effectiveDate && (
-          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
             시행 {formatDate(String(law.effectiveDate))}
           </Badge>
         )}
@@ -235,7 +235,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
   return (
     <div className="max-w-6xl mx-auto mt-8 p-4 md:p-6 bg-card/30 backdrop-blur-sm border border-border/50 rounded-2xl">
       <div className="flex items-center gap-2 mb-4">
-        <Icon name="sparkles" className="w-5 h-5 text-amber-500" />
+        <Icon name="sparkles" className="w-5 h-5 text-[#b5952f] dark:text-[#e2a85d]" />
         <h3 className="text-lg font-semibold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
           관련 검색어
         </h3>
@@ -244,7 +244,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
         {relatedSearches.map(({ keyword, results }) => (
           <div key={keyword}>
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+              <Badge variant="outline" className="text-xs bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] border-[#d4af37]/20 dark:border-[#e2a85d]/30">
                 {keyword}
               </Badge>
               <span className="text-xs text-muted-foreground">{results.length}건</span>
@@ -254,19 +254,19 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
                 <button
                   key={law.lawId || law.mst}
                   onClick={() => onSelect(law)}
-                  className="group relative p-4 bg-card/50 border border-border/50 rounded-xl hover:border-amber-500/50 hover:shadow-lg transition-all duration-200 text-left"
+                  className="group relative p-4 bg-card/50 border border-border/50 rounded-xl hover:border-[#d4af37]/50 hover:shadow-lg transition-all duration-200 text-left"
                   style={{ fontFamily: "Pretendard, sans-serif" }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm leading-snug mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                      <h4 className="font-medium text-sm leading-snug mb-1 group-hover:text-[#b5952f] dark:group-hover:text-[#e2a85d] transition-colors">
                         {String(law.lawName)}
                       </h4>
                       <Badge variant="secondary" className={`text-xs ${getLawTypeBadgeClass(String(law.lawType))}`}>
                         {String(law.lawType)}
                       </Badge>
                     </div>
-                    <Icon name="chevron-left" className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-amber-500 transition-colors flex-shrink-0" />
+                    <Icon name="chevron-left" className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-[#b5952f] dark:group-hover:text-[#e2a85d] transition-colors flex-shrink-0" />
                   </div>
                 </button>
               ))}
@@ -553,22 +553,159 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
         {ordinance.ordinKind && (
           <Badge
             variant="outline"
-            className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+            className="text-xs px-2 py-0.5 bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border"
           >
             {String(ordinance.ordinKind)}
           </Badge>
         )}
         {ordinance.orgName && (
-          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
             {String(ordinance.orgName)}
           </Badge>
         )}
         {ordinance.effectiveDate && (
-          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
             시행 {formatDate(String(ordinance.effectiveDate))}
           </Badge>
         )}
       </div>
     </button>
+  )
+})
+
+// ============================================================
+// 해석례 검색 결과 리스트
+// ============================================================
+
+interface InterpretationResultListProps {
+  results: InterpretationSearchResult[]
+  onBack: () => void
+}
+
+export const InterpretationResultList = memo(function InterpretationResultList({
+  results,
+  onBack,
+}: InterpretationResultListProps) {
+  return (
+    <div className="space-y-3">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1 px-2">
+            <Icon name="arrow-left" className="h-4 w-4" />
+            돌아가기
+          </Button>
+          <h3 className="text-base font-semibold text-foreground">
+            해석례 검색 결과
+          </h3>
+          <Badge variant="secondary" className="text-xs">
+            {results.length}건
+          </Badge>
+        </div>
+      </div>
+
+      {/* 결과 리스트 */}
+      <div className="space-y-2">
+        {results.map((item, index) => (
+          <a
+            key={item.id || index}
+            href={item.link || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block p-4 bg-card/50 border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 animate-fade-in"
+            style={{ animationDelay: `${index * 50}ms`, fontFamily: "Pretendard, sans-serif" }}
+          >
+            <h4 className="font-bold text-sm md:text-base leading-tight mb-2 text-foreground">
+              {item.name || '(안건명 없음)'}
+            </h4>
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {item.number && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-300/50">
+                  {item.number}
+                </Badge>
+              )}
+              {item.agency && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                  {item.agency}
+                </Badge>
+              )}
+              {item.date && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                  회신 {item.date}
+                </Badge>
+              )}
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+})
+
+interface RulingResultListProps {
+  results: RulingSearchResult[]
+  onBack: () => void
+}
+
+export const RulingResultList = memo(function RulingResultList({
+  results,
+  onBack,
+}: RulingResultListProps) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1 px-2">
+            <Icon name="arrow-left" className="h-4 w-4" />
+            돌아가기
+          </Button>
+          <h3 className="text-base font-semibold text-foreground">
+            재결례 검색결과
+          </h3>
+          <Badge variant="secondary" className="text-xs">
+            {results.length}건
+          </Badge>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {results.map((item, index) => (
+          <a
+            key={item.id || index}
+            href={item.link || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block p-4 bg-card/50 border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 animate-fade-in"
+            style={{ animationDelay: `${index * 50}ms`, fontFamily: "Pretendard, sans-serif" }}
+          >
+            <h4 className="font-bold text-sm md:text-base leading-tight mb-2 text-foreground">
+              {item.name || '(사건명 없음)'}
+            </h4>
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {item.claimNumber && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300/50">
+                  {item.claimNumber}
+                </Badge>
+              )}
+              {item.tribunal && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                  {item.tribunal}
+                </Badge>
+              )}
+              {item.decisionType && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                  {item.decisionType}
+                </Badge>
+              )}
+              {item.decisionDate && (
+                <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border">
+                  재결 {item.decisionDate}
+                </Badge>
+              )}
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
   )
 })

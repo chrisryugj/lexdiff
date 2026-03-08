@@ -1,723 +1,691 @@
 /**
  * useSearchHandlers/useUnifiedSearch.ts
  *
- * 통합검색 핸들러 (판례/해석례/재결례 + 페이지네이션)
+ * Unified search handlers for precedent, interpretation, and ruling flows.
  */
 
 import { useCallback } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
+import { formatPrecedentDate, type PrecedentDetail, type PrecedentSearchResult } from "@/lib/precedent-parser"
+import type { SearchResultCache } from "@/lib/search-result-store"
+import type { InterpretationSearchResult, LawDataState, RulingSearchResult } from "../../types"
 import type { HandlerDeps, SearchQuery } from "./types"
 
 interface UseUnifiedSearchDeps extends HandlerDeps {
   handleSearch: (query: SearchQuery) => void
-  handleSearchInternal: (query: SearchQuery, signal?: AbortSignal, forcedMode?: 'law' | 'ai', skipCache?: boolean) => Promise<void>
+  handleSearchInternal: (
+    query: SearchQuery,
+    signal?: AbortSignal,
+    forcedMode?: "law" | "ai",
+    skipCache?: boolean
+  ) => Promise<void>
+}
+
+interface PrecedentSearchResponse {
+  precedents: PrecedentSearchResult[]
+  totalCount?: number
+  yearFilter?: string
+  courtFilter?: string
+}
+
+interface InterpretationSearchResponse {
+  interpretations: InterpretationSearchResult[]
+}
+
+interface RulingSearchResponse {
+  rulings: RulingSearchResult[]
+}
+
+function cleanPrecedentHtml(text: string): string {
+  if (!text) return ""
+
+  return text
+    .replace(/<br\\>/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+async function buildPrecedentLawData(precedentId: string, precedent: PrecedentDetail): Promise<LawDataState> {
+  const { generateLinks } = await import("@/lib/unified-link-generator")
+
+  const toSection = (jo: string, title: string, content: string) => ({
+    jo,
+    joNum: title,
+    title,
+    content: generateLinks(cleanPrecedentHtml(content), {
+      mode: "aggressive",
+      enableSameRef: true,
+      enableAdminRules: false,
+      enablePrecedents: true,
+    }),
+  })
+
+  const articles = [
+    precedent.holdings ? toSection("000001", "판시사항", precedent.holdings) : null,
+    precedent.summary ? toSection("000002", "판결요지", precedent.summary) : null,
+    precedent.refStatutes ? toSection("000003", "참조조문", precedent.refStatutes) : null,
+    precedent.refPrecedents ? toSection("000004", "참조판례", precedent.refPrecedents) : null,
+    precedent.fullText ? toSection("000005", "판결문", precedent.fullText) : null,
+  ].filter(Boolean) as LawDataState["articles"]
+
+  return {
+    meta: {
+      lawId: `prec-${precedentId}`,
+      lawTitle: precedent.name,
+      promulgationDate: formatPrecedentDate(precedent.date),
+      lawType: `${precedent.court} ${precedent.judgmentType}`.trim(),
+      isOrdinance: false,
+      fetchedAt: new Date().toISOString(),
+      caseNumber: precedent.caseNumber,
+    },
+    articles,
+    selectedJo: undefined,
+    viewMode: "full",
+    isPrecedent: true,
+  }
 }
 
 export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
-  const { state, actions, toast, searchId, onPrecedentSelect, handleSearch, handleSearchInternal } = deps
+  const { state, actions, toast, searchId, onPrecedentSelect, handleSearchInternal } = deps
 
-  // ============================================================
-  // 판례 검색
-  // ============================================================
-  const handlePrecedentSearch = useCallback(async (query: SearchQuery) => {
-    debugLogger.info('[통합검색] 판례 검색 실행', { query })
+  const clearSecondaryResults = useCallback(() => {
+    actions.setLawSelectionState(null)
+    actions.setOrdinanceSelectionState(null)
+    actions.setSearchResults({ laws: [], ordinances: [] })
+    actions.setLawData(null)
+    actions.setArticleNotFound(null)
+    actions.setRelatedSearches([])
+    actions.setPrecedentResults(null)
+    actions.setPrecedentTotalCount(0)
+    actions.setPrecedentPage(1)
+    actions.setPrecedentYearFilter(undefined)
+    actions.setPrecedentCourtFilter(undefined)
+    actions.setInterpretationResults(null)
+    actions.setRulingResults(null)
+    actions.setOrdinancePage(1)
+    actions.setOrdinanceTotalCount(0)
+  }, [actions])
 
-    try {
-      const classification = (query as any).classification
-      const caseNumber = classification?.entities?.caseNumber
-      const court = classification?.entities?.court
-      const searchQuery = caseNumber || query.lawName || query.article || ''
+  const persistSearchCache = useCallback(
+    async (updates: Partial<SearchResultCache>) => {
+      if (!searchId) return
 
-      if (!searchQuery) {
-        toast({
-          title: "검색어 오류",
-          description: "판례 검색어를 입력해주세요.",
-          variant: "destructive"
+      const { getSearchResult, saveSearchResult } = await import("@/lib/search-result-store")
+      const existingCache = await getSearchResult(searchId)
+      const baseCache: SearchResultCache = existingCache ?? {
+        searchId,
+        query: { lawName: "" },
+        timestamp: Date.now(),
+        expiresAt: Date.now(),
+      }
+
+      await saveSearchResult({
+        ...baseCache,
+        ...updates,
+        searchId,
+      })
+    },
+    [searchId]
+  )
+
+  const handlePrecedentSearch = useCallback(
+    async (query: SearchQuery) => {
+      debugLogger.info("[unified-search] precedent search", { query })
+
+      try {
+        const classification = (query as SearchQuery & { classification?: any }).classification
+        const caseNumber = classification?.entities?.caseNumber
+        const court = classification?.entities?.court
+        const searchQuery = caseNumber || query.lawName || query.article || ""
+
+        if (!searchQuery) {
+          toast({
+            title: "검색어 오류",
+            description: "판례 검색어를 입력해 주세요.",
+            variant: "destructive",
+          })
+          return false
+        }
+
+        actions.setIsAiMode(false)
+        actions.setSearchMode("basic")
+        clearSecondaryResults()
+        actions.setSearchQuery(searchQuery)
+        actions.setUserQuery(searchQuery)
+        actions.setIsSearching(true)
+        actions.setMobileView("list")
+
+        const params = new URLSearchParams({
+          query: searchQuery,
+          display: String(state.precedentPageSize),
         })
-        return
-      }
+        if (court) params.append("court", court)
+        if (caseNumber) params.append("caseNumber", caseNumber)
 
-      // 판례 검색 모드로 명시적 설정 (AI 모드 비활성화)
-      actions.setIsAiMode(false)
-      actions.setSearchMode('basic')
+        const response = await fetch(`/api/precedent-search?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`판례 검색 실패: ${response.status}`)
+        }
 
-      // 기존 법령/조례 검색 상태 초기화
-      actions.setLawSelectionState(null)
-      actions.setOrdinanceSelectionState(null)
-      actions.setLawData(null)
+        const data = (await response.json()) as PrecedentSearchResponse
 
-      // 검색어 업데이트 (헤더 표시용)
-      actions.setSearchQuery(searchQuery)
-      actions.setUserQuery(searchQuery)
-
-      // 로딩 상태로 전환
-      actions.setIsSearching(true)
-
-      // API 호출
-      const params = new URLSearchParams({ query: searchQuery, display: String(state.precedentPageSize) })
-      if (court) params.append('court', court)
-      if (caseNumber) params.append('caseNumber', caseNumber)
-
-      const apiUrl = `/api/precedent-search?${params.toString()}`
-      debugLogger.info('[통합검색] 판례 API 호출', { url: apiUrl })
-
-      const res = await fetch(apiUrl)
-
-      if (!res.ok) {
-        const errorText = await res.text()
-        debugLogger.error('[통합검색] 판례 API 에러', { status: res.status, error: errorText })
-        throw new Error(`판례 검색 실패: ${res.status}`)
-      }
-
-      const data = await res.json()
-      debugLogger.info('[통합검색] 판례 API 응답', { data })
-
-      // 결과 표시
-      if (data.precedents && data.precedents.length > 0) {
-        actions.setPrecedentResults(data.precedents)
-        actions.setPrecedentTotalCount(data.totalCount || data.precedents.length)
+        actions.setPrecedentResults(data.precedents ?? [])
+        actions.setPrecedentTotalCount(data.totalCount ?? data.precedents?.length ?? 0)
         actions.setPrecedentPage(1)
         actions.setPrecedentYearFilter(data.yearFilter)
         actions.setPrecedentCourtFilter(data.courtFilter)
 
-        // IndexedDB에 검색 결과 저장 (뒤로가기용)
-        if (searchId) {
-          const { getSearchResult, saveSearchResult } = await import('@/lib/search-result-store')
-          const cached = await getSearchResult(searchId)
-          if (cached) {
-            await saveSearchResult({
-              ...cached,
-              precedentResults: data.precedents.map((p: any) => ({
-                id: p.id,
-                name: p.name,
-                caseNumber: p.caseNumber,
-                court: p.court,
-                date: p.date,
-                judgmentType: p.judgmentType
-              })),
-              precedentDetail: undefined
-            })
-          }
+        if ((data.precedents?.length ?? 0) === 0) {
+          toast({
+            title: "검색 결과 없음",
+            description: "판례를 찾을 수 없습니다.",
+            variant: "default",
+          })
+          return false
         }
+
+        await persistSearchCache({
+          query: { lawName: searchQuery },
+          lawData: undefined,
+          aiMode: undefined,
+          interpretationResults: undefined,
+          rulingResults: undefined,
+          precedentResults: data.precedents.map((item) => ({
+            id: item.id,
+            name: item.name,
+            caseNumber: item.caseNumber,
+            court: item.court,
+            date: item.date,
+            judgmentType: item.type,
+          })),
+          precedentDetail: undefined,
+        })
 
         toast({
           title: "판례 검색 완료",
           description: `${data.precedents.length}건의 판례를 찾았습니다.`,
-          variant: "default"
+          variant: "default",
         })
-
-        debugLogger.info('[통합검색] 판례 검색 결과', { count: data.precedents.length, results: data.precedents })
-      } else {
-        actions.setPrecedentResults([])
-
+        return true
+      } catch (error) {
+        debugLogger.error("[unified-search] precedent search failed", error)
         toast({
-          title: "검색 결과 없음",
-          description: "판례를 찾을 수 없습니다.",
-          variant: "default"
+          title: "판례 검색 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
         })
+        return false
+      } finally {
+        actions.setIsSearching(false)
       }
-    } catch (error) {
-      debugLogger.error('[통합검색] 판례 검색 실패', error)
-      toast({
-        title: "판례 검색 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, searchId, state.precedentPageSize])
+    },
+    [actions, clearSecondaryResults, persistSearchCache, state.precedentPageSize, toast]
+  )
 
-  // ============================================================
-  // 판례 선택 (상세 보기)
-  // ============================================================
-  const handlePrecedentSelect = useCallback(async (precedentId: string) => {
-    debugLogger.info('[통합검색] 판례 선택', { id: precedentId })
+  const handlePrecedentSelect = useCallback(
+    async (precedentId: string) => {
+      debugLogger.info("[unified-search] precedent detail", { precedentId })
 
-    try {
-      actions.setIsSearching(true)
-      actions.updateProgress('parsing', 50)
+      try {
+        actions.setIsSearching(true)
+        actions.updateProgress("parsing", 50)
 
-      const res = await fetch(`/api/precedent-detail?id=${precedentId}`)
-
-      if (!res.ok) {
-        throw new Error(`판례 조회 실패: ${res.status}`)
-      }
-
-      const precedent = await res.json()
-      debugLogger.info('[통합검색] 판례 상세 조회 완료', { precedent })
-
-      actions.updateProgress('parsing', 80)
-
-      // 판례 내용을 법령 뷰어 형식으로 변환
-      const { formatPrecedentDate } = await import('@/lib/precedent-parser')
-      const { generateLinks } = await import('@/lib/unified-link-generator')
-
-      const articles: Array<{ jo: string; joNum: string; content: string; title: string }> = []
-
-      // HTML 태그 정리 함수
-      const cleanHtml = (text: string) => {
-        return text
-          .replace(/<br\\>/g, '\n')
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&amp;/g, '&')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim()
-      }
-
-      // 링크 적용 함수
-      const applyLinks = (text: string, enablePrecedents: boolean = false) => {
-        let result = generateLinks(text, {
-          mode: 'aggressive',
-          enableSameRef: true,
-          enableAdminRules: false,
-          enablePrecedents,
-        })
-
-        if (enablePrecedents) {
-          result = result.replace(
-            /【\s*원심\s*판결\s*】[\s\S]*?(?=【|$)/gi,
-            (section) => section.replace(
-              /<a[^>]*class="[^"]*precedent-ref[^"]*"[^>]*>([\s\S]*?)<\/a>/gi,
-              '$1'
-            )
-          )
+        const response = await fetch(`/api/precedent-detail?id=${encodeURIComponent(precedentId)}`)
+        if (!response.ok) {
+          throw new Error(`판례 조회 실패: ${response.status}`)
         }
 
-        return result
-      }
+        const precedent = (await response.json()) as PrecedentDetail
+        const lawData = await buildPrecedentLawData(precedentId, precedent)
 
-      let sectionCounter = 1
+        actions.setLawData(lawData)
+        actions.setPrecedentResults(null)
+        actions.setInterpretationResults(null)
+        actions.setRulingResults(null)
+        actions.setMobileView("content")
+        actions.updateProgress("complete", 100)
 
-      // 1. 판시사항
-      if (precedent.holdings) {
-        articles.push({
-          jo: String(sectionCounter).padStart(6, '0'),
-          joNum: '판시사항',
-          content: applyLinks(cleanHtml(precedent.holdings), true),
-          title: '판시사항'
-        })
-        sectionCounter++
-      }
+        if (searchId) {
+          const [{ pushPrecedentHistory }, { getSearchResult, saveSearchResult }] = await Promise.all([
+            import("@/lib/history-manager"),
+            import("@/lib/search-result-store"),
+          ])
 
-      // 2. 판결요지
-      if (precedent.summary) {
-        articles.push({
-          jo: String(sectionCounter).padStart(6, '0'),
-          joNum: '판결요지',
-          content: applyLinks(cleanHtml(precedent.summary), true),
-          title: '판결요지'
-        })
-        sectionCounter++
-      }
+          pushPrecedentHistory(searchId, precedentId, state.searchMode)
 
-      // 3. 참조조문
-      if (precedent.refStatutes) {
-        articles.push({
-          jo: String(sectionCounter).padStart(6, '0'),
-          joNum: '참조조문',
-          content: applyLinks(cleanHtml(precedent.refStatutes), true),
-          title: '참조조문'
-        })
-        sectionCounter++
-      }
-
-      // 4. 참조판례
-      if (precedent.refPrecedents) {
-        articles.push({
-          jo: String(sectionCounter).padStart(6, '0'),
-          joNum: '참조판례',
-          content: applyLinks(cleanHtml(precedent.refPrecedents), true),
-          title: '참조판례'
-        })
-        sectionCounter++
-      }
-
-      // 5. 전문 처리
-      if (precedent.fullText) {
-        const fullText = cleanHtml(precedent.fullText)
-        const sectionPattern = /【([^】]+)】/g
-        const sectionTitles: string[] = []
-        let match
-
-        while ((match = sectionPattern.exec(fullText)) !== null) {
-          sectionTitles.push(match[1].trim())
+          const cached = await getSearchResult(searchId)
+          if (cached) {
+            await saveSearchResult({
+              ...cached,
+              precedentDetail: {
+                id: precedentId,
+                lawData,
+              },
+            })
+          }
         }
 
-        if (sectionTitles.length > 0) {
-          sectionTitles.forEach((title, idx) => {
-            const startMarker = `【${title}】`
-            const endMarker = idx < sectionTitles.length - 1 ? `【${sectionTitles[idx + 1]}】` : null
-
-            const startIdx = fullText.indexOf(startMarker)
-            if (startIdx === -1) return
-
-            let content = endMarker
-              ? fullText.substring(startIdx + startMarker.length, fullText.indexOf(endMarker))
-              : fullText.substring(startIdx + startMarker.length)
-
-            content = content.trim()
-            if (content) {
-              articles.push({
-                jo: String(sectionCounter).padStart(6, '0'),
-                joNum: title,
-                content: applyLinks(content, true),
-                title: title
-              })
-              sectionCounter++
-            }
-          })
-        } else {
-          articles.push({
-            jo: String(sectionCounter).padStart(6, '0'),
-            joNum: '판결문',
-            content: applyLinks(fullText, true),
-            title: '판결문'
-          })
-        }
-      }
-
-      const lawData = {
-        meta: {
-          lawId: `prec-${precedentId}`,
-          lawTitle: precedent.name,
-          promulgationDate: formatPrecedentDate(precedent.date),
-          lawType: `${precedent.court} ${precedent.judgmentType}`,
-          isOrdinance: false,
-          fetchedAt: new Date().toISOString(),
-          caseNumber: precedent.caseNumber
-        },
-        articles,
-        selectedJo: undefined,
-        viewMode: 'full' as const,
-        isPrecedent: true
-      }
-
-      actions.setLawData(lawData)
-      actions.setPrecedentResults(null)
-      actions.setMobileView("content")
-      actions.updateProgress('complete', 100)
-
-      // 히스토리에 판례 상세 상태 추가
-      if (searchId) {
-        const { pushPrecedentHistory } = await import('@/lib/history-manager')
-        pushPrecedentHistory(searchId, precedentId, state.searchMode)
-        debugLogger.info('[통합검색] 판례 상세 히스토리 추가', { searchId, precedentId })
-
-        // IndexedDB에 판례 상세 저장
-        const { getSearchResult, saveSearchResult } = await import('@/lib/search-result-store')
-        const cached = await getSearchResult(searchId)
-        if (cached) {
-          await saveSearchResult({
-            ...cached,
-            precedentDetail: {
-              id: precedentId,
-              lawData
-            }
-          })
-        }
+        const { addRecentPrecedent } = await import("@/lib/recent-precedent-store")
+        await addRecentPrecedent({
+          id: precedentId,
+          caseNumber: precedent.caseNumber || "",
+          caseName: precedent.name || "",
+          court: precedent.court || "",
+          date: precedent.date || "",
+        })
 
         onPrecedentSelect?.(precedentId)
+      } catch (error) {
+        debugLogger.error("[unified-search] precedent detail failed", error)
+        toast({
+          title: "판례 조회 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
       }
+    },
+    [actions, onPrecedentSelect, searchId, state.searchMode, toast]
+  )
 
-      // 최근 조회 판례 저장
-      const { addRecentPrecedent } = await import('@/lib/recent-precedent-store')
-      await addRecentPrecedent({
-        id: precedentId,
-        caseNumber: precedent.caseNumber || '',
-        caseName: precedent.name || '',
-        court: precedent.court || '',
-        date: precedent.date || '',
-      })
-
-      debugLogger.success('[통합검색] 판례 뷰어 표시 완료')
-    } catch (error) {
-      debugLogger.error('[통합검색] 판례 조회 실패', error)
-      toast({
-        title: "판례 조회 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, searchId, state.searchMode, onPrecedentSelect])
-
-  // ============================================================
-  // 법령/판례 강제 새로고침
-  // ============================================================
   const handleRefresh = useCallback(() => {
     if (!state.lawData) {
-      toast({ title: "새로고침 실패", description: "데이터가 없습니다.", variant: "destructive" })
-      return
-    }
-    debugLogger.info('🔄 법령/판례 강제 새로고침 (캐시 무시)', {
-      lawTitle: state.lawData.meta.lawTitle,
-      isPrecedent: state.lawData.isPrecedent,
-      lawId: state.lawData.meta.lawId
-    })
-
-    if (state.lawData.isPrecedent && state.lawData.meta.lawId?.startsWith('prec-')) {
-      const precedentId = state.lawData.meta.lawId.replace('prec-', '')
-      debugLogger.info('🔄 판례 새로고침', { precedentId })
-      handlePrecedentSelect(precedentId)
-      return
-    }
-
-    handleSearchInternal(
-      { lawName: state.lawData.meta.lawTitle },
-      undefined,
-      'law',
-      true
-    )
-  }, [state.lawData, handleSearchInternal, handlePrecedentSelect, toast])
-
-  // ============================================================
-  // 해석례 검색
-  // ============================================================
-  const handleInterpretationSearch = useCallback(async (query: SearchQuery) => {
-    debugLogger.info('[통합검색] 해석례 검색 실행', { query })
-
-    try {
-      const classification = (query as any).classification
-      const ruleType = classification?.entities?.ruleType
-      const lawName = classification?.entities?.lawName || query.lawName
-      const searchQuery = lawName || query.article || ''
-
-      if (!searchQuery) {
-        toast({
-          title: "검색어 오류",
-          description: "해석례 검색어를 입력해주세요.",
-          variant: "destructive"
-        })
-        return
-      }
-
-      actions.setIsAiMode(false)
-      actions.setSearchMode('basic')
-      actions.setLawSelectionState(null)
-      actions.setOrdinanceSelectionState(null)
-      actions.setLawData(null)
-      actions.setSearchQuery(searchQuery)
-      actions.setUserQuery(searchQuery)
-      actions.setIsSearching(true)
-
-      const params = new URLSearchParams({ query: searchQuery })
-      if (ruleType) params.append('ruleType', ruleType)
-
-      const res = await fetch(`/api/interpretation-search?${params.toString()}`)
-
-      if (!res.ok) {
-        throw new Error(`해석례 검색 실패: ${res.status}`)
-      }
-
-      const data = await res.json()
-
-      if (data.interpretations && data.interpretations.length > 0) {
-        toast({
-          title: "⚠️ 해석례 검색 기능 준비 중",
-          description: `${data.interpretations.length}건의 해석례를 찾았지만, 표시 화면이 아직 구현되지 않았습니다.`,
-          variant: "default"
-        })
-        debugLogger.info('[통합검색] 해석례 검색 결과', { count: data.interpretations.length })
-      } else {
-        toast({
-          title: "검색 결과 없음",
-          description: "해석례를 찾을 수 없습니다.",
-          variant: "default"
-        })
-      }
-
-      actions.resetToHome()
-    } catch (error) {
-      debugLogger.error('[통합검색] 해석례 검색 실패', error)
       toast({
-        title: "해석례 검색 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
+        title: "새로고침 실패",
+        description: "현재 표시 중인 데이터가 없습니다.",
+        variant: "destructive",
       })
-    } finally {
-      actions.setIsSearching(false)
+      return
     }
-  }, [toast, actions])
 
-  // ============================================================
-  // 재결례 검색
-  // ============================================================
-  const handleRulingSearch = useCallback(async (query: SearchQuery) => {
-    debugLogger.info('[통합검색] 재결례 검색 실행', { query })
+    if (state.lawData.isPrecedent && state.lawData.meta.lawId?.startsWith("prec-")) {
+      void handlePrecedentSelect(state.lawData.meta.lawId.replace("prec-", ""))
+      return
+    }
 
-    try {
-      const classification = (query as any).classification
-      const rulingNumber = classification?.entities?.rulingNumber
-      const searchQuery = rulingNumber || query.lawName || ''
+    void handleSearchInternal({ lawName: state.lawData.meta.lawTitle }, undefined, "law", true)
+  }, [handlePrecedentSelect, handleSearchInternal, state.lawData, toast])
 
-      if (!searchQuery) {
-        toast({
-          title: "검색어 오류",
-          description: "재결례 검색어를 입력해주세요.",
-          variant: "destructive"
+  const handleInterpretationSearch = useCallback(
+    async (query: SearchQuery) => {
+      debugLogger.info("[unified-search] interpretation search", { query })
+
+      try {
+        const classification = (query as SearchQuery & { classification?: any }).classification
+        const ruleType = classification?.entities?.ruleType
+        const lawName = classification?.entities?.lawName || query.lawName
+        const searchQuery = lawName || query.article || ""
+
+        if (!searchQuery) {
+          toast({
+            title: "검색어 오류",
+            description: "해석례 검색어를 입력해 주세요.",
+            variant: "destructive",
+          })
+          return false
+        }
+
+        actions.setIsAiMode(false)
+        actions.setSearchMode("basic")
+        clearSecondaryResults()
+        actions.setSearchQuery(searchQuery)
+        actions.setUserQuery(searchQuery)
+        actions.setIsSearching(true)
+        actions.setMobileView("list")
+
+        const params = new URLSearchParams({ query: searchQuery })
+        if (ruleType) params.append("ruleType", ruleType)
+
+        const response = await fetch(`/api/interpretation-search?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`해석례 검색 실패: ${response.status}`)
+        }
+
+        const data = (await response.json()) as InterpretationSearchResponse
+        actions.setInterpretationResults(data.interpretations ?? [])
+
+        if ((data.interpretations?.length ?? 0) === 0) {
+          toast({
+            title: "검색 결과 없음",
+            description: "해석례를 찾을 수 없습니다.",
+            variant: "default",
+          })
+          return false
+        }
+
+        await persistSearchCache({
+          query: { lawName: searchQuery },
+          lawData: undefined,
+          aiMode: undefined,
+          precedentResults: undefined,
+          precedentDetail: undefined,
+          rulingResults: undefined,
+          interpretationResults: data.interpretations.map((item) => ({
+            id: item.id,
+            name: item.name,
+            number: item.number,
+            date: item.date,
+            agency: item.agency,
+            link: item.link,
+          })),
         })
-        return
+
+        toast({
+          title: "해석례 검색 완료",
+          description: `${data.interpretations.length}건의 해석례를 찾았습니다.`,
+          variant: "default",
+        })
+        return true
+      } catch (error) {
+        debugLogger.error("[unified-search] interpretation search failed", error)
+        toast({
+          title: "해석례 검색 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+        return false
+      } finally {
+        actions.setIsSearching(false)
       }
+    },
+    [actions, clearSecondaryResults, persistSearchCache, toast]
+  )
 
-      actions.setIsAiMode(false)
-      actions.setSearchMode('basic')
-      actions.setLawSelectionState(null)
-      actions.setOrdinanceSelectionState(null)
-      actions.setLawData(null)
-      actions.setSearchQuery(searchQuery)
-      actions.setUserQuery(searchQuery)
-      actions.setIsSearching(true)
+  const handleRulingSearch = useCallback(
+    async (query: SearchQuery) => {
+      debugLogger.info("[unified-search] ruling search", { query })
 
-      const res = await fetch(`/api/ruling-search?query=${encodeURIComponent(searchQuery)}`)
+      try {
+        const classification = (query as SearchQuery & { classification?: any }).classification
+        const rulingNumber = classification?.entities?.rulingNumber
+        const searchQuery = rulingNumber || query.lawName || ""
 
-      if (!res.ok) {
-        throw new Error(`재결례 검색 실패: ${res.status}`)
-      }
+        if (!searchQuery) {
+          toast({
+            title: "검색어 오류",
+            description: "재결례 검색어를 입력해 주세요.",
+            variant: "destructive",
+          })
+          return false
+        }
 
-      const data = await res.json()
+        actions.setIsAiMode(false)
+        actions.setSearchMode("basic")
+        clearSecondaryResults()
+        actions.setSearchQuery(searchQuery)
+        actions.setUserQuery(searchQuery)
+        actions.setIsSearching(true)
+        actions.setMobileView("list")
 
-      if (data.rulings && data.rulings.length > 0) {
+        const response = await fetch(`/api/ruling-search?query=${encodeURIComponent(searchQuery)}`)
+        if (!response.ok) {
+          throw new Error(`재결례 검색 실패: ${response.status}`)
+        }
+
+        const data = (await response.json()) as RulingSearchResponse
+        actions.setRulingResults(data.rulings ?? [])
+
+        if ((data.rulings?.length ?? 0) === 0) {
+          toast({
+            title: "검색 결과 없음",
+            description: "재결례를 찾을 수 없습니다.",
+            variant: "default",
+          })
+          return false
+        }
+
+        await persistSearchCache({
+          query: { lawName: searchQuery },
+          lawData: undefined,
+          aiMode: undefined,
+          precedentResults: undefined,
+          precedentDetail: undefined,
+          interpretationResults: undefined,
+          rulingResults: data.rulings.map((item) => ({
+            id: item.id,
+            name: item.name,
+            claimNumber: item.claimNumber,
+            decisionDate: item.decisionDate,
+            tribunal: item.tribunal,
+            decisionType: item.decisionType,
+            link: item.link,
+          })),
+        })
+
         toast({
           title: "재결례 검색 완료",
           description: `${data.rulings.length}건의 재결례를 찾았습니다.`,
-          variant: "default"
+          variant: "default",
         })
-        debugLogger.info('[통합검색] 재결례 검색 결과', { count: data.rulings.length })
-      } else {
+        return true
+      } catch (error) {
+        debugLogger.error("[unified-search] ruling search failed", error)
         toast({
-          title: "검색 결과 없음",
-          description: "재결례를 찾을 수 없습니다.",
-          variant: "default"
+          title: "재결례 검색 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
         })
+        return false
+      } finally {
+        actions.setIsSearching(false)
       }
-    } catch (error) {
-      debugLogger.error('[통합검색] 재결례 검색 실패', error)
-      toast({
-        title: "재결례 검색 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions])
+    },
+    [actions, clearSecondaryResults, persistSearchCache, toast]
+  )
 
-  // ============================================================
-  // 복합 검색
-  // ============================================================
-  const handleMultiSearch = useCallback(async (query: SearchQuery) => {
-    debugLogger.info('[통합검색] 복합 검색 실행', { query })
+  const handleMultiSearch = useCallback(
+    async (query: SearchQuery) => {
+      debugLogger.info("[unified-search] multi search", { query })
 
-    try {
-      const classification = (query as any).classification
-      const secondaryTypes = classification?.secondaryTypes || []
+      const classification = (query as SearchQuery & { classification?: any }).classification
+      const secondaryTypes = Array.from(new Set<string>(classification?.secondaryTypes || []))
 
       if (secondaryTypes.length === 0) {
         toast({
-          title: "복합 검색 오류",
-          description: "검색 타입을 확인할 수 없습니다.",
-          variant: "destructive"
+          title: "통합 검색 오류",
+          description: "검색 경로를 확인할 수 없습니다.",
+          variant: "destructive",
         })
         return
       }
 
       actions.setIsSearching(true)
 
-      toast({
-        title: "복합 검색 시작",
-        description: `${secondaryTypes.length}개 소스에서 검색 중...`,
-        variant: "default"
-      })
-
-      const promises = secondaryTypes.map(async (type: string) => {
-        switch (type) {
-          case 'law':
-            return handleSearch(query)
-          case 'precedent':
-            return handlePrecedentSearch(query)
-          case 'interpretation':
-            return handleInterpretationSearch(query)
-          case 'ruling':
-            return handleRulingSearch(query)
-          default:
-            return Promise.resolve()
+      try {
+        for (const type of secondaryTypes) {
+          switch (type) {
+            case "precedent":
+              if (await handlePrecedentSearch(query)) return
+              break
+            case "interpretation":
+              if (await handleInterpretationSearch(query)) return
+              break
+            case "ruling":
+              if (await handleRulingSearch(query)) return
+              break
+            case "law":
+              await handleSearchInternal(query, undefined, "law")
+              return
+            default:
+              break
+          }
         }
-      })
 
-      await Promise.all(promises)
-
-      debugLogger.info('[통합검색] 복합 검색 완료', { types: secondaryTypes })
-    } catch (error) {
-      debugLogger.error('[통합검색] 복합 검색 실패', error)
-      toast({
-        title: "복합 검색 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, handleSearch, handlePrecedentSearch, handleInterpretationSearch, handleRulingSearch])
-
-  // ============================================================
-  // 판례 페이지네이션
-  // ============================================================
-  const handlePrecedentPageChange = useCallback(async (page: number) => {
-    debugLogger.info('[판례] 페이지 변경', { page })
-
-    try {
-      actions.setIsSearching(true)
-      actions.setPrecedentPage(page)
-
-      const params = new URLSearchParams({
-        query: state.userQuery || '',
-        page: page.toString(),
-        display: String(state.precedentPageSize)
-      })
-
-      const res = await fetch(`/api/precedent-search?${params.toString()}`)
-
-      if (!res.ok) {
-        throw new Error(`판례 검색 실패: ${res.status}`)
+        toast({
+          title: "검색 결과 없음",
+          description: "통합 검색 경로에서 결과를 찾지 못했습니다.",
+          variant: "default",
+        })
+      } catch (error) {
+        debugLogger.error("[unified-search] multi search failed", error)
+        toast({
+          title: "통합 검색 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
       }
+    },
+    [actions, handleInterpretationSearch, handlePrecedentSearch, handleRulingSearch, handleSearchInternal, toast]
+  )
 
-      const data = await res.json()
+  const handlePrecedentPageChange = useCallback(
+    async (page: number) => {
+      try {
+        actions.setIsSearching(true)
+        actions.setPrecedentPage(page)
 
-      actions.setPrecedentResults(data.precedents || [])
-      actions.setPrecedentTotalCount(data.totalCount || 0)
-      actions.setPrecedentYearFilter(data.yearFilter)
-      actions.setPrecedentCourtFilter(data.courtFilter)
+        const params = new URLSearchParams({
+          query: state.userQuery || "",
+          page: page.toString(),
+          display: String(state.precedentPageSize),
+        })
 
-    } catch (error) {
-      debugLogger.error('[판례] 페이지 변경 실패', error)
-      toast({
-        title: "페이지 로드 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, state.userQuery, state.precedentPageSize])
+        const response = await fetch(`/api/precedent-search?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`판례 검색 실패: ${response.status}`)
+        }
 
-  const handlePrecedentPageSizeChange = useCallback(async (size: number) => {
-    debugLogger.info('[판례] 페이지 크기 변경', { size })
-
-    try {
-      actions.setIsSearching(true)
-      actions.setPrecedentPageSize(size)
-      actions.setPrecedentPage(1)
-
-      const params = new URLSearchParams({
-        query: state.userQuery || '',
-        page: '1',
-        display: size.toString()
-      })
-
-      const res = await fetch(`/api/precedent-search?${params.toString()}`)
-
-      if (!res.ok) {
-        throw new Error(`판례 검색 실패: ${res.status}`)
+        const data = (await response.json()) as PrecedentSearchResponse
+        actions.setPrecedentResults(data.precedents ?? [])
+        actions.setPrecedentTotalCount(data.totalCount ?? 0)
+        actions.setPrecedentYearFilter(data.yearFilter)
+        actions.setPrecedentCourtFilter(data.courtFilter)
+      } catch (error) {
+        debugLogger.error("[unified-search] precedent page failed", error)
+        toast({
+          title: "페이지 로드 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
       }
+    },
+    [actions, state.precedentPageSize, state.userQuery, toast]
+  )
 
-      const data = await res.json()
+  const handlePrecedentPageSizeChange = useCallback(
+    async (size: number) => {
+      try {
+        actions.setIsSearching(true)
+        actions.setPrecedentPageSize(size)
+        actions.setPrecedentPage(1)
 
-      actions.setPrecedentResults(data.precedents || [])
-      actions.setPrecedentTotalCount(data.totalCount || 0)
-      actions.setPrecedentYearFilter(data.yearFilter)
-      actions.setPrecedentCourtFilter(data.courtFilter)
+        const params = new URLSearchParams({
+          query: state.userQuery || "",
+          page: "1",
+          display: size.toString(),
+        })
 
-    } catch (error) {
-      debugLogger.error('[판례] 페이지 크기 변경 실패', error)
-      toast({
-        title: "로드 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, state.userQuery])
+        const response = await fetch(`/api/precedent-search?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error(`판례 검색 실패: ${response.status}`)
+        }
 
-  // ============================================================
-  // 조례 페이지네이션
-  // ============================================================
-  const handleOrdinancePageChange = useCallback(async (newPage: number) => {
-    if (!state.ordinanceSelectionState) return
+        const data = (await response.json()) as PrecedentSearchResponse
+        actions.setPrecedentResults(data.precedents ?? [])
+        actions.setPrecedentTotalCount(data.totalCount ?? 0)
+        actions.setPrecedentYearFilter(data.yearFilter)
+        actions.setPrecedentCourtFilter(data.courtFilter)
+      } catch (error) {
+        debugLogger.error("[unified-search] precedent page size failed", error)
+        toast({
+          title: "로드 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
+      }
+    },
+    [actions, state.userQuery, toast]
+  )
 
-    try {
-      actions.setIsSearching(true)
-      actions.setOrdinancePage(newPage)
+  const handleOrdinancePageChange = useCallback(
+    async (newPage: number) => {
+      if (!state.ordinanceSelectionState) return
 
-      const { lawName } = state.ordinanceSelectionState.query
-      const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${state.ordinancePageSize}&page=${newPage}`
+      try {
+        actions.setIsSearching(true)
+        actions.setOrdinancePage(newPage)
 
-      const response = await fetch(apiUrl)
-      if (!response.ok) throw new Error("조례 검색 실패")
+        const { lawName } = state.ordinanceSelectionState.query
+        const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${state.ordinancePageSize}&page=${newPage}`
 
-      const xmlText = await response.text()
-      const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
+        const response = await fetch(apiUrl)
+        if (!response.ok) {
+          throw new Error("조례 검색 실패")
+        }
 
-      console.log(`[ordin-page-change] 페이지 ${newPage}: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
+        const xmlText = await response.text()
+        const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
 
-      actions.setOrdinanceSelectionState({
-        results: ordinances,
-        totalCount,
-        query: { lawName }
-      })
-    } catch (error) {
-      debugLogger.error('[조례] 페이지 변경 실패', error)
-      toast({
-        title: "페이지 로드 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, state.ordinanceSelectionState, state.ordinancePageSize])
+        actions.setOrdinanceSelectionState({
+          results: ordinances,
+          totalCount,
+          query: { lawName },
+        })
+      } catch (error) {
+        debugLogger.error("[unified-search] ordinance page failed", error)
+        toast({
+          title: "페이지 로드 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
+      }
+    },
+    [actions, state.ordinancePageSize, state.ordinanceSelectionState, toast]
+  )
 
-  const handleOrdinancePageSizeChange = useCallback(async (newSize: number) => {
-    if (!state.ordinanceSelectionState) return
+  const handleOrdinancePageSizeChange = useCallback(
+    async (newSize: number) => {
+      if (!state.ordinanceSelectionState) return
 
-    try {
-      actions.setIsSearching(true)
-      actions.setOrdinancePageSize(newSize)
-      actions.setOrdinancePage(1)
+      try {
+        actions.setIsSearching(true)
+        actions.setOrdinancePageSize(newSize)
+        actions.setOrdinancePage(1)
 
-      const { lawName } = state.ordinanceSelectionState.query
-      const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${newSize}&page=1`
+        const { lawName } = state.ordinanceSelectionState.query
+        const apiUrl = `/api/ordin-search?query=${encodeURIComponent(lawName)}&display=${newSize}&page=1`
 
-      const response = await fetch(apiUrl)
-      if (!response.ok) throw new Error("조례 검색 실패")
+        const response = await fetch(apiUrl)
+        if (!response.ok) {
+          throw new Error("조례 검색 실패")
+        }
 
-      const xmlText = await response.text()
-      const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
+        const xmlText = await response.text()
+        const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
 
-      console.log(`[ordin-size-change] ${newSize}개씩: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
-
-      actions.setOrdinanceSelectionState({
-        results: ordinances,
-        totalCount,
-        query: { lawName }
-      })
-    } catch (error) {
-      debugLogger.error('[조례] 페이지 크기 변경 실패', error)
-      toast({
-        title: "로드 실패",
-        description: error instanceof Error ? error.message : '알 수 없는 오류',
-        variant: "destructive"
-      })
-    } finally {
-      actions.setIsSearching(false)
-    }
-  }, [toast, actions, state.ordinanceSelectionState])
+        actions.setOrdinanceSelectionState({
+          results: ordinances,
+          totalCount,
+          query: { lawName },
+        })
+      } catch (error) {
+        debugLogger.error("[unified-search] ordinance page size failed", error)
+        toast({
+          title: "로드 실패",
+          description: error instanceof Error ? error.message : "알 수 없는 오류",
+          variant: "destructive",
+        })
+      } finally {
+        actions.setIsSearching(false)
+      }
+    },
+    [actions, state.ordinanceSelectionState, toast]
+  )
 
   return {
     handlePrecedentSearch,

@@ -155,9 +155,9 @@ describe('LawSearchResultList', () => {
       />
     )
 
-    // formatDate가 적용된 날짜 형식 확인
-    expect(screen.getAllByText(/공포:/)).toHaveLength(2)
-    expect(screen.getAllByText(/시행:/)).toHaveLength(2)
+    // formatDate가 적용된 날짜 형식 확인 (Badge에 "공포 YYYY-MM-DD" 형식)
+    expect(screen.getAllByText(/공포\s/)).toHaveLength(2)
+    expect(screen.getAllByText(/시행\s/)).toHaveLength(2)
   })
 })
 

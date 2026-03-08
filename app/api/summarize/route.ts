@@ -1,142 +1,122 @@
-import { NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
+import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
 
-/** 프롬프트 인젝션 방어용 입력 새니타이징 */
 function sanitizePromptInput(text: string): string {
-  return text
-    .replace(/"""/g, '"')
-    .replace(/```/g, '')
-    .substring(0, 8000)
+  return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
+}
+
+function getClientIP(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) return forwarded.split(",")[0].trim()
+
+  const realIP = request.headers.get("x-real-ip")
+  if (realIP) return realIP
+
+  return "127.0.0.1"
+}
+
+function buildPrompt(params: {
+  lawTitle: string
+  joNum?: string
+  oldContent?: string
+  newContent: string
+  effectiveDate?: string
+  isPrecedent?: boolean
+}) {
+  if (params.isPrecedent) {
+    return `당신은 대한민국 법률 실무가를 위한 판례 요약 전문가입니다.
+
+사건명: ${params.lawTitle}
+${params.effectiveDate ? `선고일: ${params.effectiveDate}` : ""}
+
+판결문 발췌:
+"""
+${sanitizePromptInput(params.newContent)}
+"""
+
+다음 형식으로 한국어로 답변하세요.
+1. 핵심 쟁점
+2. 판시 요지
+3. 실무 시사점
+4. 관련 법조문
+
+각 항목은 짧고 명확하게 작성하고, 원문에 없는 내용은 추정하지 마세요.`
+  }
+
+  return `당신은 대한민국 법령 개정 비교 분석가입니다.
+
+법령명: ${params.lawTitle}
+${params.joNum ? `조문: ${params.joNum}` : ""}
+${params.effectiveDate ? `시행일: ${params.effectiveDate}` : ""}
+
+구법:
+"""
+${sanitizePromptInput(params.oldContent || "").substring(0, 3000)}
+"""
+
+신법:
+"""
+${sanitizePromptInput(params.newContent).substring(0, 3000)}
+"""
+
+다음 형식으로 한국어로 답변하세요.
+1. 핵심 변경 요약
+2. 실무 영향
+3. 주요 변경사항 목록
+
+각 변경사항은 무엇이 어떻게 바뀌었는지 명확하게 설명하고, 원문 근거가 없는 해석은 추가하지 마세요.`
 }
 
 export async function POST(request: Request) {
+  const clientIP = getClientIP(request)
+
   try {
-    const contentLength = parseInt(request.headers.get('content-length') || '0')
+    const contentLength = Number(request.headers.get("content-length") || "0")
     if (contentLength > 200_000) {
-      return NextResponse.json({ error: "요청이 너무 큽니다" }, { status: 413 })
+      return NextResponse.json({ error: "요청 본문이 너무 큽니다." }, { status: 413 })
     }
 
     const { lawTitle, joNum, oldContent, newContent, effectiveDate, isPrecedent } = await request.json()
 
-    // 판례 모드에서는 newContent만 필요
     if (!isPrecedent && (!oldContent || !newContent)) {
-      return NextResponse.json({ error: "구법과 신법 내용이 필요합니다" }, { status: 400 })
+      return NextResponse.json({ error: "구법과 신법 본문이 모두 필요합니다." }, { status: 400 })
     }
+
     if (isPrecedent && !newContent) {
-      return NextResponse.json({ error: "판례 내용이 필요합니다" }, { status: 400 })
+      return NextResponse.json({ error: "판례 본문이 필요합니다." }, { status: 400 })
     }
 
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      debugLogger.error("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다")
+      debugLogger.error("GEMINI_API_KEY is missing")
       return NextResponse.json(
-        { error: "AI 서비스가 설정되지 않았습니다. GEMINI_API_KEY 환경 변수를 설정해주세요." },
-        { status: 500 },
+        { error: "AI 서비스가 설정되지 않았습니다. GEMINI_API_KEY를 확인해 주세요." },
+        { status: 500 }
       )
     }
 
-    debugLogger.info("AI 요약 생성 시작", { lawTitle, joNum, effectiveDate, isPrecedent })
+    if (await isQuotaExceeded(clientIP)) {
+      return NextResponse.json(
+        { error: "일일 AI 사용 시도를 초과했습니다." },
+        { status: 429, headers: await getUsageHeaders(clientIP) }
+      )
+    }
+
+    await recordAIUsage(clientIP)
+
+    debugLogger.info("AI summary request", { lawTitle, joNum, effectiveDate, isPrecedent })
 
     const ai = new GoogleGenAI({ apiKey })
-
-    // 판례 요약용 프롬프트
-    const precedentPrompt = `시스템: 당신은 대한민국 법원 판례를 핵심적으로 분석하고 요약하는 전문가입니다.
-
-사용자 맥락:
-- 사건명: ${lawTitle}
-${effectiveDate ? `- 선고일: ${effectiveDate}` : ""}
-- 판결문 전문:
-"""
-${sanitizePromptInput(newContent)}
-"""
-
-지시:
-제시된 판례를 다음 형식으로 분석하세요.
-
-1. **핵심 쟁점 (2~3줄)**
-   - 이 사건의 핵심 법적 쟁점을 간결하게 요약
-   - 원고와 피고의 주장을 명확하게 기술
-
-2. **판결 요지 (2~3줄)**
-   - 법원의 최종 판단과 그 근거를 요약
-   - 적용된 주요 법리를 명시
-
-3. **실무 시사점 (1~2줄)**
-   - 이 판례가 실무에 주는 시사점
-   - 유사 사건에서 주의해야 할 점
-
-4. **관련 조문**
-   - 판결에서 인용된 주요 법령 조문 나열
-
-불필요한 서론, 표, 강조 기호, 이모티콘은 사용하지 마세요.
-원문에 없는 내용은 추정하지 마세요.
-
-출력 형식 예시:
-
-[핵심 쟁점]
-원고는 해당 거래가 제조업에 해당하여 지방세특례제한법상 취득세 감면 대상이라고 주장하였으나, 피고는 실제 사업 형태가 제조업에 해당하지 않는다고 반박하였습니다.
-
-[판결 요지]
-대법원은 제조업 해당 여부는 등록 업종이 아닌 실제 사업 내용과 작업 형태를 종합하여 판단해야 한다고 판시하였습니다. 원고의 사업이 실질적으로 제조업에 해당하는지 원심에서 심리가 부족하다고 보아 파기환송하였습니다.
-
-[실무 시사점]
-취득세 감면 적용 시 사업자등록 업종만으로 판단하지 말고, 실제 사업 운영 형태를 종합적으로 검토해야 합니다.
-
-[관련 조문]
-- 지방세특례제한법 제58조의3
-- 상고심절차에 관한 특례법 제4조`
-
-    // 법령 비교용 프롬프트
-    const lawComparePrompt = `시스템: 당신은 핵심을 명확하게 전달하는 대한민국 법령 개정 비교 분석가입니다.
-
-사용자 맥락:
-- 법령명: ${lawTitle}
-- 조문: ${joNum}
-${effectiveDate ? `- 시행일: ${effectiveDate}` : ""}
-- 구법 본문(발췌):
-"""
-${sanitizePromptInput(oldContent).substring(0, 2000)}
-"""
-- 신법 본문(발췌):
-"""
-${sanitizePromptInput(newContent).substring(0, 2000)}
-"""
-
-지시:
-제시된 구법과 신법을 비교하여 다음 형식으로 분석하세요.
-
-1. **핵심 차이점 요약 (2~3줄)**
-   - 이번 개정의 가장 중요한 변경사항을 2~3줄로 간결하게 요약
-   - 무엇이 어떻게 바뀌었는지 명확하게 기술
-
-2. **실무 영향 분석 (1줄)**
-   - 이 변경이 실무에 미치는 영향을 1줄로 요약
-   - 납세자, 기업, 공무원 등 실무 담당자 관점에서 작성
-
-3. **세부 변경사항**
-   각 변경점은 다음 형식으로 작성:
-   - 첫 문장: 무엇이 어떻게 변경되었는지 명확하게 기술
-   - 두 번째 문장(선택): 변경의 의미나 영향을 간단히 설명
-   - 마지막에 변경 카테고리를 괄호로 표시: (용어 변경), (실질 내용 변경), (시행일 관련)
-
-불필요한 서론, 제목, 표, 강조 기호, 이모티콘은 사용하지 마세요.
-추정 금지. 원문 근거가 없으면 "불명확"이라고 표시하세요.
-
-출력 형식 예시:
-
-[핵심 차이점]
-기획재정부령으로 규정되던 권한이 기획재정부장관으로 변경되고, 국세와 관세 간 과세가격 조정 신청 절차가 신설되었습니다. 납세자는 통지를 받은 날로부터 30일 내에 조정을 신청할 수 있습니다.
-
-[실무 영향]
-납세자는 국세와 관세의 과세가격 불일치 시 조정 신청이 가능해져 이중과세 위험이 감소합니다.
-
-[세부 변경사항]
-- 제2항에서 "기획재정부령"이 "기획재정부장관"으로 변경되었습니다. 이는 권한 주체를 부처의 규칙에서 장관으로 명확히 한 것입니다. (용어 변경)
-- 제4항에 국세의 정상가격과 관세의 과세가격 간의 조정 신청 절차가 신설되었습니다. 납세자는 통지를 받은 날로부터 30일 내에 기획재정부장관에게 조정을 신청할 수 있습니다. (실질 내용 변경)`
-
-    // 모드에 따라 프롬프트 선택
-    const prompt = isPrecedent ? precedentPrompt : lawComparePrompt
+    const prompt = buildPrompt({
+      lawTitle,
+      joNum,
+      oldContent,
+      newContent,
+      effectiveDate,
+      isPrecedent,
+    })
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
@@ -144,15 +124,15 @@ ${sanitizePromptInput(newContent).substring(0, 2000)}
     })
 
     const summary = response.text
+    await recordAITokens(clientIP, summary?.length ?? 0)
 
-    debugLogger.success("AI 요약 생성 완료", { length: summary?.length ?? 0 })
-
+    debugLogger.success("AI summary complete", { length: summary?.length ?? 0 })
     return NextResponse.json({ summary })
   } catch (error) {
-    debugLogger.error("AI 요약 생성 실패", error)
+    debugLogger.error("AI summary failed", error)
     return NextResponse.json(
-      { error: "AI 요약 생성 중 오류가 발생했습니다" },
-      { status: 500 },
+      { error: "AI 요약 생성 중 오류가 발생했습니다." },
+      { status: 500 }
     )
   }
 }

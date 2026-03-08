@@ -20,52 +20,52 @@ describe('buildSystemPrompt', () => {
   })
 
   describe('queryType별 specialist 지침 포함', () => {
-    test('definition → 개념/정의 질문 구조', () => {
+    test('definition → 정의 + 헷갈리는 개념 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'definition')
-      expect(prompt).toContain('개념/정의 질문')
-      expect(prompt).toContain('[헷갈리는 개념]')
+      expect(prompt).toContain('쉽게 풀어 설명')
+      expect(prompt).toContain('헷갈리는 개념')
     })
 
-    test('requirement → 요건/자격 질문 구조', () => {
+    test('requirement → 결격사유 + 필수 요건 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'requirement')
-      expect(prompt).toContain('요건/자격 질문')
-      expect(prompt).toContain('[결격사유]')
+      expect(prompt).toContain('결격사유')
+      expect(prompt).toContain('필수 요건')
     })
 
-    test('procedure → 절차/방법 질문 구조', () => {
+    test('procedure → 로드맵 + 기한/제출처 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'procedure')
-      expect(prompt).toContain('절차/방법 질문')
       expect(prompt).toContain('로드맵')
+      expect(prompt).toContain('기한/제출처/필수서류/비용')
     })
 
-    test('comparison → 비교/구분 질문 구조', () => {
+    test('comparison → A vs B + 비교표 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'comparison')
-      expect(prompt).toContain('비교/구분 질문')
-      expect(prompt).toContain('[비교표]')
+      expect(prompt).toContain('A vs B')
+      expect(prompt).toContain('비교표')
     })
 
-    test('application → 적용/해당 판단 구조', () => {
+    test('application → 적용됨/안됨 + 확신도 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'application')
-      expect(prompt).toContain('적용/해당 판단')
+      expect(prompt).toContain('적용됨/안됨/보류')
       expect(prompt).toContain('확신도')
     })
 
-    test('consequence → 효과/위반/처벌 구조', () => {
+    test('consequence → 예상 조치 + 구제 방법 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'consequence')
-      expect(prompt).toContain('효과/위반/처벌')
-      expect(prompt).toContain('[구제 방법]')
+      expect(prompt).toContain('징역/벌금/과태료')
+      expect(prompt).toContain('구제 방법')
     })
 
-    test('scope → 범위/금액/기한 구조', () => {
+    test('scope → 산정 기준 + 시뮬레이션 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'scope')
-      expect(prompt).toContain('범위/금액/기한')
-      expect(prompt).toContain('[시뮬레이션]')
+      expect(prompt).toContain('산정 기준')
+      expect(prompt).toContain('시뮬레이션')
     })
 
-    test('exemption → 면제/감면/특례 구조', () => {
+    test('exemption → 혜택 적용 + 요건 체크 구조', () => {
       const prompt = buildSystemPrompt('moderate', 'exemption')
-      expect(prompt).toContain('면제/감면/특례')
-      expect(prompt).toContain('[요건 체크]')
+      expect(prompt).toContain('혜택 적용 가능성')
+      expect(prompt).toContain('요건 체크')
     })
   })
 

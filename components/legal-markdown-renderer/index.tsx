@@ -14,6 +14,7 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import rehypeRaw from 'rehype-raw'
+import sanitizeHtml from 'sanitize-html'
 import { linkifyMarkdownLegalRefs } from '@/lib/unified-link-generator'
 // 분리된 컴포넌트들
 import { getVisitedLaws } from './visited-laws'
@@ -21,6 +22,129 @@ import { SimpleFlowchartRenderer } from './SimpleFlowchartRenderer'
 import { BlockquoteRenderer } from './BlockquoteRenderer'
 import { LinkRenderer } from './LinkRenderer'
 import { TableRenderer, TheadRenderer, ThRenderer, TdRenderer } from './TableRenderer'
+
+const SAFE_INLINE_STYLE_PROPERTIES = new Set([
+  'align-items',
+  'background',
+  'background-color',
+  'border',
+  'border-bottom',
+  'border-left',
+  'border-radius',
+  'box-shadow',
+  'color',
+  'display',
+  'fill',
+  'flex',
+  'flex-shrink',
+  'font-size',
+  'font-weight',
+  'gap',
+  'height',
+  'justify-content',
+  'line-height',
+  'margin',
+  'margin-left',
+  'margin-top',
+  'min-width',
+  'overflow-x',
+  'padding',
+  'padding-bottom',
+  'padding-left',
+  'padding-top',
+  'stroke',
+  'text-indent',
+  'vertical-align',
+  'white-space',
+  'width',
+])
+
+function sanitizeInlineStyle(style?: string): string | undefined {
+  if (!style) return undefined
+
+  const cleaned = style
+    .split(';')
+    .map((rule) => rule.trim())
+    .filter(Boolean)
+    .map((rule) => {
+      const [rawProperty, ...rawValue] = rule.split(':')
+      const property = rawProperty?.trim().toLowerCase()
+      const value = rawValue.join(':').trim()
+      if (!property || !value) return null
+      if (!SAFE_INLINE_STYLE_PROPERTIES.has(property)) return null
+      if (/(?:expression|javascript:|@import|url\s*\()/i.test(value)) return null
+      return `${property}: ${value}`
+    })
+    .filter((rule): rule is string => Boolean(rule))
+    .join('; ')
+
+  return cleaned || undefined
+}
+
+function sanitizeMarkdownHtml(content: string): string {
+  return sanitizeHtml(content, {
+    allowedTags: [
+      'a', 'blockquote', 'br', 'code', 'div', 'em', 'h2', 'h3', 'hr',
+      'li', 'ol', 'p', 'path', 'polyline', 'line', 'rect', 'circle',
+      'pre', 'span', 'strong', 'svg', 'table', 'tbody', 'td', 'th',
+      'thead', 'tr', 'ul',
+    ],
+    allowedAttributes: {
+      '*': [
+        'aria-label',
+        'class',
+        'style',
+        'data-ref',
+        'data-law',
+        'data-article',
+        'data-law-type',
+        'data-old-law',
+        'data-kind',
+        'data-annex',
+        'data-case-number',
+        'data-court',
+        'data-date',
+        'data-efyd',
+      ],
+      a: ['href', 'target', 'rel', 'title'],
+      svg: ['viewBox', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'xmlns'],
+      path: ['d', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+      polyline: ['points', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+      line: ['x1', 'x2', 'y1', 'y2', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+      rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width'],
+      circle: ['cx', 'cy', 'r', 'fill', 'stroke', 'stroke-width'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto', 'law', 'annex'],
+    allowedSchemesByTag: {
+      a: ['http', 'https', 'mailto', 'law', 'annex'],
+    },
+    allowedSchemesAppliedToAttributes: ['href'],
+    transformTags: {
+      '*': (tagName, attribs) => {
+        const nextAttribs = { ...attribs }
+        const safeStyle = sanitizeInlineStyle(nextAttribs.style)
+
+        if (safeStyle) {
+          nextAttribs.style = safeStyle
+        } else {
+          delete nextAttribs.style
+        }
+
+        if (tagName === 'a') {
+          if (nextAttribs.href && /^javascript:/i.test(nextAttribs.href)) {
+            nextAttribs.href = '#'
+          }
+
+          if (nextAttribs.target === '_blank' && !nextAttribs.rel) {
+            nextAttribs.rel = 'noopener noreferrer'
+          }
+        }
+
+        return { tagName, attribs: nextAttribs }
+      }
+    }
+  })
+}
 
 interface LegalMarkdownRendererProps {
   content: string
@@ -62,6 +186,11 @@ export function LegalMarkdownRenderer({
     if (disabledLink) return cleanedContent
     return linkifyMarkdownLegalRefs(cleanedContent)
   }, [cleanedContent, disabledLink])
+
+  const sanitizedContent = useMemo(() => {
+    if (!linkedContent) return ''
+    return sanitizeMarkdownHtml(linkedContent)
+  }, [linkedContent])
 
 
   return (
@@ -111,9 +240,10 @@ export function LegalMarkdownRenderer({
         }}
         components={{
           // 링크 처리
-          a: ({ href, children }) => (
+          a: ({ node, href, children, ...props }) => (
             <LinkRenderer
               href={href}
+              {...props}
               onLawClick={onLawClick}
               onAnnexClick={onAnnexClick}
               disabledLink={disabledLink}
@@ -221,7 +351,7 @@ export function LegalMarkdownRenderer({
           pre: ({ children }) => <>{children}</>,
         }}
       >
-        {linkedContent}
+        {sanitizedContent}
       </ReactMarkdown>
     </div>
   )

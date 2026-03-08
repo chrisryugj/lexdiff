@@ -1,66 +1,97 @@
 /**
- * FC-RAG API Endpoint (SSE 스트리밍)
- *
- * 도구 호출 과정을 실시간 SSE 이벤트로 전송.
- * 클라이언트에서 검색→분석→답변 과정을 실시간으로 표시.
- *
- * SSE 이벤트 형식:
- *   data: {"type":"status","message":"...","progress":10}
- *   data: {"type":"tool_call","name":"search_law","displayName":"법령 검색","query":"..."}
- *   data: {"type":"tool_result","name":"search_law","displayName":"법령 검색","success":true,"summary":"..."}
- *   data: {"type":"answer_token","data":{"text":"..."}}    ← 스트리밍 토큰 (OpenClaw)
- *   data: {"type":"answer","data":{answer,citations,confidenceLevel,complexity,warnings}}
- *   data: {"type":"error","message":"..."}
+ * FC-RAG API endpoint with SSE streaming.
  */
 
-import { executeRAGStream } from '@/lib/fc-rag/engine'
-import { isOpenClawHealthy, fetchFromOpenClaw } from '@/lib/openclaw-client'
-import { recordAIUsage, isQuotaExceeded, getUsageHeaders, getUsageWarningMessage } from '@/lib/usage-tracker'
-import { NextRequest } from 'next/server'
+import { NextRequest } from "next/server"
+import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
+import { executeRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
+import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
+import {
+  getUsageHeaders,
+  getUsageWarningMessage,
+  isQuotaExceeded,
+  recordAITokens,
+  recordAIUsage,
+} from "@/lib/usage-tracker"
+
+function convertForVerification(fcCitations: FCRAGCitation[]): {
+  verifiable: Citation[]
+  skipped: VerifiedCitation[]
+} {
+  const verifiable: Citation[] = []
+  const skipped: VerifiedCitation[] = []
+
+  for (const citation of fcCitations) {
+    if (/^제?\d+조/.test(citation.articleNumber)) {
+      verifiable.push({
+        lawName: citation.lawName,
+        articleNum: citation.articleNumber,
+        text: citation.chunkText,
+        source: citation.source,
+      })
+      continue
+    }
+
+    skipped.push({
+      lawName: citation.lawName,
+      articleNum: citation.articleNumber,
+      text: citation.chunkText,
+      source: citation.source,
+      verified: false,
+      verificationMethod: "skipped",
+    })
+  }
+
+  return { verifiable, skipped }
+}
 
 function getClientIP(request: NextRequest): string {
-  // Vercel에서 설정하는 신뢰 가능한 IP 우선
-  const vercelIP = request.headers.get('x-vercel-forwarded-for')
-  if (vercelIP) return vercelIP.split(',')[0].trim()
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  const realIP = request.headers.get('x-real-ip')
+  const vercelIP = request.headers.get("x-vercel-forwarded-for")
+  if (vercelIP) return vercelIP.split(",")[0].trim()
+
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) return forwarded.split(",")[0].trim()
+
+  const realIP = request.headers.get("x-real-ip")
   if (realIP) return realIP
-  return '127.0.0.1'
+
+  return "127.0.0.1"
 }
 
 export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request)
-  const userApiKey = request.headers.get('X-User-API-Key') || undefined
+  const userApiKey = request.headers.get("X-User-API-Key") || undefined
 
-  // BYO API Key 형식 검증
   if (userApiKey && !/^AIzaSy[A-Za-z0-9_-]{33}$/.test(userApiKey)) {
-    return Response.json(
-      { error: 'API 키 형식이 올바르지 않습니다.' },
-      { status: 400 }
-    )
-  }
-
-  // BYO-Key 여부와 무관하게 rate limit 적용
-  if (isQuotaExceeded(clientIP)) {
-    return Response.json(
-      { error: '일일 AI 검색 한도를 초과했습니다. 내일 다시 시도해주세요.' },
-      { status: 429, headers: getUsageHeaders(clientIP) }
-    )
+    return Response.json({ error: "API key format is invalid." }, { status: 400 })
   }
 
   let query: string
   let conversationId: string | undefined
+
   try {
     const body = await request.json()
     query = body.query
     conversationId = body.conversationId || undefined
   } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  if (!query || typeof query !== 'string') {
-    return Response.json({ error: 'Query is required' }, { status: 400 })
+  if (!query || typeof query !== "string") {
+    return Response.json({ error: "Query is required" }, { status: 400 })
+  }
+
+  let usageHeaders: Record<string, string> | undefined
+  if (!userApiKey) {
+    if (await isQuotaExceeded(clientIP)) {
+      return Response.json(
+        { error: "일일 AI 검색 시도를 초과했습니다. 내일 다시 시도해 주세요." },
+        { status: 429, headers: await getUsageHeaders(clientIP) }
+      )
+    }
+
+    await recordAIUsage(clientIP)
+    usageHeaders = await getUsageHeaders(clientIP)
   }
 
   const encoder = new TextEncoder()
@@ -72,37 +103,63 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // OpenClaw 우선 시도 (활성화 + 건강 상태 확인)
         let openClawHandled = false
-        if (process.env.OPENCLAW_ENABLED === 'true' && await isOpenClawHealthy()) {
-          send({ type: 'status', message: 'AI 엔진 연결 중...', progress: 2 })
-          openClawHandled = await fetchFromOpenClaw(query, send, { conversationId })
+
+        if (process.env.OPENCLAW_ENABLED === "true" && await isOpenClawHealthy()) {
+          send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+          openClawHandled = await fetchFromOpenClaw(query, send, {
+            conversationId,
+            abortSignal: request.signal,
+          })
         }
 
-        // OpenClaw 실패/비활성 → 기존 Gemini fallback
         if (!openClawHandled) {
-          if (process.env.OPENCLAW_ENABLED === 'true') {
-            send({ type: 'status', message: 'AI 엔진 전환 중...', progress: 3 })
+          if (process.env.OPENCLAW_ENABLED === "true") {
+            send({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
           }
 
-          for await (const event of executeRAGStream(query, userApiKey)) {
-            // answer 이벤트에 사용량 경고 추가
-            if (event.type === 'answer' && !userApiKey) {
-              const usageStats = recordAIUsage(clientIP, event.data.answer.length)
-              const warningMessage = getUsageWarningMessage(usageStats)
-              if (warningMessage) {
-                const warnings = [...(event.data.warnings || []), warningMessage]
-                send({ ...event, data: { ...event.data, warnings } })
-                continue
+          let lastAnswerCitations: FCRAGCitation[] = []
+
+          for await (const event of executeRAGStream(query, {
+            apiKey: userApiKey,
+            signal: request.signal,
+            conversationId,
+          })) {
+            if (event.type === "answer") {
+              lastAnswerCitations = event.data.citations || []
+
+              if (!userApiKey) {
+                const usageStats = await recordAITokens(clientIP, event.data.answer.length)
+                const warningMessage = getUsageWarningMessage(usageStats)
+
+                if (warningMessage) {
+                  const warnings = [...(event.data.warnings || []), warningMessage]
+                  send({ ...event, data: { ...event.data, warnings } })
+                  continue
+                }
               }
             }
+
             send(event)
+          }
+
+          if (lastAnswerCitations.length > 0) {
+            try {
+              const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
+              if (verifiable.length > 0) {
+                send({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
+                const verified = await verifyAllCitations(verifiable)
+                send({ type: "citation_verification", citations: [...verified, ...skipped] })
+              }
+            } catch (error) {
+              console.error("[FC-RAG] Citation verification failed:", error)
+            }
           }
         }
       } catch (error) {
         send({
-          type: 'error',
-          message: 'AI 검색 처리 중 오류가 발생했습니다. 다시 시도해주세요.',
+          type: "error",
+          message: "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
         })
       } finally {
         controller.close()
@@ -111,16 +168,14 @@ export async function POST(request: NextRequest) {
   })
 
   const headers: Record<string, string> = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
   }
 
-  // 사용량 헤더 추가
-  if (!userApiKey) {
-    const usageHeaders = getUsageHeaders(clientIP)
+  if (usageHeaders) {
     for (const [key, value] of Object.entries(usageHeaders)) {
-      headers[key] = value as string
+      headers[key] = value
     }
   }
 

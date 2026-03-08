@@ -16,7 +16,7 @@
 import type { LawMeta, LawArticle } from "./law-types"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 10 // 2단계 행정규칙 캐시 구조 (법령별 제1조 + 조문별 매칭 인덱스)
+const DB_VERSION = 11 // admin-rule-cache와 동일 DB 공유 → 버전 통일
 const CONTENT_STORE = "lawContentCache"
 const CACHE_EXPIRY_DAYS = 7 // 7일 후 자동 삭제 (법령은 자주 변경될 수 있음)
 

@@ -104,18 +104,19 @@ export function convertAIAnswerToHTML(markdown: string): string {
   text = escapeHtml(text)
   debugLogger.info('이스케이프 후', { hasEscapedMarker: text.includes('&lt;&lt;&lt;QUOTE_START&gt;&gt;&gt;') })
 
-  // 4단계: 구조화 항목 스타일링 추가
+  // 4단계: 법령 링크 생성 (이스케이프된 텍스트에서 실행 — styling 전에)
+  // linkifyRefsAI는 <a> 태그만 보존하고 나머지 HTML 태그를 re-escape하므로
+  // blockquote/div 등 styling 태그 생성 전에 실행해야 함
+  text = linkifyRefsAI(text)
+  debugLogger.info('링크 생성 완료', { hasLawLink: text.includes('law-ref') })
+
+  // 5단계: 구조화 항목 스타일링 추가 (linkify 후에 실행하여 HTML 태그 보존)
   text = styleStructuredSections(text)
   debugLogger.info('스타일링 후', { hasBlockquote: text.includes('<blockquote') })
 
-  // 4.5단계: [1] [2] [3] 단계 형식을 CSS 스타일링으로 변환 (Phase 7)
+  // 5.5단계: [1] [2] [3] 단계 형식을 CSS 스타일링으로 변환 (Phase 7)
   text = styleStepNumbers(text)
   debugLogger.info('단계 스타일링 후', { hasStepContainer: text.includes('step-container') })
-
-  // 5단계: 법령 링크 생성 (이스케이프된 텍스트 처리)
-  // linkifyRefsAI가 디코드 → 링크 생성 → 재이스케이프 처리
-  text = linkifyRefsAI(text)
-  debugLogger.info('링크 생성 완료', { hasLawLink: text.includes('law-ref') })
 
   // 6단계: 이모지를 아이콘으로 교체
   text = replaceEmojisWithIcons(text)

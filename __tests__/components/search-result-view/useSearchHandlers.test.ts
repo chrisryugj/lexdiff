@@ -22,6 +22,7 @@ vi.mock('@/lib/error-report-store', () => ({
 
 vi.mock('@/lib/debug-logger', () => ({
   debugLogger: {
+    debug: vi.fn(),
     info: vi.fn(),
     success: vi.fn(),
     warning: vi.fn(),
@@ -48,6 +49,8 @@ vi.mock('@/lib/query-detector', () => ({
 
 vi.mock('@/lib/search-normalizer', () => ({
   normalizeLawSearchText: vi.fn((text) => text),
+  normalizeSearchQuery: vi.fn((text) => text),
+  resolveLawAlias: vi.fn((name) => ({ canonical: name, matchedAlias: null })),
   expandSearchSynonyms: vi.fn(() => ({ expanded: [] }))
 }))
 

@@ -1,5 +1,6 @@
 import type { OldNewComparison } from "./law-types"
 import { debugLogger } from "./debug-logger"
+import sanitizeHtml from "sanitize-html"
 
 export function parseOldNewXML(xmlText: string, targetJo?: string): OldNewComparison {
 
@@ -197,5 +198,29 @@ export function highlightDifferences(
 
   console.log("Highlighting complete")
 
-  return { oldHighlighted, newHighlighted }
+  // XSS 방어: 허용된 태그/속성만 통과
+  const sanitizeOptions = {
+    allowedTags: ['span', 'br', 'div'],
+    allowedAttributes: { span: ['style'], div: ['style'] },
+    allowedStyles: {
+      span: {
+        background: [/^linear-gradient\(/],
+        color: [/^rgb\(/],
+        'font-weight': [/^\d+$/],
+        padding: [/.*/],
+        'border-radius': [/.*/],
+        'border-left': [/.*/],
+      },
+      div: {
+        'border-top': [/.*/],
+        margin: [/.*/],
+        'padding-top': [/.*/],
+      },
+    },
+  }
+
+  return {
+    oldHighlighted: sanitizeHtml(oldHighlighted, sanitizeOptions),
+    newHighlighted: sanitizeHtml(newHighlighted, sanitizeOptions),
+  }
 }

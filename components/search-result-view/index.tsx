@@ -43,7 +43,7 @@ const HelpGuideSheet = dynamic(
 // Local imports
 import { useSearchState } from "./hooks/useSearchState"
 import { useSearchHandlers } from "./hooks/useSearchHandlers"
-import { LawSearchResultList, OrdinanceSearchResultList } from "./SearchResultList"
+import { LawSearchResultList, OrdinanceSearchResultList, InterpretationResultList, RulingResultList } from "./SearchResultList"
 import { PrecedentResultList } from "./PrecedentResultList"
 import { SearchChoiceDialog, NoResultDialog } from "./SearchDialogs"
 import type { SearchResultViewProps } from "./types"
@@ -160,6 +160,44 @@ function SearchResultViewComponent({
 
         // ✅ 조례 검색 결과 복원 (뒤로가기 시)
         // hasOrdinanceDetail이 false/undefined면 목록으로 복원
+        if (cached.interpretationResults && cached.interpretationResults.length > 0 && !initialPrecedentId) {
+          debugLogger.success('??해석례 검색결과 캐시 HIT')
+
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+
+          actions.setInterpretationResults(cached.interpretationResults)
+          actions.setLawData(null)
+          actions.setMobileView("list")
+
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, 300)
+          return
+        }
+
+        if (cached.rulingResults && cached.rulingResults.length > 0 && !initialPrecedentId) {
+          debugLogger.success('??재결례 검색결과 캐시 HIT')
+
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+
+          actions.setRulingResults(cached.rulingResults)
+          actions.setLawData(null)
+          actions.setMobileView("list")
+
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, 300)
+          return
+        }
+
         const historyState = window.history.state
         if (cached.ordinanceSelectionState && !historyState?.hasOrdinanceDetail) {
           debugLogger.success('✅ 조례 검색 결과 캐시 HIT')
@@ -485,6 +523,17 @@ function SearchResultViewComponent({
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */
             <LawViewerSkeleton stage={state.searchStage} />
+          ) : state.interpretationResults !== null && state.interpretationResults.length > 0 ? (
+            /* 해석례 검색 결과 */
+            <InterpretationResultList
+              results={state.interpretationResults}
+              onBack={handlers.handleReset}
+            />
+          ) : state.rulingResults !== null && state.rulingResults.length > 0 ? (
+            <RulingResultList
+              results={state.rulingResults}
+              onBack={handlers.handleReset}
+            />
           ) : state.precedentResults !== null ? (
             /* 판례 검색 결과 */
             <PrecedentResultList

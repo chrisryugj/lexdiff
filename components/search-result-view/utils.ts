@@ -12,15 +12,11 @@ export function getLawTypeBadgeClass(lawType: string): string {
   const normalizedType = lawType.toLowerCase()
 
   if (normalizedType.includes('법률')) {
-    return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-  } else if (normalizedType.includes('시행령')) {
-    return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-  } else if (normalizedType.includes('시행규칙')) {
-    return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-  } else if (normalizedType.includes('대통령령')) {
-    return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-  } else if (normalizedType.includes('총리령') || normalizedType.includes('부령')) {
-    return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20'
+    return 'bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] border border-[#d4af37]/20 dark:border-[#e2a85d]/30'
+  } else if (normalizedType.includes('시행령') || normalizedType.includes('대통령령')) {
+    return 'bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border border-[#1a2b4c]/20 dark:border-border'
+  } else if (normalizedType.includes('시행규칙') || normalizedType.includes('총리령') || normalizedType.includes('부령')) {
+    return 'bg-muted text-muted-foreground border border-border'
   } else {
     return 'bg-secondary text-secondary-foreground'
   }

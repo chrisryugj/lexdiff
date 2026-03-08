@@ -1,36 +1,53 @@
-import { NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
+import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
-import { parseHwpxToMarkdown, isHwpxFile, isOldHwpFile } from "@/lib/hwpx-parser"
+import { isHwpxFile, isOldHwpFile, parseHwpxToMarkdown } from "@/lib/hwpx-parser"
+import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
 import { validateExternalUrl } from "@/lib/url-validator"
 
-/**
- * 별표 파일 → 마크다운 변환 API
- * - HWPX (신 한글): 직접 파싱 (빠르고 정확)
- * - 구 HWP (OLE2): 다운로드만 제공 (표 형식이라 파싱 결과가 좋지 않음)
- * - PDF: Gemini Vision API 사용
- *
- * POST /api/annex-to-markdown
- * Body: { pdfUrl, annexNumber, lawName }
- */
+function getClientIP(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) return forwarded.split(",")[0].trim()
+
+  const realIP = request.headers.get("x-real-ip")
+  if (realIP) return realIP
+
+  return "127.0.0.1"
+}
+
+function getBaseUrl(request: Request): string {
+  const url = new URL(request.url)
+  return `${url.protocol}//${url.host}`
+}
+
+function buildPdfPrompt(lawName?: string, annexNumber?: string) {
+  return `다음 PDF는 ${lawName || "법령"}의 ${annexNumber || "별표"}입니다.
+
+한국어 마크다운으로만 변환하세요.
+- 표는 가능한 한 마크다운 표 형식으로 유지합니다.
+- 제목, 항목 번호, 들여쓰기 구조를 보존합니다.
+- 페이지 번호나 반복 머리글은 제거합니다.
+- 설명 문장 없이 변환 결과만 출력합니다.`
+}
+
 export async function POST(request: Request) {
+  const clientIP = getClientIP(request)
+
   try {
     const { pdfUrl, annexNumber, lawName } = await request.json()
 
     if (!pdfUrl) {
-      return NextResponse.json({ error: "pdfUrl이 필요합니다" }, { status: 400 })
+      return NextResponse.json({ error: "pdfUrl is required." }, { status: 400 })
     }
 
-    debugLogger.info("별표 파일→마크다운 변환 시작", { annexNumber, lawName })
+    const baseUrl = getBaseUrl(request)
+    const fullPdfUrl = pdfUrl.startsWith("/") ? `${baseUrl}${pdfUrl}` : pdfUrl
 
-    // 파일 다운로드 (내부 프록시 또는 외부 URL)
-    const fullPdfUrl = pdfUrl.startsWith("/")
-      ? `${getBaseUrl(request)}${pdfUrl}`
-      : pdfUrl
-
-    if (!fullPdfUrl.startsWith(getBaseUrl(request)) && !validateExternalUrl(fullPdfUrl)) {
+    if (!fullPdfUrl.startsWith(baseUrl) && !validateExternalUrl(fullPdfUrl)) {
       return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
     }
+
+    debugLogger.info("Annex conversion requested", { annexNumber, lawName, fullPdfUrl })
 
     const fileResponse = await fetch(fullPdfUrl)
     if (!fileResponse.ok) {
@@ -38,18 +55,13 @@ export async function POST(request: Request) {
     }
 
     const fileBuffer = await fileResponse.arrayBuffer()
-    debugLogger.info("파일 다운로드 완료", { size: fileBuffer.byteLength })
-
-    // 파일 타입 확인 (HWPX vs 구 HWP vs PDF)
     const isHwpx = isHwpxFile(fileBuffer)
     const isOldHwp = isOldHwpFile(fileBuffer)
 
     if (isOldHwp) {
-      // 구 HWP 파일: 표 형식이 대부분이라 파싱해도 결과가 좋지 않음
-      debugLogger.info("⚠️ 구 HWP 파일 감지 - 다운로드만 제공", { annexNumber })
       return NextResponse.json(
         {
-          error: "구 HWP 파일은 다운로드하여 한컴오피스로 열어주세요.",
+          error: "구형 HWP 파일은 다운로드 후 별도 뷰어로 열어 주세요.",
           fileType: "old-hwp",
         },
         { status: 400 }
@@ -57,20 +69,10 @@ export async function POST(request: Request) {
     }
 
     if (isHwpx) {
-      // HWPX 파일: 직접 파싱
-      debugLogger.info("HWPX 파일 감지, 직접 파싱 시작")
-
       const parseResult = await parseHwpxToMarkdown(fileBuffer)
-
       if (!parseResult.success || !parseResult.markdown) {
         throw new Error(parseResult.error || "HWPX 파싱 실패")
       }
-
-      debugLogger.success("HWPX→마크다운 변환 완료", {
-        annexNumber,
-        markdownLength: parseResult.markdown.length,
-        meta: parseResult.meta,
-      })
 
       return NextResponse.json({
         markdown: parseResult.markdown,
@@ -79,77 +81,48 @@ export async function POST(request: Request) {
       })
     }
 
-    // PDF 파일: Gemini Vision API 사용
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      debugLogger.error("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다")
+      debugLogger.error("GEMINI_API_KEY is missing")
       return NextResponse.json(
-        { error: "AI 서비스가 설정되지 않았습니다" },
+        { error: "AI 서비스가 설정되지 않았습니다." },
         { status: 500 }
       )
     }
 
-    debugLogger.info("PDF 파일 감지, Gemini Vision API 사용")
+    if (await isQuotaExceeded(clientIP)) {
+      return NextResponse.json(
+        { error: "일일 AI 사용 시도를 초과했습니다." },
+        { status: 429, headers: await getUsageHeaders(clientIP) }
+      )
+    }
 
-    const pdfBase64 = Buffer.from(fileBuffer).toString("base64")
+    await recordAIUsage(clientIP)
 
-    // Gemini Vision API로 PDF 분석
     const ai = new GoogleGenAI({ apiKey })
-
-    const prompt = `이 PDF는 한국 법령 「${lawName || "법령"}」의 ${annexNumber || "별표"}입니다.
-
-다음 지침에 따라 마크다운으로 변환해주세요:
-
-## 변환 규칙
-
-1. **표(Table)** - 가장 중요!
-   - 반드시 마크다운 테이블 형식으로 정확히 변환
-   - 셀 병합이 있는 경우 가능한 한 구조를 보존
-   - 복잡한 표는 여러 개의 간단한 표로 분리 가능
-
-2. **제목/소제목**
-   - 문서 제목은 ## (h2)
-   - 섹션 제목은 ### (h3)
-   - 소섹션은 #### (h4)
-
-3. **번호 리스트**
-   - 1. 2. 3. 또는 가. 나. 다. 형식 그대로 유지
-   - 들여쓰기 레벨 보존
-
-4. **특수 표기**
-   - 법령 참조 (제X조, 「법령명」 등)는 그대로 유지
-   - 괄호 안 내용 보존
-   - 비고, 주, 각주는 별도 섹션으로 분리
-
-5. **제외 사항**
-   - 불필요한 머리글/꼬리글 제거
-   - 페이지 번호 제거
-   - 빈 줄 최소화
-
-## 출력 형식
-
-마크다운만 출력하세요. 부가 설명 없이 변환된 내용만 반환하세요.`
-
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents: [
         {
           inlineData: {
             mimeType: "application/pdf",
-            data: pdfBase64,
+            data: Buffer.from(fileBuffer).toString("base64"),
           },
         },
-        { text: prompt },
+        {
+          text: buildPdfPrompt(lawName, annexNumber),
+        },
       ],
     })
 
     const markdown = response.text
-
     if (!markdown || markdown.length < 10) {
-      throw new Error("마크다운 변환 결과가 비어있습니다")
+      throw new Error("마크다운 변환 결과가 비어 있습니다.")
     }
 
-    debugLogger.success("별표 PDF→마크다운 변환 완료", {
+    await recordAITokens(clientIP, markdown.length)
+
+    debugLogger.success("Annex conversion complete", {
       annexNumber,
       markdownLength: markdown.length,
     })
@@ -159,23 +132,14 @@ export async function POST(request: Request) {
       source: "gemini-vision",
     })
   } catch (error) {
-    debugLogger.error("별표 PDF→마크다운 변환 실패", error)
-
+    debugLogger.error("Annex conversion failed", error)
     return NextResponse.json(
       {
-        error: "별표 변환 중 오류가 발생했습니다",
+        error: "별표 변환 중 오류가 발생했습니다.",
         markdown: null,
         source: "error",
       },
       { status: 500 }
     )
   }
-}
-
-/**
- * 요청에서 기본 URL 추출
- */
-function getBaseUrl(request: Request): string {
-  const url = new URL(request.url)
-  return `${url.protocol}//${url.host}`
 }

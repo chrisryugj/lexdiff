@@ -35,7 +35,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' data:;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:;",
           },
         ],
       },

@@ -146,7 +146,7 @@ export function SearchViewTest({
   const handleHelpClick = () => { setHelpSheetOpen(true) }
 
   const handleLogoClick = () => {
-    window.history.pushState({}, "", "/test")
+    window.history.pushState({}, "", "/")
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 

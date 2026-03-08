@@ -365,14 +365,22 @@ async function correctToolArgs(
 
 // ─── 메인 엔진 (SSE 스트림) ───
 
+/** executeRAGStream 옵션 */
+interface RAGStreamOptions {
+  apiKey?: string
+  signal?: AbortSignal
+  conversationId?: string
+}
+
 /**
  * FC-RAG 스트리밍 실행 (SSE용 AsyncGenerator)
  * 도구 호출 과정을 실시간으로 yield
  */
 export async function* executeRAGStream(
   query: string,
-  geminiApiKey?: string
+  options?: RAGStreamOptions
 ): AsyncGenerator<FCRAGStreamEvent> {
+  const { apiKey: geminiApiKey, signal } = options || {}
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
@@ -472,6 +480,12 @@ export async function* executeRAGStream(
         d => (failureCount.get(d.name!) || 0) < 2
       )
 
+      // 클라이언트 취소 시 조기 종료
+      if (signal?.aborted) {
+        yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
+        return
+      }
+
       const response = await ai.models.generateContent({
         model: MODEL,
         contents: messages,
@@ -538,6 +552,7 @@ export async function* executeRAGStream(
           }
           return
         }
+        if (signal?.aborted) return
         yield { type: 'status', message: '답변 생성을 요청하고 있습니다...', progress: 88 }
         messages.push({ role: 'model', parts })
         messages.push({
@@ -737,7 +752,7 @@ export async function executeRAG(
   query: string,
   geminiApiKey?: string
 ): Promise<FCRAGResult> {
-  for await (const event of executeRAGStream(query, geminiApiKey)) {
+  for await (const event of executeRAGStream(query, { apiKey: geminiApiKey })) {
     if (event.type === 'answer') return event.data
     if (event.type === 'error') throw new Error(event.message)
   }

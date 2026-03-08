@@ -15,11 +15,20 @@ vi.mock('./lib/debug-logger', () => ({
 // Mock search-normalizer for law-parser tests
 vi.mock('./lib/search-normalizer', () => ({
   normalizeLawSearchText: (text: string) => text.trim(),
+  normalizeSearchQuery: (query: string) => query.trim(),
   resolveLawAlias: (name: string) => ({
     canonical: name,
     matchedAlias: null,
   }),
+  expandSearchSynonyms: () => ({ expanded: [] }),
 }))
+
+// Mock ResizeObserver (jsdom에 없음)
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver
 
 // Global test utilities
 globalThis.DOMParser = class DOMParser {

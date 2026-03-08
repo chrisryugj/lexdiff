@@ -250,6 +250,39 @@ export async function cacheResponse(
   }
 }
 
+export async function updateCachedResponseCitations(
+  query: string,
+  citations: any[]
+): Promise<void> {
+  try {
+    const db = await openDB()
+    const key = hashQuery(query)
+
+    const tx = db.transaction(CACHE_STORE, 'readwrite')
+    const store = tx.objectStore(CACHE_STORE)
+
+    const cached = await new Promise<RAGCacheEntry | undefined>((resolve, reject) => {
+      const request = store.get(key)
+      request.onsuccess = () => resolve(request.result as RAGCacheEntry | undefined)
+      request.onerror = () => reject(request.error)
+    })
+
+    if (!cached) {
+      return
+    }
+
+    cached.citations = citations
+
+    await new Promise<void>((resolve, reject) => {
+      const request = store.put(cached)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch {
+    // Failed to update cached citations - silently ignore
+  }
+}
+
 /**
  * 캐시 항목 수 조회
  */

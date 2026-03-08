@@ -1,9 +1,6 @@
 import React from 'react'
 import { markLawVisited } from './visited-laws'
 
-/**
- * React children을 텍스트로 변환
- */
 function getTextFromChildren(c: React.ReactNode): string {
   if (typeof c === 'string') return c
   if (typeof c === 'number') return String(c)
@@ -17,9 +14,7 @@ function getTextFromChildren(c: React.ReactNode): string {
   return ''
 }
 
-interface LinkRendererProps {
-  href?: string
-  children: React.ReactNode
+interface LinkRendererProps extends React.ComponentPropsWithoutRef<'a'> {
   onLawClick?: (lawName: string, article?: string) => void
   onAnnexClick?: (annexNumber: string, lawName: string) => void
   disabledLink?: boolean
@@ -27,13 +22,22 @@ interface LinkRendererProps {
   setVisitedLaws: React.Dispatch<React.SetStateAction<Set<string>>>
 }
 
-/**
- * 법령 링크 렌더러
- * - law:// 프로토콜 처리
- * - annex:// 프로토콜 처리 (별표)
- * - law.go.kr URL 처리
- * - 방문 기록 관리
- */
+function buildLawKey(href: string | undefined, dataset: DOMStringMap): string {
+  if (dataset.law) {
+    return `${dataset.law}|${dataset.article || ''}`
+  }
+
+  if (href?.startsWith('law://')) {
+    const path = href.replace('law://', '')
+    const parts = path.split('/')
+    const lawName = decodeURIComponent(parts[0] || '')
+    const article = parts[1] ? decodeURIComponent(parts[1]) : ''
+    return `${lawName}|${article}`
+  }
+
+  return ''
+}
+
 export function LinkRenderer({
   href,
   children,
@@ -41,42 +45,59 @@ export function LinkRenderer({
   onAnnexClick,
   disabledLink = false,
   visitedLaws,
-  setVisitedLaws
+  setVisitedLaws,
+  className,
+  target,
+  rel,
+  onClick,
+  ...anchorProps
 }: LinkRendererProps) {
-  const handleAnyLinkClick = (e: React.MouseEvent) => {
-    if (!onLawClick && !onAnnexClick) return
+  const handleAnyLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    onClick?.(e)
+    if (e.defaultPrevented) return
 
-    e.preventDefault()
-    e.stopPropagation()
+    const dataset = e.currentTarget.dataset
+    const annexLawName = dataset.law
+    const annexNumber = dataset.annex
 
-    // 1. annex:// 프로토콜 (별표)
-    if (href?.startsWith('annex://')) {
-      if (disabledLink) return
-      const path = href.replace('annex://', '')
-      const parts = decodeURIComponent(path).split('/')
-      const lawName = parts[0]
-      const annexNumber = parts[1]
+    if (disabledLink) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
 
-      if (onAnnexClick && lawName && annexNumber) {
-        onAnnexClick(annexNumber, lawName)
+    if (annexNumber && onAnnexClick) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (annexLawName) {
+        onAnnexClick(annexNumber, annexLawName)
       }
       return
     }
 
-    // href에서 법령 정보 추출 시도
-    let lawName: string | undefined
-    let article: string | undefined
+    let lawName = dataset.law
+    let article = dataset.article
 
-    // 2. law:// 프로토콜
-    if (href?.startsWith('law://')) {
-      if (disabledLink) return
+    if (!lawName && href?.startsWith('annex://')) {
+      e.preventDefault()
+      e.stopPropagation()
+      const path = href.replace('annex://', '')
+      const parts = decodeURIComponent(path).split('/')
+      const fallbackLawName = parts[0]
+      const fallbackAnnex = parts[1]
+
+      if (onAnnexClick && fallbackLawName && fallbackAnnex) {
+        onAnnexClick(fallbackAnnex, fallbackLawName)
+      }
+      return
+    }
+
+    if (!lawName && href?.startsWith('law://')) {
       const path = href.replace('law://', '')
       const parts = path.split('/')
-      lawName = decodeURIComponent(parts[0])
+      lawName = decodeURIComponent(parts[0] || '')
       article = parts[1] ? decodeURIComponent(parts[1]) : undefined
-    }
-    // 3. law.go.kr URL
-    else if (href?.includes('law.go.kr')) {
+    } else if (!lawName && href?.includes('law.go.kr')) {
       const match = href.match(/law\.go\.kr\/(?:법령|lsSc|자치법규)\/([^/\s?#]+)(?:\/([^/\s?#]+))?/)
       if (match) {
         lawName = decodeURIComponent(match[1])
@@ -84,12 +105,9 @@ export function LinkRenderer({
       }
     }
 
-    // 4. 링크 텍스트에서 법령 패턴 추출 (href가 없거나 실패했을 때 보완)
     if (!lawName) {
       const text = getTextFromChildren(children)
-
-      // 법령 패턴 매칭
-      const lawMatch = text.match(/「?([가-힣a-zA-Z0-9·\s]{2,30}(?:법|령|규칙|조례|약관))」?\s*(제\d+조(?:의\d+)?)?/)
+      const lawMatch = text.match(/「([가-힣a-zA-Z0-9·\s]{2,30}(?:법|규칙|조례|시행령|시행규칙))」\s*((?:제\s*\d+\s*조(?:의\s*\d+)?)?)?/)
       if (lawMatch) {
         lawName = lawMatch[1].trim()
         article = lawMatch[2] || undefined
@@ -97,52 +115,57 @@ export function LinkRenderer({
     }
 
     if (lawName && onLawClick) {
-      // 방문 기록 저장
+      e.preventDefault()
+      e.stopPropagation()
       const lawKey = `${lawName}|${article || ''}`
       markLawVisited(lawKey)
       setVisitedLaws(prev => new Set([...prev, lawKey]))
-
       onLawClick(lawName, article)
-    } else {
-      // 법령 정보 추출 실패 시 새 창으로 열기
-      if (href && href.startsWith('http')) {
-        window.open(href, '_blank', 'noopener,noreferrer')
-      }
+      return
+    }
+
+    if (href && href.startsWith('http')) {
+      e.preventDefault()
+      window.open(href, '_blank', 'noopener,noreferrer')
     }
   }
 
-  // 방문 여부 체크
-  let lawKey = ''
-  if (href?.startsWith('law://')) {
-    const path = href.replace('law://', '')
-    const parts = path.split('/')
-    const ln = decodeURIComponent(parts[0])
-    const art = parts[1] ? decodeURIComponent(parts[1]) : ''
-    lawKey = `${ln}|${art}`
-  }
+  const dataLaw = String((anchorProps as Record<string, unknown>)['data-law'] || '')
+  const dataArticle = String((anchorProps as Record<string, unknown>)['data-article'] || '')
+  const lawKey = buildLawKey(href, {
+    law: dataLaw,
+    article: dataArticle,
+  } as DOMStringMap)
   const isVisited = lawKey && visitedLaws.has(lawKey)
 
-  // onLawClick이 있으면 모든 링크에 클릭 핸들러 적용
-  if (onLawClick) {
+  const mergedClassName = [
+    className,
+    (onLawClick || onAnnexClick) ? 'law-ref hover:underline cursor-pointer font-medium' : 'text-primary hover:underline',
+    isVisited ? 'law-ref-visited' : '',
+  ].filter(Boolean).join(' ')
+
+  if (onLawClick || onAnnexClick) {
     return (
       <a
+        {...anchorProps}
         href={href || '#'}
         onClick={handleAnyLinkClick}
-        className={`law-ref hover:underline cursor-pointer font-medium ${isVisited ? 'law-ref-visited' : ''}`}
-        data-ref="law-article"
+        className={mergedClassName}
+        target={target}
+        rel={rel}
       >
         {children}
       </a>
     )
   }
 
-  // onLawClick이 없으면 기본 동작 (새 창)
   return (
     <a
+      {...anchorProps}
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-primary hover:underline"
+      target={target || '_blank'}
+      rel={rel || 'noopener noreferrer'}
+      className={mergedClassName}
     >
       {children}
     </a>

@@ -71,6 +71,10 @@ export interface SearchResultCache {
       lawName: string
       articleNum: string
       verified?: boolean
+      verificationMethod?: string
+      verificationError?: string
+      source?: string
+      text?: string
     }>
     userQuery?: string
     fileSearchFailed?: boolean
@@ -80,6 +84,23 @@ export interface SearchResultCache {
       article?: string
     }
   }
+  interpretationResults?: Array<{
+    id: string
+    name: string
+    number: string
+    date: string
+    agency: string
+    link: string
+  }>
+  rulingResults?: Array<{
+    id: string
+    name: string
+    claimNumber: string
+    decisionDate: string
+    tribunal: string
+    decisionType: string
+    link: string
+  }>
   // 판례 검색 결과 (목록)
   precedentResults?: Array<{
     id: string

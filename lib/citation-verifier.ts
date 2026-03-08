@@ -34,7 +34,7 @@ export interface Citation {
  */
 export interface VerifiedCitation extends Citation {
   verified: boolean
-  verificationMethod: 'eflaw-lookup' | 'not-found' | 'error'
+  verificationMethod: 'eflaw-lookup' | 'not-found' | 'error' | 'skipped'
   verificationError?: string
   lawId?: string
   actualArticleExists?: boolean

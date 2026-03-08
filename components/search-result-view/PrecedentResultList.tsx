@@ -84,13 +84,13 @@ export const PrecedentResultList = memo(function PrecedentResultList({
           {/* 필터 배지 + 키워드 검색 + 표시개수 */}
           <div className="flex flex-wrap items-center gap-3">
             {courtFilter && (
-              <Badge variant="outline" className="text-sm px-3 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30">
+              <Badge variant="outline" className="text-sm px-3 py-1 bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border">
                 <Icon name="gavel" className="h-3.5 w-3.5 mr-1.5" />
                 {courtFilter}
               </Badge>
             )}
             {yearFilter && (
-              <Badge variant="outline" className="text-sm px-3 py-1 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">
+              <Badge variant="outline" className="text-sm px-3 py-1 bg-muted text-muted-foreground border-border">
                 <Icon name="calendar" className="h-3.5 w-3.5 mr-1.5" />
                 {yearFilter}년
               </Badge>
@@ -274,19 +274,19 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
 
   // 법원 배지 색상
   const getCourtBadgeClass = (court: string) => {
-    if (court?.includes('대법원')) return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-    if (court?.includes('고등') || court?.includes('고법')) return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20'
-    if (court?.includes('지방') || court?.includes('지법')) return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-    return 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
+    if (court?.includes('대법원')) return 'bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] border-[#d4af37]/20 dark:border-[#e2a85d]/30'
+    if (court?.includes('고등') || court?.includes('고법')) return 'bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border'
+    if (court?.includes('지방') || court?.includes('지법')) return 'bg-muted text-muted-foreground border-border'
+    return 'bg-muted text-muted-foreground border-border'
   }
 
   // 판결유형 배지 색상
   const getTypeBadgeClass = (type: string) => {
-    if (type?.includes('전원합의체')) return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
-    if (type?.includes('파기')) return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-    if (type?.includes('승')) return 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-    if (type?.includes('패')) return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-    return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
+    if (type?.includes('전원합의체')) return 'bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border'
+    if (type?.includes('파기')) return 'bg-destructive/10 text-destructive border-destructive/20'
+    if (type?.includes('승')) return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+    if (type?.includes('패')) return 'bg-destructive/10 text-destructive border-destructive/20'
+    return 'bg-muted text-muted-foreground border-border'
   }
 
   // 선고일자 포맷
@@ -346,7 +346,7 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
         {precedent.caseNumber && (
           <Badge
             variant="outline"
-            className="text-xs font-mono px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20"
+            className="text-xs font-mono px-2 py-0.5 bg-muted text-muted-foreground border-border"
           >
             {precedent.caseNumber}
           </Badge>
@@ -364,7 +364,7 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
         {precedent.date && (
           <Badge
             variant="outline"
-            className="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+            className="text-xs px-2 py-0.5 bg-muted text-muted-foreground border-border"
           >
             {formatDate(precedent.date)}
           </Badge>

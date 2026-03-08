@@ -8,7 +8,7 @@
 import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws } from "@/lib/law-parser"
-import { getCachedResponse, cacheResponse } from "@/lib/rag-response-cache"
+import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from "@/lib/rag-response-cache"
 import { detectSearchFailed } from "../../utils"
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
@@ -34,6 +34,35 @@ export function useAiSearch(deps: HandlerDeps) {
       })
     }
   }, [state.aiAnswerContent, state.userQuery, state.aiCitations, state.aiQueryType, state.aiConfidenceLevel, actions])
+
+  const persistVerifiedCitations = useCallback(async (query: string, citations: any[]) => {
+    try {
+      const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
+      const currentState = window.history.state
+      const currentSearchId = currentState?.searchId
+
+      if (currentSearchId) {
+        const existingCache = await getSearchResult(currentSearchId)
+        if (existingCache?.aiMode) {
+          await saveSearchResult({
+            ...existingCache,
+            aiMode: {
+              ...existingCache.aiMode,
+              aiCitations: citations,
+            }
+          })
+        }
+      }
+    } catch (e) {
+      debugLogger.error('검증 citation 캐시 갱신 실패', e)
+    }
+
+    try {
+      await updateCachedResponseCitations(query, citations)
+    } catch (e) {
+      debugLogger.error('RAG citation 캐시 갱신 실패', e)
+    }
+  }, [])
 
   const handleAiSearch = useCallback(async (
     fullQuery: string,
@@ -313,6 +342,18 @@ export function useAiSearch(deps: HandlerDeps) {
           saveCaches(query, processedContent, data, relatedLaws, searchFailed)
           break
         }
+        case 'citation_verification': {
+          // 검증된 citation으로 교체
+          if (event.citations && event.citations.length > 0) {
+            actions.setAiCitations(event.citations)
+            persistVerifiedCitations(query, event.citations)
+            debugLogger.success('인용 검증 완료', {
+              total: event.citations.length,
+              verified: event.citations.filter((c: any) => c.verified).length,
+            })
+          }
+          break
+        }
         case 'error': {
           debugLogger.error('FC-RAG 서버 오류', event.message)
           actions.addToolCallLog({
@@ -361,7 +402,7 @@ export function useAiSearch(deps: HandlerDeps) {
       } catch (e) { debugLogger.error('RAG 캐시 저장 실패', e) }
     }
 
-  }, [actions, toast, state.isSearching])
+  }, [actions, toast, state.isSearching, persistVerifiedCitations])
 
   /** 연속 대화 추가 질문 */
   const handleFollowUp = useCallback((followUpQuery: string) => {

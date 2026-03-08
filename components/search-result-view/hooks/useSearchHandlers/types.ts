@@ -48,13 +48,13 @@ export interface SearchHandlers {
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
   // 통합검색 핸들러
-  handlePrecedentSearch: (query: SearchQuery) => void
-  handlePrecedentSelect: (precedentId: string) => void
+  handlePrecedentSearch: (query: SearchQuery) => Promise<boolean>
+  handlePrecedentSelect: (precedentId: string) => Promise<void>
   handlePrecedentPageChange: (page: number) => Promise<void>
   handlePrecedentPageSizeChange: (size: number) => Promise<void>
-  handleInterpretationSearch: (query: SearchQuery) => void
-  handleRulingSearch: (query: SearchQuery) => void
-  handleMultiSearch: (query: SearchQuery) => void
+  handleInterpretationSearch: (query: SearchQuery) => Promise<boolean>
+  handleRulingSearch: (query: SearchQuery) => Promise<boolean>
+  handleMultiSearch: (query: SearchQuery) => Promise<void>
   // 조례 페이지네이션
   handleOrdinancePageChange: (page: number) => Promise<void>
   handleOrdinancePageSizeChange: (size: number) => Promise<void>
