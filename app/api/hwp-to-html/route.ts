@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { validateExternalUrl } from "@/lib/url-validator"
 
 /**
  * HWP 파일을 HTML로 변환하는 API
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
     // 1. HWP 파일 다운로드
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
     const fullUrl = hwpUrl.startsWith("/") ? `${baseUrl}${hwpUrl}` : hwpUrl
+
+    if (!fullUrl.startsWith(baseUrl) && !validateExternalUrl(fullUrl)) {
+      return NextResponse.json({ error: "허용되지 않은 URL입니다.", success: false }, { status: 400 })
+    }
 
     const response = await fetch(fullUrl)
     if (!response.ok) {
@@ -124,7 +129,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "HWP 변환 실패",
+        error: "HWP 변환 중 오류가 발생했습니다",
       },
       { status: 500 }
     )

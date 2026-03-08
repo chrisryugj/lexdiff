@@ -19,6 +19,9 @@ import { recordAIUsage, isQuotaExceeded, getUsageHeaders, getUsageWarningMessage
 import { NextRequest } from 'next/server'
 
 function getClientIP(request: NextRequest): string {
+  // Vercel에서 설정하는 신뢰 가능한 IP 우선
+  const vercelIP = request.headers.get('x-vercel-forwarded-for')
+  if (vercelIP) return vercelIP.split(',')[0].trim()
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) return forwarded.split(',')[0].trim()
   const realIP = request.headers.get('x-real-ip')
@@ -30,8 +33,16 @@ export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request)
   const userApiKey = request.headers.get('X-User-API-Key') || undefined
 
-  // BYO-Key가 없을 때만 쿼터 검사
-  if (!userApiKey && isQuotaExceeded(clientIP)) {
+  // BYO API Key 형식 검증
+  if (userApiKey && !/^AIzaSy[A-Za-z0-9_-]{33}$/.test(userApiKey)) {
+    return Response.json(
+      { error: 'API 키 형식이 올바르지 않습니다.' },
+      { status: 400 }
+    )
+  }
+
+  // BYO-Key 여부와 무관하게 rate limit 적용
+  if (isQuotaExceeded(clientIP)) {
     return Response.json(
       { error: '일일 AI 검색 한도를 초과했습니다. 내일 다시 시도해주세요.' },
       { status: 429, headers: getUsageHeaders(clientIP) }
@@ -91,7 +102,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         send({
           type: 'error',
-          message: error instanceof Error ? error.message : 'FC-RAG 처리 중 오류',
+          message: 'AI 검색 처리 중 오류가 발생했습니다. 다시 시도해주세요.',
         })
       } finally {
         controller.close()

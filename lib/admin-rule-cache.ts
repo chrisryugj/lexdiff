@@ -427,7 +427,7 @@ export async function setArticleMatchIndex(
       }
     })
   } catch (error) {
-    // Silently fail
+    console.warn('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -520,7 +520,7 @@ export async function setAdminRuleContentCache(
       }
     })
   } catch (error) {
-    // Silently fail
+    console.warn('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -548,7 +548,7 @@ export async function clearAdminRuleContentCache(ruleId: string): Promise<void> 
       }
     })
   } catch (error) {
-    // Silently fail
+    console.warn('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -570,11 +570,15 @@ export async function clearAllAdminRuleCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    // Silently fail
+    console.warn('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
 // 앱 시작 시 만료된 캐시 정리
 if (typeof window !== "undefined") {
-  cleanExpiredCache()
+  try {
+    cleanExpiredCache()
+  } catch {
+    // IndexedDB 사용 불가 시 무시
+  }
 }

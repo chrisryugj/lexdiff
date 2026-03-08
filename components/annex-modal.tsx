@@ -151,13 +151,6 @@ export function AnnexModal({
       const data = await res.json()
       const annexes: LawAnnex[] = data.annexes || []
 
-      console.log('[AnnexModal] API 응답:', {
-        query: lawName,
-        annexCount: annexes.length,
-        annexNumbers: annexes.map(a => a.annexNumber),
-        targetAnnexNumber: annexNumber
-      })
-
       // 3. 별표 번호로 매칭 (숫자만 비교)
       const targetNum = extractAnnexNum(annexNumber)
       const targetAnnex = annexes.find((a) => {
@@ -170,10 +163,6 @@ export function AnnexModal({
 
       if (!finalAnnex) {
         throw new Error(`「${lawName}」에서 별표를 찾을 수 없습니다.\n해당 법령에 별표가 없거나 API에서 제공되지 않을 수 있습니다.`)
-      }
-
-      if (!targetAnnex && annexes.length > 0) {
-        console.warn(`[AnnexModal] 별표 ${annexNumber} 미발견, 첫 번째 별표 사용:`, finalAnnex.annexNumber)
       }
 
       setAnnexData(finalAnnex)
@@ -190,10 +179,7 @@ export function AnnexModal({
           })
           const detectedFileType = fileCheckRes.headers.get("X-File-Type") as "pdf" | "hwp" | "unknown" || "unknown"
           setFileType(detectedFileType)
-
-          console.log("[AnnexModal] 파일 타입 감지:", detectedFileType)
         } catch {
-          console.warn("[AnnexModal] 파일 타입 확인 실패, PDF로 가정")
           setFileType("pdf")
         }
 
@@ -212,11 +198,6 @@ export function AnnexModal({
 
         if (mdRes.ok) {
           const mdData = await mdRes.json()
-          console.log("[AnnexModal] 변환 성공:", {
-            hasMarkdown: !!mdData.markdown,
-            source: mdData.source,
-            length: mdData.markdown?.length
-          })
           if (mdData.markdown) {
             setMarkdown(mdData.markdown)
 
@@ -236,19 +217,13 @@ export function AnnexModal({
                 await setAnnexCache(lawName, annexNumber, mdData.markdown, flSeq, lawName, finalAnnex.annexName)
               }
             }
-          } else {
-            console.warn("[AnnexModal] 응답은 성공했지만 markdown이 없음:", mdData)
           }
         } else {
           // 마크다운 변환 실패 시
           const errorData = await mdRes.json().catch(() => ({ error: "응답 파싱 실패" }))
-          console.warn("[AnnexModal] 마크다운 변환 실패:", {
-            status: mdRes.status,
-            error: errorData
-          })
           // 구 HWP 파일인 경우 다운로드만 제공
-          if (fileType === "hwp") {
-            console.log("[AnnexModal] 구 HWP 파일 - 다운로드만 제공")
+          if (errorData?.fileType === "old-hwp") {
+            // 구 HWP 파일 - 다운로드만 제공 (아무 조치 없음)
           } else {
             // PDF는 원문 뷰로 전환
             setViewMode("pdf")
@@ -258,7 +233,6 @@ export function AnnexModal({
 
       setLoadingState("done")
     } catch (err) {
-      console.error("별표 조회 실패:", err)
       setError(err instanceof Error ? err.message : "별표를 불러올 수 없습니다")
       setLoadingState("error")
     }

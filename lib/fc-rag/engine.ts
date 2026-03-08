@@ -7,11 +7,17 @@
  * SSE 스트리밍 지원: executeRAGStream()으로 도구 호출 과정을 실시간 전송
  */
 
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, type Part } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
+
+interface GeminiPart {
+  text?: string
+  functionCall?: { name?: string; args?: Record<string, unknown> }
+  functionResponse?: { name?: string; response?: { result?: string } }
+}
 
 // ─── 타입 ───
 
@@ -45,7 +51,7 @@ export type FCRAGStreamEvent =
 
 // ─── 설정 ───
 
-const MODEL = 'gemini-3-flash-preview'
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 
 const MAX_TOKENS: Record<QueryComplexity, number> = {
   simple: 3072,
@@ -81,11 +87,19 @@ function getMaxToolTurns(complexity: QueryComplexity): number {
 // ─── KNOWN_MST 런타임 캐시 ───
 // search_law 호출 결과에서 자동 축적. 서버 프로세스 수명 동안 유지.
 const KNOWN_MST = new Map<string, string>()
+const KNOWN_MST_MAX = 5000
 
 /** search_law 결과를 KNOWN_MST에 저장 */
 function cacheMSTEntries(entries: LawEntry[]) {
   for (const e of entries) {
-    if (e.name && e.mst) KNOWN_MST.set(e.name, e.mst)
+    if (e.name && e.mst) {
+      if (KNOWN_MST.size >= KNOWN_MST_MAX) {
+        // FIFO: 가장 오래된 엔트리 제거
+        const firstKey = KNOWN_MST.keys().next().value
+        if (firstKey) KNOWN_MST.delete(firstKey)
+      }
+      KNOWN_MST.set(e.name, e.mst)
+    }
   }
 }
 
@@ -429,6 +443,7 @@ export async function* executeRAGStream(
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const toolDeclarations = getToolDeclarations()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: Array<{ role: 'user' | 'model'; parts: any[] }> = [
     { role: 'user', parts: [{ text: query }] },
   ]
@@ -471,7 +486,7 @@ export async function* executeRAGStream(
       const candidate = response.candidates?.[0]
 
       // 토큰 사용량 추적
-      const usage = (response as any).usageMetadata
+      const usage = (response as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
       if (usage) {
         totalInputTokens += usage.promptTokenCount || 0
         totalOutputTokens += usage.candidatesTokenCount || 0
@@ -484,11 +499,11 @@ export async function* executeRAGStream(
       }
 
       const parts = candidate.content.parts
-      const functionCalls = parts.filter((p: any) => p.functionCall)
+      const functionCalls = parts.filter((p: GeminiPart) => p.functionCall)
 
       // 텍스트 답변 (도구 호출 없음) → 완료
       if (functionCalls.length === 0) {
-        const answer = parts.filter((p: any) => p.text).map((p: any) => p.text).join('')
+        const answer = parts.filter((p: GeminiPart) => p.text).map((p: GeminiPart) => p.text).join('')
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         yield {
           type: 'answer',
@@ -506,9 +521,9 @@ export async function* executeRAGStream(
 
       // 마지막 턴: 도구 호출 무시, 텍스트 답변 강제
       if (isLastTurn) {
-        const textParts = parts.filter((p: any) => p.text)
+        const textParts = parts.filter((p: GeminiPart) => p.text)
         if (textParts.length > 0) {
-          const answer = textParts.map((p: any) => p.text).join('')
+          const answer = textParts.map((p: GeminiPart) => p.text).join('')
           yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
           yield {
             type: 'answer',
@@ -534,14 +549,14 @@ export async function* executeRAGStream(
           contents: messages,
           config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
         })
-        const retryUsage = (retry as any).usageMetadata
+        const retryUsage = (retry as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
         if (retryUsage) {
           totalInputTokens += retryUsage.promptTokenCount || 0
           totalOutputTokens += retryUsage.candidatesTokenCount || 0
           yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
         }
         const retryText = (retry.candidates?.[0]?.content?.parts || [])
-          .filter((p: any) => p.text).map((p: any) => p.text).join('')
+          .filter((p: GeminiPart) => p.text).map((p: GeminiPart) => p.text).join('')
         yield {
           type: 'answer',
           data: {
@@ -557,9 +572,9 @@ export async function* executeRAGStream(
       }
 
       // ── Function Call 실행 ──
-      const calls = functionCalls.map((p: any) => ({
-        name: p.functionCall.name as string,
-        args: (p.functionCall.args || {}) as Record<string, unknown>,
+      const calls = functionCalls.map((p: GeminiPart) => ({
+        name: (p.functionCall!.name || '') as string,
+        args: (p.functionCall!.args || {}) as Record<string, unknown>,
       }))
 
       // MST 보정 (unknown MST면 search_law 자동 호출)
@@ -676,7 +691,7 @@ export async function* executeRAGStream(
       // 히스토리 추가
       const modelParts = [...parts]
       for (const chain of autoChains) {
-        modelParts.push({ functionCall: { name: chain.name, args: chain.args } } as any)
+        modelParts.push({ functionCall: { name: chain.name, args: chain.args } } as Part)
       }
       messages.push({ role: 'model', parts: modelParts })
       messages.push({

@@ -49,8 +49,6 @@ export function LinkRenderer({
     e.preventDefault()
     e.stopPropagation()
 
-    console.log('[LegalMarkdown] Link click:', { href })
-
     // 1. annex:// 프로토콜 (별표)
     if (href?.startsWith('annex://')) {
       if (disabledLink) return
@@ -59,12 +57,8 @@ export function LinkRenderer({
       const lawName = parts[0]
       const annexNumber = parts[1]
 
-      console.log('[LegalMarkdown] Annex link click:', { lawName, annexNumber })
-
       if (onAnnexClick && lawName && annexNumber) {
         onAnnexClick(annexNumber, lawName)
-      } else {
-        console.warn('[LegalMarkdown] onAnnexClick not provided or invalid data')
       }
       return
     }

@@ -33,6 +33,10 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' data:;",
+          },
         ],
       },
       {
@@ -40,12 +44,16 @@ const nextConfig = {
         source: '/api/:path*',
         headers: [
           {
+            key: 'Access-Control-Allow-Origin',
+            value: process.env.NEXT_PUBLIC_SITE_URL || 'https://lexdiff.vercel.app',
+          },
+          {
             key: 'Access-Control-Allow-Methods',
             value: 'GET, POST, OPTIONS',
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type',
+            value: 'Content-Type, X-User-API-Key',
           },
         ],
       },

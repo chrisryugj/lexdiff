@@ -4,6 +4,11 @@
 
 import { linkifyRefsB } from "./unified-link-generator"
 
+/** 정규식 특수문자 이스케이프 */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export interface AdminRuleListItem {
   name: string // 행정규칙명
   id: string // 행정규칙ID
@@ -130,13 +135,11 @@ export function parseAdminRuleContent(xmlText: string): AdminRuleContent | null 
   // AdmRulService 구조 확인
   const serviceNode = doc.querySelector("AdmRulService")
   if (!serviceNode) {
-    console.error("[admrul-parser] AdmRulService node not found")
     return null
   }
 
   const infoNode = serviceNode.querySelector("행정규칙기본정보")
   if (!infoNode) {
-    console.error("[admrul-parser] 행정규칙기본정보 node not found")
     return null
   }
 
@@ -168,10 +171,6 @@ export function parseAdminRuleContent(xmlText: string): AdminRuleContent | null 
   })
 
   const content = contentParts.join("\n\n")
-
-  if (!content) {
-    console.warn("[admrul-parser] No content found for:", name)
-  }
 
   return {
     name,
@@ -212,54 +211,6 @@ function parseArticleFromSingleContent(text: string): AdminRuleArticle | null {
 }
 
 /**
- * 조문 내용에서 개별 조문 추출 (레거시, 사용 안 함)
- * 예: "제1조(목적) 이 고시는..." → { number: "제1조", title: "목적", content: "이 고시는..." }
- */
-function parseArticlesFromContent(content: string): AdminRuleArticle[] {
-  const articles: AdminRuleArticle[] = []
-
-  // 제N조 패턴으로 분할
-  const articlePattern = /(제\d+조(?:의\d+)?)\s*(?:\(([^)]+)\))?\s*/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  const matches: Array<{ number: string; title?: string; index: number }> = []
-
-  while ((match = articlePattern.exec(content)) !== null) {
-    matches.push({
-      number: match[1],
-      title: match[2],
-      index: match.index,
-    })
-  }
-
-  // 각 조문의 내용 추출
-  for (let i = 0; i < matches.length; i++) {
-    const current = matches[i]
-    const next = matches[i + 1]
-
-    const startIndex = current.index + content.substring(current.index).indexOf(current.number) + current.number.length
-    const endIndex = next ? next.index : content.length
-
-    // 괄호 제목 다음부터 시작
-    let articleContent = content.substring(startIndex, endIndex).trim()
-
-    // 괄호 제목이 있으면 제거
-    if (current.title) {
-      articleContent = articleContent.replace(/^\([^)]+\)\s*/, "").trim()
-    }
-
-    articles.push({
-      number: current.number,
-      title: current.title,
-      content: articleContent,
-    })
-  }
-
-  return articles
-}
-
-/**
  * 제1조(목적) 추출
  */
 export function extractPurposeArticle(ruleContent: AdminRuleContent): AdminRuleArticle | null {
@@ -274,7 +225,7 @@ function normalizeLawReferences(content: string, baseLawName: string): string {
   let normalized = content
 
   // "「법령명」"을 기준 법령명으로 인식
-  const baseLawPattern = new RegExp(`「\\s*${baseLawName}\\s*」`, "g")
+  const baseLawPattern = new RegExp(`「\\s*${escapeRegExp(baseLawName)}\\s*」`, "g")
   const hasBaseLaw = baseLawPattern.test(content)
 
   if (hasBaseLaw) {
@@ -358,14 +309,14 @@ export function checkLawArticleReference(
   const normalized = normalizeLawReferences(purposeContent, lawName)
 
   // 2-1. 정확한 법령명 + 조문번호 패턴
-  const exactPattern = new RegExp(`「\\s*${lawName}\\s*」[^「」]*${articleNumber}(?![0-9의])`)
+  const exactPattern = new RegExp(`「\\s*${escapeRegExp(lawName)}\\s*」[^「」]*${escapeRegExp(articleNumber)}(?![0-9의])`)
   if (exactPattern.test(normalized)) {
     return true
   }
 
   // 2-2. 시행령 참조 패턴
   const decreePattern = new RegExp(
-    `「\\s*${lawName}\\s*시행령\\s*」[^「」]*${articleNumber}(?![0-9의])`
+    `「\\s*${escapeRegExp(lawName)}\\s*시행령\\s*」[^「」]*${escapeRegExp(articleNumber)}(?![0-9의])`
   )
   if (decreePattern.test(normalized)) {
     return true
@@ -373,7 +324,7 @@ export function checkLawArticleReference(
 
   // 2-3. 시행규칙 참조 패턴
   const rulePattern = new RegExp(
-    `「\\s*${lawName}\\s*시행규칙\\s*」[^「」]*${articleNumber}(?![0-9의])`
+    `「\\s*${escapeRegExp(lawName)}\\s*시행규칙\\s*」[^「」]*${escapeRegExp(articleNumber)}(?![0-9의])`
   )
   if (rulePattern.test(normalized)) {
     return true
