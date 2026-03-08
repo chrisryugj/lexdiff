@@ -41,19 +41,15 @@ async function openDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
 
-      console.log(`📦 [RAG Cache] IndexedDB upgrade: v${event.oldVersion} → v${DB_VERSION}`)
-
       // 기존 스토어 삭제 (버전 업그레이드 시)
       if (db.objectStoreNames.contains(CACHE_STORE)) {
         db.deleteObjectStore(CACHE_STORE)
-        console.log(`🗑️ [RAG Cache] Deleted old store: ${CACHE_STORE}`)
       }
 
       // RAG 응답 캐시 스토어 생성
       const store = db.createObjectStore(CACHE_STORE, { keyPath: 'key' })
       store.createIndex('timestamp', 'timestamp', { unique: false })
       store.createIndex('hitCount', 'hitCount', { unique: false })
-      console.log(`✅ [RAG Cache] Created ${CACHE_STORE} (v${DB_VERSION})`)
     }
   })
 }
@@ -63,20 +59,10 @@ async function openDB(): Promise<IDBDatabase> {
  */
 function hashQuery(query: string): string {
   // 쿼리 정규화 (대소문자, 공백)
-  const normalized = query
+  return query
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()
-
-  // 간단한 문자열 해시
-  let hash = 0
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash  // Convert to 32bit integer
-  }
-
-  return hash.toString(36)
 }
 
 /**
@@ -104,17 +90,14 @@ async function cleanExpiredCache(): Promise<void> {
           deletedCount++
           cursor.continue()
         } else {
-          if (deletedCount > 0) {
-            console.log(`🗑️ [RAG Cache] Cleaned ${deletedCount} expired entries (TTL: 24h)`)
-          }
           resolve()
         }
       }
 
       request.onerror = () => reject(request.error)
     })
-  } catch (error) {
-    console.error('[RAG Cache] Failed to clean expired cache:', error)
+  } catch {
+    // Failed to clean expired cache - silently ignore
   }
 }
 
@@ -149,7 +132,6 @@ async function cleanOldestEntries(db: IDBDatabase, targetCount: number): Promise
         })
 
         deleteTx.oncomplete = () => {
-          console.log(`🗑️ [RAG Cache] Deleted ${targetCount} oldest entries (max: ${MAX_ENTRIES})`)
           resolve()
         }
         deleteTx.onerror = () => reject(deleteTx.error)
@@ -183,14 +165,12 @@ export async function getCachedResponse(query: string): Promise<{
         const cached = request.result as RAGCacheEntry | undefined
 
         if (!cached) {
-          console.log('[RAG Cache] ❌ Cache miss for query:', query.substring(0, 50))
           resolve(null)
           return
         }
 
         // TTL 체크
         if (Date.now() - cached.timestamp > CACHE_TTL) {
-          console.log('[RAG Cache] ⏰ Cache expired (TTL: 24h), deleting...')
           const deleteTx = db.transaction(CACHE_STORE, 'readwrite')
           deleteTx.objectStore(CACHE_STORE).delete(key)
           resolve(null)
@@ -203,12 +183,6 @@ export async function getCachedResponse(query: string): Promise<{
         cached.hitCount++
         updateStore.put(cached)
 
-        console.log('[RAG Cache] ✅ Cache hit!', {
-          query: query.substring(0, 50),
-          hitCount: cached.hitCount,
-          age: Math.round((Date.now() - cached.timestamp) / 1000 / 60) + ' minutes'
-        })
-
         resolve({
           response: cached.response,
           citations: cached.citations,
@@ -219,8 +193,7 @@ export async function getCachedResponse(query: string): Promise<{
 
       request.onerror = () => reject(request.error)
     })
-  } catch (error) {
-    console.error('[RAG Cache] Error reading cache:', error)
+  } catch {
     return null
   }
 }
@@ -258,7 +231,6 @@ export async function cacheResponse(
       const request = store.put(entry)
 
       request.onsuccess = () => {
-        console.log('[RAG Cache] ✅ Cached response for query:', query.substring(0, 50))
         resolve()
       }
 
@@ -273,8 +245,8 @@ export async function cacheResponse(
     if (count > MAX_ENTRIES) {
       await cleanOldestEntries(db, count - MAX_ENTRIES)
     }
-  } catch (error) {
-    console.error('[RAG Cache] Error writing cache:', error)
+  } catch {
+    // Failed to write cache - silently ignore
   }
 }
 
@@ -338,8 +310,7 @@ export async function getCacheStats(): Promise<{
         ? timestamps.reduce((sum, t) => sum + (now - t), 0) / timestamps.length / 1000 / 60  // minutes
         : 0
     }
-  } catch (error) {
-    console.error('[RAG Cache] Error getting stats:', error)
+  } catch {
     return {
       totalEntries: 0,
       totalHits: 0,
@@ -363,13 +334,12 @@ export async function clearCache(): Promise<void> {
       const request = store.clear()
 
       request.onsuccess = () => {
-        console.log('🗑️ [RAG Cache] ✅ All cache cleared')
         resolve()
       }
 
       request.onerror = () => reject(request.error)
     })
-  } catch (error) {
-    console.error('[RAG Cache] Error clearing cache:', error)
+  } catch {
+    // Failed to clear cache - silently ignore
   }
 }

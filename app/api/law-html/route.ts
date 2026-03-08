@@ -3,6 +3,7 @@ import { load, type CheerioAPI, type Cheerio } from "cheerio"
 import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
+import { validateExternalUrl } from "@/lib/url-validator"
 
 /**
  * 개정 태그 키워드를 4가지 타입으로 분류
@@ -133,6 +134,10 @@ export async function GET(req: Request) {
       }
     } catch {}
 
+    if (!targetUrl.startsWith('/') && !validateExternalUrl(targetUrl)) {
+      return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
+    }
+
     const res = await fetch(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
@@ -181,7 +186,6 @@ export async function GET(req: Request) {
     }
     return NextResponse.json({ html: sanitized })
   } catch (e) {
-    console.error("[law-html] error:", e)
-    return NextResponse.json({ error: e instanceof Error ? e.message : "unknown" }, { status: 500 })
+    return NextResponse.json({ error: "법령 HTML 조회 중 오류가 발생했습니다" }, { status: 500 })
   }
 }

@@ -28,6 +28,15 @@ type HierarchyRule = { id: string; name: string; serialNumber?: string }
 const fetchingLawNames = new Set<string>()
 // 전역 상태: 이미 로드된 hierarchy 데이터 캐시 (메모리)
 const loadedHierarchyCache = new Map<string, { rules: HierarchyRule[]; mst: string }>()
+const HIERARCHY_CACHE_MAX = 100
+
+function cacheHierarchy(key: string, value: { rules: HierarchyRule[]; mst: string }) {
+  if (loadedHierarchyCache.size >= HIERARCHY_CACHE_MAX) {
+    const firstKey = loadedHierarchyCache.keys().next().value
+    if (firstKey) loadedHierarchyCache.delete(firstKey)
+  }
+  loadedHierarchyCache.set(key, value)
+}
 
 export interface AdminRuleMatch {
   name: string
@@ -104,7 +113,18 @@ export function useAdminRules(
     // 다른 인스턴스가 fetch 중이면 대기
     if (fetchingLawNames.has(lawName)) {
       setLoadingHierarchy(true)
+      const MAX_WAIT = 30000 // 30초 타임아웃
+      const startTime = Date.now()
       const waitForFetch = setInterval(() => {
+        if (Date.now() - startTime > MAX_WAIT) {
+          clearInterval(waitForFetch)
+          setHierarchyRules([])
+          setHierarchyMst("")
+          loadedLawNameRef.current = lawName
+          setHierarchyLoaded(true)
+          setLoadingHierarchy(false)
+          return
+        }
         const cached = loadedHierarchyCache.get(lawName)
         if (cached) {
           clearInterval(waitForFetch)
@@ -139,7 +159,7 @@ export function useAdminRules(
         if (optimisticCache) {
           setHierarchyRules(optimisticCache.rules)
           setHierarchyMst(optimisticCache.mst)
-          loadedHierarchyCache.set(lawName, { rules: optimisticCache.rules, mst: optimisticCache.mst })
+          cacheHierarchy(lawName, { rules: optimisticCache.rules, mst: optimisticCache.mst })
           loadedLawNameRef.current = lawName
           setHierarchyLoaded(true)
           setLoadingHierarchy(false)
@@ -173,12 +193,12 @@ export function useAdminRules(
           // MST 일치 캐시 → 그대로 사용
           setHierarchyRules(cachedRules)
           setHierarchyMst(currentMst)
-          loadedHierarchyCache.set(lawName, { rules: cachedRules, mst: currentMst })
+          cacheHierarchy(lawName, { rules: cachedRules, mst: currentMst })
         } else if (!cancelled) {
           // 새 hierarchy 데이터 저장
           setHierarchyRules(rules)
           setHierarchyMst(currentMst)
-          loadedHierarchyCache.set(lawName, { rules, mst: currentMst })
+          cacheHierarchy(lawName, { rules, mst: currentMst })
           // IndexedDB에 캐시 저장
           await setLawAdminRulesPurposeCache(lawName, currentMst, rules)
         }
@@ -193,7 +213,6 @@ export function useAdminRules(
       } catch (err: any) {
         fetchingLawNames.delete(lawName)
         if (!cancelled) {
-          console.error("[use-admin-rules] Hierarchy error:", err)
           setError(err.message || "행정규칙 조회 중 오류 발생")
           setLoadingHierarchy(false)
           setHierarchyLoaded(true) // 에러도 "시도 완료"
@@ -301,8 +320,7 @@ export function useAdminRules(
             await setArticleMatchIndex(lawName, articleNumber, hierarchyMst, allMatchIds)
           }
         }
-      } catch (err) {
-        console.error("[use-admin-rules] Tier 2 error:", err)
+      } catch {
         // Tier 2 실패는 graceful degradation — Tier 1 결과는 유지
       } finally {
         if (!cancelled) {

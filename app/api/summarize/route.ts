@@ -2,8 +2,21 @@ import { NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
 import { debugLogger } from "@/lib/debug-logger"
 
+/** 프롬프트 인젝션 방어용 입력 새니타이징 */
+function sanitizePromptInput(text: string): string {
+  return text
+    .replace(/"""/g, '"')
+    .replace(/```/g, '')
+    .substring(0, 8000)
+}
+
 export async function POST(request: Request) {
   try {
+    const contentLength = parseInt(request.headers.get('content-length') || '0')
+    if (contentLength > 200_000) {
+      return NextResponse.json({ error: "요청이 너무 큽니다" }, { status: 413 })
+    }
+
     const { lawTitle, joNum, oldContent, newContent, effectiveDate, isPrecedent } = await request.json()
 
     // 판례 모드에서는 newContent만 필요
@@ -25,19 +38,6 @@ export async function POST(request: Request) {
 
     debugLogger.info("AI 요약 생성 시작", { lawTitle, joNum, effectiveDate, isPrecedent })
 
-    console.log("========== AI에 전달되는 데이터 ==========")
-    console.log("모드:", isPrecedent ? "판례 요약" : "법령 비교")
-    console.log("법령명/사건명:", lawTitle)
-    console.log("조문:", joNum)
-    console.log("시행일/선고일:", effectiveDate || "정보 없음")
-    if (!isPrecedent) {
-      console.log("구법 내용 길이:", oldContent?.length || 0, "자")
-      console.log(oldContent?.substring(0, 500))
-    }
-    console.log("신법/판례 내용 길이:", newContent.length, "자")
-    console.log(newContent.substring(0, 500))
-    console.log("==========================================")
-
     const ai = new GoogleGenAI({ apiKey })
 
     // 판례 요약용 프롬프트
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 ${effectiveDate ? `- 선고일: ${effectiveDate}` : ""}
 - 판결문 전문:
 """
-${newContent.substring(0, 6000)}
+${sanitizePromptInput(newContent)}
 """
 
 지시:
@@ -96,11 +96,11 @@ ${newContent.substring(0, 6000)}
 ${effectiveDate ? `- 시행일: ${effectiveDate}` : ""}
 - 구법 본문(발췌):
 """
-${oldContent.substring(0, 2000)}
+${sanitizePromptInput(oldContent).substring(0, 2000)}
 """
 - 신법 본문(발췌):
 """
-${newContent.substring(0, 2000)}
+${sanitizePromptInput(newContent).substring(0, 2000)}
 """
 
 지시:
@@ -138,10 +138,6 @@ ${newContent.substring(0, 2000)}
     // 모드에 따라 프롬프트 선택
     const prompt = isPrecedent ? precedentPrompt : lawComparePrompt
 
-    console.log("========== Gemini에 전달되는 프롬프트 ==========")
-    console.log(prompt)
-    console.log("================================================")
-
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents: prompt,
@@ -155,7 +151,7 @@ ${newContent.substring(0, 2000)}
   } catch (error) {
     debugLogger.error("AI 요약 생성 실패", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI 요약 생성 중 오류가 발생했습니다" },
+      { error: "AI 요약 생성 중 오류가 발생했습니다" },
       { status: 500 },
     )
   }

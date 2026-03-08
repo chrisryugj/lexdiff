@@ -170,24 +170,20 @@ export function getGlobalUsageSummary(): {
   totalIPs: number
   totalRequests: number
   totalTokens: number
-  activeIPs: string[]
 } {
   cleanupExpiredRecords()
 
   let totalRequests = 0
   let totalTokens = 0
-  const activeIPs: string[] = []
 
-  for (const [ip, record] of usageStore.entries()) {
+  for (const [, record] of usageStore.entries()) {
     totalRequests += record.count
     totalTokens += record.totalTokens
-    activeIPs.push(ip)
   }
 
   return {
     totalIPs: usageStore.size,
     totalRequests,
     totalTokens,
-    activeIPs,
   }
 }

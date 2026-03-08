@@ -270,7 +270,6 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
     const articleInfo = item.querySelector("조문정보")
 
     if (!lawInfo || !articleInfo) {
-      console.log(`[조문이력 ${index + 1}] Missing lawInfo or articleInfo, skipping`)
       return
     }
 
@@ -309,13 +308,6 @@ export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
     }
 
     history.push(historyItem)
-
-    console.log(`[조문이력 ${index + 1}]`, {
-      date: historyItem.date,
-      type: historyItem.type,
-      reason: historyItem.changeReason,
-      articleNumber,
-    })
   })
 
   return history

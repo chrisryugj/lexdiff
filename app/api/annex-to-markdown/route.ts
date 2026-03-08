@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseHwpxToMarkdown, isHwpxFile, isOldHwpFile } from "@/lib/hwpx-parser"
+import { validateExternalUrl } from "@/lib/url-validator"
 
 /**
  * 별표 파일 → 마크다운 변환 API
@@ -26,6 +27,10 @@ export async function POST(request: Request) {
     const fullPdfUrl = pdfUrl.startsWith("/")
       ? `${getBaseUrl(request)}${pdfUrl}`
       : pdfUrl
+
+    if (!fullPdfUrl.startsWith(getBaseUrl(request)) && !validateExternalUrl(fullPdfUrl)) {
+      return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
+    }
 
     const fileResponse = await fetch(fullPdfUrl)
     if (!fileResponse.ok) {
@@ -156,12 +161,9 @@ export async function POST(request: Request) {
   } catch (error) {
     debugLogger.error("별표 PDF→마크다운 변환 실패", error)
 
-    // 에러 메시지에 따른 분기
-    const errorMessage = error instanceof Error ? error.message : "변환 실패"
-
     return NextResponse.json(
       {
-        error: errorMessage,
+        error: "별표 변환 중 오류가 발생했습니다",
         markdown: null,
         source: "error",
       },

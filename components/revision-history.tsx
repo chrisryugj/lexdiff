@@ -110,7 +110,7 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
               <div className="space-y-0.5">
                 {displayedHistory.map((item, index) => (
                     <button
-                      key={index}
+                      key={`${item.date || ''}-${item.type || ''}-${index}`}
                       onClick={() => item.articleLink && setSelectedRevision(item)}
                       disabled={!item.articleLink}
                       className={`w-full text-left py-1.5 pl-4 pr-2 rounded transition-colors flex items-center gap-2.5 relative

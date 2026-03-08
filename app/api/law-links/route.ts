@@ -58,6 +58,10 @@ export async function GET(req: Request) {
       }
       targetUrl = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(joLabel)}`
     }
+    if (!targetUrl.startsWith('https://www.law.go.kr')) {
+      return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
+    }
+
     const res = await fetch(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
@@ -90,7 +94,6 @@ export async function GET(req: Request) {
     links.sort((a, b) => b.text.length - a.text.length)
     return NextResponse.json({ links })
   } catch (e) {
-    console.error('[law-links] error', e)
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'unknown' }, { status: 500 })
+    return NextResponse.json({ error: '법령 링크 조회 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -37,7 +37,11 @@ import type { ZodSchema } from 'zod'
 
 // ─── API 클라이언트 (모듈 레벨 싱글턴) ───
 
-const apiClient = new LawApiClient({ apiKey: process.env.LAW_OC || '' })
+const LAW_OC = process.env.LAW_OC
+if (!LAW_OC) {
+  console.warn('[FC-RAG] LAW_OC 환경 변수가 설정되지 않았습니다.')
+}
+const apiClient = new LawApiClient({ apiKey: LAW_OC || '' })
 
 // ─── API 결과 캐시 ───
 
