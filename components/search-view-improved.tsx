@@ -25,6 +25,43 @@ const HelpGuideSheet = dynamic(
   { ssr: false }
 )
 
+/** 0에서 target까지 카운트업 애니메이션 (뷰포트 진입 시 시작) */
+function AnimatedNumber({ value, duration = 1500 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0)
+  const [started, setStarted] = useState(false)
+  const spanRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    const el = spanRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setStarted(true); observer.disconnect() } },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!started || value <= 0) return
+    let start: number | null = null
+    let raf: number
+
+    const step = (ts: number) => {
+      if (!start) start = ts
+      const progress = Math.min((ts - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(eased * value))
+      if (progress < 1) raf = requestAnimationFrame(step)
+    }
+
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [started, value, duration])
+
+  return <span ref={spanRef}>{display.toLocaleString()}</span>
+}
+
 export interface SearchViewProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => Promise<void>
   onFavoriteSelect: (favorite: Favorite) => void
@@ -296,25 +333,25 @@ export function SearchViewImproved({
                 {lawStats.laws > 0 && (
                   <span className="flex items-center gap-1">
                     <Icon name="scale" size={12} className="text-primary/60" />
-                    법령 {lawStats.laws.toLocaleString()}건
+                    법령 <AnimatedNumber value={lawStats.laws} />건
                   </span>
                 )}
                 {lawStats.adminRules > 0 && (
                   <span className="flex items-center gap-1">
                     <Icon name="file-text" size={12} className="text-primary/60" />
-                    행정규칙 {lawStats.adminRules.toLocaleString()}건
+                    행정규칙 <AnimatedNumber value={lawStats.adminRules} />건
                   </span>
                 )}
                 {lawStats.ordinances > 0 && (
                   <span className="flex items-center gap-1">
                     <Icon name="building-2" size={12} className="text-primary/60" />
-                    자치법규 {lawStats.ordinances.toLocaleString()}건
+                    자치법규 <AnimatedNumber value={lawStats.ordinances} />건
                   </span>
                 )}
                 {lawStats.precedents > 0 && (
                   <span className="flex items-center gap-1">
                     <Icon name="gavel" size={12} className="text-primary/60" />
-                    판례 {lawStats.precedents.toLocaleString()}건
+                    판례 <AnimatedNumber value={lawStats.precedents} />건
                   </span>
                 )}
               </div>

@@ -524,6 +524,24 @@ export function AIAnswerContent({
         )
     }
 
+    // 검색 완료 후 통계 계산
+    const searchStats = useMemo(() => {
+        if (isStreaming || toolCallLogs.length === 0) return null
+        const calls = toolCallLogs.filter(l => l.type === 'call')
+        const toolNames = new Map<string, number>()
+        calls.forEach(l => {
+            const name = l.displayName || l.name || 'unknown'
+            toolNames.set(name, (toolNames.get(name) || 0) + 1)
+        })
+        const tokenLog = toolCallLogs.find(l => l.type === 'token_usage')
+        return {
+            totalCalls: calls.length,
+            uniqueTools: toolNames.size,
+            toolBreakdown: Array.from(toolNames.entries()),
+            totalTokens: tokenLog?.totalTokens,
+        }
+    }, [isStreaming, toolCallLogs])
+
     return (
         <div className="w-full max-w-full min-w-0 overflow-hidden">
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
@@ -537,6 +555,54 @@ export function AIAnswerContent({
                     </Badge>
                     {/* 신뢰도 배지 - RAG 배지 바로 옆 */}
                     <ConfidenceBadge />
+                    {/* 검색 통계 아이콘 (완료 후 표시, hover 시 상세) */}
+                    {searchStats && streamElapsed > 0 && (
+                        <div className="relative group flex-shrink-0">
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/30 text-[11px] text-muted-foreground/60 cursor-default hover:text-muted-foreground hover:border-border/50 transition-colors">
+                                <Icon name="zap" size={12} />
+                                <span className="tabular-nums">{streamElapsed.toFixed(1)}s</span>
+                                <span className="opacity-30">·</span>
+                                <Icon name="settings" size={10} />
+                                <span className="tabular-nums">{searchStats.totalCalls}</span>
+                            </div>
+                            {/* Hover 상세 팝업 */}
+                            <div className="absolute top-full left-0 mt-1.5 hidden group-hover:block z-50">
+                                <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[190px] text-xs space-y-1.5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="clock" size={12} />소요 시간</span>
+                                        <span className="font-medium tabular-nums">{streamElapsed.toFixed(1)}초</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="settings" size={12} />도구 호출</span>
+                                        <span className="font-medium tabular-nums">{searchStats.totalCalls}회</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="database" size={12} />도구 종류</span>
+                                        <span className="font-medium tabular-nums">{searchStats.uniqueTools}개</span>
+                                    </div>
+                                    {searchStats.totalTokens && (
+                                        <div className="flex items-center justify-between gap-4">
+                                            <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="bar-chart" size={12} />토큰</span>
+                                            <span className="font-medium tabular-nums">{searchStats.totalTokens.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    {searchStats.toolBreakdown.length > 0 && (
+                                        <>
+                                            <div className="h-px bg-border/40 my-1" />
+                                            <div className="space-y-1">
+                                                {searchStats.toolBreakdown.map(([name, count]) => (
+                                                    <div key={name} className="flex items-center justify-between text-muted-foreground/70">
+                                                        <span className="truncate max-w-[130px]">{name}</span>
+                                                        <span className="tabular-nums ml-2 text-foreground/60">{count}회</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* 2줄: 질문 표시 + 쿼리 타입 배지 + PC 버튼들 우측 */}

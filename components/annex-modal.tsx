@@ -122,9 +122,10 @@ export function AnnexModal({
     setMarkdown(null)
 
     try {
-      // 1. 캐시 확인
-      if (lawId) {
-        const cached = await getAnnexCache(lawId, annexNumber)
+      // 1. 캐시 확인 (lawId 우선, 없으면 lawName으로 fallback)
+      const cacheKey = lawId || lawName
+      if (cacheKey) {
+        const cached = await getAnnexCache(cacheKey, annexNumber)
         if (cached) {
           setMarkdown(cached.markdown)
           setAnnexData({
@@ -133,7 +134,7 @@ export function AnnexModal({
             annexName: cached.annexName || "",
             annexKind: "1",
             lawName: cached.lawName,
-            lawId: lawId,
+            lawId: lawId || "",
             pdfLink: `/LSW/flDownload.do?flSeq=${cached.pdfFlSeq}`,
           })
           setLoadingState("done")
@@ -219,16 +220,21 @@ export function AnnexModal({
           if (mdData.markdown) {
             setMarkdown(mdData.markdown)
 
-            // 캐시 저장
-            if (lawId || finalAnnex.lawId) {
+            // 캐시 저장 (lawId 또는 lawName으로)
+            const saveKey = lawId || finalAnnex.lawId || lawName
+            if (saveKey) {
               await setAnnexCache(
-                lawId || finalAnnex.lawId,
+                saveKey,
                 annexNumber,
                 mdData.markdown,
                 flSeq,
                 lawName,
                 finalAnnex.annexName
               )
+              // lawId가 있을 때 lawName 키로도 저장 (AI 답변에서 lawId 없이 열 때 캐시 히트)
+              if (saveKey !== lawName) {
+                await setAnnexCache(lawName, annexNumber, mdData.markdown, flSeq, lawName, finalAnnex.annexName)
+              }
             }
           } else {
             console.warn("[AnnexModal] 응답은 성공했지만 markdown이 없음:", mdData)
@@ -295,7 +301,7 @@ export function AnnexModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-4xl max-w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:hidden">
+      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:hidden">
         {/* 헤더 - 1줄 레이아웃 */}
         <div className="flex items-center justify-between p-4 sm:p-6 pb-3 border-b border-border bg-background shrink-0 gap-3">
           {/* 왼쪽: 뒤로가기 + 제목 */}

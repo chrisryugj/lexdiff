@@ -106,6 +106,7 @@ export function LegalMarkdownRenderer({
         rehypePlugins={[rehypeRaw]}
         urlTransform={(url) => {
           if (url?.startsWith('law://')) return url
+          if (url?.startsWith('annex://')) return url
           return defaultUrlTransform(url)
         }}
         components={{
