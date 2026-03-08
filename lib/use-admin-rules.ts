@@ -1,43 +1,49 @@
 /**
- * 행정규칙 조회 Hook
- * - 개선된 구조: 법령별 전체 규칙을 한 번만 로드하고, 조문별 필터링은 메모리에서 수행
- * - 효과: 조문 이동 시 로딩 없음, 즉각적인 반응
+ * 행정규칙 조회 Hook — Two-Tier Lazy Matching
+ *
+ * 기존: 법령의 모든 행정규칙 본문을 fetch (N calls) → 제1조 파싱 → 필터링
+ * 변경: Tier 1 (이름 매칭, 0 calls) + Tier 2 (admrul-search, 1 call) → 교차 참조
+ *
+ * API 호출: 50+ → 2~3으로 감소
  */
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { parseHierarchyXML } from "./hierarchy-parser"
-import { parseAdminRulePurposeOnly, checkLawArticleReference, type AdminRuleArticle } from "./admrul-parser"
+import {
+  filterAdminRulesByTitle,
+  crossReferenceSearchWithHierarchy,
+  parseAdminRuleList,
+} from "./admrul-parser"
 import {
   getLawAdminRulesPurposeCache,
   getLawAdminRulesPurposeCacheOptimistic,
   setLawAdminRulesPurposeCache,
+  getArticleMatchIndex,
+  setArticleMatchIndex,
 } from "./admin-rule-cache"
+
+type HierarchyRule = { id: string; name: string; serialNumber?: string }
 
 // 전역 상태: 현재 fetch 중인 법령명 (중복 fetch 방지)
 const fetchingLawNames = new Set<string>()
-// 전역 상태: 이미 로드된 법령 데이터 캐시 (메모리)
-const loadedLawDataCache = new Map<string, Array<{
-  id: string
-  name: string
-  serialNumber?: string
-  purpose: AdminRuleArticle | null
-}>>()
+// 전역 상태: 이미 로드된 hierarchy 데이터 캐시 (메모리)
+const loadedHierarchyCache = new Map<string, { rules: HierarchyRule[]; mst: string }>()
 
 export interface AdminRuleMatch {
   name: string
   id: string
   serialNumber?: string // 행정규칙일련번호 (API 호출 시 우선 사용)
-  purpose: AdminRuleArticle
+  purpose?: { number: string; content: string } // optional — UI에서 미사용
   matchType: "title" | "content" // 제목에서 매칭 or 내용에서 매칭
 }
 
 interface UseAdminRulesResult {
   adminRules: AdminRuleMatch[]
-  allRulesCount: number // 필터링 전 전체 규칙 수 (로딩 완료 판단용)
-  loading: boolean // 법령 데이터 로딩 중 여부 (조문 변경 시에는 false 유지)
-  dataReady: boolean // 데이터 로드 완료 여부 (Optimistic 캐시 포함)
+  allRulesCount: number // 전체 규칙 수 (hierarchy 기준)
+  loading: boolean
+  dataReady: boolean
   error: string | null
-  progress: { current: number; total: number } | null
+  progress: { current: number; total: number } | null // 하위 호환 (항상 null)
 }
 
 /**
@@ -48,77 +54,73 @@ export function useAdminRules(
   articleNumber: string | null,
   enabled: boolean = true
 ): UseAdminRulesResult {
-  // 1. 법령 수준의 전체 데이터 상태
-  const [allRules, setAllRules] = useState<Array<{
-    id: string
-    name: string
-    serialNumber?: string
-    purpose: AdminRuleArticle | null
-  }>>([])
+  // === 법령 수준 상태 ===
+  const [hierarchyRules, setHierarchyRules] = useState<HierarchyRule[]>([])
+  const [hierarchyMst, setHierarchyMst] = useState<string>("")
+  const [hierarchyLoaded, setHierarchyLoaded] = useState(false)
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false)
 
-  const [loadingLaw, setLoadingLaw] = useState(false)
-  const [dataReady, setDataReady] = useState(false) // 데이터 로드 완료 여부
-  const [lawError, setLawError] = useState<string | null>(null)
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
+  // === 조문 수준 상태 ===
+  const [tier1Results, setTier1Results] = useState<AdminRuleMatch[]>([])
+  const [tier2Results, setTier2Results] = useState<AdminRuleMatch[]>([])
+  const [tier2Loading, setTier2Loading] = useState(false)
+  const [dataReady, setDataReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // 2. 현재 로드된 법령 이름 추적 (불필요한 재로딩 방지)
-  const [loadedLawName, setLoadedLawName] = useState<string | null>(null)
+  // Ref: 현재 로드된 법령 추적
   const loadedLawNameRef = useRef<string | null>(null)
 
-  // 3. 법령 데이터 Fetching Effect (법령명이 바뀔 때만 실행)
+  // ==============================================
+  // Effect 1: 법령 수준 — Hierarchy 로드 (lawName 변경 시)
+  // ==============================================
   useEffect(() => {
-    // 메모리 캐시 먼저 확인 (enabled 상관없이 - 재검색 시 즉시 반환용)
+    // 메모리 캐시 먼저 확인
     if (lawName) {
-      const memoryCached = loadedLawDataCache.get(lawName)
+      const memoryCached = loadedHierarchyCache.get(lawName)
       if (memoryCached) {
-        setAllRules(memoryCached)
+        setHierarchyRules(memoryCached.rules)
+        setHierarchyMst(memoryCached.mst)
         loadedLawNameRef.current = lawName
-        setLoadedLawName(lawName)
-        setLoadingLaw(false)
-        setDataReady(true) // ✅ 메모리 캐시 히트 - 즉시 ready
+        setHierarchyLoaded(true)
+        setLoadingHierarchy(false)
         return
       }
     }
 
-    // enabled가 false면 여기서 종료 (캐시 없으면 로딩 안 함)
     if (!enabled || !lawName) {
-      setLoadingLaw(false)
-      setDataReady(false) // enabled가 아니면 ready 아님
-      setLawError(null)
-      setProgress(null)
+      setLoadingHierarchy(false)
+      setHierarchyLoaded(false)
+      setError(null)
       return
     }
 
-    // 이미 로드된 법령이면 스킵 (ref 사용하여 최신 값 참조)
+    // 이미 로드된 법령이면 스킵
     if (lawName === loadedLawNameRef.current) {
-      setLoadingLaw(false) // 이미 로드된 경우 로딩 해제
-      setDataReady(true) // 이미 로드됨 = ready
+      setLoadingHierarchy(false)
+      setHierarchyLoaded(true)
       return
     }
 
-    // 다른 인스턴스가 이미 fetch 중이면 대기
+    // 다른 인스턴스가 fetch 중이면 대기
     if (fetchingLawNames.has(lawName)) {
-      setLoadingLaw(true)
-      setDataReady(false) // 대기 중 = not ready
-      // 폴링으로 완료 대기
+      setLoadingHierarchy(true)
       const waitForFetch = setInterval(() => {
-        const cached = loadedLawDataCache.get(lawName)
+        const cached = loadedHierarchyCache.get(lawName)
         if (cached) {
           clearInterval(waitForFetch)
-          setAllRules(cached)
+          setHierarchyRules(cached.rules)
+          setHierarchyMst(cached.mst)
           loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 폴링 완료 - ready
+          setHierarchyLoaded(true)
+          setLoadingHierarchy(false)
         }
-        // fetch가 완료되었지만 캐시가 없는 경우 (빈 결과)
         if (!fetchingLawNames.has(lawName) && !cached) {
           clearInterval(waitForFetch)
-          setAllRules([])
+          setHierarchyRules([])
+          setHierarchyMst("")
           loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 빈 결과도 ready (로드 완료)
+          setHierarchyLoaded(true)
+          setLoadingHierarchy(false)
         }
       }, 100)
       return () => clearInterval(waitForFetch)
@@ -126,45 +128,32 @@ export function useAdminRules(
 
     // 새 법령 요청 시작
     fetchingLawNames.add(lawName)
-    setDataReady(false) // 새 요청 시작 = not ready yet
-    setLawError(null)
-    setProgress(null)
+    setError(null)
 
     let cancelled = false
-    let optimisticCacheMst: string | null = null // Optimistic 캐시의 MST 저장
 
-    const fetchAllRulesForLaw = async () => {
-      // ✅ Optimistic UI: IndexedDB 캐시 먼저 확인 (MST 체크 없이)
-      // 페이지 새로고침 후에도 캐시가 있으면 즉시 보여줌
-      // ⚠️ 중요: Optimistic 캐시는 cancelled 체크 없이 즉시 적용 (Strict Mode 대응)
+    const fetchHierarchy = async () => {
+      // Optimistic: IndexedDB 캐시 먼저 확인
       try {
         const optimisticCache = await getLawAdminRulesPurposeCacheOptimistic(lawName)
-        // ✅ Optimistic 캐시는 cancelled 체크 제거 - Strict Mode에서도 작동하도록
-        // 어차피 메모리 캐시에 저장되므로 중복 실행되어도 안전함
         if (optimisticCache) {
-          // 캐시가 있으면 즉시 UI에 표시 (loading=false)
-          setAllRules(optimisticCache.rules)
-          loadedLawDataCache.set(lawName, optimisticCache.rules)
+          setHierarchyRules(optimisticCache.rules)
+          setHierarchyMst(optimisticCache.mst)
+          loadedHierarchyCache.set(lawName, { rules: optimisticCache.rules, mst: optimisticCache.mst })
           loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false) // ✅ 로딩 완료 (사용자에게 즉시 보여줌)
-          setDataReady(true) // ✅✅ Optimistic 캐시 로드 완료 - 핵심!
-          optimisticCacheMst = optimisticCache.mst // 나중에 검증용
+          setHierarchyLoaded(true)
+          setLoadingHierarchy(false)
         } else {
-          // 캐시가 없으면 로딩 표시
-          setLoadingLaw(true)
+          setLoadingHierarchy(true)
         }
       } catch {
-        // IndexedDB 에러 시 무시하고 진행
-        setLoadingLaw(true)
+        setLoadingHierarchy(true)
       }
 
       try {
-        // Step 0: 법령 체계도에서 MST 가져오기 (백그라운드 검증용)
+        // Hierarchy API 호출
         const hierarchyUrl = `/api/hierarchy?lawName=${encodeURIComponent(lawName)}`
-        const hierarchyResponse = await fetch(hierarchyUrl, {
-          cache: 'no-store'
-        })
+        const hierarchyResponse = await fetch(hierarchyUrl, { cache: 'no-store' })
 
         if (!hierarchyResponse.ok) {
           throw new Error(`체계도 조회 실패: ${hierarchyResponse.status}`)
@@ -173,211 +162,193 @@ export function useAdminRules(
         const hierarchyXml = await hierarchyResponse.text()
         const hierarchy = parseHierarchyXML(hierarchyXml)
 
-        if (!hierarchy || !hierarchy.adminRules || hierarchy.adminRules.length === 0) {
-          if (cancelled) return
-          // ✅ Optimistic 캐시가 있었으면 그 데이터 유지 (체계도 빈 결과는 무시)
-          // 체계도 API가 빈 결과를 반환해도 IndexedDB 캐시가 유효할 수 있음
-          if (!optimisticCacheMst) {
-            // Optimistic 캐시가 없었던 경우에만 빈 결과 설정
-            setAllRules([])
-            loadedLawDataCache.set(lawName, [])
-          }
-          loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 빈 결과도 ready (로드 완료)
-          fetchingLawNames.delete(lawName)
-          return
-        }
+        if (cancelled) return
 
-        const currentMst = hierarchy.mst || ""
-        const hierarchyRules = hierarchy.adminRules
+        const currentMst = hierarchy?.mst || ""
+        const rules: HierarchyRule[] = hierarchy?.adminRules || []
 
-        // Step 1: Optimistic 캐시 검증 (백그라운드)
-        // MST가 일치하면 이미 보여준 데이터가 최신이므로 종료
-        if (optimisticCacheMst && optimisticCacheMst === currentMst) {
-          // ✅ MST 일치 → 캐시가 유효, 추가 작업 불필요
-          // dataReady는 이미 Optimistic 로드 시 true로 설정됨
-          fetchingLawNames.delete(lawName)
-          return
-        }
-
-        // MST 불일치 또는 캐시 없음 → 새로 fetch 필요
-        // 기존 방식: IndexedDB에서 MST 체크하여 조회
+        // IndexedDB 캐시의 MST와 비교
         const cachedRules = await getLawAdminRulesPurposeCache(lawName, currentMst)
-
         if (cachedRules && !cancelled) {
-          setAllRules(cachedRules)
-          loadedLawDataCache.set(lawName, cachedRules) // 메모리 캐시에도 저장
-          loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 유효한 MST 캐시 로드 완료
-          fetchingLawNames.delete(lawName)
-          return
-        }
-
-        // Step 2: 캐시 MISS (또는 MST 불일치) -> API 호출하여 전체 수집
-        if (!cancelled) {
-          // Optimistic 캐시가 stale이면 로딩 표시 + 데이터 초기화
-          if (optimisticCacheMst && optimisticCacheMst !== currentMst) {
-            console.log(`[use-admin-rules] MST mismatch: cached=${optimisticCacheMst}, current=${currentMst}. Refetching...`)
-          }
-          setLoadingLaw(true)
-          setDataReady(false) // MST 불일치 = 새로 fetch 필요 = not ready
-          setAllRules([]) // 캐시 MISS 시에만 비움
-          setProgress({ current: 0, total: hierarchyRules.length })
-        }
-
-        const fetchedRules: Array<{
-          id: string
-          name: string
-          serialNumber?: string
-          purpose: AdminRuleArticle | null
-        }> = []
-
-        let completed = 0
-        const BATCH_SIZE = 25 // ✅ 배치 사이즈 증가 (10 → 25)
-
-        const processRule = async (rule: any): Promise<void> => {
-          const idParam = rule.serialNumber || rule.id
-          if (!idParam) {
-            completed++
-            return
-          }
-
-          try {
-            const contentUrl = `/api/admrul?ID=${encodeURIComponent(idParam)}`
-            const contentResponse = await fetch(contentUrl, { cache: 'no-store' })
-
-            if (!contentResponse.ok) {
-              completed++
-              fetchedRules.push({
-                id: rule.id,
-                name: rule.name,
-                serialNumber: rule.serialNumber,
-                purpose: null,
-              })
-              return
-            }
-
-            const contentXml = await contentResponse.text()
-            const purposeData = parseAdminRulePurposeOnly(contentXml)
-
-            fetchedRules.push({
-              id: rule.id,
-              name: rule.name,
-              serialNumber: rule.serialNumber,
-              purpose: purposeData?.purpose || null,
-            })
-
-            completed++
-
-          } catch (err) {
-            console.error(`[use-admin-rules] Error processing ${rule.name}:`, err)
-            completed++
-            fetchedRules.push({
-              id: rule.id,
-              name: rule.name,
-              serialNumber: rule.serialNumber,
-              purpose: null,
-            })
-          }
-        }
-
-        // 배치 처리 (progress는 배치 단위로만 업데이트하여 렌더링 부하 감소)
-        for (let i = 0; i < hierarchyRules.length; i += BATCH_SIZE) {
-          if (cancelled) break
-          const batch = hierarchyRules.slice(i, i + BATCH_SIZE)
-          await Promise.all(batch.map(processRule))
-          // ✅ 배치 완료 시에만 progress 업데이트 (렌더링 최적화)
-          if (!cancelled) setProgress({ current: completed, total: hierarchyRules.length })
+          // MST 일치 캐시 → 그대로 사용
+          setHierarchyRules(cachedRules)
+          setHierarchyMst(currentMst)
+          loadedHierarchyCache.set(lawName, { rules: cachedRules, mst: currentMst })
+        } else if (!cancelled) {
+          // 새 hierarchy 데이터 저장
+          setHierarchyRules(rules)
+          setHierarchyMst(currentMst)
+          loadedHierarchyCache.set(lawName, { rules, mst: currentMst })
+          // IndexedDB에 캐시 저장
+          await setLawAdminRulesPurposeCache(lawName, currentMst, rules)
         }
 
         if (!cancelled) {
-          // 캐시 저장
-          await setLawAdminRulesPurposeCache(lawName, currentMst, fetchedRules)
-
-          setAllRules(fetchedRules)
-          loadedLawDataCache.set(lawName, fetchedRules) // 메모리 캐시에도 저장
           loadedLawNameRef.current = lawName
-          setLoadedLawName(lawName)
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 전체 fetch 완료 - ready
-          setProgress(null)
+          setHierarchyLoaded(true)
+          setLoadingHierarchy(false)
         }
         fetchingLawNames.delete(lawName)
 
       } catch (err: any) {
         fetchingLawNames.delete(lawName)
         if (!cancelled) {
-          console.error("[use-admin-rules] Error:", err)
-          setLawError(err.message || "행정규칙 조회 중 오류 발생")
-          setLoadingLaw(false)
-          setDataReady(true) // ✅ 에러도 ready (로드 시도 완료)
-          setProgress(null)
+          console.error("[use-admin-rules] Hierarchy error:", err)
+          setError(err.message || "행정규칙 조회 중 오류 발생")
+          setLoadingHierarchy(false)
+          setHierarchyLoaded(true) // 에러도 "시도 완료"
         }
       }
     }
 
-    fetchAllRulesForLaw()
+    fetchHierarchy()
 
-    return () => {
-      cancelled = true
+    return () => { cancelled = true }
+  }, [lawName, enabled])
+
+  // ==============================================
+  // Effect 2: 조문 수준 — Two-Tier 매칭 (articleNumber 변경 시)
+  // ==============================================
+  useEffect(() => {
+    if (!hierarchyLoaded || !articleNumber || !lawName) {
+      setTier1Results([])
+      setTier2Results([])
+      setDataReady(!hierarchyLoaded ? false : true) // hierarchy 미로드면 not ready
+      return
     }
-  }, [lawName, enabled]) // loadedLawName 의존성 제거 - 내부에서 체크
 
-  // 4. 조문별 필터링 (메모리 연산 - 즉시 실행)
-  const filteredRules = useMemo(() => {
-    if (!articleNumber || allRules.length === 0) {
-      return []
+    if (hierarchyRules.length === 0) {
+      setTier1Results([])
+      setTier2Results([])
+      setDataReady(true) // 규칙이 없음 = 완료
+      return
     }
 
-    const matching: AdminRuleMatch[] = []
+    // === Tier 1: 이름 매칭 (즉시, 0 API calls) ===
+    const titleMatches = filterAdminRulesByTitle(hierarchyRules, lawName, articleNumber)
+    setTier1Results(titleMatches)
 
-    allRules.forEach((rule) => {
-      if (!rule.purpose) return
+    // === Tier 2: admrul-search 본문 검색 (비동기, 1 API call) ===
+    let cancelled = false
 
-      // 1. 제목 매칭 (가장 우선)
-      if (rule.name.includes(articleNumber)) {
-        matching.push({
-          name: rule.name,
-          id: rule.id,
-          serialNumber: rule.serialNumber,
-          purpose: rule.purpose,
-          matchType: "title",
+    const searchContentMatches = async () => {
+      setTier2Loading(true)
+
+      try {
+        // 캐시 확인: 조문별 매칭 인덱스
+        if (hierarchyMst) {
+          const cachedMatchIds = await getArticleMatchIndex(lawName, articleNumber, hierarchyMst)
+          if (cachedMatchIds && !cancelled) {
+            // 캐시된 ID로 규칙 복원
+            const idSet = new Set(cachedMatchIds)
+            const titleMatchIds = new Set(titleMatches.map(r => r.serialNumber || r.id))
+            const cachedContentMatches: AdminRuleMatch[] = hierarchyRules
+              .filter(r => {
+                const key = r.serialNumber || r.id
+                return idSet.has(key) && !titleMatchIds.has(key) // Tier 1과 중복 제거
+              })
+              .map(r => ({ ...r, matchType: "content" as const }))
+
+            setTier2Results(cachedContentMatches)
+            setTier2Loading(false)
+            setDataReady(true)
+            return
+          }
+        }
+
+        // admrul-search API 호출
+        const searchQuery = `「${lawName}」 ${articleNumber}`
+        const params = new URLSearchParams({
+          query: searchQuery,
+          search: "2",     // 본문 검색
+          display: "100",
+          nw: "1",         // 현행만
         })
-        return
-      }
 
-      // 2. 내용 매칭
-      const isMatch = checkLawArticleReference(
-        rule.purpose.content,
-        lawName || "",
-        articleNumber,
-        rule.name
-      )
+        const response = await fetch(`/api/admrul-search?${params}`)
+        if (cancelled) return
 
-      if (isMatch) {
-        matching.push({
-          name: rule.name,
-          id: rule.id,
-          serialNumber: rule.serialNumber,
-          purpose: rule.purpose,
-          matchType: "content",
+        if (!response.ok) {
+          console.warn(`[use-admin-rules] Tier 2 search failed: ${response.status}`)
+          // Tier 2 실패는 치명적이지 않음 — Tier 1 결과만 표시
+          setTier2Loading(false)
+          setDataReady(true)
+          return
+        }
+
+        const xml = await response.text()
+        if (cancelled) return
+
+        const searchResults = parseAdminRuleList(xml)
+        const contentMatches = crossReferenceSearchWithHierarchy(searchResults, hierarchyRules)
+
+        // Tier 1과 중복 제거
+        const titleMatchIds = new Set(titleMatches.map(r => r.serialNumber || r.id))
+        const uniqueContentMatches = contentMatches.filter(r => {
+          const key = r.serialNumber || r.id
+          return !titleMatchIds.has(key)
         })
-      }
-    })
 
-    return matching
-  }, [allRules, articleNumber, lawName])
+        if (!cancelled) {
+          setTier2Results(uniqueContentMatches)
+
+          // 조문별 매칭 인덱스 캐시 저장
+          if (hierarchyMst) {
+            const allMatchIds = [
+              ...titleMatches.map(r => r.serialNumber || r.id),
+              ...uniqueContentMatches.map(r => r.serialNumber || r.id),
+            ]
+            await setArticleMatchIndex(lawName, articleNumber, hierarchyMst, allMatchIds)
+          }
+        }
+      } catch (err) {
+        console.error("[use-admin-rules] Tier 2 error:", err)
+        // Tier 2 실패는 graceful degradation — Tier 1 결과는 유지
+      } finally {
+        if (!cancelled) {
+          setTier2Loading(false)
+          setDataReady(true)
+        }
+      }
+    }
+
+    searchContentMatches()
+
+    return () => { cancelled = true }
+  }, [hierarchyRules, hierarchyMst, articleNumber, lawName, hierarchyLoaded])
+
+  // === 결과 병합 (Tier 1 + Tier 2, 중복 제거) ===
+  const mergedResults = useMemo(() => {
+    const seen = new Set<string>()
+    const results: AdminRuleMatch[] = []
+
+    // Tier 1 먼저 (높은 신뢰도)
+    for (const r of tier1Results) {
+      const key = r.serialNumber || r.id
+      if (!seen.has(key)) {
+        seen.add(key)
+        results.push(r)
+      }
+    }
+
+    // Tier 2 추가
+    for (const r of tier2Results) {
+      const key = r.serialNumber || r.id
+      if (!seen.has(key)) {
+        seen.add(key)
+        results.push(r)
+      }
+    }
+
+    return results
+  }, [tier1Results, tier2Results])
 
   return {
-    adminRules: filteredRules,
-    allRulesCount: allRules.length, // 필터링 전 전체 규칙 수
-    loading: loadingLaw, // 법령 로딩 중일 때만 true
-    dataReady, // ✅ 데이터 로드 완료 여부 (hasEverLoaded 판단용)
-    error: lawError,
-    progress
+    adminRules: mergedResults,
+    allRulesCount: hierarchyRules.length,
+    loading: loadingHierarchy || tier2Loading,
+    dataReady,
+    error,
+    progress: null, // 하위 호환 유지 (배치 progress 더 이상 없음)
   }
 }

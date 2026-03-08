@@ -14,43 +14,43 @@ interface RevisionHistoryProps {
 // 유형별 배지 스타일 (타법개정 vs 일부개정 등 구분 - 명확한 색상)
 const getTypeBadgeStyle = (type: string) => {
   if (type === "제정") {
-    return "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
+    return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30"
   }
   if (type.includes("전부개정") || type.includes("전문개정")) {
-    return "bg-rose-600/20 text-rose-400 border-rose-500/50"
+    return "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30"
   }
   if (type.includes("타법개정")) {
     // 보라색 - 다른 법에 의한 변경
-    return "bg-purple-600/25 text-purple-300 border-purple-400/50"
+    return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30"
   }
   if (type.includes("일부개정")) {
     // 파란색 - 직접 개정
-    return "bg-sky-600/25 text-sky-300 border-sky-400/50"
+    return "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:text-sky-400 dark:border-sky-500/30"
   }
   if (type.includes("폐지") || type.includes("삭제")) {
-    return "bg-zinc-600/20 text-zinc-400 border-zinc-500/50"
+    return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30"
   }
   // 기타 개정
-  return "bg-slate-600/20 text-slate-400 border-slate-500/40"
+  return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/30"
 }
 
 // 설명(사유) 배지 스타일 - 타법개정 vs 일부개정 구분
 const getReasonBadgeStyle = (reason: string) => {
   if (reason.includes("타법개정")) {
     // 보라색 - 다른 법에 의한 변경
-    return "bg-purple-600/25 text-purple-300 border border-purple-400/40"
+    return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30"
   }
   if (reason.includes("일부개정")) {
     // 파란색 - 직접 개정
-    return "bg-sky-600/25 text-sky-300 border border-sky-400/40"
+    return "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:text-sky-400 dark:border-sky-500/30"
   }
   if (reason.includes("전부개정") || reason.includes("전문개정")) {
-    return "bg-rose-600/25 text-rose-300 border border-rose-400/40"
+    return "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30"
   }
   if (reason.includes("제정")) {
-    return "bg-emerald-600/25 text-emerald-300 border border-emerald-400/40"
+    return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30"
   }
-  return "bg-zinc-600/20 text-zinc-400 border border-zinc-500/30"
+  return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-400 dark:border-zinc-500/30"
 }
 
 // 불릿 색상 (유형에 따라 - 배지와 동일한 색상 체계)

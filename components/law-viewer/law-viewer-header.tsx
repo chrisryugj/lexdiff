@@ -32,7 +32,7 @@ export function LawViewerHeader({
   return (
     <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-2 sm:pb-3.5">
       <div className="flex items-center gap-2 mb-1">
-        <Icon name={isPrecedent ? "gavel" : "book-open"} size={20} className="text-primary" />
+        <Icon name={isPrecedent ? "gavel" : "book-open"} size={20} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
         <h2 className="text-xl font-bold text-foreground">{meta.lawTitle}</h2>
         {/* 심급 배지 - 제목 옆에 표시 */}
         {isPrecedent && hasLevelSection && currentCourtLevel && (
@@ -110,7 +110,7 @@ export function LawViewerHeader({
             variant="outline"
             className="text-xs px-1.5 py-0.5"
           >
-            <Icon name="star" size={12} className="mr-1 fill-yellow-400 text-yellow-500" />
+            <Icon name="star" size={12} className="mr-1 fill-[#d4af37] text-[#d4af37]" />
             {favoriteCount}
           </Badge>
         )}

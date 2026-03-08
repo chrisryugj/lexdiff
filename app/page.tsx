@@ -10,8 +10,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { SearchView } from "@/components/search-view"
-import { SearchViewImproved } from "@/components/search-view-improved"
+import { SearchViewTest } from "@/components/search-view-test"
 import { SearchResultView } from "@/components/search-result-view"
 import { favoritesStore } from "@/lib/favorites-store"
 import { debugLogger } from "@/lib/debug-logger"
@@ -197,9 +196,9 @@ export default function Home() {
 
   return (
     <>
-      {/* viewMode에 따라 SearchViewImproved 또는 SearchResultView 표시 */}
+      {/* viewMode에 따라 SearchViewTest 또는 SearchResultView 표시 */}
       {viewMode === 'home' ? (
-        <SearchViewImproved
+        <SearchViewTest
           onSearch={handleSearch}
           onFavoriteSelect={handleFavoriteSelect}
           isSearching={isSearching}

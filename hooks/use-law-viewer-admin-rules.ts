@@ -106,6 +106,9 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
       if (!contentResponse.ok) {
         const errorText = await contentResponse.text()
         console.error('[행정규칙] API 오류:', contentResponse.status, errorText)
+        if (contentResponse.status === 429) {
+          throw new Error('법제처 API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.')
+        }
         throw new Error(`행정규칙 조회 실패: ${contentResponse.status}`)
       }
 
@@ -142,12 +145,11 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
           '</strong>'
 
         textParts.push(titleHtml)
-        textParts.push('\n') // 제목 뒤 줄바꿈 1개
+        textParts.push('<br>') // 제목 뒤 줄바꿈
 
         // Article content - format with links + styling + revision marks
         const formattedContent = formatAdminRuleHTML(article.content, meta.lawTitle)
         textParts.push(formattedContent)
-        textParts.push('\n') // 조문 끝 줄바꿈
 
         // Add spacing between articles (Separator)
         if (idx < fullContent.articles.length - 1) {

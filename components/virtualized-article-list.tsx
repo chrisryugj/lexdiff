@@ -49,8 +49,8 @@ export const VirtualizedArticleList = React.memo(
         const timer = setTimeout(() => {
           const container = parentRef.current
           if (container && container.clientHeight > 0) {
-            // 직접 스크롤 위치 계산 (virtualizer.scrollToIndex 대신)
-            const scrollTop = Math.max(0, activeIndex * 60 - container.clientHeight / 2 + 30)
+            // Scroll to the top of the selected item rather than center
+            const scrollTop = Math.max(0, activeIndex * (isPrecedent ? 28 : 60))
             container.scrollTop = scrollTop
           }
         }, 150)
@@ -61,7 +61,7 @@ export const VirtualizedArticleList = React.memo(
     return (
       <div
         ref={parentRef}
-        className="h-full overflow-y-auto"
+        className="h-full overflow-y-auto slim-scrollbar"
         style={{ contain: "strict" }}
       >
         <div

@@ -203,15 +203,15 @@ export function DelegationPanel({
                             <div className="mb-3 pb-2 border-b border-border">
                                 <div className="flex items-center gap-2 mb-2">
                                     <Icon name="file-text" size={16} className="text-foreground shrink-0" />
-                                    <h3 className="text-base font-bold text-foreground truncate flex-1 min-w-0">
+                                    <h3 className="text-base font-bold text-foreground truncate flex-1 min-w-0 font-maruburi">
                                         {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                                        {activeArticle.title && <span className="text-muted-foreground font-normal ml-1">({activeArticle.title})</span>}
+                                        {activeArticle.title && <span className="text-muted-foreground font-normal ml-1 font-pretendard">({activeArticle.title})</span>}
                                     </h3>
                                     <Badge variant="secondary" className="text-xs shrink-0">법률 본문</Badge>
                                 </div>
                             </div>
                             <div
-                                className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm font-maruburi"
                                 style={{ fontSize: `${fontSize}px`, lineHeight: "1.8", overflowWrap: "break-word", wordBreak: "break-word" }}
                                 onClick={handleContentClick}
                                 dangerouslySetInnerHTML={{ __html: articleHtml }}
@@ -317,7 +317,7 @@ export function DelegationPanel({
                                     </Button>
                                 </div>
                                 <div
-                                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm font-maruburi"
                                     style={{ fontSize: `${fontSize}px`, lineHeight: "1.8", overflowWrap: "break-word", wordBreak: "break-word" }}
                                     onClick={handleContentClick}
                                     dangerouslySetInnerHTML={{ __html: adminRuleHtml }}
@@ -385,15 +385,15 @@ export function DelegationPanel({
                                     <div className="mb-4 pb-2 border-b border-border">
                                         <div className="flex items-center gap-2">
                                             <Icon name="file-text" size={16} className="text-foreground" />
-                                            <h3 className="text-base font-bold text-foreground">
+                                            <h3 className="text-base font-bold text-foreground font-maruburi">
                                                 {formatSimpleJo(activeArticle.jo, isOrdinance)}
-                                                {activeArticle.title && <span className="text-muted-foreground text-sm"> ({activeArticle.title})</span>}
+                                                {activeArticle.title && <span className="text-muted-foreground text-sm font-pretendard"> ({activeArticle.title})</span>}
                                             </h3>
                                             <Badge variant="secondary" className="text-xs">법률 본문</Badge>
                                         </div>
                                     </div>
                                     <div
-                                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm"
+                                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm font-maruburi"
                                         style={{ fontSize: `${fontSize}px`, lineHeight: "1.8", overflowWrap: "break-word", wordBreak: "break-word" }}
                                         onClick={handleContentClick}
                                         dangerouslySetInnerHTML={{ __html: articleHtml }}

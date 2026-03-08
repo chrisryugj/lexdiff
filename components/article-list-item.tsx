@@ -62,25 +62,24 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         isPrecedent ? "py-1" : "py-2"
       } ${
         isActive
-          ? "bg-primary text-primary-foreground font-bold"
+          ? "bg-[#1a2b4c] text-white dark:bg-[#1a2b4c] dark:text-[#e2a85d] font-bold shadow-sm"
           : "hover:bg-secondary text-foreground font-medium"
       } ${isLoading ? "opacity-50 cursor-wait" : ""} ${isDeleted ? "opacity-40 text-muted-foreground" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 font-bold text-base">
-            {isPrecedent && <span className="text-primary">•</span>}
+          <div className="flex items-center gap-1.5 font-bold text-base font-ridi">
+            {isPrecedent && <span className="text-[#d4af37] dark:text-[#e2a85d]">•</span>}
             <span className="whitespace-nowrap">{article.joNum || formatSimpleJo(article.jo, isOrdinance)}</span>
             {isDeleted && (
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded">
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded font-pretendard">
                 삭제된 조문
               </span>
             )}
           </div>
-          {/* 판례 모드에서는 joNum과 title이 같으므로 title 생략 */}
           {article.title && !isDeleted && !isPrecedent && (
             <div
-              className="text-sm opacity-75 mt-0.5 truncate"
+              className={`text-sm opacity-90 mt-0.5 truncate font-pretendard ${isActive ? 'text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}
               title={article.title}
             >
               ({article.title})
@@ -96,7 +95,7 @@ export const ArticleListItem = React.memo(function ArticleListItem({
           {article.hasChanges && (
             <Icon
               name="alert-circle"
-              className="h-3 w-3 text-[var(--color-warning)]"
+              className="h-3 w-3 text-[#e2a85d]"
               title="변경된 조문"
             />
           )}

@@ -106,6 +106,7 @@ export function LawViewerActionButtons({
   }
 
   const hasRelatedCases = relatedCases.length > 0
+  const activeBtnCls = "bg-[#1a2b4c] border-[#1a2b4c] text-white hover:bg-[#0f192e] hover:text-white dark:bg-[#1a2b4c] dark:border-[#1a2b4c] dark:text-[#e2a85d] dark:hover:bg-[#0f192e] dark:hover:text-[#e2a85d]"
 
   return (
     <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
@@ -127,10 +128,10 @@ export function LawViewerActionButtons({
               {/* 【심급】 섹션이 있는 판례만 관련 심급 버튼 표시 */}
               {hasLevelSection && (
                 <Button
-                  variant={showRelatedCases ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
                   onClick={() => setShowRelatedCases(!showRelatedCases)}
-                  className="h-7 px-1.5 sm:px-2 shrink-0"
+                  className={`h-7 px-1.5 sm:px-2 shrink-0 ${showRelatedCases ? activeBtnCls : ''}`}
                 >
                   <Icon name="git-compare" size={14} className="sm:mr-1" />
                   <span className="hidden sm:inline">관련 심급</span>
@@ -146,10 +147,10 @@ export function LawViewerActionButtons({
               )}
               {activeArticle && (
                 <Button
-                  variant={favorites.has(favoriteKey(activeArticle.jo)) ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
                   onClick={() => onToggleFavorite?.(activeArticle.jo)}
-                  className="h-7 px-1.5 sm:px-2 shrink-0"
+                  className={`h-7 px-1.5 sm:px-2 shrink-0 ${favorites.has(favoriteKey(activeArticle.jo)) ? activeBtnCls : ''}`}
                 >
                   <Icon
                     name="star"
@@ -189,7 +190,7 @@ export function LawViewerActionButtons({
         ) : !isOrdinance && activeArticle ? (
           // 법령 전용 액션 버튼
           <>
-            <Button variant="default" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className="h-7 px-1.5 sm:px-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => onCompare?.(activeArticle.jo)} className={`h-7 px-1.5 sm:px-2 shrink-0 ${activeBtnCls}`}>
               <Icon name="git-compare" size={14} className="sm:mr-1" />
               <span className="hidden sm:inline">신·구법 비교</span>
               <span className="sm:hidden">비교</span>
@@ -206,7 +207,7 @@ export function LawViewerActionButtons({
             </Button>
             {/* 위임법령 보기 버튼 (2단 뷰 + 탭 구조) */}
             <Button
-              variant={tierViewMode === "2-tier" ? "default" : "outline"}
+              variant="outline"
               size="sm"
               disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && shouldDisableDelegationButton)}
               onClick={async () => {
@@ -224,7 +225,7 @@ export function LawViewerActionButtons({
                 }
               }}
               title="위임법령 보기 (시행령/시행규칙/행정규칙)"
-              className="h-7 px-1.5 sm:px-2 shrink-0"
+              className={`h-7 px-1.5 sm:px-2 shrink-0 ${tierViewMode === "2-tier" ? activeBtnCls : ''}`}
             >
               {isLoadingThreeTier ? (
                 <Icon name="loader" size={14} className="sm:mr-1 animate-spin" />
@@ -236,11 +237,11 @@ export function LawViewerActionButtons({
             </Button>
             {/* 판례 보기 버튼 */}
             <Button
-              variant={showPrecedents ? "default" : "outline"}
+              variant="outline"
               size="sm"
               onClick={() => setShowPrecedents(!showPrecedents)}
               title="관련 판례 보기"
-              className="h-7 px-1.5 sm:px-2 shrink-0"
+              className={`h-7 px-1.5 sm:px-2 shrink-0 ${showPrecedents ? activeBtnCls : ''}`}
             >
               <Icon name="scale" size={14} className="sm:mr-1" />
               <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
@@ -253,10 +254,7 @@ export function LawViewerActionButtons({
               size="sm"
               onClick={() => onToggleFavorite?.(activeArticle.jo)}
               data-favorited={isFavorite(activeArticle.jo)}
-              className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo)
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                : ''
-                }`}
+              className={`hidden lg:flex h-7 px-2 transition-all ${isFavorite(activeArticle.jo) ? activeBtnCls : ''}`}
             >
               <Icon name="star" size={14} className={`mr-1 transition-all ${isFavorite(activeArticle.jo) ? "fill-yellow-300 text-yellow-300" : ""}`} />
               즐겨찾기

@@ -295,7 +295,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   return (
     <div
       ref={parentRef}
-      className="overflow-y-auto h-full w-full px-5 pt-3"
+      className="overflow-y-auto h-full w-full px-5 pt-3 slim-scrollbar"
     >
       <div
         style={{
@@ -336,8 +336,8 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                 >
                   {/* 섹션 헤더 */}
                   <div className="mb-1.5 flex items-center justify-between">
-                    <h3 className="text-base font-bold text-foreground m-0 flex items-center gap-1.5">
-                      <span className="text-foreground">•</span>
+                    <h3 className="text-base font-bold text-foreground m-0 flex items-center gap-1.5 font-maruburi">
+                      <span className="text-[#d4af37] dark:text-[#e2a85d]">•</span>
                       {item.article.joNum || item.article.title}
                     </h3>
                     {/* 복사 버튼만 표시 (즐겨찾기 없음) */}
@@ -361,7 +361,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
 
                   {/* 내용 - br 태그 처리 + 빈줄 정리 */}
                   <div
-                    className="text-foreground leading-relaxed"
+                    className="text-foreground leading-relaxed font-maruburi"
                     style={{
                       fontSize: `${fontSize}px`,
                       lineHeight: "1.7",
@@ -399,7 +399,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                 >
                   <div className="mb-2 pb-1 border-b border-border">
                     <div className="flex items-center justify-between gap-1">
-                      <h3 className="text-lg font-bold text-foreground flex items-center gap-1 lg:gap-2 flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-foreground flex items-center gap-1 lg:gap-2 flex-1 min-w-0 font-maruburi">
                         {formatSimpleJo(item.article)}
                         {item.article.title && (
                           <span className="text-muted-foreground truncate">({item.article.title})</span>
@@ -455,7 +455,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   </div>
 
                   <div
-                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+                    className="text-foreground leading-relaxed break-words whitespace-pre-wrap font-maruburi"
                     style={{
                       fontSize: `${fontSize}px`,
                       lineHeight: "1.8",

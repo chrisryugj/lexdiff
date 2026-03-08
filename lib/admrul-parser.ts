@@ -383,6 +383,51 @@ export function checkLawArticleReference(
 }
 
 /**
+ * Hierarchy 규칙 목록에서 이름(제목)으로 조문 매칭
+ * - API 호출 없이 즉시 필터링 (Tier 1)
+ */
+export function filterAdminRulesByTitle(
+  hierarchyRules: Array<{ id: string; name: string; serialNumber?: string }>,
+  lawName: string,
+  articleNumber: string
+): Array<{ id: string; name: string; serialNumber?: string; matchType: "title" }> {
+  return hierarchyRules
+    .filter(rule => {
+      const titleRef = extractLawReferenceFromTitle(rule.name)
+      if (titleRef.lawName && titleRef.article) {
+        const lawMatches =
+          titleRef.lawName.includes(lawName) ||
+          titleRef.lawName === `${lawName} 시행령` ||
+          titleRef.lawName === `${lawName} 시행규칙`
+        if (lawMatches && titleRef.article === articleNumber) return true
+      }
+      return false
+    })
+    .map(rule => ({ id: rule.id, name: rule.name, serialNumber: rule.serialNumber, matchType: "title" as const }))
+}
+
+/**
+ * admrul-search 결과와 hierarchy 규칙을 교차 참조 (Tier 2)
+ * - search는 모든 법령의 규칙을 반환하므로, hierarchy에 있는 것만 필터
+ */
+export function crossReferenceSearchWithHierarchy(
+  searchResults: AdminRuleListItem[],
+  hierarchyRules: Array<{ id: string; name: string; serialNumber?: string }>
+): Array<{ id: string; name: string; serialNumber?: string; matchType: "content" }> {
+  const searchSerialNumbers = new Set(
+    searchResults.map(r => r.serialNumber).filter((s): s is string => !!s)
+  )
+  const searchNames = new Set(searchResults.map(r => r.name))
+
+  return hierarchyRules
+    .filter(rule => {
+      if (rule.serialNumber && searchSerialNumbers.has(rule.serialNumber)) return true
+      return searchNames.has(rule.name)
+    })
+    .map(rule => ({ id: rule.id, name: rule.name, serialNumber: rule.serialNumber, matchType: "content" as const }))
+}
+
+/**
  * 여러 행정규칙 중에서 특정 법령 조문을 참조하는 것들 필터링
  */
 export function filterMatchingAdminRules(
@@ -448,6 +493,10 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
   // 공백 또는 구두점(. ! ?) 뒤에 나타나는 단일 한글 글자 + ". " 패턴만 매칭
   // 예: "분장한다. 가. " ✅, "담당한다. 나. " ✅
   text = text.replace(/(\s|^)([가나다라마바사아자차카타파하]\.)\s/g, '$1<br>&nbsp;&nbsp;$2 ')
+
+  // 7. 남은 \n을 <br>로 변환 + 연속 <br> 정리 (whitespace-pre-wrap과 \n 중복 방지)
+  text = text.replace(/\n/g, '<br>')
+  text = text.replace(/(<br>\s*){2,}/g, '<br>')
 
   return text
 }

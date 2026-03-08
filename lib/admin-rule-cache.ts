@@ -2,22 +2,21 @@
  * IndexedDB를 사용한 행정규칙 캐싱 시스템
  *
  * 2단계 캐시 구조:
- * - lawAdminRulesPurposeCache: 법령별 전체 행정규칙 제1조 캐시 (법령명 기준)
+ * - lawAdminRulesPurposeCache: 법령별 행정규칙 hierarchy 캐시 (법령명 기준)
  * - articleMatchIndexCache: 조문별 매칭 결과 인덱스 (법령명 + 조문번호 기준)
  * - adminRulesContentCache: 행정규칙 전체 내용 캐시 (규칙ID 기준)
  */
 
 import type { AdminRuleMatch } from "./use-admin-rules"
-import type { AdminRuleArticle } from "./admrul-parser"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 10 // 2단계 캐시 구조 도입
-const PURPOSE_STORE = "lawAdminRulesPurposeCache" // 법령별 제1조 캐시
+const DB_VERSION = 11 // Two-Tier matching: purpose 필드 제거, hierarchy만 캐시
+const PURPOSE_STORE = "lawAdminRulesPurposeCache" // 법령별 hierarchy 규칙 목록 캐시
 const MATCH_INDEX_STORE = "articleMatchIndexCache" // 조문별 매칭 인덱스
 const CONTENT_STORE = "adminRulesContentCache"
-const CACHE_EXPIRY_DAYS = 7 // 30일 → 7일로 단축
+const CACHE_EXPIRY_DAYS = 7
 
-// 법령별 전체 행정규칙의 제1조 캐시
+// 법령별 행정규칙 hierarchy 캐시 (제1조 없이 이름+ID만)
 interface LawAdminRulesPurposeCache {
   key: string // "${lawName}"
   lawName: string
@@ -27,7 +26,6 @@ interface LawAdminRulesPurposeCache {
     id: string
     name: string
     serialNumber?: string
-    purpose: AdminRuleArticle | null // 제1조(목적)
   }>
 }
 

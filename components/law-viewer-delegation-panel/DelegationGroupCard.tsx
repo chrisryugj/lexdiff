@@ -31,13 +31,13 @@ export function DelegationGroupCard({
                     return (
                         <div key={itemKey || header} className="pt-3 border-t border-border first:border-t-0 first:pt-0">
                             {header && (
-                                <p className="font-semibold text-sm text-foreground mb-2">
+                                <p className="font-semibold text-sm text-foreground mb-2 font-maruburi">
                                     {header}
                                 </p>
                             )}
                             {delegation.content && (
                                 <div
-                                    className="text-xs text-foreground leading-relaxed break-words"
+                                    className="text-xs text-foreground leading-relaxed break-words font-maruburi"
                                     style={{
                                         fontSize: `${fontSize}px`,
                                         lineHeight: "1.8",

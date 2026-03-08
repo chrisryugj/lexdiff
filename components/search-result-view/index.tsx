@@ -347,7 +347,7 @@ function SearchResultViewComponent({
   // 렌더링
   // ============================================================
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f8f9fa] dark:bg-background">
       {/* 검색 모달 (Cmd+K) */}
       <CommandSearchModal
         isOpen={state.showSearchModal}

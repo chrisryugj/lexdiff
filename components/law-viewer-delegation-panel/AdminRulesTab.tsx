@@ -42,21 +42,16 @@ export function AdminRulesTab({
         )
     }
 
-    // Loading
-    if (loadingAdminRules || !hasEverLoaded) {
+    // Loading — Tier 1 결과가 있으면 즉시 표시 (아래 list view에서 처리)
+    // 결과가 전혀 없을 때만 로딩 스피너 표시
+    if ((loadingAdminRules || !hasEverLoaded) && adminRules.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <Icon name="loader" size={48} className="mb-4 animate-spin text-primary" />
                 <p className="text-sm font-medium">행정규칙 검색 중...</p>
-                {adminRulesProgress ? (
-                    <p className="text-xs mt-2 text-primary font-medium">
-                        {adminRulesProgress.current} / {adminRulesProgress.total}
-                    </p>
-                ) : (
-                    <p className="text-xs mt-2 text-muted-foreground/70">
-                        관련 행정규칙을 찾고 있습니다
-                    </p>
-                )}
+                <p className="text-xs mt-2 text-muted-foreground/70">
+                    관련 행정규칙을 찾고 있습니다
+                </p>
             </div>
         )
     }
@@ -108,7 +103,7 @@ export function AdminRulesTab({
                 </div>
                 <ScrollArea className="h-[calc(100vh-12rem)]">
                     <div
-                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4"
+                        className="text-foreground leading-relaxed break-words whitespace-pre-wrap text-sm pr-4 font-maruburi"
                         style={{
                             fontSize: `${fontSize}px`,
                             lineHeight: "1.8",
@@ -175,6 +170,13 @@ export function AdminRulesTab({
                                 </div>
                             </button>
                         ))}
+                        {/* Tier 2 검색 진행 중 인디케이터 */}
+                        {loadingAdminRules && (
+                            <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground">
+                                <Icon name="loader" size={14} className="animate-spin" />
+                                <span className="text-xs">추가 검색 중...</span>
+                            </div>
+                        )}
                     </div>
                 </ScrollArea>
             </>

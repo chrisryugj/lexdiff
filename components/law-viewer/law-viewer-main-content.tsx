@@ -341,7 +341,7 @@ export function LawViewerMainContent({
                 {/* 패널 헤더 */}
                 <div className="flex items-center justify-between p-3 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <Icon name="scale" size={16} className="text-primary" />
+                    <Icon name="scale" size={16} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
                     <h3 className="font-semibold text-sm">판례 상세</h3>
                   </div>
                   <Button

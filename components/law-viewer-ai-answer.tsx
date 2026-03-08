@@ -139,7 +139,7 @@ export function AIAnswerSidebar({
                 <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                            <Icon name="link-2" size={20} className="text-primary" />
+                            <Icon name="link-2" size={20} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
                             <h3 className="text-xl font-bold text-foreground">관련 법령</h3>
                         </div>
                         {onCollapseClick && (
@@ -193,21 +193,18 @@ export function AIAnswerSidebar({
                                     <button
                                         key={`${law.lawName}-${law.jo}-${idx}`}
                                         onClick={handleClick}
-                                        className="group relative w-full max-w-full text-left px-3 py-4 rounded-xl border border-border/40 bg-card/30 hover:bg-card/50 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden box-border"
+                                        className="group relative w-full max-w-full text-left px-2 py-2 rounded-md transition-colors hover:bg-secondary text-foreground overflow-hidden box-border"
                                     >
-                                        {/* Hover Gradient Glow */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
                                         <div className="relative flex items-start gap-2.5 w-full">
                                             <div className="flex-1 min-w-0">
                                                 {/* 법령명 + 조문번호 (한 줄, 조문번호 색상 다르게) */}
-                                                <div className="text-base font-semibold leading-tight mb-1 break-words pr-12">
-                                                    <span className="text-foreground/90 group-hover:text-primary transition-colors">{law.lawName}</span>
+                                                <div className="text-base font-bold font-ridi leading-tight mb-0.5 break-words pr-12">
+                                                    <span className="text-foreground">{law.lawName}</span>
                                                     {' '}
-                                                    <span className="text-muted-foreground/70">{law.article}</span>
+                                                    <span className="text-foreground">{law.article}</span>
                                                 </div>
                                                 {/* 조문제목 - 괄호 제거 */}
-                                                <div className="text-sm text-muted-foreground truncate">
+                                                <div className="text-sm font-pretendard text-gray-600 dark:text-gray-400 truncate opacity-90">
                                                     {(() => {
                                                         const hydrated = hydratedTitles[key]
                                                         const title = law.title || hydrated
@@ -533,7 +530,7 @@ export function AIAnswerContent({
             <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도 */}
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <Icon name="sparkles" size={20} className="text-primary flex-shrink-0" />
+                    <Icon name="sparkles" size={20} className="text-[#1a2b4c] dark:text-[#e2a85d] flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
                         Real-time Legal AI
@@ -683,20 +680,20 @@ export function AIAnswerContent({
                             isCollapsing ? 'max-h-0 opacity-0 -translate-y-4' : 'max-h-[600px] opacity-100'
                         }`}
                     >
-                        <div className="rounded-lg bg-slate-950/90 dark:bg-slate-950/95 border border-slate-800/60 p-3 sm:p-4">
+                        <div className="rounded-lg bg-slate-50/90 dark:bg-[#0c162c]/95 border border-slate-200/60 dark:border-[#1a2b4c]/60 p-3 sm:p-4">
                             {/* 프로그레스 바 + 경과 시간 */}
                             <div className="mb-3 flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-[#1a2b4c]/50 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-500 ease-out"
+                                        className="h-full bg-[#1a2b4c] dark:bg-transparent dark:bg-gradient-to-r dark:from-[#d4af37] dark:to-[#e2a85d] rounded-full transition-all duration-500 ease-out"
                                         style={{ width: `${Math.round(searchProgress)}%` }}
                                     />
                                 </div>
-                                <span className="text-[11px] font-mono text-slate-500 tabular-nums flex-shrink-0">
+                                <span className="text-[11px] font-mono text-slate-500 dark:text-gray-400 tabular-nums flex-shrink-0">
                                     {Math.round(searchProgress)}%
                                 </span>
                                 {isStreaming && (
-                                    <span className="text-[11px] font-mono text-slate-400/60 tabular-nums flex-shrink-0">
+                                    <span className="text-[11px] font-mono text-slate-400 dark:text-gray-500 tabular-nums flex-shrink-0">
                                         {streamElapsed.toFixed(1)}s
                                     </span>
                                 )}
@@ -712,37 +709,37 @@ export function AIAnswerContent({
                                     >
                                         {log.type === 'status' && (
                                             <>
-                                                <Icon name="info" size={13} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                                                <span className="text-slate-400 truncate">{log.displayName}</span>
+                                                <Icon name="info" size={13} className="text-slate-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                                                <span className="text-slate-600 dark:text-gray-400 truncate">{log.displayName}</span>
                                             </>
                                         )}
                                         {log.type === 'call' && (
                                             <>
-                                                <Icon name="arrow-right" size={13} className="text-yellow-500/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-yellow-400/90 truncate min-w-0">
+                                                <Icon name="arrow-right" size={13} className="text-amber-600/80 dark:text-[#e2a85d]/80 mt-0.5 flex-shrink-0" />
+                                                <span className="text-amber-700/90 dark:text-[#e2a85d]/90 truncate min-w-0">
                                                     {log.displayName}
-                                                    {log.query && <span className="text-slate-500 ml-1">: {log.query}</span>}
+                                                    {log.query && <span className="text-slate-400 dark:text-gray-500 ml-1">: {log.query}</span>}
                                                 </span>
-                                                <span className="inline-block w-1 h-3 bg-yellow-400/60 animate-pulse ml-1 flex-shrink-0" />
+                                                <span className="inline-block w-1 h-3 bg-amber-500/60 dark:bg-[#e2a85d]/60 animate-pulse ml-1 flex-shrink-0" />
                                             </>
                                         )}
                                         {log.type === 'result' && (
                                             <>
                                                 {log.success ? (
-                                                    <Icon name="check" size={13} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                                                    <Icon name="check" size={13} className="text-emerald-600/80 dark:text-emerald-500/80 mt-0.5 flex-shrink-0" />
                                                 ) : (
-                                                    <Icon name="x" size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
+                                                    <Icon name="x" size={13} className="text-red-500/80 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                                 )}
-                                                <span className={`truncate min-w-0 ${log.success ? 'text-emerald-400/90' : 'text-red-400/80'}`}>
+                                                <span className={`truncate min-w-0 ${log.success ? 'text-emerald-700/90 dark:text-emerald-600/90' : 'text-red-500/90 dark:text-red-400/80'}`}>
                                                     {log.displayName}
-                                                    {log.summary && <span className="text-slate-500 ml-1">→ {log.summary}</span>}
+                                                    {log.summary && <span className="text-slate-400 dark:text-gray-500 ml-1">→ {log.summary}</span>}
                                                 </span>
                                             </>
                                         )}
                                         {log.type === 'token_usage' && (
                                             <>
-                                                <Icon name="info" size={13} className="text-cyan-400/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-cyan-400/80 truncate">{log.displayName}</span>
+                                                <Icon name="info" size={13} className="text-amber-600/70 dark:text-[#d4af37]/70 mt-0.5 flex-shrink-0" />
+                                                <span className="text-amber-700/80 dark:text-[#d4af37]/80 truncate">{log.displayName}</span>
                                             </>
                                         )}
                                     </div>
@@ -750,9 +747,9 @@ export function AIAnswerContent({
 
                                 {/* 마지막 줄: 현재 상태 표시 - 마지막 status 메시지 또는 대기 중 */}
                                 {isStreaming && !isCollapsing && (
-                                    <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 pt-1">
+                                    <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 dark:text-gray-500 pt-1">
                                         <div className="w-3 h-3 flex-shrink-0">
-                                            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mx-auto" />
+                                            <div className="w-2 h-2 rounded-full bg-amber-500 dark:bg-[#d4af37] animate-pulse mx-auto" />
                                         </div>
                                         <span className="truncate">
                                             {(() => {

@@ -78,10 +78,10 @@ export function LawViewerSingleArticle({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           {/* 제목 + 배지 */}
           <div className="flex items-center gap-1 lg:gap-2 min-w-0 sm:flex-1">
-            <h2 className="text-lg lg:text-xl font-bold text-foreground break-words sm:truncate">
+            <h2 className="text-lg lg:text-xl font-bold text-foreground break-words sm:truncate font-maruburi">
               {formatSimpleJo(activeArticle.jo, isOrdinance)}
               {activeArticle.title && (
-                <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2">({activeArticle.title})</span>
+                <span className="text-muted-foreground text-base lg:text-lg ml-1 lg:ml-2 font-pretendard">({activeArticle.title})</span>
               )}
             </h2>
             {meta.lawTitle === "대한민국헌법" ? (
@@ -134,7 +134,7 @@ export function LawViewerSingleArticle({
 
       {/* 본문 */}
       <div
-        className="text-foreground leading-relaxed break-words whitespace-pre-wrap"
+        className="text-foreground leading-relaxed break-words whitespace-pre-wrap font-maruburi"
         style={{
           fontSize: `${fontSize}px`,
           lineHeight: "1.8",

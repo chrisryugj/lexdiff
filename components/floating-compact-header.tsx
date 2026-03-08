@@ -128,12 +128,12 @@ export function FloatingCompactHeader({
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
                     title="홈으로 이동"
                   >
-                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-lg bg-primary">
-                      <Icon name="scale" size={18} className="text-primary-foreground" />
+                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-sm bg-[#1a2b4c] dark:bg-[#e2a85d] transition-transform duration-300 group-hover:scale-105">
+                      <Icon name="scale" size={18} className="text-white dark:text-[#0c0e14]" />
                     </div>
                     <span
-                      className="hidden md:block text-lg lg:text-xl font-bold text-foreground tracking-tight"
-                      style={{ fontFamily: "'Noto Serif KR', serif" }}
+                      className="hidden md:block text-lg lg:text-xl font-bold text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
+                      style={{ fontFamily: "'RIDIBatang', serif" }}
                     >
                       LexDiff
                     </span>
@@ -144,7 +144,7 @@ export function FloatingCompactHeader({
                     <Button
                       variant="outline"
                       onClick={onSearchClick}
-                      className="flex items-center gap-2 max-w-[180px] lg:max-w-md truncate bg-muted/50 hover:bg-muted border-primary/20 hover:border-primary/40 transition-all"
+                      className="flex items-center gap-2 max-w-[180px] lg:max-w-md truncate bg-muted/50 hover:bg-accent hover:text-accent-foreground border-primary/20 hover:border-primary/40 transition-all"
                       title="검색 (Cmd+K)"
                     >
                       <Icon name="search" size={16} className="flex-shrink-0 text-muted-foreground" />
@@ -170,11 +170,11 @@ export function FloatingCompactHeader({
                       variant="ghost"
                       size="sm"
                       onClick={onFavoritesClick}
-                      className="flex items-center gap-1.5 lg:gap-2"
+                      className="flex items-center gap-1.5 lg:gap-2 hover:bg-gray-200 dark:hover:bg-gray-800"
                       title="즐겨찾기"
                     >
-                      <Icon name="star" size={16} className="text-yellow-400 fill-yellow-400" />
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                      <Icon name="star" size={16} className="text-[#d4af37] fill-[#d4af37]" />
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-transparent border-[#1a2b4c]/20 dark:border-[#e2a85d]/30 text-[#1a2b4c] dark:text-[#e2a85d]">
                         {favoritesCount}
                       </Badge>
                     </Button>

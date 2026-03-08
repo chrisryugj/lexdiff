@@ -371,7 +371,7 @@ export function PrecedentDetailPanel({
       <div className="p-4 space-y-3">
         {/* 헤더 */}
         <div className="space-y-2">
-          <h3 className="font-bold text-lg">{detail.name}</h3>
+          <h3 className="font-bold text-lg font-maruburi">{detail.name}</h3>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <span className="px-2 py-1 bg-muted rounded">{detail.court}</span>
             <span className="px-2 py-1 bg-muted rounded">{detail.caseNumber}</span>
@@ -389,7 +389,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판시사항
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg"
+              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.holdings) }}
             />
@@ -403,7 +403,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판결요지
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg"
+              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.summary) }}
             />
@@ -417,7 +417,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />참조조문
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg"
+              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.refStatutes) }}
             />
@@ -431,7 +431,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />참조판례
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg"
+              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.refPrecedents) }}
             />
@@ -445,7 +445,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판결 전문
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg whitespace-pre-wrap"
+              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg whitespace-pre-wrap font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.fullText) }}
             />
