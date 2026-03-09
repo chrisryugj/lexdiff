@@ -20,6 +20,7 @@
 | 14 | SKILLS_GUIDE | Superpowers 스킬 가이드 |
 | 15 | UI_UX_ANALYSIS | UI/UX 분석 보고서 |
 | 16 | AGENTIC_RAG_PLAN | Agentic RAG 구현 계획 |
+| 17 | LEGAL-AI-GRAPHRAG-PRD | Neo4j GraphRAG 기반 법령 AI 고도화 PRD |
 
 ### `/docs/future`
 **미래 계획 문서**
@@ -52,11 +53,14 @@
 | 목적 | 문서 |
 |------|------|
 | 처음 시작 | `CLAUDE.md`, `02-GEMINI_FILE_SEARCH_GUIDE` |
-| AI 검색 | `02-GEMINI_FILE_SEARCH_GUIDE`, `16-AGENTIC_RAG_PLAN` |
+| AI 검색 | `02-GEMINI_FILE_SEARCH_GUIDE`, `16-AGENTIC_RAG_PLAN`, `17-LEGAL-AI-GRAPHRAG-PRD` |
 | 아키텍처 | `05-LAW_VIEWER_ARCHITECTURE`, `06-PROJECT_ARCHITECTURE` |
 | UI/UX | `15-UI_UX_ANALYSIS` |
 
 ## 📅 최근 업데이트
+
+### 2026-03-08
+- 17-LEGAL-AI-GRAPHRAG-PRD 추가 (Mini PC + Neo4j + 법령DB 자동화 + Stream 챗봇 계획)
 
 ### 2025-12-20
 - 판례/해석례/재결례 검색 API 9개 추가 (korean-law-mcp 도입)
