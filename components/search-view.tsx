@@ -86,11 +86,24 @@ export function SearchView({
   const [lawStats, setLawStats] = useState<{ laws: number; adminRules: number; ordinances: number; precedents: number } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const lastScrollY = useRef(0)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
 
   const isLoading = isSearching || ragLoading
+
+  // Libre Bodoni italic 폰트 로드 후 리페인트 강제 (마지막 f 글리프 클리핑 방지)
+  useEffect(() => {
+    document.fonts.load('italic 500 60px "Libre Bodoni"').then(() => {
+      const el = titleRef.current
+      if (el) {
+        el.style.display = 'none'
+        void el.offsetHeight
+        el.style.display = ''
+      }
+    })
+  }, [])
 
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
@@ -247,6 +260,7 @@ export function SearchView({
 
             {/* Title */}
             <m.h1
+              ref={titleRef}
               variants={titleVariants}
               className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
               style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1 }}
