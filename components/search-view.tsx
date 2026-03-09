@@ -239,8 +239,8 @@ export function SearchView({
             {/* Title */}
             <m.h1
               variants={itemVariants}
-              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter overflow-visible"
-              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1, paddingRight: '0.1em' }}
+              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
+              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1, paddingRight: '0.1em', transform: 'translateZ(0)' }}
             >
               LexDiff
             </m.h1>
@@ -295,7 +295,7 @@ export function SearchView({
             </div>
             {/* Live stats */}
             {lawStats && (
-              <div className="flex flex-wrap items-center gap-6 text-sm font-medium">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-sm font-medium">
                 {lawStats.laws > 0 && (
                   <span className="flex items-center gap-2">
                     <Icon name="scale" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
