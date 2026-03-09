@@ -1,8 +1,8 @@
 "use client"
 
-import { SearchBarTest } from "@/components/search-bar-test"
+import { SearchBar } from "@/components/search-bar"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
-import { FeatureCardsTest } from "@/components/feature-cards-test"
+import { FeatureCards } from "@/components/feature-cards"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
@@ -263,7 +263,7 @@ export function SearchViewTest({
 
             {/* Search Bar */}
             <m.div variants={itemVariants} className="w-full max-w-3xl relative z-40">
-              <SearchBarTest
+              <SearchBar
                 onSearch={onSearch}
                 isLoading={isLoading}
                 searchMode={searchMode}
@@ -280,7 +280,7 @@ export function SearchViewTest({
           className={`py-20 lg:py-32 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
         >
           <div className="container mx-auto max-w-7xl px-6 lg:px-8">
-            <FeatureCardsTest revealed={featuresRevealed} />
+            <FeatureCards revealed={featuresRevealed} />
           </div>
         </section>
       </main>
