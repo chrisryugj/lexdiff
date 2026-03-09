@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,14 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
   const { state, actions, isAiMode } = useSearchBarState(searchMode)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
 
   const {
     handleSubmit,
@@ -82,7 +90,10 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder={isAiMode ? 'AI 법률 자문 (예: "수출통관 절차는?", "청년 창업 지원제도는?")' : '법령명, 조문번호 검색 (예: "관세법 38조", "근로기준법")'}
+                placeholder={isAiMode
+                  ? (isMobile ? 'AI 법률 자문' : 'AI 법률 자문 (예: "수출통관 절차는?", "청년 창업 지원제도는?")')
+                  : (isMobile ? '법령명, 조문번호 검색' : '법령명, 조문번호 검색 (예: "관세법 38조", "근로기준법")')
+                }
                 value={query}
                 onChange={(e) => {
                   actions.setQuery(e.target.value)
@@ -91,7 +102,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
                 onFocus={() => actions.setShowDropdown(true)}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "h-16 pl-14 pr-4 text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",
+                  "h-16 pl-14 pr-4 text-sm sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",
                   showDropdown && "bg-gray-50 dark:bg-[#1a222c]"
                 )}
                 disabled={isLoading}

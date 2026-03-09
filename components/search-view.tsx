@@ -239,8 +239,8 @@ export function SearchView({
             {/* Title */}
             <m.h1
               variants={itemVariants}
-              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tighter"
-              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1 }}
+              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter overflow-visible"
+              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1, paddingRight: '0.1em' }}
             >
               LexDiff
             </m.h1>
@@ -254,7 +254,7 @@ export function SearchView({
             {/* Subtitle */}
             <m.p
               variants={itemVariants}
-              className="text-lg lg:text-xl text-gray-600 dark:text-gray-300 font-medium tracking-wider mb-8 lg:mb-12 max-w-2xl leading-relaxed break-keep"
+              className="text-base lg:text-xl text-gray-600 dark:text-gray-300 font-medium tracking-wider mb-8 lg:mb-12 max-w-2xl leading-relaxed break-keep"
               style={{ fontFamily: "'RIDIBatang', serif" }}
             >
               어려운 법률 용어 대신 일상 언어로,<br/>
