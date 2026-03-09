@@ -246,9 +246,9 @@ export function SearchView({
             </m.div>
 
             {/* Title */}
-            <m.div variants={titleVariants}>
+            <m.div variants={titleVariants} className="w-full overflow-visible">
               <h1
-                className="inline-block overflow-visible pr-[0.12em] text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
+                className="overflow-visible text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', lineHeight: 1.1 }}
               >
                 LexDiff
