@@ -90,19 +90,48 @@ export function SearchView({
   const lastScrollY = useRef(0)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
+  const [isTitlePaintReady, setIsTitlePaintReady] = useState(false)
 
   const isLoading = isSearching || ragLoading
 
   // Libre Bodoni italic 폰트 로드 후 리페인트 강제 (마지막 f 글리프 클리핑 방지)
   useEffect(() => {
-    document.fonts.load('italic 500 60px "Libre Bodoni"').then(() => {
-      const el = titleRef.current
-      if (el) {
-        el.style.display = 'none'
-        void el.offsetHeight
-        el.style.display = ''
-      }
+    let cancelled = false
+    let settled = false
+
+    const revealTitle = () => {
+      if (cancelled || settled) return
+      settled = true
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (cancelled) return
+
+          const el = titleRef.current
+          if (el) {
+            el.style.display = 'none'
+            void el.offsetHeight
+            el.style.display = ''
+          }
+
+          setIsTitlePaintReady(true)
+        })
+      })
+    }
+
+    const timeoutId = window.setTimeout(revealTitle, 1200)
+    const fontSet = document.fonts
+    const fontLoad = fontSet.load('italic 500 96px "Libre Bodoni"')
+
+    Promise.allSettled([fontLoad, fontSet.ready]).finally(() => {
+      window.clearTimeout(timeoutId)
+      revealTitle()
     })
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
   }, [])
 
   useEffect(() => {
@@ -261,8 +290,10 @@ export function SearchView({
             {/* Title */}
             <m.h1
               ref={titleRef}
+              initial="hidden"
+              animate={isTitlePaintReady ? "visible" : "hidden"}
               variants={titleVariants}
-              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
+              className="overflow-visible pr-[0.08em] text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
               style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1 }}
             >
               LexDiff
