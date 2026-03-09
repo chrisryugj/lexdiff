@@ -49,8 +49,8 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
             <Icon name="scale" size={20} className="text-primary-foreground" />
           </div>
           <span
-            className="text-lg font-bold text-foreground tracking-tight"
-            style={{ fontFamily: "'Noto Serif KR', serif" }}
+            className="text-lg font-medium italic text-foreground tracking-tight"
+            style={{ fontFamily: "'Libre Bodoni', serif" }}
           >
             LexDiff
           </span>

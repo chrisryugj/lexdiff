@@ -132,8 +132,8 @@ export function FloatingCompactHeader({
                       <Icon name="scale" size={18} className="text-white dark:text-[#0c0e14]" />
                     </div>
                     <span
-                      className="hidden md:block text-lg lg:text-xl font-bold text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
-                      style={{ fontFamily: "'RIDIBatang', serif" }}
+                      className="hidden md:block text-lg lg:text-xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
+                      style={{ fontFamily: "'Libre Bodoni', serif" }}
                     >
                       LexDiff
                     </span>
