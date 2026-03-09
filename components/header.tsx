@@ -50,7 +50,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
           </div>
           <span
             className="text-lg font-medium italic text-foreground tracking-tight"
-            style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic' }}
+            style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}
           >
             LexDiff
           </span>

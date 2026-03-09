@@ -133,7 +133,7 @@ export function FloatingCompactHeader({
                     </div>
                     <span
                       className="hidden md:block text-lg lg:text-xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
-                      style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic' }}
+                      style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}
                     >
                       LexDiff
                     </span>
