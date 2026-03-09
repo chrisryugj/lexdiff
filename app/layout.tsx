@@ -19,6 +19,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@1,500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className={`font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
