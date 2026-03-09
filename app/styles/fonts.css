@@ -1,4 +1,11 @@
-/* Libre Bodoni는 layout.tsx <head> link 태그로 로드 (variable font) */
+/* Libre Bodoni — 로컬 variable font (Italic, wght 400-700) */
+@font-face {
+    font-family: 'Libre Bodoni';
+    font-style: italic;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/LibreBodoni-Italic-VariableFont_wght.woff2') format('woff2');
+}
 
 /* ============================================
    Font Faces — 3종으로 정리
