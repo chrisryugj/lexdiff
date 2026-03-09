@@ -191,8 +191,8 @@ export function SearchView({
                 <Icon name="scale" size={22} />
               </div>
               <span
-                className="text-xl lg:text-2xl font-bold text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
-                style={{ fontFamily: "'RIDIBatang', serif" }}
+                className="text-xl lg:text-2xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
+                style={{ fontFamily: "'Libre Bodoni', serif" }}
               >
                 LexDiff
               </span>
@@ -239,8 +239,8 @@ export function SearchView({
             {/* Title */}
             <m.h1
               variants={itemVariants}
-              className="text-6xl lg:text-8xl font-black text-[#1a2b4c] dark:text-[#e2a85d] tracking-tighter"
-              style={{ fontFamily: "'RIDIBatang', serif", lineHeight: 1.1 }}
+              className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tighter"
+              style={{ fontFamily: "'Libre Bodoni', serif", lineHeight: 1.1 }}
             >
               LexDiff
             </m.h1>
@@ -291,7 +291,7 @@ export function SearchView({
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center gap-2">
               <Icon name="scale" size={24} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
-              <span className="text-xl font-bold text-[#1a2b4c] dark:text-white tracking-tight" style={{ fontFamily: "'RIDIBatang', serif" }}>LexDiff</span>
+              <span className="text-xl font-medium italic text-[#1a2b4c] dark:text-white tracking-tight" style={{ fontFamily: "'Libre Bodoni', serif" }}>LexDiff</span>
             </div>
             {/* Live stats */}
             {lawStats && (
