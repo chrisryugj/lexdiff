@@ -1,11 +1,10 @@
-/* Libre Bodoni — 로고 전용 (Medium 500 Italic, woff2) */
+/* Libre Bodoni — 로고 전용 (Variable font, Italic 400-700) */
 @font-face {
     font-family: 'Libre Bodoni';
     font-style: italic;
-    font-weight: 500;
+    font-weight: 400 700;
     font-display: swap;
-    src: url('https://fonts.gstatic.com/s/librebodoni/v9/_Xm4-H45qDWDYULr5OfyZud9xBKfuwNnnsVZ_UUcGy_jc87z.woff2') format('woff2'),
-         url('https://fonts.gstatic.com/s/librebodoni/v9/_Xm4-H45qDWDYULr5OfyZud9xBKfuwNnnsVZ_UUcGy_TdA.ttf') format('truetype');
+    src: url('https://fonts.gstatic.com/s/librebodoni/v9/_Xm1-H45qDWDYULr5OfyZud9xDiTk_I.woff2') format('woff2');
 }
 
 /* ============================================
