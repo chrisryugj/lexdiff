@@ -170,6 +170,13 @@ export function SearchView({
   }
 
   // 타이틀 전용: y transform 없이 opacity만 (italic 글리프 GPU 레이어 클리핑 방지)
+  const titleVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { duration: 0.8, ease: [0.25, 1, 0.5, 1] as const },
+    },
+  }
   return (
     <div className="min-h-screen bg-[#faf9f7] dark:bg-[#0c0e14]">
       {/* Header - 솔리드하고 정제된 스타일 */}
@@ -239,7 +246,7 @@ export function SearchView({
             </m.div>
 
             {/* Title */}
-            <m.div variants={itemVariants}>
+            <m.div variants={titleVariants}>
               <h1
                 className="inline-block overflow-visible pr-[0.12em] text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', lineHeight: 1.1 }}
