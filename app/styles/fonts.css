@@ -3,7 +3,7 @@
     font-family: 'Libre Bodoni';
     font-style: italic;
     font-weight: 400 700;
-    font-display: swap;
+    font-display: block;
     src: url('/fonts/LibreBodoni-Italic-VariableFont_wght.woff2') format('woff2');
 }
 

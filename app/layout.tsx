@@ -19,6 +19,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <link
+          rel="preload"
+          href="/fonts/LibreBodoni-Italic-VariableFont_wght.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={`font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
