@@ -279,10 +279,14 @@ export async function executeTool(
     const parsedArgs = tool.schema.parse(args)
     const response = await tool.handler(apiClient, parsedArgs)
     const text = response.content.map(c => c.text).join('\n')
-    const truncated = truncateForContext(text)
+    const truncated = truncateForContext(text, name)
     const result: ToolCallResult = {
       name,
-      result: name === 'search_law' ? compressSearchResult(truncated) : truncated,
+      result: name === 'search_law'
+        ? compressSearchResult(truncated)
+        : name === 'search_ai_law'
+          ? compressAiSearchResult(truncated)
+          : truncated,
       isError: response.isError || false,
     }
 
@@ -311,14 +315,35 @@ export async function executeToolsParallel(
 
 // ─── 유틸 ───
 
-const MAX_RESULT_LENGTH = 3000
+/** 도구별 컨텍스트 절삭 한도 (중요도에 따라 차등) */
+const TOOL_RESULT_LIMITS: Record<string, number> = {
+  // 핵심 조문 조회 — 원문이 잘리면 Context Recall 하락
+  get_batch_articles: 10000,
+  get_law_text: 8000,
+  get_precedent_text: 8000,
+  get_interpretation_text: 6000,
+  get_ordinance: 8000,
+  // 검색 결과 — 상위 결과가 중요, 하위는 노이즈
+  search_ai_law: 6000,
+  search_precedents: 4000,
+  search_interpretations: 4000,
+  // 비교/구조 — 적당한 길이
+  get_three_tier: 6000,
+  compare_old_new: 6000,
+  get_article_history: 4000,
+  get_law_tree: 4000,
+  get_annexes: 6000,
+}
+const DEFAULT_RESULT_LIMIT = 3000
 
 /**
  * 도구 결과가 너무 길면 잘라서 컨텍스트 윈도우 절약
+ * 도구별 한도를 차등 적용하여 중요한 원문은 더 많이 유지
  */
-function truncateForContext(text: string): string {
-  if (text.length <= MAX_RESULT_LENGTH) return text
-  return text.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과가 너무 길어 일부만 표시)'
+function truncateForContext(text: string, toolName?: string): string {
+  const limit = (toolName && TOOL_RESULT_LIMITS[toolName]) || DEFAULT_RESULT_LIMIT
+  if (text.length <= limit) return text
+  return text.slice(0, limit) + '\n\n... (결과가 너무 길어 일부만 표시)'
 }
 
 /**
@@ -339,4 +364,39 @@ function compressSearchResult(text: string): string {
 
   if (entries.length === 0) return text  // 파싱 실패시 원본 반환
   return header + entries.join('\n')
+}
+
+/**
+ * search_ai_law 결과에서 관련성 낮은 조문을 제거하고 상위 결과에 집중
+ *
+ * 원본 형식 (📜 법령명\n  제N조 ... \n  내용...) 블록을 파싱하여:
+ * 1. 최대 TOP_AI_RESULTS개 블록만 유지 (Context Precision 향상)
+ * 2. 각 블록 내 조문 텍스트를 MAX_ARTICLE_CHARS자로 압축
+ */
+const TOP_AI_RESULTS = 7
+const MAX_ARTICLE_CHARS = 600
+
+function compressAiSearchResult(text: string): string {
+  // 헤더 추출 (예: "검색 결과 (12건):")
+  const headerMatch = text.match(/^[^\n]*검색[^\n]*\n/)
+  const header = headerMatch ? headerMatch[0] : ''
+  const body = headerMatch ? text.slice(header.length) : text
+
+  // 📜 구분자로 블록 분리
+  const blocks = body.split(/(?=📜\s)/).filter(b => b.trim().length > 0)
+  if (blocks.length === 0) return text  // 파싱 실패 시 원본 반환
+
+  // 상위 N개만 유지
+  const topBlocks = blocks.slice(0, TOP_AI_RESULTS)
+
+  // 각 블록 내용 압축 (너무 긴 조문 텍스트 축약)
+  const compressed = topBlocks.map(block => {
+    if (block.length <= MAX_ARTICLE_CHARS) return block.trim()
+    return block.slice(0, MAX_ARTICLE_CHARS).trim() + '\n  ...(이하 생략)'
+  })
+
+  const kept = compressed.length
+  const total = blocks.length
+  const suffix = total > kept ? `\n\n(총 ${total}건 중 상위 ${kept}건 표시)` : ''
+  return header + compressed.join('\n\n') + suffix
 }
