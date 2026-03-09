@@ -1,0 +1,132 @@
+{
+  "evaluated_at": "2026-03-10T00:10:32.964062",
+  "ragas_version": "0.4.3",
+  "judge_llm": "gemini-2.5-flash",
+  "num_samples": 10,
+  "evaluation_time_seconds": 248.8,
+  "aggregate_scores": {
+    "faithfulness": {
+      "mean": 0.4983,
+      "min": 0.1364,
+      "max": 0.7333,
+      "per_question": [
+        0.7059,
+        0.625,
+        0.5238,
+        0.5517,
+        0.1364,
+        0.7333,
+        0.4667,
+        0.375,
+        0.6154,
+        0.25
+      ]
+    },
+    "llm_context_precision_with_reference": {
+      "mean": 0.3906,
+      "min": 0.0,
+      "max": 1.0,
+      "per_question": [
+        0.1111,
+        1.0,
+        0.5769,
+        0.0,
+        0.2652
+      ]
+    },
+    "context_recall": {
+      "mean": 0.525,
+      "min": 0.0,
+      "max": 1.0,
+      "per_question": [
+        0.5,
+        0.5,
+        0.5,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.5,
+        0.25
+      ]
+    }
+  },
+  "per_question_results": [
+    {
+      "question": "관세법상 수입의 정의는 무엇인가요?",
+      "query_type": "definition",
+      "confidence": "medium",
+      "faithfulness": 0.7059,
+      "llm_context_precision_with_reference": 0.1111,
+      "context_recall": 0.5
+    },
+    {
+      "question": "개인정보보호법에서 개인정보의 정의는?",
+      "query_type": "definition",
+      "confidence": "medium",
+      "faithfulness": 0.625,
+      "context_recall": 0.5
+    },
+    {
+      "question": "근로기준법상 연장근로 제한 시간은 얼마인가요?",
+      "query_type": "requirement",
+      "confidence": "medium",
+      "faithfulness": 0.5238,
+      "llm_context_precision_with_reference": 1.0,
+      "context_recall": 0.5
+    },
+    {
+      "question": "형법상 정당방위의 성립 요건은?",
+      "query_type": "requirement",
+      "confidence": "medium",
+      "faithfulness": 0.5517,
+      "context_recall": 1.0
+    },
+    {
+      "question": "도로교통법에서 음주운전 처벌 기준이 되는 혈중알코올농도는?",
+      "query_type": "requirement",
+      "confidence": "high",
+      "faithfulness": 0.1364,
+      "context_recall": 0.0
+    },
+    {
+      "question": "민법에서 성년 연령은 몇 세인가요?",
+      "query_type": "definition",
+      "confidence": "medium",
+      "faithfulness": 0.7333,
+      "context_recall": 1.0
+    },
+    {
+      "question": "주택임대차보호법에서 대항력의 요건은 무엇인가요?",
+      "query_type": "requirement",
+      "confidence": "medium",
+      "faithfulness": 0.4667,
+      "llm_context_precision_with_reference": 0.5769,
+      "context_recall": 1.0
+    },
+    {
+      "question": "국가공무원법에서 공무원의 의무에는 어떤 것들이 있나요?",
+      "query_type": "scope",
+      "confidence": "high",
+      "faithfulness": 0.375,
+      "context_recall": 0.0
+    },
+    {
+      "question": "상법에서 주식회사 설립 시 발기인의 최소 인원은?",
+      "query_type": "requirement",
+      "confidence": "medium",
+      "faithfulness": 0.6154,
+      "llm_context_precision_with_reference": 0.0,
+      "context_recall": 0.5
+    },
+    {
+      "question": "소비자기본법에서 소비자의 8대 권리는 무엇인가요?",
+      "query_type": "scope",
+      "confidence": "high",
+      "faithfulness": 0.25,
+      "llm_context_precision_with_reference": 0.2652,
+      "context_recall": 0.25
+    }
+  ]
+}
