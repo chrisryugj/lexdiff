@@ -86,54 +86,13 @@ export function SearchView({
   const [lawStats, setLawStats] = useState<{ laws: number; adminRules: number; ordinances: number; precedents: number } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
-  const titleRef = useRef<HTMLHeadingElement>(null)
   const lastScrollY = useRef(0)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
-  const [isTitlePaintReady, setIsTitlePaintReady] = useState(false)
 
   const isLoading = isSearching || ragLoading
 
   // Libre Bodoni italic 폰트 로드 후 리페인트 강제 (마지막 f 글리프 클리핑 방지)
-  useEffect(() => {
-    let cancelled = false
-    let settled = false
-
-    const revealTitle = () => {
-      if (cancelled || settled) return
-      settled = true
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (cancelled) return
-
-          const el = titleRef.current
-          if (el) {
-            el.style.display = 'none'
-            void el.offsetHeight
-            el.style.display = ''
-          }
-
-          setIsTitlePaintReady(true)
-        })
-      })
-    }
-
-    const timeoutId = window.setTimeout(revealTitle, 1200)
-    const fontSet = document.fonts
-    const fontLoad = fontSet.load('italic 500 96px "Libre Bodoni"')
-
-    Promise.allSettled([fontLoad, fontSet.ready]).finally(() => {
-      window.clearTimeout(timeoutId)
-      revealTitle()
-    })
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timeoutId)
-    }
-  }, [])
-
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
       setFavoritesCount(favs.length)
@@ -280,15 +239,10 @@ export function SearchView({
             </m.div>
 
             {/* Title */}
-            <m.div
-              initial="hidden"
-              animate={isTitlePaintReady ? "visible" : "hidden"}
-              variants={itemVariants}
-            >
+            <m.div variants={itemVariants}>
               <h1
-                ref={titleRef}
-                className={`${isTitlePaintReady ? "visible opacity-100" : "invisible opacity-0"} inline-block overflow-visible pr-[0.12em] text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter transition-opacity duration-700`}
-                style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1 }}
+                className="inline-block overflow-visible pr-[0.12em] text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
+                style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', lineHeight: 1.1 }}
               >
                 LexDiff
               </h1>
