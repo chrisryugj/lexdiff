@@ -240,9 +240,9 @@ export function SearchView({
             <m.h1
               variants={itemVariants}
               className="text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
-              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1, paddingRight: '0.1em', transform: 'translateZ(0)' }}
+              style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500", lineHeight: 1.1 }}
             >
-              LexDiff
+              LexDiff{'\u2009'}
             </m.h1>
 
             {/* Accent Line */}
