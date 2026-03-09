@@ -1,5 +1,11 @@
 /* Libre Bodoni — 로고 전용 (Medium 500 Italic) */
-@import url('https://fonts.googleapis.com/css2?family=Libre+Bodoni:ital,wght@0,400..700;1,400..700&display=swap');
+@font-face {
+    font-family: 'Libre Bodoni';
+    font-style: italic;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/librebodoni/v9/_Xm4-H45qDWDYULr5OfyZud9xBKfuwNnnsVZ_UUcGy_TdA.ttf') format('truetype');
+}
 
 /* ============================================
    Font Faces — 3종으로 정리
