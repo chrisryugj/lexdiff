@@ -624,6 +624,14 @@ export async function* executeRAGStream(
       }
 
       const results = await executeToolsParallel(calls)
+
+      // ── Context Precision 향상: search_ai_law 결과를 쿼리 관련성 기준으로 재정렬 ──
+      for (const r of results) {
+        if (r.name === 'search_ai_law' && !r.isError) {
+          r.result = rerankAiSearchResult(r.result, query)
+        }
+      }
+
       allToolResults.push(...results)
 
       currentProgress = Math.min(8 + ((turnCount + 0.5) * progressPerTurn), 85)
@@ -797,6 +805,63 @@ export function inferQueryType(query: string): LegalQueryType {
   return 'application'
 }
 
+// ─── search_ai_law 결과 관련성 재정렬 (Context Precision 향상) ───
+
+/**
+ * search_ai_law 결과를 쿼리 키워드 매칭으로 재정렬.
+ * 쿼리와 관련 없는 조문을 후순위로 밀어 Gemini가 핵심 조문에 집중하게 함.
+ *
+ * 점수 기준:
+ * - 법령명에 쿼리 키워드 포함 시 +3/키워드
+ * - 조문 내용에 쿼리 키워드 포함 시 +1/키워드
+ * - "제N조" 형태 매칭 시 +5 (사용자가 조문 지정)
+ */
+function rerankAiSearchResult(text: string, query: string): string {
+  const headerMatch = text.match(/^[^\n]*(?:검색|총)[^\n]*\n/)
+  const header = headerMatch ? headerMatch[0] : ''
+  const body = headerMatch ? text.slice(header.length) : text
+
+  const blocks = body.split(/(?=📜\s)/).filter(b => b.trim().length > 0)
+  if (blocks.length <= 1) return text  // 1건 이하면 재정렬 불필요
+
+  // 쿼리에서 키워드 추출 (불용어 제거)
+  const stopWords = /(?:은|는|이|가|을|를|에|의|로|으로|와|과|에서|한|하는|대한|대해|무엇|어떤|어떻게|인가요|인지|것|및|또는|경우|위한|있는|없는|되는|되어|알려|설명|궁금|내용|관련|해서|해|줘)$/
+  const keywords = query
+    .replace(/[「」]/g, '')
+    .split(/\s+/)
+    .map(w => w.replace(stopWords, ''))
+    .filter(w => w.length >= 2)
+
+  // 쿼리에서 조문번호 추출
+  const queryArticles = new Set(
+    Array.from(query.matchAll(/제(\d+)조(?:의(\d+))?/g))
+      .map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
+  )
+
+  const scored = blocks.map(block => {
+    let score = 0
+    const firstLine = block.split('\n')[0] || ''  // 📜 법령명 라인
+
+    // 법령명 키워드 매칭 (가중치 높음)
+    for (const kw of keywords) {
+      if (firstLine.includes(kw)) score += 3
+      else if (block.includes(kw)) score += 1
+    }
+
+    // 조문번호 직접 매칭 (가중치 최고)
+    for (const art of queryArticles) {
+      if (block.includes(art)) score += 5
+    }
+
+    return { block, score }
+  })
+
+  // 점수 내림차순 정렬
+  scored.sort((a, b) => b.score - a.score)
+
+  return header + scored.map(s => s.block).join('\n\n')
+}
+
 /**
  * 도구 결과에서 Citation 구성 (답변 텍스트 기반 필터링)
  */
@@ -828,7 +893,7 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
         if (!seen.has(key)) {
           seen.add(key)
           const idx = text.indexOf(match[0])
-          const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 200))
+          const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 400))
           citations.push({ lawName, articleNumber: articleNum, chunkText, source: result.name })
         }
       }
@@ -843,7 +908,7 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
         if (!seen.has(key)) {
           seen.add(key)
           const idx = text.indexOf(match[0])
-          const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 200))
+          const chunkText = text.slice(Math.max(0, idx), Math.min(text.length, idx + 400))
           citations.push({ lawName, articleNumber: articleNum, chunkText, source: 'search_ai_law' })
         }
       }
@@ -921,7 +986,7 @@ function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCR
           if (!seen.has(key)) {
             seen.add(key)
             const idx = text.indexOf(match[0])
-            citations.push({ lawName: ordinName, articleNumber: articleNum, chunkText: text.slice(Math.max(0, idx), Math.min(text.length, idx + 200)), source: 'get_ordinance' })
+            citations.push({ lawName: ordinName, articleNumber: articleNum, chunkText: text.slice(Math.max(0, idx), Math.min(text.length, idx + 400)), source: 'get_ordinance' })
           }
         }
         // 조문 매칭이 없어도 조례 자체는 citation으로 등록
