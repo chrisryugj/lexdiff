@@ -217,6 +217,13 @@ export async function GET(request: Request) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 법령 타입별 검색 결과 추출
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 법제처 API는 결과가 1건이면 단일 객체, 2건 이상이면 배열을 반환
+    // 항상 배열로 정규화하는 헬퍼
+    const ensureArray = <T,>(data: T | T[] | undefined): T[] => {
+      if (!data) return []
+      return Array.isArray(data) ? data : [data]
+    }
+
     let annexes: LawAnnex[]
 
     switch (lawType) {
@@ -224,7 +231,7 @@ export async function GET(request: Request) {
         // 🏛️ 조례/규칙 (자치법규)
         // - API 응답: licBylSearch.ordinbyl[]
         // - 특징: 지자체기관명 포함, PDF 링크 단일
-        const rows: OrdinanceAnnexRow[] = (searchResult as any).ordinbyl || []
+        const rows: OrdinanceAnnexRow[] = ensureArray((searchResult as any).ordinbyl)
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",
@@ -252,7 +259,7 @@ export async function GET(request: Request) {
         // 📋 행정규칙 (훈령, 예규, 고시, 지침, 내규)
         // - API 응답: admRulBylSearch.admbyl[]
         // - 특징: 소관부처 포함, 발령일자
-        const rows: AdminRuleAnnexRow[] = (searchResult as any).admbyl || []
+        const rows: AdminRuleAnnexRow[] = ensureArray((searchResult as any).admbyl)
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",
@@ -279,7 +286,7 @@ export async function GET(request: Request) {
         // ⚖️ 일반 법령 (법률, 대통령령, 총리령, 부령 등)
         // - API 응답: licBylSearch.licbyl[]
         // - 특징: PDF 링크 별도, 공포일자
-        const rows: LawApiAnnexRow[] = (searchResult as any).licbyl || []
+        const rows: LawApiAnnexRow[] = ensureArray((searchResult as any).licbyl)
 
         annexes = rows.map((row) => ({
           annexId: row.별표일련번호 || "",

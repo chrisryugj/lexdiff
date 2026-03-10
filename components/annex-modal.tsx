@@ -41,10 +41,11 @@ function extractFlSeq(link: string): string {
 function extractAnnexNum(text: string): string {
   if (!text) return ""
 
-  // API 형식: 6자리 숫자 (000100 → 1, 000203 → 2의3)
+  // API 형식: 6자리 숫자 (000100 → 1, 000203 → 2의3, 000000 → "" 번호 없음)
   if (/^\d{6}$/.test(text)) {
     const main = parseInt(text.substring(0, 4), 10)
     const sub = parseInt(text.substring(4, 6), 10)
+    if (main === 0 && sub === 0) return "" // 번호 없는 별표
     if (sub > 0) {
       return `${main}의${sub}`
     }
