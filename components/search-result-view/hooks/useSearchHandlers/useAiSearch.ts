@@ -9,7 +9,6 @@ import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from "@/lib/rag-response-cache"
-import { detectSearchFailed } from "../../utils"
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
 
@@ -305,7 +304,7 @@ export function useAiSearch(deps: HandlerDeps) {
           const data = event.data
           // Bridge에서 이미 extractAnswerFromJson 처리됨 — 중복 추출 불필요
           const processedContent = (data.answer || '').replace(/\^/g, ' ')
-          const searchFailed = detectSearchFailed(processedContent)
+          const searchFailed = false // Gemini RAG에서는 별도 실패 감지 불필요
           const relatedLaws = extractRelatedLaws(processedContent)
 
           actions.setFileSearchFailed(searchFailed)

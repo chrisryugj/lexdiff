@@ -245,7 +245,7 @@ export function AIAnswerSidebar({
                     ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
                             <Icon name="alert-circle" size={32} className="opacity-40 text-amber-500" />
-                            <p className="text-sm font-medium text-amber-600">File Search 인용 없음</p>
+                            <p className="text-sm font-medium text-amber-600">인용 조문 없음</p>
                             <p className="text-xs text-center px-4">AI가 일반 지식으로 답변했습니다.<br />법령 데이터베이스에서 관련 조문을 찾지 못했습니다.</p>
                         </div>
                     )}
@@ -837,7 +837,7 @@ export function AIAnswerContent({
                         <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
                             <div className="flex items-center gap-2 text-red-500 text-sm">
                                 <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
-                                <span>File Search 인용 없음 - 법령 데이터베이스에서 결과를 찾지 못함</span>
+                                <span>인용 조문 없음 - 법령 데이터베이스에서 관련 조문을 찾지 못함</span>
                             </div>
                         </div>
 

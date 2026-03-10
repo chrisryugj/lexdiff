@@ -128,11 +128,3 @@ export function buildFullQuery(lawName: string, article?: string): string {
   return article ? `${lawName} ${article}` : lawName
 }
 
-// ============================================================
-// AI 검색 실패 감지
-// ============================================================
-
-export function detectSearchFailed(content: string): boolean {
-  return content.includes('File Search Store에서') &&
-    content.includes('찾을 수 없습니다')
-}
