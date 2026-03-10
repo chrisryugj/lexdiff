@@ -1,9 +1,11 @@
 /**
- * FC-RAG Prompts - 시스템 프롬프트 모듈
+ * FC-RAG Prompts - 통합 시스템 프롬프트 모듈
  *
- * queryType별 specialist 지침을 포함한 동적 시스템 프롬프트 생성.
- * engine.ts에서 분리하여 테스트 가능하게 모듈화.
+ * Bridge(Claude)와 Gemini가 동일 구조의 프롬프트를 공유.
+ * queryType별 specialist 지침 + 도메인별 도구 힌트 포함.
  */
+
+import { detectDomain, selectToolsForQuery, TOOL_DISPLAY_NAMES, type LegalDomain } from './tool-tiers'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -107,16 +109,37 @@ A 유리한 경우 / B 유리한 경우
 「법령명」 제N조 형식으로 나열`,
 }
 
+// ─── 도메인별 도구 힌트 ───
+
+const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
+  customs: '- 관세 도메인: search_customs_interpretations 로 관세청 해석 먼저, get_three_tier 로 위임 구조 확인',
+  labor: '- 노동 도메인: search_nlrc_decisions 로 노동위 결정 확인 가능',
+  tax: '- 세무 도메인: search_tax_tribunal_decisions 로 조세심판 재결례 확인 가능',
+  privacy: '- 개인정보 도메인: search_pipc_decisions 로 개인정보위 결정 확인 가능',
+  competition: '- 공정거래 도메인: search_ftc_decisions 로 공정위 결정 확인 가능',
+  constitutional: '- 헌법 도메인: search_constitutional_decisions 로 헌재 결정 확인 가능',
+  admin: '- 행정 도메인: search_admin_appeals 로 행정심판례, search_admin_rule 로 행정규칙 확인 가능',
+  public_servant: '- 공무원 도메인: search_admin_rule, get_annexes(별표/급여표) 활용. 금액은 별표 조회 필수',
+  housing: '- 주택·임대차 도메인: search_ordinance 로 지방 조례 확인',
+  construction: '- 건설 도메인: search_admin_rule, get_three_tier 활용',
+  environment: '- 환경 도메인: search_ordinance, search_admin_rule 활용',
+}
+
 // ─── 시스템 프롬프트 생성 ───
 
 /**
- * complexity + queryType 기반 동적 시스템 프롬프트 생성
+ * complexity + queryType + domain 기반 통합 시스템 프롬프트 생성.
+ * Bridge(Claude)와 Gemini 양쪽에서 동일 구조로 사용.
  */
 export function buildSystemPrompt(
   complexity: QueryComplexity,
-  queryType: LegalQueryType
+  queryType: LegalQueryType,
+  query?: string
 ): string {
-  return `한국 법령 전문가. 도구로 조회한 법령 데이터만 근거로 정확하게 답변.
+  const domain = query ? detectDomain(query) : 'general'
+  const domainHint = DOMAIN_TOOL_HINTS[domain] || ''
+
+  return `한국 법령 정보 분석 전문가. 도구로 조회한 법령 데이터만 근거로 정확하게 답변.
 
 ## 🔴 인용 정확성 (최우선 규칙)
 - **도구가 반환한 결과에 있는 내용만** 답변에 사용할 것.
@@ -148,5 +171,6 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 6. 조례/자치법규 질문 시 search_ordinance 사용 (search_law 금지). 지역명 포함 필수.
 7. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
 8. search_ai_law 결과가 불충분하면 get_batch_articles로 핵심 조문 원문을 반드시 추가 조회.
-9. 처벌 기준·수치·금액 등 구체적 데이터는 조문 원문을 확인한 후에만 답변.`
+9. 처벌 기준·수치·금액 등 구체적 데이터는 조문 원문을 확인한 후에만 답변.
+${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}`
 }

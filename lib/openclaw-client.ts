@@ -31,13 +31,22 @@ function getAuthHeaders(): Record<string, string> {
   return headers
 }
 
-// ─── 서킷 브레이커 ───
+// ─── 서킷 브레이커 (유형별 분류) ───
 
-const CIRCUIT_FAILURE_THRESHOLD = 3
-const CIRCUIT_OPEN_DURATION = 5 * 60_000 // 5분
+const CIRCUIT_FAILURE_THRESHOLD = 5 // 3→5 인프라 실패
+const CIRCUIT_OPEN_DURATION = 2 * 60_000 // 5분→2분
 
 let circuitFailureCount = 0
 let circuitOpenUntil = 0
+
+// 인프라 실패만 서킷 브레이커 트리거
+const INFRA_ERRORS = ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'HTTP_5xx', 'AbortError', 'timeout', 'fetch failed']
+// quality gate 실패는 서킷 브레이커에 영향 없음
+const CONTENT_ERRORS = ['no_legal_tool_evidence', 'low_confidence']
+
+function isInfraError(error: string): boolean {
+  return INFRA_ERRORS.some(e => error.includes(e))
+}
 
 function isCircuitOpen(): boolean {
   if (Date.now() > circuitOpenUntil) {
@@ -54,7 +63,11 @@ function recordSuccess(): void {
   circuitOpenUntil = 0
 }
 
-function recordFailure(): void {
+function recordFailure(error?: string): void {
+  // content 에러(quality gate fail)는 서킷 브레이커에서 무시
+  if (error && CONTENT_ERRORS.some(e => error.includes(e))) {
+    return // Bridge가 응답은 했으므로 인프라 문제 아님
+  }
   circuitFailureCount++
   if (circuitFailureCount >= CIRCUIT_FAILURE_THRESHOLD) {
     circuitOpenUntil = Date.now() + CIRCUIT_OPEN_DURATION
@@ -147,14 +160,14 @@ export async function fetchFromOpenClaw(
     })
 
     if (!response.ok) {
-      recordFailure()
+      recordFailure(`HTTP_${response.status >= 500 ? '5xx' : response.status}`)
       return false
     }
 
     // SSE 스트림 파싱
     const reader = response.body?.getReader()
     if (!reader) {
-      recordFailure()
+      recordFailure('no_reader')
       return false
     }
 
@@ -235,6 +248,10 @@ export async function fetchFromOpenClaw(
 
             case 'error':
               console.error('[openclaw-client] bridge SSE error:', parsed.error)
+              // content 에러는 서킷 브레이커에 영향 없음
+              if (parsed.error === 'no_legal_tool_evidence') {
+                // Bridge가 응답은 했으므로 인프라는 정상
+              }
               break
           }
         } catch {
@@ -278,14 +295,14 @@ export async function fetchFromOpenClaw(
     }
 
     if (!gotDone) {
-      recordFailure()
+      recordFailure('no_done_event')
       return false
     }
 
     recordSuccess()
     return true
-  } catch {
-    recordFailure()
+  } catch (err) {
+    recordFailure(err instanceof Error ? err.message : 'unknown')
     return false
   }
 }

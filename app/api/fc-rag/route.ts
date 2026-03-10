@@ -13,6 +13,7 @@ import {
   recordAITokens,
   recordAIUsage,
 } from "@/lib/usage-tracker"
+import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 
 function convertForVerification(fcCitations: FCRAGCitation[]): {
   verifiable: Citation[]
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
     usageHeaders = await getUsageHeaders(clientIP)
   }
 
+  const traceId = generateTraceId()
+  traceLogger.startTrace(traceId, query)
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -106,17 +110,24 @@ export async function POST(request: NextRequest) {
         let openClawHandled = false
 
         if (process.env.OPENCLAW_ENABLED === "true" && await isOpenClawHealthy()) {
+          traceLogger.addEvent(traceId, 'bridge_attempt', { healthy: true })
           send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
           openClawHandled = await fetchFromOpenClaw(query, send, {
             conversationId,
             abortSignal: request.signal,
           })
+          if (openClawHandled) {
+            traceLogger.completeTrace(traceId, 'openclaw')
+          } else {
+            traceLogger.addEvent(traceId, 'bridge_failed', { fallback: 'gemini' })
+          }
         }
 
         if (!openClawHandled) {
           if (process.env.OPENCLAW_ENABLED === "true") {
             send({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
           }
+          traceLogger.addEvent(traceId, 'gemini_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []
 
@@ -155,8 +166,11 @@ export async function POST(request: NextRequest) {
               console.error("[FC-RAG] Citation verification failed:", error)
             }
           }
+
+          traceLogger.completeTrace(traceId, 'gemini')
         }
       } catch (error) {
+        traceLogger.addEvent(traceId, 'error', { message: error instanceof Error ? error.message : 'unknown' })
         send({
           type: "error",
           message: "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",

@@ -10,6 +10,7 @@
 import { GoogleGenAI, type Part } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
+import { TOOL_DISPLAY_NAMES as TIER_DISPLAY_NAMES } from './tool-tiers'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -59,21 +60,8 @@ const MAX_TOKENS: Record<QueryComplexity, number> = {
   complex: 6144,
 }
 
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  search_ai_law: '지능형 법령 검색',
-  search_law: '법령 검색',
-  get_law_text: '법령 본문 조회',
-  get_batch_articles: '조문 일괄 조회',
-  search_precedents: '판례 검색',
-  get_precedent_text: '판례 본문 조회',
-  search_interpretations: '해석례 검색',
-  get_interpretation_text: '해석례 본문 조회',
-  get_three_tier: '위임법령 조회',
-  compare_old_new: '신구법 대조',
-  get_article_history: '조문 이력 조회',
-  search_ordinance: '자치법규 검색',
-  get_ordinance: '자치법규 조회',
-}
+// 57개 전체 도구 한국어 표시명 (tool-tiers.ts에서 가져옴)
+const TOOL_DISPLAY_NAMES: Record<string, string> = { ...TIER_DISPLAY_NAMES }
 
 /** complexity 기반 최대 도구 턴 수 */
 function getMaxToolTurns(complexity: QueryComplexity): number {
@@ -447,7 +435,7 @@ export async function* executeRAGStream(
     return
   }
 
-  const systemPrompt = buildSystemPrompt(complexity, queryType)
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const toolDeclarations = getToolDeclarations()
 
