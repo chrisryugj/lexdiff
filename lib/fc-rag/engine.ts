@@ -654,6 +654,44 @@ export async function* executeRAGStream(
 
       const searchOK = results.filter(r => r.name === 'search_law' && !r.isError)
 
+      // Auto-chain: search_precedents 0건 시 키워드 단순화 재검색
+      const precedentSearches = results.filter(r => r.name === 'search_precedents' && !r.isError)
+      if (precedentSearches.length > 0) {
+        const hasResults = precedentSearches.some(r => /총 [1-9]\d*건/.test(r.result))
+        if (!hasResults) {
+          const precStopWords = /(?:은|는|이|가|을|를|에|의|로|으로|와|과|에서|한|하는|대한|무엇|어떤|어떻게|경우|관련|대해|할|수|있|되|것|법|조|항|호)$/
+          const coreKeywords = query
+            .replace(/[「」]/g, '')
+            .replace(/제\d+조(?:의\d+)?/g, '')
+            .split(/\s+/)
+            .map(w => w.replace(precStopWords, ''))
+            .filter(w => w.length >= 2)
+            .slice(0, 3)
+          if (coreKeywords.length >= 2) {
+            autoChains.push({ name: 'search_precedents', args: { query: coreKeywords.join(' ') } })
+          }
+        }
+      }
+
+      // Auto-chain: 조문 결과에서 "별표" 참조 감지 → get_annexes 자동 호출
+      const alreadyGotAnnexes = results.some(r => r.name === 'get_annexes')
+      if (!alreadyGotAnnexes) {
+        const annexSources = results.filter(r =>
+          (r.name === 'search_ai_law' || r.name === 'get_batch_articles' || r.name === 'get_law_text') && !r.isError
+        )
+        for (const src of annexSources) {
+          const annexMatch = src.result.match(/별표\s*(\d+)/)
+          if (annexMatch) {
+            const lawNameMatch = src.result.match(/(?:📜\s+|법령명:\s*)(.+?)(?:\n|$)/)
+            const lawName = lawNameMatch?.[1]?.trim()
+            if (lawName) {
+              autoChains.push({ name: 'get_annexes', args: { lawName: `${lawName} 별표${annexMatch[1]}` } })
+              break
+            }
+          }
+        }
+      }
+
       const interpSearchOK = results.filter(r => r.name === 'search_interpretations' && !r.isError)
       const alreadyGotInterpText = results.some(r => r.name === 'get_interpretation_text')
       if (interpSearchOK.length > 0 && !alreadyGotInterpText) {
@@ -849,7 +887,11 @@ function rerankAiSearchResult(text: string, query: string): string {
   // 점수 내림차순 정렬
   scored.sort((a, b) => b.score - a.score)
 
-  return header + scored.map(s => s.block).join('\n\n')
+  // 관련성 없는 노이즈 제거: score > 0 결과가 3건 이상이면 score 0 결과 드롭
+  const positiveScored = scored.filter(s => s.score > 0)
+  const filtered = positiveScored.length >= 3 ? positiveScored : scored
+
+  return header + filtered.map(s => s.block).join('\n\n')
 }
 
 /**

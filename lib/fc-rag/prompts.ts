@@ -163,6 +163,7 @@ export function buildSystemPrompt(
 ${SPECIALIST_INSTRUCTIONS[queryType]}
 
 ## 도구 사용 (우선순위)
+0. **조문번호 지정 질문** (예: "국가공무원법 제78조"): search_law로 MST 확인 → get_batch_articles로 해당 조문 직접 조회. search_ai_law는 의미검색이므로 특정 조문 조회에 부적합.
 1. **search_ai_law 우선**: 관련 법령·조문을 모를 때 자연어로 검색. 조문 내용 기반 의미 검색이므로 가장 먼저 사용.
 2. **search_law**: 법령명을 정확히 알 때 MST 확인용. search_ai_law로 이미 관련 조문을 찾았다면 생략 가능.
 3. **get_batch_articles**: 여러 조문을 한번에 조회. 전문이 필요한 조문번호를 배열로 지정. 예: articles=["제38조", "제39조"].
@@ -172,5 +173,10 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 7. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
 8. search_ai_law 결과가 불충분하면 get_batch_articles로 핵심 조문 원문을 반드시 추가 조회.
 9. 처벌 기준·수치·금액 등 구체적 데이터는 조문 원문을 확인한 후에만 답변.
-${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}`
+10. 조문에 '별표 N'이 언급되면 get_annexes로 해당 별표 내용을 반드시 조회. 금액/기준/가액 질문은 별표에 답이 있는 경우가 많음.
+${queryType === 'consequence' ? `
+## 벌칙조 자동 조회 지침
+- 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.
+- 방법: get_batch_articles로 벌칙 조항을 조회하거나, search_ai_law에 "[법령명] 벌칙 과태료"로 추가 검색.
+` : ''}${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}`
 }
