@@ -1,8 +1,9 @@
-// Tier 0: Always loaded (8 tools) — every query
+// Tier 0: Always loaded (10 tools) — every query
 export const TIER_0 = [
   'search_ai_law', 'search_law', 'get_law_text',
   'get_batch_articles', 'get_article_with_precedents',
   'search_precedents', 'get_precedent_text', 'search_all',
+  'search_interpretations', 'get_interpretation_text',
 ] as const
 
 // Tier 1: Domain-activated (15 tools) — based on query classification
@@ -37,7 +38,7 @@ export const TIER_3 = [
   'get_term_articles', 'get_related_laws', 'get_law_statistics',
   'parse_article_links', 'parse_jo_code', 'get_english_law_text',
   'search_english_law', 'compare_articles', 'summarize_precedent',
-  'extract_precedent_keywords', 'get_batch_articles',
+  'extract_precedent_keywords',
 ] as const
 
 // Domain detection for query classification

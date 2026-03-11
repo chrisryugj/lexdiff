@@ -10,7 +10,7 @@
 import { GoogleGenAI, type Part } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
-import { TOOL_DISPLAY_NAMES as TIER_DISPLAY_NAMES } from './tool-tiers'
+import { TOOL_DISPLAY_NAMES as TIER_DISPLAY_NAMES, selectToolsForQuery } from './tool-tiers'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -437,7 +437,8 @@ export async function* executeRAGStream(
 
   const systemPrompt = buildSystemPrompt(complexity, queryType, query)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
-  const toolDeclarations = getToolDeclarations()
+  const selectedTools = new Set(selectToolsForQuery(query))
+  const toolDeclarations = getToolDeclarations().filter(d => selectedTools.has(d.name!))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: Array<{ role: 'user' | 'model'; parts: any[] }> = [
@@ -690,7 +691,8 @@ export async function* executeRAGStream(
           success: !autoResult.isError,
           summary: summarizeToolResult(chain.name, autoResult),
         }
-        if (!autoResult.isError) results.push(autoResult)
+        // Always push to results so functionCall/functionResponse pairs stay symmetric
+        results.push(autoResult)
       }
 
       // 에러 경고
