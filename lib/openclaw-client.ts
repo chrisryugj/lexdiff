@@ -38,11 +38,10 @@ const CIRCUIT_OPEN_DURATION = 2 * 60_000 // 5분→2분
 
 let circuitFailureCount = 0
 let circuitOpenUntil = 0
+let circuitHalfOpen = false
 
 // 인프라 실패만 서킷 브레이커 트리거
 const INFRA_ERRORS = ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'HTTP_5xx', 'AbortError', 'timeout', 'fetch failed']
-// quality gate 실패는 서킷 브레이커에 영향 없음
-const CONTENT_ERRORS = ['no_legal_tool_evidence', 'low_confidence']
 
 function isInfraError(error: string): boolean {
   return INFRA_ERRORS.some(e => error.includes(e))
@@ -51,7 +50,8 @@ function isInfraError(error: string): boolean {
 function isCircuitOpen(): boolean {
   if (Date.now() > circuitOpenUntil) {
     if (circuitFailureCount >= CIRCUIT_FAILURE_THRESHOLD) {
-      circuitFailureCount = 0
+      // Timeout expired — enter half-open state for a single probe
+      circuitHalfOpen = true
     }
     return false
   }
@@ -61,13 +61,22 @@ function isCircuitOpen(): boolean {
 function recordSuccess(): void {
   circuitFailureCount = 0
   circuitOpenUntil = 0
+  circuitHalfOpen = false
 }
 
 function recordFailure(error?: string): void {
-  // content 에러(quality gate fail)는 서킷 브레이커에서 무시
-  if (error && CONTENT_ERRORS.some(e => error.includes(e))) {
-    return // Bridge가 응답은 했으므로 인프라 문제 아님
+  // Only infra errors trigger the circuit breaker
+  if (error && !isInfraError(error)) {
+    return // content / quality-gate errors are not infra failures
   }
+
+  // Half-open probe failed — re-open immediately without waiting for threshold
+  if (circuitHalfOpen) {
+    circuitHalfOpen = false
+    circuitOpenUntil = Date.now() + CIRCUIT_OPEN_DURATION
+    return
+  }
+
   circuitFailureCount++
   if (circuitFailureCount >= CIRCUIT_FAILURE_THRESHOLD) {
     circuitOpenUntil = Date.now() + CIRCUIT_OPEN_DURATION
