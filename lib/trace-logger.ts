@@ -72,14 +72,14 @@ class TraceLogger {
     return this.traceOrder
       .slice(-count)
       .reverse()
-      .map(id => this.traces.get(id)!)
-      .filter(Boolean)
+      .map(id => this.traces.get(id))
+      .filter((t): t is Trace => t !== undefined)
   }
 
   getAllTraces(): Trace[] {
     return this.traceOrder
-      .map(id => this.traces.get(id)!)
-      .filter(Boolean)
+      .map(id => this.traces.get(id))
+      .filter((t): t is Trace => t !== undefined)
       .reverse()
   }
 }

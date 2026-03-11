@@ -41,19 +41,20 @@ let circuitOpenUntil = 0
 let circuitHalfOpen = false
 
 // 인프라 실패만 서킷 브레이커 트리거
-const INFRA_ERRORS = ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'HTTP_5xx', 'AbortError', 'timeout', 'fetch failed']
+const INFRA_ERRORS = ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'HTTP_5xx', 'AbortError', 'timeout', 'fetch failed', 'no_reader']
 
 function isInfraError(error: string): boolean {
   return INFRA_ERRORS.some(e => error.includes(e))
 }
 
 function isCircuitOpen(): boolean {
+  if (circuitFailureCount < CIRCUIT_FAILURE_THRESHOLD) return false
   if (Date.now() > circuitOpenUntil) {
-    if (circuitFailureCount >= CIRCUIT_FAILURE_THRESHOLD) {
-      // Timeout expired — enter half-open state for a single probe
-      circuitHalfOpen = true
+    if (!circuitHalfOpen) {
+      circuitHalfOpen = true  // 첫 번째 호출만 probe 진행 (CAS 패턴)
+      return false
     }
-    return false
+    return true  // 이미 probe 중이면 차단
   }
   return true
 }
@@ -80,6 +81,95 @@ function recordFailure(error?: string): void {
   circuitFailureCount++
   if (circuitFailureCount >= CIRCUIT_FAILURE_THRESHOLD) {
     circuitOpenUntil = Date.now() + CIRCUIT_OPEN_DURATION
+  }
+}
+
+// ─── SSE 이벤트 처리 (공통 함수) ───
+
+interface SSEProcessState {
+  gotDone: boolean
+  finalData: OpenClawResponse | null
+}
+
+/** SSE 청크에서 eventType/eventData를 파싱 (multi-line data 대응) */
+function parseSSEChunk(chunk: string): { eventType: string; eventData: string } {
+  const lines = chunk.split('\n')
+  let eventType = ''
+  const dataLines: string[] = []
+
+  for (const line of lines) {
+    if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+    else if (line.startsWith('data: ')) dataLines.push(line.slice(6))
+  }
+
+  return { eventType, eventData: dataLines.join('\n') }
+}
+
+/** SSE 이벤트 하나를 처리하여 send()로 전달 */
+function processSSEEvent(
+  eventType: string,
+  eventData: string,
+  send: (data: unknown) => void,
+  state: SSEProcessState,
+): void {
+  if (!eventType || !eventData) return
+
+  try {
+    const parsed = JSON.parse(eventData)
+
+    switch (eventType) {
+      case 'status': {
+        const BRIDGE_PHASE_PROGRESS: Record<string, number> = {
+          cached: 90, fetching: 20, analyzing: 45,
+          tools: 35, reasoning: 60, finalizing: 80,
+        }
+        send({
+          type: 'status',
+          message: parsed.message || '',
+          progress: BRIDGE_PHASE_PROGRESS[parsed.phase] ?? 50,
+        })
+        break
+      }
+
+      case 'tool_result':
+        send({
+          type: 'tool_result',
+          name: parsed.name,
+          displayName: parsed.displayName || parsed.name,
+          success: parsed.success,
+          summary: parsed.summary || '',
+        })
+        break
+
+      case 'token':
+        send({
+          type: 'answer_token',
+          data: { text: parsed.text },
+        })
+        break
+
+      case 'done': {
+        state.gotDone = true
+        send({
+          type: 'answer',
+          data: {
+            answer: String(parsed.answer || '').trim(),
+            citations: parsed.citations || [],
+            confidenceLevel: parsed.confidenceLevel || 'medium',
+            complexity: parsed.complexity || 'moderate',
+            queryType: (parsed.queryType || 'definition') as LegalQueryType,
+            warnings: parsed.warnings,
+          } satisfies FCRAGResult,
+        })
+        break
+      }
+
+      case 'error':
+        console.error('[openclaw-client] bridge SSE error:', parsed.error)
+        break
+    }
+  } catch {
+    // malformed SSE data, skip
   }
 }
 
@@ -182,7 +272,7 @@ export async function fetchFromOpenClaw(
 
     const decoder = new TextDecoder()
     let buffer = ''
-    let gotDone = false
+    const state: SSEProcessState = { gotDone: false, finalData: null }
 
     while (true) {
       const { done, value } = await reader.read()
@@ -193,79 +283,8 @@ export async function fetchFromOpenClaw(
       buffer = chunks.pop() || ''
 
       for (const chunk of chunks) {
-        const lines = chunk.split('\n')
-        let eventType = ''
-        let eventData = ''
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) eventType = line.slice(7).trim()
-          else if (line.startsWith('data: ')) eventData = line.slice(6)
-        }
-
-        if (!eventType || !eventData) continue
-
-        try {
-          const parsed = JSON.parse(eventData)
-
-          switch (eventType) {
-            case 'status': {
-              const BRIDGE_PHASE_PROGRESS: Record<string, number> = {
-                cached: 90, fetching: 20, analyzing: 45,
-                tools: 35, reasoning: 60, finalizing: 80,
-              }
-              send({
-                type: 'status',
-                message: parsed.message || '',
-                progress: BRIDGE_PHASE_PROGRESS[parsed.phase] ?? 50,
-              })
-              break
-            }
-
-            case 'tool_result':
-              send({
-                type: 'tool_result',
-                name: parsed.name,
-                displayName: parsed.displayName || parsed.name,
-                success: parsed.success,
-                summary: parsed.summary || '',
-              })
-              break
-
-            case 'token':
-              send({
-                type: 'answer_token',
-                data: { text: parsed.text },
-              })
-              break
-
-            case 'done': {
-              gotDone = true
-              // Bridge에서 이미 extractAnswerFromJson 처리됨 — 중복 추출 불필요
-              send({
-                type: 'answer',
-                data: {
-                  answer: String(parsed.answer || '').trim(),
-                  citations: parsed.citations || [],
-                  confidenceLevel: parsed.confidenceLevel || 'medium',
-                  complexity: parsed.complexity || 'moderate',
-                  queryType: (parsed.queryType || 'definition') as LegalQueryType,
-                  warnings: parsed.warnings,
-                } satisfies FCRAGResult,
-              })
-              break
-            }
-
-            case 'error':
-              console.error('[openclaw-client] bridge SSE error:', parsed.error)
-              // content 에러는 서킷 브레이커에 영향 없음
-              if (parsed.error === 'no_legal_tool_evidence') {
-                // Bridge가 응답은 했으므로 인프라는 정상
-              }
-              break
-          }
-        } catch {
-          // malformed SSE data, skip
-        }
+        const { eventType, eventData } = parseSSEChunk(chunk)
+        processSSEEvent(eventType, eventData, send, state)
       }
     }
 
@@ -273,37 +292,12 @@ export async function fetchFromOpenClaw(
     if (buffer.trim()) {
       const chunks = buffer.split('\n\n')
       for (const chunk of chunks) {
-        const lines = chunk.split('\n')
-        let eventType = ''
-        let eventData = ''
-        for (const line of lines) {
-          if (line.startsWith('event: ')) eventType = line.slice(7).trim()
-          else if (line.startsWith('data: ')) eventData = line.slice(6)
-        }
-        if (!eventType || !eventData) continue
-        try {
-          const parsed = JSON.parse(eventData)
-          if (eventType === 'done') {
-            gotDone = true
-            send({
-              type: 'answer',
-              data: {
-                answer: String(parsed.answer || '').trim(),
-                citations: parsed.citations || [],
-                confidenceLevel: parsed.confidenceLevel || 'medium',
-                complexity: parsed.complexity || 'moderate',
-                queryType: (parsed.queryType || 'definition') as LegalQueryType,
-                warnings: parsed.warnings,
-              } satisfies FCRAGResult,
-            })
-          } else if (eventType === 'token') {
-            send({ type: 'answer_token', data: { text: parsed.text } })
-          }
-        } catch { /* malformed residue, skip */ }
+        const { eventType, eventData } = parseSSEChunk(chunk)
+        processSSEEvent(eventType, eventData, send, state)
       }
     }
 
-    if (!gotDone) {
+    if (!state.gotDone) {
       recordFailure('no_done_event')
       return false
     }

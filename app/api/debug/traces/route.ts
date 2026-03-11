@@ -10,9 +10,18 @@ import { NextRequest } from 'next/server'
 import { traceLogger } from '@/lib/trace-logger'
 
 export async function GET(request: NextRequest) {
-  // Only allow in development
-  if (process.env.NODE_ENV === 'production') {
-    return Response.json({ error: 'Not available in production' }, { status: 404 })
+  // Only allow in development — block production and preview environments
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
+    return Response.json({ error: 'Not available' }, { status: 404 })
+  }
+
+  // Optional token-based authentication for non-production environments
+  const debugToken = process.env.DEBUG_TRACE_TOKEN
+  if (debugToken) {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || authHeader !== `Bearer ${debugToken}`) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   const { searchParams } = new URL(request.url)

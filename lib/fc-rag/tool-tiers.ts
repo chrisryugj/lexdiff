@@ -107,9 +107,7 @@ export function selectToolsForQuery(query: string): string[] {
     }
   }
 
-  // Add interpretation tools for all domains (commonly needed)
-  tools.add('search_interpretations')
-  tools.add('get_interpretation_text')
+  // search_interpretations, get_interpretation_text are already in TIER_0 — no need to add again
 
   // Cap at 25
   return Array.from(tools).slice(0, 25)

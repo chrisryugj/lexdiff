@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Query is required" }, { status: 400 })
   }
 
+  if (query.length > 2000) {
+    return Response.json({ error: "Query too long (max 2000 chars)" }, { status: 400 })
+  }
+
   let usageHeaders: Record<string, string> | undefined
   if (!userApiKey) {
     if (await isQuotaExceeded(clientIP)) {

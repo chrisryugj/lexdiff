@@ -131,6 +131,8 @@ describe('useSearchHandlers', () => {
       ordinancePage: 1,
       ordinancePageSize: 10,
       ordinanceTotalCount: 0,
+      conversationId: null,
+      conversationHistory: [],
     }
 
     // 액션 mock
@@ -185,6 +187,9 @@ describe('useSearchHandlers', () => {
       setOrdinanceTotalCount: vi.fn(),
       resetSearchState: vi.fn(),
       resetToHome: vi.fn(),
+      setConversationId: vi.fn(),
+      addConversationEntry: vi.fn(),
+      clearConversation: vi.fn(),
     }
   })
 
