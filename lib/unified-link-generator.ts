@@ -641,8 +641,9 @@ function collectAdminRuleMatches(text: string, matches: LinkMatch[]): void {
  * 별표 1 (법령명 없음) → undefined 반환
  */
 function extractLawNameBeforeAnnex(text: string, annexIndex: number): string | undefined {
-  // 별표 앞 50자 내에서 「법령명」 패턴 검색
-  const searchStart = Math.max(0, annexIndex - 50)
+  // 별표 앞 200자 내에서 「법령명」 패턴 검색
+  // (50자로는 AI 답변에서 법령명과 별표 사이 설명이 길 때 못 찾음)
+  const searchStart = Math.max(0, annexIndex - 200)
   const beforeText = text.substring(searchStart, annexIndex)
 
   // 가장 가까운 「법령명」 찾기 (마지막 매칭)
