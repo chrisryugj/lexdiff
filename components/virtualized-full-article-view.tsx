@@ -400,7 +400,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   <div className="mb-2 pb-1 border-b border-border">
                     <div className="flex items-center justify-between gap-1">
                       <h3 className="text-lg font-bold text-foreground flex items-center gap-1 lg:gap-2 flex-1 min-w-0 font-maruburi">
-                        {formatSimpleJo(item.article)}
+                        <span className="whitespace-nowrap flex-shrink-0">{formatSimpleJo(item.article)}</span>
                         {item.article.title && (
                           <span className="text-muted-foreground truncate">({item.article.title})</span>
                         )}
