@@ -82,8 +82,9 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
         <h3 className="text-3xl lg:text-5xl font-black text-[#1a2b4c] dark:text-white mb-6" style={{ fontFamily: "'RIDIBatang', serif" }}>
           법령에서 찾고,<br/>근거로 답합니다.
         </h3>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto break-keep">
-          위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지, 지어낸 답은 없는 행정AI.
+        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+          <span className="hidden sm:inline">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지, 지어낸 답은 없는 행정AI.</span>
+          <span className="sm:hidden">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지,<br/>지어낸 답은 없는 행정AI.</span>
         </p>
       </div>
 
