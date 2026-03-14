@@ -9,7 +9,7 @@ import { SEVERITY_CONFIG, type ImpactItem } from '@/lib/impact-tracker/types'
 interface ImpactCardProps {
   item: ImpactItem
   onCompare?: (lawName: string, lawId: string, mst: string) => void
-  onViewLaw?: (lawName: string, jo: string) => void
+  onViewLaw?: (lawName: string, jo: string, joDisplay: string) => void
 }
 
 export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
@@ -103,7 +103,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
             variant="outline"
             size="sm"
             className="text-xs h-7"
-            onClick={() => onViewLaw(item.change.lawName, item.change.joDisplay)}
+            onClick={() => onViewLaw(item.change.lawName, item.change.jo, item.change.joDisplay)}
           >
             <Icon name="file-text" size={12} />
             조문 보기

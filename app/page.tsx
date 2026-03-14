@@ -42,6 +42,7 @@ export default function Home() {
   const [ragLoading, setRagLoading] = useState(false)
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
   const [impactRequest, setImpactRequest] = useState<ImpactTrackerRequest | null>(null)
+  const [impactMounted, setImpactMounted] = useState(false) // 한 번 열리면 유지
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
@@ -122,9 +123,9 @@ export default function Home() {
         setImpactRequest(null)
         setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
         setIsSearching(false) // 검색 중 상태 초기화
-      } else if (state.viewMode === 'impact-tracker' && state.impactRequest) {
+      } else if (state.viewMode === 'impact-tracker') {
         setViewMode('impact-tracker')
-        setImpactRequest(state.impactRequest as ImpactTrackerRequest)
+        setImpactMounted(true)
       } else if (state.viewMode === 'precedent-detail' && state.searchId && state.precedentId) {
         // 판례 상세 → 앞으로가기로 다시 판례 상세
         setViewMode('precedent-detail')
@@ -208,6 +209,7 @@ export default function Home() {
   const handleImpactTracker = () => {
     pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
     setViewMode('impact-tracker')
+    setImpactMounted(true)
     setImpactRequest(null)
   }
 
@@ -226,6 +228,23 @@ export default function Home() {
   return (
     <>
       {/* viewMode에 따라 SearchView 또는 SearchResultView 표시 */}
+      {/* 영향 추적기: 한 번 열리면 언마운트하지 않음 (결과 보존) */}
+      {impactMounted && (
+        <div className={viewMode !== 'impact-tracker' ? 'hidden' : ''}>
+          <ImpactTrackerView
+            initialRequest={impactRequest}
+            onBack={() => window.history.back()}
+            onHomeClick={handleHomeClick}
+            onCompare={(lawName, lawId, mst) => {
+              handleImpactCompare(lawName, mst)
+            }}
+            onViewLaw={(lawName, jo, joDisplay) => {
+              handleSearch({ lawName, article: joDisplay, jo })
+            }}
+          />
+        </div>
+      )}
+
       {viewMode === 'home' ? (
         <SearchView
           onSearch={handleSearch}
@@ -235,19 +254,7 @@ export default function Home() {
           searchMode={searchMode}
           onImpactTracker={handleImpactTracker}
         />
-      ) : viewMode === 'impact-tracker' ? (
-        <ImpactTrackerView
-          initialRequest={impactRequest}
-          onBack={() => window.history.back()}
-          onHomeClick={handleHomeClick}
-          onCompare={(lawName, lawId, mst) => {
-            handleImpactCompare(lawName, mst)
-          }}
-          onViewLaw={(lawName, joDisplay) => {
-            handleSearch({ lawName, jo: joDisplay })
-          }}
-        />
-      ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
+      ) : viewMode === 'impact-tracker' ? null : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView
           key={`${searchId}-${historyKey}`}  // 뒤로가기 시 강제 리마운트
           searchId={searchId}
