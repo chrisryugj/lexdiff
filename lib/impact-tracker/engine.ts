@@ -2,7 +2,7 @@
  * 법령 영향 추적기 엔진 - AsyncGenerator + SSE 패턴
  *
  * 6단계 파이프라인:
- * 1. resolving  — search_law로 lawId/MST 확보 (raw 호출)
+ * 1. resolving  — search_law (+ search_ordinance 폴백) 으로 MST 확보
  * 2. comparing  — compare_old_new로 변경 조문 + 신구문 텍스트
  * 3. tracing    — get_three_tier로 하위법령 의존성
  * 4. classifying — AI 영향도 분류 (OpenClaw → Gemini)
@@ -10,12 +10,11 @@
  * 6. complete   — 최종 결과 조립
  */
 
-import { LawApiClient } from 'korean-law-mcp/build/lib/api-client.js'
-import { searchLaw } from 'korean-law-mcp/build/tools/search.js'
 import { executeTool } from '@/lib/fc-rag/tool-adapter'
 import { classifyImpact, generateImpactSummary, getAISource } from './classifier'
 import {
-  parseSearchLawRaw,
+  parseSearchResult,
+  parseOrdinanceSearchResult,
   parseCompareOldNew,
   buildChangesFromOldNew,
   parseThreeTierResult,
@@ -31,8 +30,6 @@ import type {
   DownstreamImpact,
   ClassificationInput,
 } from './types'
-
-const apiClient = new LawApiClient({ apiKey: process.env.LAW_OC || '' })
 
 export async function* executeImpactAnalysis(
   request: ImpactTrackerRequest,
@@ -51,9 +48,21 @@ export async function* executeImpactAnalysis(
     for (const lawName of lawNames) {
       if (options?.signal?.aborted) throw new Error('cancelled')
 
-      const result = await searchLaw(apiClient, { query: lawName, maxResults: 5 })
-      const rawText = result.content.map(c => c.text).join('\n')
-      const parsed = parseSearchLawRaw(rawText)
+      // 1차: search_law (국가법령)
+      const lawResult = await executeTool('search_law', { query: lawName })
+      let parsed: ResolvedLaw[] = []
+
+      if (!lawResult.isError) {
+        parsed = parseSearchResult(lawResult.result)
+      }
+
+      // 2차: search_ordinance 폴백 (자치법규)
+      if (parsed.length === 0) {
+        const ordinResult = await executeTool('search_ordinance', { query: lawName })
+        if (!ordinResult.isError) {
+          parsed = parseOrdinanceSearchResult(ordinResult.result)
+        }
+      }
 
       if (parsed.length === 0) {
         yield {
@@ -64,7 +73,6 @@ export async function* executeImpactAnalysis(
         continue
       }
 
-      // 첫 번째 결과 사용 (가장 관련도 높은 법령)
       const law = parsed[0]
       resolvedLaws.push(law)
       yield {
@@ -112,13 +120,22 @@ export async function* executeImpactAnalysis(
         continue
       }
 
+      // 조례 등 신구법 대조 데이터 없는 경우
+      if (compareResult.result.includes('개정 이력이 없거나') || compareResult.result.includes('데이터가 없습니다')) {
+        yield {
+          type: 'error',
+          message: `${law.lawName}: 신구법 대조 데이터가 없습니다. (${law.kind === '조례' ? '자치법규는 신구법비교를 지원하지 않을 수 있습니다' : '해당 기간 개정 이력 없음'})`,
+          recoverable: true,
+        }
+        continue
+      }
+
       const parsed = parseCompareOldNew(compareResult.result)
       const revisionDate = extractDateFromCompare(compareResult.result)
       const changes = buildChangesFromOldNew(parsed, law.lawId, law.mst, revisionDate)
 
       allChanges.push(...changes)
 
-      // oldText/newText 매핑 저장
       for (const pair of parsed.pairs) {
         const key = `${law.lawId}:${pair.joDisplay}`
         allOldNewMap.set(key, { oldText: pair.oldText, newText: pair.newText })
@@ -152,6 +169,10 @@ export async function* executeImpactAnalysis(
       if (options?.signal?.aborted) throw new Error('cancelled')
 
       const law = resolvedLaws[i]
+
+      // 조례는 three_tier 지원 안 함 — 스킵
+      if (law.kind === '조례') continue
+
       const progressPer = 45 + ((i + 1) / resolvedLaws.length) * 15
 
       yield {
@@ -181,7 +202,6 @@ export async function* executeImpactAnalysis(
     const aiSource = await getAISource()
     yield { type: 'ai_source', source: aiSource }
 
-    // 분류 입력 준비
     const classificationInputs: ClassificationInput[] = allChanges.map(change => {
       const key = `${change.lawId}:${change.joDisplay}`
       const oldNew = allOldNewMap.get(key)
@@ -197,7 +217,6 @@ export async function* executeImpactAnalysis(
       }
     })
 
-    // 배치 분류 (10개씩)
     const BATCH_SIZE = 10
     const classificationResults: Map<string, { severity: ImpactSeverity; reason: string }> = new Map()
 

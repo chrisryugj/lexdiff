@@ -227,6 +227,12 @@ export default function Home() {
           initialRequest={impactRequest}
           onBack={() => window.history.back()}
           onHomeClick={handleHomeClick}
+          onCompare={(lawId, mst) => {
+            window.open(`/api/oldnew?lawId=${lawId}&mst=${mst}`, '_blank', 'noopener')
+          }}
+          onViewLaw={(lawId, mst, jo) => {
+            handleSearch({ lawName: lawId, article: jo })
+          }}
         />
       ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView

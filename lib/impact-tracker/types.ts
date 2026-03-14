@@ -91,7 +91,6 @@ export type ImpactSSEEvent =
 
 export type ImpactStep =
   | 'resolving'
-  | 'scanning'
   | 'comparing'
   | 'tracing'
   | 'classifying'

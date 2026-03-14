@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
 import { useImpactTracker } from '@/hooks/use-impact-tracker'
@@ -51,6 +51,16 @@ export function ImpactTrackerView({
   const [severityFilter, setSeverityFilter] = useState<ImpactSeverity | 'all'>('all')
   const [lawFilter, setLawFilter] = useState<string | 'all'>('all')
   const [hasStarted, setHasStarted] = useState(false)
+  const autoStarted = useRef(false)
+
+  // 히스토리 복원 시 자동 분석 시작
+  useEffect(() => {
+    if (initialRequest && initialRequest.lawNames.length > 0 && !autoStarted.current) {
+      autoStarted.current = true
+      setHasStarted(true)
+      startAnalysis(initialRequest)
+    }
+  }, [initialRequest, startAnalysis])
 
   const handleSubmit = useCallback((request: ImpactTrackerRequest) => {
     setHasStarted(true)

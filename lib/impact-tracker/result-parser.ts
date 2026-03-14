@@ -14,29 +14,40 @@ export interface ResolvedLaw {
 }
 
 /**
- * search_law 원본 텍스트에서 법령 정보 추출
+ * executeTool('search_law') 압축 결과에서 법령 정보 추출
  *
- * 포맷:
- * ```
- * 검색 결과 (총 N건):
- *
- * 1. 관세법
- *    - 법령ID: 001556
- *    - MST: 268725
- *    - 공포일: 2023-04-01
- *    - 구분: 법률
- * ```
+ * 포맷: `1. 건축법 (MST:273437, 법률)`
  */
-export function parseSearchLawRaw(text: string): ResolvedLaw[] {
+export function parseSearchResult(text: string): ResolvedLaw[] {
   const results: ResolvedLaw[] = []
-  const regex = /(\d+)\.\s+(.+?)\n\s+- 법령ID:\s*(\S+)\n\s+- MST:\s*(\d+)\n\s+- 공포일:\s*\S+\n\s+- 구분:\s*(\S+)/g
+  const regex = /\d+\.\s+(.+?)\s+\(MST:(\d+),\s*(\S+)\)/g
+  let m
+  while ((m = regex.exec(text)) !== null) {
+    results.push({
+      lawName: m[1].trim(),
+      lawId: m[2],  // MST를 lawId로 사용
+      mst: m[2],
+      kind: m[3],
+    })
+  }
+  return results
+}
+
+/**
+ * executeTool('search_ordinance') 결과에서 조례 정보 추출
+ *
+ * 포맷: `[2098841] 서울특별시 광진구 도시계획 조례`
+ */
+export function parseOrdinanceSearchResult(text: string): ResolvedLaw[] {
+  const results: ResolvedLaw[] = []
+  const regex = /\[(\d+)\]\s+(.+)/g
   let m
   while ((m = regex.exec(text)) !== null) {
     results.push({
       lawName: m[2].trim(),
-      lawId: m[3],
-      mst: m[4],
-      kind: m[5],
+      lawId: m[1],
+      mst: m[1],
+      kind: '조례',
     })
   }
   return results
