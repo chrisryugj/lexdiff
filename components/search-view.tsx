@@ -281,13 +281,16 @@ export function SearchView({
                 searchMode={searchMode}
               />
               {onImpactTracker && (
-                <div className="flex justify-center mt-3">
+                <div className="flex justify-center mt-5">
                   <button
                     onClick={onImpactTracker}
-                    className="text-xs text-gray-400 hover:text-[#d4af37] dark:hover:text-[#e2a85d] transition-colors flex items-center gap-1.5"
+                    className="group flex items-center gap-2 px-4 py-2 rounded-full border border-[#1a2b4c]/15 dark:border-[#e2a85d]/20 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-[#d4af37] dark:hover:border-[#e2a85d] hover:shadow-md hover:shadow-[#d4af37]/10 transition-all duration-300"
                   >
-                    <Icon name="shield-alert" size={14} />
-                    법령 영향 추적기
+                    <Icon name="file-search" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-sm font-medium text-[#1a2b4c] dark:text-gray-300 group-hover:text-[#1a2b4c] dark:group-hover:text-[#e2a85d] transition-colors">
+                      법령 변경 영향 분석
+                    </span>
+                    <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-[#d4af37] dark:group-hover:text-[#e2a85d] group-hover:translate-x-0.5 transition-all" />
                   </button>
                 </div>
               )}
