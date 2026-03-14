@@ -218,6 +218,7 @@ export async function GET(request: NextRequest) {
   const query = searchParams.get('q')?.trim() || ''
   const queryLower = query.toLowerCase()
   const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20)
+  const scope = searchParams.get('scope') || '' // 'all' = 항상 조례 포함, 'law-only' = 법령만
 
   if (!query || query.length < 1) {
     return NextResponse.json({ suggestions: [] })
@@ -271,12 +272,12 @@ export async function GET(request: NextRequest) {
       searchQuery = articleMatch[1].trim()  // 법령명만 추출
     }
 
-    // 조례 키워드 감지
-    const isOrdinanceQuery = /조례|규칙|자치법규|시|군|구/.test(query)
+    // 조례 키워드 감지 (scope=all이면 항상 조례 검색)
+    const isOrdinanceQuery = scope === 'all' || /조례|규칙|자치법규|시|군|구/.test(query)
 
     // 병렬 검색: 법령 + 조례 (조례 키워드 있으면 조례도 검색)
     const [lawResults, ordinanceResults] = await Promise.all([
-      searchLawNames(searchQuery),  // 추출된 법령명으로 검색
+      scope === 'law-only' ? Promise.resolve([]) : searchLawNames(searchQuery),
       isOrdinanceQuery ? searchOrdinances(searchQuery) : Promise.resolve([])
     ])
 

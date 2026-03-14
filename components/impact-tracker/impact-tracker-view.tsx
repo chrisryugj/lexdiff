@@ -14,8 +14,8 @@ interface ImpactTrackerViewProps {
   initialRequest?: ImpactTrackerRequest | null
   onBack: () => void
   onHomeClick: () => void
-  onCompare?: (lawId: string, mst: string) => void
-  onViewLaw?: (lawId: string, mst: string, jo: string) => void
+  onCompare?: (lawName: string, lawId: string, mst: string) => void
+  onViewLaw?: (lawName: string, joDisplay: string) => void
 }
 
 const STEP_LABELS: Record<string, string> = {

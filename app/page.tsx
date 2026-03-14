@@ -29,6 +29,7 @@ import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
 import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
 import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
+import { ComparisonModal } from "@/components/comparison-modal"
 
 type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
 
@@ -46,6 +47,13 @@ export default function Home() {
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
   const [searchProgress, setSearchProgress] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // 영향 추적기 신구법 비교 모달
+  const [compareModal, setCompareModal] = useState<{
+    isOpen: boolean
+    lawTitle: string
+    mst: string
+  }>({ isOpen: false, lawTitle: '', mst: '' })
 
   // 초기화: History API + IndexedDB 설정
   useEffect(() => {
@@ -191,6 +199,11 @@ export default function Home() {
     // popstate 이벤트에서 상태 업데이트가 처리됨
   }
 
+  // 영향 추적기 신구법 비교
+  const handleImpactCompare = (lawName: string, mst: string) => {
+    setCompareModal({ isOpen: true, lawTitle: lawName, mst })
+  }
+
   // 영향 추적기 이동
   const handleImpactTracker = () => {
     pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
@@ -227,11 +240,11 @@ export default function Home() {
           initialRequest={impactRequest}
           onBack={() => window.history.back()}
           onHomeClick={handleHomeClick}
-          onCompare={(lawId, mst) => {
-            window.open(`/api/oldnew?lawId=${lawId}&mst=${mst}`, '_blank', 'noopener')
+          onCompare={(lawName, lawId, mst) => {
+            handleImpactCompare(lawName, mst)
           }}
-          onViewLaw={(lawId, mst, jo) => {
-            handleSearch({ lawName: lawId, article: jo })
+          onViewLaw={(lawName, joDisplay) => {
+            handleSearch({ lawName, jo: joDisplay })
           }}
         />
       ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
@@ -265,6 +278,14 @@ export default function Home() {
           }}
         />
       ) : null}
+
+      {/* 영향 추적기 신구법 비교 모달 */}
+      <ComparisonModal
+        isOpen={compareModal.isOpen}
+        onClose={() => setCompareModal(prev => ({ ...prev, isOpen: false }))}
+        lawTitle={compareModal.lawTitle}
+        mst={compareModal.mst}
+      />
     </>
   )
 }

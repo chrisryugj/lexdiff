@@ -86,7 +86,9 @@ export async function* executeImpactAnalysis(
         continue
       }
 
-      const law = parsed[0]
+      // 정확한 이름 매칭 우선 (사용자가 자동완성에서 선택한 경우)
+      const exactMatch = parsed.find(p => p.lawName === lawName)
+      const law = exactMatch || parsed[0]
       resolvedLaws.push(law)
       yield { type: 'law_resolved', lawName: law.lawName, lawId: law.lawId, mst: law.mst }
     }
