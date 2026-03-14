@@ -102,7 +102,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
                 onFocus={() => actions.setShowDropdown(true)}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "h-16 pl-14 pr-4 text-sm sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",
+                  "h-16 pl-14 pr-4 text-base sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",
                   showDropdown && "bg-gray-50 dark:bg-[#1a222c]"
                 )}
                 disabled={isLoading}

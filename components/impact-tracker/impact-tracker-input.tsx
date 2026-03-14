@@ -231,7 +231,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowSuggestions(true)}
                 placeholder="예: 건축법, 광진구 도시계획 조례"
-                className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
                 disabled={isAnalyzing}
                 autoComplete="off"
               />
@@ -323,7 +323,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
           value={region}
           onChange={e => setRegion(e.target.value)}
           placeholder="예: 광진구, 강동구"
-          className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+          className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
           disabled={isAnalyzing}
         />
         <p className="text-xs text-gray-400 mt-1">상위법령 입력 시, 영향받는 조례를 이 지역 범위로 탐색합니다.</p>
@@ -355,7 +355,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
             type="date"
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            className="text-base border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
             disabled={isAnalyzing}
           />
           <span className="text-gray-400 text-xs">~</span>
@@ -363,7 +363,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
             type="date"
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            className="text-base border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
             disabled={isAnalyzing}
           />
         </div>

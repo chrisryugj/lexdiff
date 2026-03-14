@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Icon } from '@/components/ui/icon'
 import type { ImpactSummary as ImpactSummaryType } from '@/lib/impact-tracker/types'
 import type { OrdinanceRefInfo, ParentLawChangeInfo } from '@/hooks/use-impact-tracker'
@@ -85,9 +87,11 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
                 AI 종합 요약
               </button>
               {expanded && (
-                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                  {summary.aiSummary}
-                </p>
+                <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-headings:text-base prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {summary.aiSummary}
+                  </ReactMarkdown>
+                </div>
               )}
             </div>
           )}
