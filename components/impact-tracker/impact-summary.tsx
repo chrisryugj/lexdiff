@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { Icon } from '@/components/ui/icon'
+import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 import type { ImpactSummary as ImpactSummaryType } from '@/lib/impact-tracker/types'
 import type { OrdinanceRefInfo, ParentLawChangeInfo } from '@/hooks/use-impact-tracker'
 
@@ -20,6 +19,10 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
 
   if (!summary && !isLoading) return null
 
+  // 조례 참조 + 변경감지 통합 텍스트
+  const hasOrdinanceInfo = ordinanceRefs && ordinanceRefs.length > 0
+  const hasParentChanges = parentLawChanges && parentLawChanges.length > 0
+
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/80 mb-6">
       {/* 상단 골드 라인 */}
@@ -35,50 +38,61 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
           </div>
         ) : summary ? (
           <>
-            {/* 통계 행 */}
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 flex-wrap">
-              <span className="text-[15px] text-gray-500 dark:text-gray-400">
-                {summary.dateRange.from} ~ {summary.dateRange.to}
-              </span>
-              <span className="text-[15px] font-semibold text-[#1a2b4c] dark:text-white">
-                총 {summary.totalChanges}건
-              </span>
+            {/* 핵심 통계 블록: 기간 + 건수 + 등급 배지 통합 */}
+            <div className="flex flex-col gap-3 mb-4">
+              {/* 첫 줄: 기간 + 총건수 */}
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-2xl font-bold text-[#1a2b4c] dark:text-white tabular-nums">
+                  {summary.totalChanges}건
+                </span>
+                <span className="text-sm text-gray-400 dark:text-gray-500">
+                  {summary.dateRange.from} ~ {summary.dateRange.to}
+                </span>
+              </div>
 
-              <div className="flex gap-1.5 ml-auto">
+              {/* 둘째 줄: 등급 배지 바 */}
+              <div className="flex items-center gap-2">
                 {summary.bySeverity.critical > 0 && (
-                  <span className="text-xs font-semibold text-red-600 bg-red-500/10 dark:bg-red-500/20 dark:text-red-400 px-2 py-0.5 rounded-full">
-                    긴급 {summary.bySeverity.critical}
-                  </span>
+                  <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-lg px-3 py-1.5">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="text-sm font-semibold text-red-700 dark:text-red-400">긴급 {summary.bySeverity.critical}</span>
+                  </div>
                 )}
                 {summary.bySeverity.review > 0 && (
-                  <span className="text-xs font-semibold text-amber-700 bg-amber-500/10 dark:bg-amber-500/20 dark:text-amber-400 px-2 py-0.5 rounded-full">
-                    검토 {summary.bySeverity.review}
-                  </span>
+                  <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg px-3 py-1.5">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">검토 {summary.bySeverity.review}</span>
+                  </div>
                 )}
                 {summary.bySeverity.info > 0 && (
-                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-500/10 dark:bg-emerald-500/20 dark:text-emerald-400 px-2 py-0.5 rounded-full">
-                    참고 {summary.bySeverity.info}
-                  </span>
+                  <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-lg px-3 py-1.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">참고 {summary.bySeverity.info}</span>
+                  </div>
                 )}
               </div>
-            </div>
 
-            {/* B방향: 조례→상위법령 참조 통계 */}
-            {ordinanceRefs && ordinanceRefs.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 mb-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
-                <Icon name="link" size={12} className="text-[#d4af37]" />
-                {ordinanceRefs.map((ref, i) => (
-                  <span key={i}>
-                    {ref.ordinanceName}: 상위법령 {ref.refs.length}건 참조
-                  </span>
-                ))}
-                {parentLawChanges && parentLawChanges.length > 0 && (
-                  <span className="text-[#d4af37] dark:text-[#e2a85d] font-medium">
-                    → {parentLawChanges.length}건 변경 감지
-                  </span>
-                )}
-              </div>
-            )}
+              {/* 셋째 줄: 조례→상위법령 참조 통계 (있을 때만, 배지와 통합) */}
+              {hasOrdinanceInfo && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-3">
+                  <Icon name="link" size={14} className="text-[#d4af37] shrink-0" />
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {ordinanceRefs!.map((ref, i) => (
+                      <span key={i} className="whitespace-nowrap">
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{ref.ordinanceName}</span>
+                        <span className="text-gray-400 dark:text-gray-500"> · 상위법령 {ref.refs.length}건 참조</span>
+                      </span>
+                    ))}
+                    {hasParentChanges && (
+                      <span className="inline-flex items-center gap-1 bg-[#d4af37]/10 dark:bg-[#e2a85d]/15 text-[#b8941f] dark:text-[#e2a85d] font-semibold px-2 py-0.5 rounded text-xs">
+                        <Icon name="alert-triangle" size={12} />
+                        {parentLawChanges!.length}건 변경 감지
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* AI 요약 (접기/펼치기) */}
             {summary.aiSummary && (
@@ -91,10 +105,11 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
                   AI 종합 요약
                 </button>
                 {expanded && (
-                  <div className="mt-3 text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-headings:text-base prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-gray-900 dark:prose-strong:text-white prose-table:border-collapse prose-table:w-full prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:text-xs prose-th:font-semibold prose-th:border prose-th:border-gray-200 dark:prose-th:border-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-gray-200 dark:prose-td:border-gray-700 prose-td:text-sm bg-[#faf9f7] dark:bg-gray-800/30 rounded-lg p-5 border border-gray-100 dark:border-gray-800">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {summary.aiSummary}
-                    </ReactMarkdown>
+                  <div className="mt-3 bg-[#faf9f7] dark:bg-gray-800/30 rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                    <LegalMarkdownRenderer
+                      content={summary.aiSummary}
+                      disabledLink
+                    />
                   </div>
                 )}
               </div>

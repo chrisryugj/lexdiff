@@ -80,10 +80,10 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
           Core Competence
         </h2>
         <h3 className="text-3xl lg:text-5xl font-black text-[#1a2b4c] dark:text-white mb-6" style={{ fontFamily: "'RIDIBatang', serif" }}>
-          완벽을 기하는<br/>전문가를 위한 인텔리전스
+          법령에서 찾고,<br/>근거로 답합니다.
         </h3>
         <p className="text-lg text-gray-500 max-w-2xl mx-auto break-keep">
-          파편화된 법률 정보를 하나로 연결하여, 정책 리서치의 속도를 혁신적으로 높입니다.
+          위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지, 지어낸 답은 없는 행정AI.
         </p>
       </div>
 

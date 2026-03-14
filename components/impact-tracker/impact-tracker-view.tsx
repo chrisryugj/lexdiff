@@ -197,22 +197,37 @@ export function ImpactTrackerView({
           <ImpactTrackerInput onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
         )}
 
-        {/* 분석 중: 스택형 프로그레스 */}
-        {isAnalyzing && (
+        {/* 분석 진행/완료 스택형 프로그레스 */}
+        {(isAnalyzing || (!isAnalyzing && completedSteps.length > 0 && hasStarted)) && (
           <div className="mb-6 bg-white dark:bg-gray-900/80 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            {/* 프로그레스 바 */}
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">영향 분석 진행 중</span>
-              <span className="text-sm font-bold text-[#1a2b4c] dark:text-[#e2a85d] tabular-nums">{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4">
-              <div
-                className="bg-gradient-to-r from-[#1a2b4c] to-[#d4af37] dark:from-[#e2a85d] dark:to-[#d4af37] h-2 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            {/* 프로그레스 바 (분석 중에만) */}
+            {isAnalyzing && (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">영향 분석 진행 중</span>
+                  <span className="text-sm font-bold text-[#1a2b4c] dark:text-[#e2a85d] tabular-nums">{Math.round(progress)}%</span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4">
+                  <div
+                    className="bg-gradient-to-r from-[#1a2b4c] to-[#d4af37] dark:from-[#e2a85d] dark:to-[#d4af37] h-2 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </>
+            )}
 
-            {/* 완료된 단계 스택 */}
+            {/* 완료 헤더 (분석 끝난 후) */}
+            {!isAnalyzing && completedSteps.length > 0 && (
+              <div className="flex items-center gap-2 mb-3">
+                <Icon name="check-circle" size={16} className="text-emerald-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">분석 완료</span>
+                <span className="text-xs text-gray-400 tabular-nums ml-auto">
+                  총 {(completedSteps.reduce((s, cs) => s + cs.durationMs, 0) / 1000).toFixed(1)}초
+                </span>
+              </div>
+            )}
+
+            {/* 단계 스택 */}
             <div className="space-y-1.5">
               {completedSteps.map((cs, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-sm">
@@ -222,34 +237,40 @@ export function ImpactTrackerView({
                 </div>
               ))}
 
-              {/* 현재 진행 중 단계 */}
-              <div className="flex items-center gap-2.5 text-sm">
-                <Icon name="loader" size={15} className="text-[#d4af37] animate-spin shrink-0" />
-                <span className="font-medium text-gray-800 dark:text-gray-200 flex-1">
-                  {STEP_LABELS[step] || step}
-                </span>
-                <ImpactStepTimer step={step} />
-              </div>
+              {/* 현재 진행 중 단계 (분석 중에만) */}
+              {isAnalyzing && (
+                <>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Icon name="loader" size={15} className="text-[#d4af37] animate-spin shrink-0" />
+                    <span className="font-medium text-gray-800 dark:text-gray-200 flex-1">
+                      {STEP_LABELS[step] || step}
+                    </span>
+                    <ImpactStepTimer step={step} />
+                  </div>
 
-              {/* 상태 메시지 */}
-              {statusMessage && (
-                <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400">
-                  {statusMessage}
-                </div>
+                  {/* 상태 메시지 */}
+                  {statusMessage && (
+                    <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400">
+                      {statusMessage}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={cancelAnalysis}
-                className="text-xs h-7 text-gray-400 hover:text-red-500"
-              >
-                <Icon name="x" size={14} />
-                취소
-              </Button>
-            </div>
+            {isAnalyzing && (
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelAnalysis}
+                  className="text-xs h-7 text-gray-400 hover:text-red-500"
+                >
+                  <Icon name="x" size={14} />
+                  취소
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

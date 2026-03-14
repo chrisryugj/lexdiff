@@ -768,7 +768,17 @@ export function AIAnswerContent({
 
                             {/* 도구 호출 로그 */}
                             <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden">
-                                {toolCallLogs.map((log, idx) => (
+                                {toolCallLogs.map((log, idx) => {
+                                    // result 타입에 대해 매칭되는 call의 timestamp와의 차이로 소요시간 계산
+                                    let durationText = ''
+                                    if (log.type === 'result' && log.timestamp) {
+                                        const matchingCall = [...toolCallLogs].slice(0, idx).reverse().find(l => l.type === 'call' && l.name === log.name)
+                                        if (matchingCall?.timestamp) {
+                                            const dur = (log.timestamp - matchingCall.timestamp) / 1000
+                                            durationText = `${dur.toFixed(1)}s`
+                                        }
+                                    }
+                                    return (
                                     <div
                                         key={log.id}
                                         className="flex items-start gap-2 text-[12px] font-mono animate-in slide-in-from-left-2 fade-in duration-300 min-w-0"
@@ -797,10 +807,15 @@ export function AIAnswerContent({
                                                 ) : (
                                                     <Icon name="x" size={13} className="text-red-500/80 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                                 )}
-                                                <span className={`truncate min-w-0 ${log.success ? 'text-emerald-700/90 dark:text-emerald-600/90' : 'text-red-500/90 dark:text-red-400/80'}`}>
+                                                <span className={`truncate min-w-0 flex-1 ${log.success ? 'text-emerald-700/90 dark:text-emerald-600/90' : 'text-red-500/90 dark:text-red-400/80'}`}>
                                                     {log.displayName}
                                                     {log.summary && <span className="text-slate-400 dark:text-gray-500 ml-1">→ {log.summary}</span>}
                                                 </span>
+                                                {durationText && (
+                                                    <span className="text-[10px] text-slate-400 dark:text-gray-500 tabular-nums flex-shrink-0 ml-auto">
+                                                        {durationText}
+                                                    </span>
+                                                )}
                                             </>
                                         )}
                                         {log.type === 'token_usage' && (
@@ -810,7 +825,8 @@ export function AIAnswerContent({
                                             </>
                                         )}
                                     </div>
-                                ))}
+                                    )
+                                })}
 
                                 {/* 마지막 줄: 현재 상태 표시 - 마지막 status 메시지 또는 대기 중 */}
                                 {isStreaming && !isCollapsing && (
