@@ -112,6 +112,13 @@ export async function* executeImpactAnalysis(
       yield* processNationalLaws(nationalLaws, allChanges, allOldNew, allDownstreamMap, request, options)
     }
 
+    // 중복 조문 제거 (같은 법령+조문이 A/B방향에서 중복 수집될 수 있음)
+    const deduped = deduplicateChanges(allChanges, allOldNew)
+    allChanges.length = 0
+    allOldNew.length = 0
+    allChanges.push(...deduped.changes)
+    allOldNew.push(...deduped.oldNewPairs)
+
     if (allChanges.length === 0) {
       yield { type: 'status', message: '조회 기간 내 변경사항이 없습니다.', progress: 100, step: 'complete' }
       yield { type: 'complete', result: { items: [], summary: buildEmptySummary(dateFrom, dateTo), analyzedAt: new Date().toISOString() } }
@@ -430,6 +437,25 @@ async function* processNationalLaws(
 }
 
 // ── 유틸 ──
+
+function deduplicateChanges(
+  changes: ArticleChange[],
+  oldNewPairs: Array<{ oldText: string; newText: string }>,
+): { changes: ArticleChange[]; oldNewPairs: Array<{ oldText: string; newText: string }> } {
+  const seen = new Set<string>()
+  const dedupedChanges: ArticleChange[] = []
+  const dedupedOldNew: Array<{ oldText: string; newText: string }> = []
+
+  for (let i = 0; i < changes.length; i++) {
+    const key = `${changes[i].lawId}:${changes[i].joDisplay}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    dedupedChanges.push(changes[i])
+    if (oldNewPairs[i]) dedupedOldNew.push(oldNewPairs[i])
+  }
+
+  return { changes: dedupedChanges, oldNewPairs: dedupedOldNew }
+}
 
 function extractDateFromCompare(text: string): string {
   const m = text.match(/신법 공포일:\s*(\S+)/)

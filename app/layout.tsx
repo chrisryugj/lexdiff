@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "LexDiff — Your AI-Powered Legal Companion.",
   description: "LexDiff: Your AI-Powered Legal Companion",
   generator: "Chris Ryu",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 }
 
 export default function RootLayout({
