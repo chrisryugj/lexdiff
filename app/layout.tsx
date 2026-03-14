@@ -1,16 +1,22 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MotionProvider } from "@/components/providers/motion-provider"
 import "./globals.css"
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export const metadata: Metadata = {
   title: "LexDiff — Your AI-Powered Legal Companion.",
   description: "LexDiff: Your AI-Powered Legal Companion",
   generator: "Chris Ryu",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 }
 
 export default function RootLayout({
