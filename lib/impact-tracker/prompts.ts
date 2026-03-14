@@ -47,8 +47,9 @@ export function buildClassificationQuery(changes: ClassificationInput[]): string
 ${changesJson}
 
 반드시 아래 JSON 배열 형식으로만 답변하세요. 다른 텍스트는 포함하지 마세요.
+reason은 개조식(명사형 종결)으로 작성. 예: "다자녀 양육자 우대 정책 신설로 실질적 내용 변경 발생, 조례 반영 검토 대상"
 [
-  { "jo": "조문코드", "severity": "critical|review|info", "reason": "분류 근거 1-2문장" }
+  { "jo": "조문코드", "severity": "critical|review|info", "reason": "분류 근거 1-2문장 (개조식)" }
 ]`
 }
 
