@@ -8,8 +8,8 @@ import { SEVERITY_CONFIG, type ImpactItem } from '@/lib/impact-tracker/types'
 
 interface ImpactCardProps {
   item: ImpactItem
-  onCompare?: (lawId: string, mst: string) => void
-  onViewLaw?: (lawId: string, mst: string, jo: string) => void
+  onCompare?: (lawName: string, lawId: string, mst: string) => void
+  onViewLaw?: (lawName: string, jo: string) => void
 }
 
 export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
@@ -92,7 +92,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
             variant="outline"
             size="sm"
             className="text-xs h-7"
-            onClick={() => onCompare(item.change.lawId, item.change.mst)}
+            onClick={() => onCompare(item.change.lawName, item.change.lawId, item.change.mst)}
           >
             <Icon name="git-compare" size={12} />
             신구대비
@@ -103,7 +103,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
             variant="outline"
             size="sm"
             className="text-xs h-7"
-            onClick={() => onViewLaw(item.change.lawId, item.change.mst, item.change.jo)}
+            onClick={() => onViewLaw(item.change.lawName, item.change.joDisplay)}
           >
             <Icon name="file-text" size={12} />
             조문 보기
