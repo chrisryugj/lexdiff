@@ -85,7 +85,7 @@ export function SearchView({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const [lawStats, setLawStats] = useState<{ constitution: number; laws: number; adminRules: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
+  const [lawStats, setLawStats] = useState<{ constitution: number; statutes: number; delegated: number; laws: number; adminRules: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
   const lastScrollY = useRef(0)
@@ -322,22 +322,28 @@ export function SearchView({
             {/* Live stats */}
             {lawStats && (
               <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm font-medium">
-                {lawStats.laws > 0 && (
+                {lawStats.constitution > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="scale" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">법령 <AnimatedNumber value={lawStats.laws} delay={0} /></span>
+                    <Icon name="shield" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">헌법 <AnimatedNumber value={lawStats.constitution} delay={0} /></span>
                   </span>
                 )}
-                {lawStats.adminRules > 0 && (
+                {lawStats.statutes > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="scale" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">법률 <AnimatedNumber value={lawStats.statutes} delay={150} /></span>
+                  </span>
+                )}
+                {lawStats.delegated > 0 && (
                   <span className="flex items-center gap-1.5">
                     <Icon name="file-text" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">위임법령 <AnimatedNumber value={lawStats.adminRules} delay={200} /></span>
+                    <span className="text-gray-700 dark:text-gray-300">위임법령 <AnimatedNumber value={lawStats.delegated} delay={300} /></span>
                   </span>
                 )}
                 {lawStats.ordinances > 0 && (
                   <span className="flex items-center gap-1.5">
                     <Icon name="landmark" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">자치법규 <AnimatedNumber value={lawStats.ordinances} delay={400} /></span>
+                    <span className="text-gray-700 dark:text-gray-300">자치법규 <AnimatedNumber value={lawStats.ordinances} delay={450} /></span>
                   </span>
                 )}
                 {lawStats.precedents > 0 && (
@@ -347,6 +353,9 @@ export function SearchView({
                   </span>
                 )}
               </div>
+            )}
+            {lawStats?.asOf && (
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums mt-1">{lawStats.asOf} 기준 · 법제처</p>
             )}
           </div>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 text-xs text-gray-500">

@@ -5,8 +5,8 @@ import { Icon } from "@/components/ui/icon"
 
 interface LawStats {
   constitution: number
-  laws: number
-  adminRules: number
+  statutes: number
+  delegated: number
   ordinances: number
   precedents: number
   asOf?: string
@@ -14,8 +14,8 @@ interface LawStats {
 
 const FALLBACK: LawStats = {
   constitution: 1,
-  laws: 5561,
-  adminRules: 15000,
+  statutes: 1706,
+  delegated: 3476,
   ordinances: 158711,
   precedents: 250000,
 }
@@ -23,8 +23,7 @@ const FALLBACK: LawStats = {
 function formatCount(n: number): string {
   if (n >= 100000) return `${(n / 10000).toFixed(1)}만`
   if (n >= 10000) return `${(n / 10000).toFixed(1)}만`
-  if (n >= 1000) return n.toLocaleString()
-  return `${n}`
+  return n.toLocaleString()
 }
 
 export function StatsSection() {
@@ -33,8 +32,16 @@ export function StatsSection() {
   useEffect(() => {
     fetch("/api/law-stats")
       .then((r) => r.json())
-      .then((data: LawStats) => {
-        if (data.laws > 0) setStats(data)
+      .then((data: Record<string, unknown>) => {
+        const s: LawStats = {
+          constitution: (data.constitution as number) || 0,
+          statutes: (data.statutes as number) || 0,
+          delegated: (data.delegated as number) || 0,
+          ordinances: (data.ordinances as number) || 0,
+          precedents: (data.precedents as number) || 0,
+          asOf: data.asOf as string | undefined,
+        }
+        if (s.statutes > 0 || s.delegated > 0) setStats(s)
       })
       .catch(() => {})
   }, [])
@@ -52,16 +59,16 @@ export function StatsSection() {
     },
     {
       icon: "scale" as const,
-      value: s.laws,
-      formatted: formatCount(s.laws),
-      label: "법령",
+      value: s.statutes,
+      formatted: formatCount(s.statutes),
+      label: "법률",
       color: "text-blue-400",
       iconBg: "bg-blue-500/10",
     },
     {
       icon: "file-text" as const,
-      value: s.adminRules,
-      formatted: formatCount(s.adminRules),
+      value: s.delegated,
+      formatted: formatCount(s.delegated),
       label: "위임법령",
       color: "text-emerald-400",
       iconBg: "bg-emerald-500/10",
@@ -89,22 +96,17 @@ export function StatsSection() {
       <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-5 reveal-stagger revealed">
         {items.map((stat, index) => (
           <div key={index} className="stat-card text-center">
-            {/* Icon */}
             <div className="flex justify-center mb-3">
               <div className={`${stat.iconBg} w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center`}>
                 <Icon name={stat.icon} className={`h-5 w-5 md:h-6 md:w-6 ${stat.color}`} />
               </div>
             </div>
-
-            {/* Value */}
             <div
               className="font-bold text-lg md:text-2xl text-foreground mb-0.5 tabular-nums"
               style={{ fontFamily: "Pretendard, sans-serif" }}
             >
               {stat.formatted}
             </div>
-
-            {/* Label */}
             <div
               className="text-xs md:text-sm text-muted-foreground/60"
               style={{ fontFamily: "Pretendard, sans-serif" }}
