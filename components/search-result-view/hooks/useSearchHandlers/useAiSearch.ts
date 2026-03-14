@@ -70,6 +70,14 @@ export function useAiSearch(deps: HandlerDeps) {
     skipCache?: boolean,
     conversationId?: string | null
   ) => {
+    // AI 비밀번호 게이트 확인
+    try {
+      if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
+        toast({ title: 'AI 기능을 사용하려면 비밀번호 인증이 필요합니다.', variant: 'destructive' })
+        return
+      }
+    } catch { /* private browsing */ }
+
     debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
 
     // 이전 검색 진행 중이면 abort

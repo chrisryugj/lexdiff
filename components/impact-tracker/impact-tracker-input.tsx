@@ -207,12 +207,12 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 max-w-xl mx-auto">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4" style={{ fontFamily: "'RIDIBatang', serif" }}>
-        법령 영향 추적기
+    <div className="bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 rounded-xl p-6 max-w-xl mx-auto">
+      <h3 className="text-lg font-bold text-[#1a2b4c] dark:text-white mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
+        법령 변경 영향 분석
       </h3>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        법령·조례 개정이 하위법령 및 자치법규에 미치는 영향을 양방향으로 추적합니다.
+        법령·조례 개정이 하위법령 및 자치법규에 미치는 영향을 양방향으로 분석합니다.
       </p>
 
       {/* 법령명 입력 + 자동완성 */}
@@ -373,7 +373,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
       <Button
         onClick={handleSubmit}
         disabled={lawNames.length === 0 || isAnalyzing}
-        className="w-full"
+        className="w-full bg-[#1a2b4c] hover:bg-[#1a2b4c]/90 dark:bg-[#e2a85d] dark:hover:bg-[#e2a85d]/90 dark:text-[#0c0e14]"
       >
         {isAnalyzing ? (
           <>
@@ -382,7 +382,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
           </>
         ) : (
           <>
-            <Icon name="shield-alert" size={16} />
+            <Icon name="file-search" size={16} />
             영향 분석 시작
           </>
         )}

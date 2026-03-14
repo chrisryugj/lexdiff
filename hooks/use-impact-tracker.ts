@@ -118,6 +118,15 @@ export function useImpactTracker() {
     // SSE 스트리밍 시작
     const fetchSSE = async () => {
       try {
+        // AI 비밀번호 게이트 확인
+        try {
+          if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
+            setError('AI 기능을 사용하려면 비밀번호 인증이 필요합니다.')
+            setIsAnalyzing(false)
+            return
+          }
+        } catch { /* private browsing */ }
+
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         try {
           const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')

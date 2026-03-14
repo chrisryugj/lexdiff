@@ -12,10 +12,9 @@
 import { useState, useEffect } from "react"
 import { SearchView } from "@/components/search-view"
 import { SearchResultView } from "@/components/search-result-view"
-import { favoritesStore } from "@/lib/favorites-store"
 import { debugLogger } from "@/lib/debug-logger"
 import { generateSearchId } from "@/lib/search-id-generator"
-import { saveSearchResult, getSearchResult, deleteExpiredResults } from "@/lib/search-result-store"
+import { saveSearchResult, deleteExpiredResults } from "@/lib/search-result-store"
 import {
   initializeHistory,
   pushSearchHistory,
@@ -25,11 +24,14 @@ import {
   onPopState,
   type HistoryState
 } from "@/lib/history-manager"
+import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
 import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
 import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
 import { ComparisonModal } from "@/components/comparison-modal"
+import { AiGateDialog } from "@/components/ai-gate-dialog"
+import { useAiGate } from "@/hooks/use-ai-gate"
 
 type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
 
@@ -55,6 +57,9 @@ export default function Home() {
     lawTitle: string
     mst: string
   }>({ isOpen: false, lawTitle: '', mst: '' })
+
+  // AI 비밀번호 게이트
+  const { showGate, requireAuth, handleSubmit: handleGateSubmit, handleClose: handleGateClose } = useAiGate()
 
   // 초기화: History API + IndexedDB 설정
   useEffect(() => {
@@ -205,12 +210,14 @@ export default function Home() {
     setCompareModal({ isOpen: true, lawTitle: lawName, mst })
   }
 
-  // 영향 추적기 이동
+  // 영향 추적기 이동 (비밀번호 게이트 적용)
   const handleImpactTracker = () => {
-    pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
-    setViewMode('impact-tracker')
-    setImpactMounted(true)
-    setImpactRequest(null)
+    requireAuth(() => {
+      pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
+      setViewMode('impact-tracker')
+      setImpactMounted(true)
+      setImpactRequest(null)
+    })
   }
 
   // 홈으로 직접 이동 (로고 클릭)
@@ -235,11 +242,8 @@ export default function Home() {
             initialRequest={impactRequest}
             onBack={() => window.history.back()}
             onHomeClick={handleHomeClick}
-            onCompare={(lawName, lawId, mst) => {
+            onCompare={(lawName, _lawId, mst) => {
               handleImpactCompare(lawName, mst)
-            }}
-            onViewLaw={(lawName, jo, joDisplay) => {
-              handleSearch({ lawName, article: joDisplay, jo })
             }}
           />
         </div>
@@ -292,6 +296,13 @@ export default function Home() {
         onClose={() => setCompareModal(prev => ({ ...prev, isOpen: false }))}
         lawTitle={compareModal.lawTitle}
         mst={compareModal.mst}
+      />
+
+      {/* AI 비밀번호 게이트 */}
+      <AiGateDialog
+        open={showGate}
+        onSubmit={handleGateSubmit}
+        onClose={handleGateClose}
       />
     </>
   )
