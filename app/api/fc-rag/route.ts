@@ -5,7 +5,7 @@
 import { NextRequest } from "next/server"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
-import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
+import { fetchFromOpenClaw, isOpenClawHealthy, getOpenClawStatus } from "@/lib/openclaw-client"
 import {
   getUsageHeaders,
   getUsageWarningMessage,
@@ -113,17 +113,24 @@ export async function POST(request: NextRequest) {
       try {
         let openClawHandled = false
 
-        if (process.env.OPENCLAW_ENABLED === "true" && await isOpenClawHealthy()) {
-          traceLogger.addEvent(traceId, 'bridge_attempt', { healthy: true })
-          send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
-          openClawHandled = await fetchFromOpenClaw(query, send, {
-            conversationId,
-            abortSignal: request.signal,
-          })
-          if (openClawHandled) {
-            traceLogger.completeTrace(traceId, 'openclaw')
+        if (process.env.OPENCLAW_ENABLED === "true") {
+          const healthy = await isOpenClawHealthy()
+          if (healthy) {
+            traceLogger.addEvent(traceId, 'bridge_attempt', { healthy: true })
+            send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+            openClawHandled = await fetchFromOpenClaw(query, send, {
+              conversationId,
+              abortSignal: request.signal,
+            })
+            if (openClawHandled) {
+              traceLogger.completeTrace(traceId, 'openclaw')
+            } else {
+              traceLogger.addEvent(traceId, 'bridge_failed', { fallback: 'gemini' })
+            }
           } else {
-            traceLogger.addEvent(traceId, 'bridge_failed', { fallback: 'gemini' })
+            const status = getOpenClawStatus()
+            const reason = status.circuitOpen ? '서킷 브레이커 오픈' : '헬스체크 실패'
+            traceLogger.addEvent(traceId, 'bridge_skip', { reason, ...status })
           }
         }
 

@@ -18,28 +18,26 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
 
   return (
     <div className={`border rounded-lg p-4 ${config.bgClass} transition-all hover:shadow-md`}>
-      {/* 헤더: 등급 뱃지 + 법령명 + 조문 */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge
-            className={`${
-              item.severity === 'critical'
-                ? 'bg-red-600 text-white'
-                : item.severity === 'review'
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-green-600 text-white'
-            }`}
-          >
-            {config.label}
-          </Badge>
-          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-            {item.change.lawName}
-          </span>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {item.change.joDisplay}
-          </span>
-        </div>
-        <Badge variant="outline" className="text-xs shrink-0">
+      {/* 헤더: 등급 뱃지 + 법령명 + 조문 + 개정 타입 (1줄) */}
+      <div className="flex items-center gap-1.5 mb-3 min-w-0">
+        <Badge
+          className={`shrink-0 ${
+            item.severity === 'critical'
+              ? 'bg-red-600 text-white'
+              : item.severity === 'review'
+                ? 'bg-yellow-500 text-white'
+                : 'bg-green-600 text-white'
+          }`}
+        >
+          {config.label}
+        </Badge>
+        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate min-w-0">
+          {item.change.lawName}
+        </span>
+        <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">
+          {item.change.joDisplay}
+        </span>
+        <Badge variant="outline" className="text-xs shrink-0 ml-auto">
           {item.change.revisionType}
         </Badge>
       </div>

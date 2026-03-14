@@ -293,7 +293,7 @@ export function AnnexModal({
               </Button>
             )}
             <DialogTitle className="text-sm sm:text-base font-bold text-primary truncate">
-              {lawName} 별표 {annexNumber}
+              {lawName || '법령'} 별표 {annexNumber}
               {annexData?.annexName && (
                 <span className="text-muted-foreground font-normal ml-1 hidden sm:inline">
                   ({annexData.annexName})
@@ -301,7 +301,7 @@ export function AnnexModal({
               )}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              {lawName} 별표 {annexNumber} 내용
+              {lawName || '법령'} 별표 {annexNumber} 내용
             </DialogDescription>
           </div>
 
@@ -411,7 +411,7 @@ export function AnnexModal({
             {/* 파일명 */}
             <div className="text-center">
               <p className="text-base font-medium mb-1">
-                {lawName} 별표 {annexNumber}
+                {lawName || '법령'} 별표 {annexNumber}
                 {annexData?.annexName && ` (${annexData.annexName})`}
               </p>
               <p className="text-sm text-muted-foreground">

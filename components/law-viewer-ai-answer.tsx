@@ -413,11 +413,12 @@ export function AIAnswerContent({
 
     // ✅ 별표 모달 열기 핸들러
     const handleAnnexClick = (annexNumber: string, lawName: string) => {
-        debugLogger.info('🔗 [AI답변] 별표 링크 클릭', { annexNumber, lawName })
+        const safeLawName = lawName && lawName !== 'undefined' ? lawName : ''
+        debugLogger.info('🔗 [AI답변] 별표 링크 클릭', { annexNumber, lawName: safeLawName })
         setAnnexModal({
             open: true,
             annexNumber,
-            lawName,
+            lawName: safeLawName,
         })
     }
 

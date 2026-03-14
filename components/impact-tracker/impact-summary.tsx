@@ -29,31 +29,31 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
         </div>
       ) : summary ? (
         <>
-          {/* 기간 + 통계 */}
-          <div className="flex flex-wrap items-center gap-3 mb-3">
-            <span className="text-sm text-gray-500">
+          {/* 기간 + 통계 (1줄, 모바일 스크롤) */}
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 overflow-x-auto scrollbar-none">
+            <span className="text-sm text-gray-500 shrink-0">
               {summary.dateRange.from} ~ {summary.dateRange.to}
             </span>
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium shrink-0">
               총 {summary.totalChanges}건
             </span>
             {summary.bySeverity.critical > 0 && (
-              <span className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-950 px-2 py-0.5 rounded">
+              <span className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-950 px-2 py-0.5 rounded shrink-0">
                 긴급 {summary.bySeverity.critical}
               </span>
             )}
             {summary.bySeverity.review > 0 && (
-              <span className="text-xs font-medium text-yellow-600 bg-yellow-50 dark:bg-yellow-950 px-2 py-0.5 rounded">
+              <span className="text-xs font-medium text-yellow-600 bg-yellow-50 dark:bg-yellow-950 px-2 py-0.5 rounded shrink-0">
                 검토 {summary.bySeverity.review}
               </span>
             )}
             {summary.bySeverity.info > 0 && (
-              <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded">
+              <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded shrink-0">
                 참고 {summary.bySeverity.info}
               </span>
             )}
             {aiSource && (
-              <span className="text-xs text-gray-400 ml-auto">
+              <span className="text-xs text-gray-400 ml-auto shrink-0">
                 {aiSource === 'openclaw' ? 'OpenClaw' : 'Gemini'}
               </span>
             )}

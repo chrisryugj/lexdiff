@@ -16,7 +16,7 @@ const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID || ''
 const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET || ''
 const HEALTH_CHECK_INTERVAL = 30_000 // 30초
 const OPENCLAW_TIMEOUT = 90_000 // 90초 (복잡한 법률 쿼리 대비)
-const HEALTH_CHECK_TIMEOUT = 2_000 // 2초
+const HEALTH_CHECK_TIMEOUT = 5_000 // 5초 (모바일 네트워크 지연 고려)
 
 /** Cloudflare Access + Bridge 인증 헤더 */
 function getAuthHeaders(): Record<string, string> {

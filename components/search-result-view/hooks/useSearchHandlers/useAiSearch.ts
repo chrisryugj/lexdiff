@@ -18,6 +18,7 @@ export function useAiSearch(deps: HandlerDeps) {
   const { state, actions, toast } = deps
   const abortRef = useRef<AbortController | null>(null)
   const streamBufferRef = useRef<string>('')  // 스트리밍 토큰 누적 버퍼
+  const answerReceivedRef = useRef(false)  // answer 이벤트 수신 여부
 
   /** 현재 답변을 대화 히스토리에 저장 */
   const saveCurrentToHistory = useCallback(() => {
@@ -127,6 +128,7 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.clearToolCallLogs()
     actions.updateProgress('analyzing', 5)
     streamBufferRef.current = '' // 스트리밍 버퍼 초기화
+    answerReceivedRef.current = false
 
     // AI 뷰 즉시 표시
     const aiLawData: LawDataState = {
@@ -245,7 +247,10 @@ export function useAiSearch(deps: HandlerDeps) {
           const resolvedProgress = typeof event.progress === 'number'
             ? event.progress
             : (PHASE_PROGRESS[event.phase] ?? 30)
-          actions.updateProgress('streaming', resolvedProgress)
+          // answer 이후 progress 역행 방지 (100% → 95% 역행 차단)
+          if (!answerReceivedRef.current) {
+            actions.updateProgress('streaming', resolvedProgress)
+          }
           actions.addToolCallLog({
             id: `log-${++logIdCounter}`,
             type: 'status',
@@ -335,6 +340,7 @@ export function useAiSearch(deps: HandlerDeps) {
           })
 
           // 검색 완료 즉시 (isStreaming=false → 깜빡임 커서 즉시 제거)
+          answerReceivedRef.current = true
           actions.setIsSearching(false)
 
           // 캐시 저장 (백그라운드)
@@ -344,11 +350,21 @@ export function useAiSearch(deps: HandlerDeps) {
         case 'citation_verification': {
           // 검증된 citation으로 교체
           if (event.citations && event.citations.length > 0) {
+            const verifiedCount = event.citations.filter((c: any) => c.verified).length
             actions.setAiCitations(event.citations)
             persistVerifiedCitations(query, event.citations)
+            // 검증 완료 로그 추가
+            actions.addToolCallLog({
+              id: `log-${++logIdCounter}`,
+              type: 'result',
+              name: 'citation_verification',
+              displayName: `인용 검증 완료 (${verifiedCount}/${event.citations.length})`,
+              success: true,
+              timestamp: Date.now(),
+            })
             debugLogger.success('인용 검증 완료', {
               total: event.citations.length,
-              verified: event.citations.filter((c: any) => c.verified).length,
+              verified: verifiedCount,
             })
           }
           break
