@@ -85,7 +85,7 @@ export function SearchView({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const [lawStats, setLawStats] = useState<{ laws: number; adminRules: number; ordinances: number; precedents: number } | null>(null)
+  const [lawStats, setLawStats] = useState<{ constitution: number; laws: number; adminRules: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
   const lastScrollY = useRef(0)
@@ -321,29 +321,29 @@ export function SearchView({
             </div>
             {/* Live stats */}
             {lawStats && (
-              <div className="flex flex-wrap items-center justify-center gap-6 text-sm font-medium">
+              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm font-medium">
                 {lawStats.laws > 0 && (
-                  <span className="flex items-center gap-2">
-                    <Icon name="scale" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">법령 <AnimatedNumber value={lawStats.laws} delay={0} />건</span>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="scale" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">법령 <AnimatedNumber value={lawStats.laws} delay={0} /></span>
                   </span>
                 )}
                 {lawStats.adminRules > 0 && (
-                  <span className="flex items-center gap-2">
-                    <Icon name="file-text" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">행정규칙 <AnimatedNumber value={lawStats.adminRules} delay={300} />건</span>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="file-text" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">위임법령 <AnimatedNumber value={lawStats.adminRules} delay={200} /></span>
                   </span>
                 )}
                 {lawStats.ordinances > 0 && (
-                  <span className="flex items-center gap-2">
-                    <Icon name="building-2" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">자치법규 <AnimatedNumber value={lawStats.ordinances} delay={600} />건</span>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="landmark" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">자치법규 <AnimatedNumber value={lawStats.ordinances} delay={400} /></span>
                   </span>
                 )}
                 {lawStats.precedents > 0 && (
-                  <span className="flex items-center gap-2">
-                    <Icon name="gavel" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">판례 <AnimatedNumber value={lawStats.precedents} delay={900} />건</span>
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="gavel" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-700 dark:text-gray-300">판례 <AnimatedNumber value={lawStats.precedents} delay={600} /></span>
                   </span>
                 )}
               </div>
