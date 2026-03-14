@@ -24,6 +24,11 @@
     @apply bg-background text-foreground;
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
+
+  /* iOS Safari 자동 줌 방지: 모든 입력 필드 최소 16px */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 /* 스크롤바 - 테마 대응 */
