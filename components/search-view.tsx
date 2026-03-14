@@ -69,6 +69,7 @@ export interface SearchViewProps {
   isSearching: boolean
   ragLoading: boolean
   searchMode: 'basic' | 'rag'
+  onImpactTracker?: () => void
 }
 
 export function SearchView({
@@ -77,6 +78,7 @@ export function SearchView({
   isSearching,
   ragLoading,
   searchMode,
+  onImpactTracker,
 }: SearchViewProps) {
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
@@ -278,6 +280,17 @@ export function SearchView({
                 isLoading={isLoading}
                 searchMode={searchMode}
               />
+              {onImpactTracker && (
+                <div className="flex justify-center mt-3">
+                  <button
+                    onClick={onImpactTracker}
+                    className="text-xs text-gray-400 hover:text-[#d4af37] dark:hover:text-[#e2a85d] transition-colors flex items-center gap-1.5"
+                  >
+                    <Icon name="shield-alert" size={14} />
+                    법령 영향 추적기
+                  </button>
+                </div>
+              )}
             </m.div>
           </m.div>
         </div>

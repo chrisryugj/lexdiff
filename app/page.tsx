@@ -20,14 +20,17 @@ import {
   initializeHistory,
   pushSearchHistory,
   pushHomeHistory,
+  pushImpactTrackerHistory,
   getCurrentHistoryState,
   onPopState,
   type HistoryState
 } from "@/lib/history-manager"
 import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
+import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
+import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
 
-type ViewMode = 'home' | 'search-result' | 'precedent-detail'
+type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('home')
@@ -37,6 +40,7 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false)
   const [ragLoading, setRagLoading] = useState(false)
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
+  const [impactRequest, setImpactRequest] = useState<ImpactTrackerRequest | null>(null)
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
@@ -107,8 +111,12 @@ export default function Home() {
         setViewMode('home')
         setSearchId(null)
         setPrecedentId(null)
+        setImpactRequest(null)
         setSearchMode('basic') // 홈으로 돌아오면 기본 모드로 초기화
         setIsSearching(false) // 검색 중 상태 초기화
+      } else if (state.viewMode === 'impact-tracker' && state.impactRequest) {
+        setViewMode('impact-tracker')
+        setImpactRequest(state.impactRequest as ImpactTrackerRequest)
       } else if (state.viewMode === 'precedent-detail' && state.searchId && state.precedentId) {
         // 판례 상세 → 앞으로가기로 다시 판례 상세
         setViewMode('precedent-detail')
@@ -183,6 +191,13 @@ export default function Home() {
     // popstate 이벤트에서 상태 업데이트가 처리됨
   }
 
+  // 영향 추적기 이동
+  const handleImpactTracker = () => {
+    pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
+    setViewMode('impact-tracker')
+    setImpactRequest(null)
+  }
+
   // 홈으로 직접 이동 (로고 클릭)
   const handleHomeClick = () => {
     debugLogger.info('🏠 홈으로 이동')
@@ -190,6 +205,7 @@ export default function Home() {
     setViewMode('home')
     setSearchId(null)
     setPrecedentId(null)
+    setImpactRequest(null)
     setSearchMode('basic')
     setIsSearching(false)
   }
@@ -204,6 +220,13 @@ export default function Home() {
           isSearching={isSearching}
           ragLoading={ragLoading}
           searchMode={searchMode}
+          onImpactTracker={handleImpactTracker}
+        />
+      ) : viewMode === 'impact-tracker' ? (
+        <ImpactTrackerView
+          initialRequest={impactRequest}
+          onBack={() => window.history.back()}
+          onHomeClick={handleHomeClick}
         />
       ) : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView

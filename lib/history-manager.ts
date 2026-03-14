@@ -11,11 +11,12 @@
  * History 상태 데이터 구조
  */
 export interface HistoryState {
-  viewMode: 'home' | 'search-result' | 'precedent-detail'
+  viewMode: 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
   searchId?: string
   searchMode?: 'basic' | 'rag'  // 검색 모드 (기본/AI)
   precedentId?: string  // 판례 상세 보기 시 판례 ID
   hasOrdinanceDetail?: boolean  // 조례 상세 보기 여부 (뒤로가기 시 목록 복원용)
+  impactRequest?: { lawNames: string[]; dateFrom: string; dateTo: string }  // 영향 추적기 요청
   timestamp: number
 }
 
@@ -144,6 +145,20 @@ export function replacePrecedentHistory(
     timestamp: Date.now()
   }
   window.history.replaceState(state, '', '/')
+}
+
+/**
+ * 영향 추적기 페이지로 이동
+ */
+export function pushImpactTrackerHistory(
+  request: { lawNames: string[]; dateFrom: string; dateTo: string }
+): void {
+  const state: HistoryState = {
+    viewMode: 'impact-tracker',
+    impactRequest: request,
+    timestamp: Date.now()
+  }
+  window.history.pushState(state, '', '/')
 }
 
 /**

@@ -34,6 +34,11 @@ const features = [
     description: "특정 법률 조항과 연관된 하위 법령(시행령, 규칙, 고시 등)의 네트워크를 자동으로 스캐닝하여 누락 없는 검토를 보장합니다.",
     icon: "shield-check" as const,
   },
+  {
+    title: "법령 영향 추적기",
+    description: "상위법 개정이 하위법령에 미치는 영향을 자동으로 탐지·분석하여, 긴급/검토/참고 등급으로 분류합니다.",
+    icon: "shield-alert" as const,
+  },
 ]
 
 interface FeatureCardsProps {
