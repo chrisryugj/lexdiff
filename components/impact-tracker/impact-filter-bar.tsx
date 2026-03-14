@@ -56,7 +56,7 @@ export function ImpactFilterBar({
           <button
             key={opt.value}
             onClick={() => onSeverityChange(opt.value)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
               severityFilter === opt.value
                 ? `${opt.activeClass} shadow-sm`
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -72,7 +72,7 @@ export function ImpactFilterBar({
         <select
           value={lawFilter}
           onChange={e => onLawChange(e.target.value)}
-          className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#d4af37]/50"
+          className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#d4af37]/50"
         >
           <option value="all">전체 법령</option>
           {availableLaws.map(law => (
@@ -82,7 +82,7 @@ export function ImpactFilterBar({
       )}
 
       {/* 카운트 */}
-      <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto font-medium tabular-nums">
+      <span className="text-sm text-gray-400 dark:text-gray-500 ml-auto font-medium tabular-nums">
         {filteredCount === totalCount
           ? `${totalCount}건`
           : `${filteredCount}/${totalCount}건`}

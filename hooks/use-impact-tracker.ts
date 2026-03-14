@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type {
   ImpactTrackerRequest,
   ImpactStep,
@@ -43,12 +43,30 @@ export function useImpactTracker() {
   const [aiSource, setAiSource] = useState<'openclaw' | 'gemini' | null>(null)
   const [ordinanceRefs, setOrdinanceRefs] = useState<OrdinanceRefInfo[]>([])
   const [parentLawChanges, setParentLawChanges] = useState<ParentLawChangeInfo[]>([])
+  // 완료된 단계 기록 (스택형 UI용)
+  const [completedSteps, setCompletedSteps] = useState<Array<{ step: ImpactStep; message: string; durationMs: number }>>([])
+  const stepStartRef = useRef<number>(Date.now())
 
   const abortRef = useRef<AbortController | null>(null)
+
+  const prevStepRef = useRef<ImpactStep>('resolving')
+  const prevMessageRef = useRef<string>('')
 
   const handleSSEEvent = useCallback((event: ImpactSSEEvent) => {
     switch (event.type) {
       case 'status':
+        // 단계 전환 시 이전 단계를 completedSteps에 기록
+        if (event.step !== prevStepRef.current) {
+          const elapsed = Date.now() - stepStartRef.current
+          setCompletedSteps(prev => [...prev, {
+            step: prevStepRef.current,
+            message: prevMessageRef.current || event.message,
+            durationMs: elapsed,
+          }])
+          stepStartRef.current = Date.now()
+          prevStepRef.current = event.step
+        }
+        prevMessageRef.current = event.message
         setStatusMessage(event.message)
         setProgress(event.progress)
         setStep(event.step)
@@ -114,6 +132,10 @@ export function useImpactTracker() {
     setAiSource(null)
     setOrdinanceRefs([])
     setParentLawChanges([])
+    setCompletedSteps([])
+    stepStartRef.current = Date.now()
+    prevStepRef.current = 'resolving'
+    prevMessageRef.current = ''
 
     // SSE 스트리밍 시작
     const fetchSSE = async () => {
@@ -212,6 +234,7 @@ export function useImpactTracker() {
     setAiSource(null)
     setOrdinanceRefs([])
     setParentLawChanges([])
+    setCompletedSteps([])
   }, [])
 
   return {
@@ -225,6 +248,7 @@ export function useImpactTracker() {
     aiSource,
     ordinanceRefs,
     parentLawChanges,
+    completedSteps,
     startAnalysis,
     cancelAnalysis,
     clearResults,

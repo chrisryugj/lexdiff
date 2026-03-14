@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import type { ImpactStep } from '@/lib/impact-tracker/types'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
@@ -60,6 +61,7 @@ export function ImpactTrackerView({
     aiSource,
     ordinanceRefs,
     parentLawChanges,
+    completedSteps,
     startAnalysis,
     cancelAnalysis,
     clearResults,
@@ -135,13 +137,22 @@ export function ImpactTrackerView({
     }
   }, [])
 
-  // 필터링
+  // 필터링 + 정렬 (긴급→검토→참고, 같은 등급 내 조문번호순)
+  const SEVERITY_ORDER: Record<string, number> = { critical: 0, review: 1, info: 2 }
+
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      if (severityFilter !== 'all' && item.severity !== severityFilter) return false
-      if (lawFilter !== 'all' && item.change.lawName !== lawFilter) return false
-      return true
-    })
+    return items
+      .filter(item => {
+        if (severityFilter !== 'all' && item.severity !== severityFilter) return false
+        if (lawFilter !== 'all' && item.change.lawName !== lawFilter) return false
+        return true
+      })
+      .sort((a, b) => {
+        const sevDiff = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
+        if (sevDiff !== 0) return sevDiff
+        // 같은 등급: 조문 코드(숫자) 기준 오름차순
+        return (a.change.jo || '').localeCompare(b.change.jo || '', undefined, { numeric: true })
+      })
   }, [items, severityFilter, lawFilter])
 
   const availableLaws = useMemo(() => {
@@ -186,30 +197,49 @@ export function ImpactTrackerView({
           <ImpactTrackerInput onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
         )}
 
-        {/* 분석 중: 프로그레스 */}
+        {/* 분석 중: 스택형 프로그레스 */}
         {isAnalyzing && (
           <div className="mb-6 bg-white dark:bg-gray-900/80 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-[#1a2b4c]/10 dark:bg-[#e2a85d]/10 flex items-center justify-center">
-                <Icon name={(STEP_ICONS[step] || 'loader') as import('@/components/ui/icon').IconName} size={16} className="text-[#1a2b4c] dark:text-[#e2a85d] animate-pulse" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                    {STEP_LABELS[step] || step}
-                  </span>
-                  <span className="text-xs text-gray-400 tabular-nums">{Math.round(progress)}%</span>
-                </div>
-                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mt-1.5">
-                  <div
-                    className="bg-gradient-to-r from-[#1a2b4c] to-[#d4af37] dark:from-[#e2a85d] dark:to-[#d4af37] h-1.5 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
+            {/* 프로그레스 바 */}
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">영향 분석 진행 중</span>
+              <span className="text-sm font-bold text-[#1a2b4c] dark:text-[#e2a85d] tabular-nums">{Math.round(progress)}%</span>
             </div>
-            <p className="text-xs text-gray-500 pl-11">{statusMessage}</p>
-            <div className="pl-11 mt-3">
+            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4">
+              <div
+                className="bg-gradient-to-r from-[#1a2b4c] to-[#d4af37] dark:from-[#e2a85d] dark:to-[#d4af37] h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            {/* 완료된 단계 스택 */}
+            <div className="space-y-1.5">
+              {completedSteps.map((cs, i) => (
+                <div key={i} className="flex items-center gap-2.5 text-sm">
+                  <Icon name="check-circle" size={15} className="text-emerald-500 shrink-0" />
+                  <span className="text-gray-600 dark:text-gray-400 flex-1">{STEP_LABELS[cs.step] || cs.step}</span>
+                  <span className="text-xs text-gray-400 tabular-nums shrink-0">{(cs.durationMs / 1000).toFixed(1)}초</span>
+                </div>
+              ))}
+
+              {/* 현재 진행 중 단계 */}
+              <div className="flex items-center gap-2.5 text-sm">
+                <Icon name="loader" size={15} className="text-[#d4af37] animate-spin shrink-0" />
+                <span className="font-medium text-gray-800 dark:text-gray-200 flex-1">
+                  {STEP_LABELS[step] || step}
+                </span>
+                <ImpactStepTimer step={step} />
+              </div>
+
+              {/* 상태 메시지 */}
+              {statusMessage && (
+                <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400">
+                  {statusMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
               <Button
                 variant="ghost"
                 size="sm"
@@ -299,5 +329,28 @@ export function ImpactTrackerView({
         loading={refModal.loading}
       />
     </div>
+  )
+}
+
+/** 현재 단계 경과 시간 타이머 */
+function ImpactStepTimer({ step }: { step: ImpactStep }) {
+  const [elapsed, setElapsed] = useState(0)
+  const startRef = useRef(Date.now())
+  const prevStep = useRef(step)
+
+  useEffect(() => {
+    if (step !== prevStep.current) {
+      startRef.current = Date.now()
+      setElapsed(0)
+      prevStep.current = step
+    }
+    const id = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100)
+    return () => clearInterval(id)
+  }, [step])
+
+  return (
+    <span className="text-xs text-[#d4af37] dark:text-[#e2a85d] tabular-nums shrink-0">
+      {elapsed.toFixed(1)}초
+    </span>
   )
 }
