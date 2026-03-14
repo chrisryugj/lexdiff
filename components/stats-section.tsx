@@ -7,6 +7,7 @@ interface LawStats {
   constitution: number
   statutes: number
   delegated: number
+  adminRules: number
   ordinances: number
   precedents: number
   asOf?: string
@@ -16,6 +17,7 @@ const FALLBACK: LawStats = {
   constitution: 1,
   statutes: 1706,
   delegated: 3476,
+  adminRules: 10000,
   ordinances: 158711,
   precedents: 250000,
 }
@@ -37,6 +39,7 @@ export function StatsSection() {
           constitution: (data.constitution as number) || 0,
           statutes: (data.statutes as number) || 0,
           delegated: (data.delegated as number) || 0,
+          adminRules: (data.adminRules as number) || 0,
           ordinances: (data.ordinances as number) || 0,
           precedents: (data.precedents as number) || 0,
           asOf: data.asOf as string | undefined,
@@ -74,6 +77,14 @@ export function StatsSection() {
       iconBg: "bg-emerald-500/10",
     },
     {
+      icon: "clipboard-check" as const,
+      value: s.adminRules,
+      formatted: formatCount(s.adminRules),
+      label: "행정규칙",
+      color: "text-cyan-400",
+      iconBg: "bg-cyan-500/10",
+    },
+    {
       icon: "landmark" as const,
       value: s.ordinances,
       formatted: formatCount(s.ordinances),
@@ -93,7 +104,7 @@ export function StatsSection() {
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-5 reveal-stagger revealed">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4 reveal-stagger revealed">
         {items.map((stat, index) => (
           <div key={index} className="stat-card text-center">
             <div className="flex justify-center mb-3">

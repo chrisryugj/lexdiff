@@ -85,7 +85,7 @@ export function SearchView({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const [lawStats, setLawStats] = useState<{ constitution: number; statutes: number; delegated: number; laws: number; adminRules: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
+  const [lawStats, setLawStats] = useState<{ constitution: number; statutes: number; delegated: number; adminRules: number; laws: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
   const lastScrollY = useRef(0)
@@ -314,48 +314,54 @@ export function SearchView({
       {/* Footer */}
       <footer className="bg-[#f8f9fa] dark:bg-[#080b0f] text-gray-600 dark:text-gray-400 py-12 border-t border-gray-200 dark:border-gray-800">
         <div className="container mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-gray-200 dark:border-gray-700/50">
-            <div className="flex items-center gap-2">
+          <div className="pb-8 border-b border-gray-200 dark:border-gray-700/50 space-y-5">
+            <div className="flex items-center justify-center gap-2">
               <Icon name="scale" size={24} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
               <span className="text-xl font-medium italic text-[#1a2b4c] dark:text-white tracking-tight" style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}>LexDiff</span>
             </div>
             {/* Live stats */}
             {lawStats && (
-              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm font-medium">
+              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-medium">
                 {lawStats.constitution > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="shield" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">헌법 <AnimatedNumber value={lawStats.constitution} delay={0} /></span>
+                    <Icon name="shield" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">헌법 <span className="tabular-nums"><AnimatedNumber value={lawStats.constitution} delay={0} /></span></span>
                   </span>
                 )}
                 {lawStats.statutes > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="scale" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">법률 <AnimatedNumber value={lawStats.statutes} delay={150} /></span>
+                    <Icon name="scale" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">법률 <span className="tabular-nums"><AnimatedNumber value={lawStats.statutes} delay={100} /></span></span>
                   </span>
                 )}
                 {lawStats.delegated > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="file-text" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">위임법령 <AnimatedNumber value={lawStats.delegated} delay={300} /></span>
+                    <Icon name="file-text" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">위임법령 <span className="tabular-nums"><AnimatedNumber value={lawStats.delegated} delay={200} /></span></span>
+                  </span>
+                )}
+                {lawStats.adminRules > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="clipboard-check" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">행정규칙 <span className="tabular-nums"><AnimatedNumber value={lawStats.adminRules} delay={300} /></span></span>
                   </span>
                 )}
                 {lawStats.ordinances > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="landmark" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">자치법규 <AnimatedNumber value={lawStats.ordinances} delay={450} /></span>
+                    <Icon name="landmark" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">자치법규 <span className="tabular-nums"><AnimatedNumber value={lawStats.ordinances} delay={400} /></span></span>
                   </span>
                 )}
                 {lawStats.precedents > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <Icon name="gavel" size={14} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-700 dark:text-gray-300">판례 <AnimatedNumber value={lawStats.precedents} delay={600} /></span>
+                    <Icon name="gavel" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
+                    <span className="text-gray-600 dark:text-gray-400">판례 <span className="tabular-nums"><AnimatedNumber value={lawStats.precedents} delay={500} /></span></span>
                   </span>
                 )}
               </div>
             )}
             {lawStats?.asOf && (
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums mt-1">{lawStats.asOf} 기준 · 법제처</p>
+              <p className="text-center text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{lawStats.asOf} 기준 · 법제처</p>
             )}
           </div>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 text-xs text-gray-500">

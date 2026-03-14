@@ -11,12 +11,11 @@ interface LawStats {
   constitution: number    // 헌법
   statutes: number        // 법률
   delegated: number       // 위임법령 (대통령령+총리령+부령)
+  adminRules: number      // 행정규칙 (훈령/예규/고시)
   ordinances: number      // 자치법규 소계 (조례+규칙+기타)
   precedents: number      // 판례
   asOf?: string           // 기준일
-  // 하위 호환
-  laws: number            // 법령 소계 (= statutes + delegated + 기타)
-  adminRules: number      // 위임법령 (= delegated, 하위 호환 키)
+  laws: number            // 법령 소계 (하위 호환)
 }
 
 /**
@@ -83,27 +82,20 @@ async function fetchFromStatisticsPage(): Promise<Partial<LawStats> | null> {
 }
 
 /**
- * DRF 검색 API로 판례 건수 조회
+ * DRF 검색 API로 건수 조회 (행정규칙, 판례용)
  */
-async function fetchPrecedentCount(apiKey: string): Promise<number> {
+async function fetchDrfCount(target: string, query: string, apiKey: string): Promise<number> {
   try {
     const params = new URLSearchParams({
-      OC: apiKey,
-      target: "prec",
-      type: "XML",
-      query: "판결",
-      display: "1",
+      OC: apiKey, target, type: "XML", query, display: "1",
     })
-
     const response = await fetch(
       `https://www.law.go.kr/DRF/lawSearch.do?${params}`,
       { next: { revalidate: 86400 } }
     )
     if (!response.ok) return 0
-
     const xml = await response.text()
     if (xml.includes("<!DOCTYPE html")) return 0
-
     const match = xml.match(/<totalCnt>([^<]*)<\/totalCnt>/)
     return match ? parseInt(match[1], 10) : 0
   } catch {
@@ -114,19 +106,18 @@ async function fetchPrecedentCount(apiKey: string): Promise<number> {
 export async function GET() {
   const apiKey = process.env.LAW_OC
 
-  const [statsPage, precedents] = await Promise.all([
+  const [statsPage, adminRules, precedents] = await Promise.all([
     fetchFromStatisticsPage(),
-    apiKey ? fetchPrecedentCount(apiKey) : Promise.resolve(0),
+    apiKey ? fetchDrfCount("admrul", "규", apiKey) : Promise.resolve(0),
+    apiKey ? fetchDrfCount("prec", "판결", apiKey) : Promise.resolve(0),
   ])
-
-  const delegated = statsPage?.delegated || 0
 
   const result: LawStats = {
     constitution: statsPage?.constitution || 0,
     statutes: statsPage?.statutes || 0,
-    delegated,
+    delegated: statsPage?.delegated || 0,
+    adminRules,
     laws: statsPage?.laws || 0,
-    adminRules: delegated, // 하위 호환
     ordinances: statsPage?.ordinances || 0,
     precedents,
     asOf: statsPage?.asOf,
