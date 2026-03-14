@@ -16,15 +16,22 @@ import type { ClassificationInput, ImpactItem } from './types'
  */
 export function buildClassificationQuery(changes: ClassificationInput[]): string {
   const changesJson = JSON.stringify(
-    changes.map(c => ({
-      jo: c.jo,
-      조문: c.joDisplay,
-      법령: c.lawName,
-      개정유형: c.revisionType,
-      하위법령수: c.downstreamCount,
-      구법: c.oldText?.slice(0, 500) || '(없음)',
-      신법: c.newText?.slice(0, 500) || '(없음)',
-    })),
+    changes.map(c => {
+      const entry: Record<string, unknown> = {
+        jo: c.jo,
+        조문: c.joDisplay,
+        법령: c.lawName,
+        개정유형: c.revisionType,
+        하위법령수: c.downstreamCount,
+        구법: c.oldText?.slice(0, 500) || '(없음)',
+        신법: c.newText?.slice(0, 500) || '(없음)',
+      }
+      if (c.referencingOrdinance) {
+        entry.참조조례 = c.referencingOrdinance.ordinanceName
+        entry.영향받는조례조문 = c.referencingOrdinance.ordinanceArticles.join(', ')
+      }
+      return entry
+    }),
     null,
     2,
   )
@@ -32,8 +39,8 @@ export function buildClassificationQuery(changes: ClassificationInput[]): string
   return `다음 법령 조문 변경사항의 영향도를 분류해주세요.
 
 분류 기준:
-- critical(긴급): 위임 근거 삭제/변경, 벌칙 신설/강화, 전부개정, 하위법령 3개 이상 영향
-- review(검토): 용어 변경, 기준/수치 수정, 일부개정으로 실질적 내용 변경
+- critical(긴급): 위임 근거 삭제/변경, 벌칙 신설/강화, 전부개정, 하위법령 3개 이상 영향, 조례가 직접 참조하는 조문의 실질적 변경
+- review(검토): 용어 변경, 기준/수치 수정, 일부개정으로 실질적 내용 변경, 조례 참조 조문의 형식적 변경
 - info(참고): 단순 자구 정비, 조번호 이동, 부칙 변경, 형식적 수정
 
 변경사항:

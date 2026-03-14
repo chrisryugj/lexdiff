@@ -19,6 +19,19 @@ import type {
   ImpactSSEEvent,
 } from '@/lib/impact-tracker/types'
 
+// B방향: 조례가 참조하는 상위법령 목록
+export interface OrdinanceRefInfo {
+  ordinanceName: string
+  refs: Array<{ lawName: string; refCount: number; articles: string[] }>
+}
+
+// B방향: 상위법령 변경 → 영향받는 조례 조문 매핑
+export interface ParentLawChangeInfo {
+  parentLaw: string
+  changedArticles: string[]
+  affectedOrdinanceArticles: string[]
+}
+
 export function useImpactTracker() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -28,6 +41,8 @@ export function useImpactTracker() {
   const [summary, setSummary] = useState<ImpactSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [aiSource, setAiSource] = useState<'openclaw' | 'gemini' | null>(null)
+  const [ordinanceRefs, setOrdinanceRefs] = useState<OrdinanceRefInfo[]>([])
+  const [parentLawChanges, setParentLawChanges] = useState<ParentLawChangeInfo[]>([])
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -49,6 +64,21 @@ export function useImpactTracker() {
         break
       case 'summary':
         setSummary(event.summary)
+        break
+      case 'ordinance_refs':
+        setOrdinanceRefs(prev => [...prev, {
+          ordinanceName: event.ordinanceName,
+          refs: event.refs,
+        }])
+        setStatusMessage(`${event.ordinanceName}: 상위법령 ${event.refs.length}건 참조`)
+        break
+      case 'parent_law_change':
+        setParentLawChanges(prev => [...prev, {
+          parentLaw: event.parentLaw,
+          changedArticles: event.changedArticles,
+          affectedOrdinanceArticles: event.affectedOrdinanceArticles,
+        }])
+        setStatusMessage(`${event.parentLaw}: ${event.changedArticles.length}건 변경 → 조례 ${event.affectedOrdinanceArticles.length}개 조문 영향`)
         break
       case 'ai_source':
         setAiSource(event.source)
@@ -82,6 +112,8 @@ export function useImpactTracker() {
     setSummary(null)
     setError(null)
     setAiSource(null)
+    setOrdinanceRefs([])
+    setParentLawChanges([])
 
     // SSE 스트리밍 시작
     const fetchSSE = async () => {
@@ -169,6 +201,8 @@ export function useImpactTracker() {
     setStep('resolving')
     setStatusMessage('')
     setAiSource(null)
+    setOrdinanceRefs([])
+    setParentLawChanges([])
   }, [])
 
   return {
@@ -180,6 +214,8 @@ export function useImpactTracker() {
     summary,
     error,
     aiSource,
+    ordinanceRefs,
+    parentLawChanges,
     startAnalysis,
     cancelAnalysis,
     clearResults,

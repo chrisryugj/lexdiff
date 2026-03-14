@@ -20,6 +20,7 @@ interface ImpactTrackerViewProps {
 
 const STEP_LABELS: Record<string, string> = {
   resolving: '법령 검색',
+  extracting: '상위법령 참조 추출',
   comparing: '신구법 비교',
   tracing: '하위법령 추적',
   classifying: 'AI 영향도 분류',
@@ -43,6 +44,8 @@ export function ImpactTrackerView({
     summary,
     error,
     aiSource,
+    ordinanceRefs,
+    parentLawChanges,
     startAnalysis,
     cancelAnalysis,
     clearResults,
@@ -161,6 +164,8 @@ export function ImpactTrackerView({
             summary={summary}
             isLoading={isAnalyzing && step === 'summarizing'}
             aiSource={aiSource}
+            ordinanceRefs={ordinanceRefs}
+            parentLawChanges={parentLawChanges}
           />
 
           {items.length > 0 && (

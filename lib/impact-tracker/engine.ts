@@ -1,13 +1,22 @@
 /**
  * 법령 영향 추적기 엔진 - AsyncGenerator + SSE 패턴
  *
- * 6단계 파이프라인:
- * 1. resolving  — search_law (+ search_ordinance 폴백) 으로 MST 확보
- * 2. comparing  — compare_old_new로 변경 조문 + 신구문 텍스트
- * 3. tracing    — get_three_tier로 하위법령 의존성
- * 4. classifying — AI 영향도 분류 (OpenClaw → Gemini)
- * 5. summarizing — AI 종합 요약 (OpenClaw → Gemini)
- * 6. complete   — 최종 결과 조립
+ * 양방향 파이프라인:
+ *
+ * [국가법령 입력] (기존 A방향)
+ *   1. resolving  — search_law로 MST 확보
+ *   2. comparing  — compare_old_new로 변경 조문 + 신구문
+ *   3. tracing    — get_three_tier + 조례 영향 탐색
+ *
+ * [조례 입력] (B방향)
+ *   1. resolving  — search_ordinance로 ordinSeq 확보
+ *   2. extracting — 조례 전문에서 상위법령 참조 추출
+ *   3. comparing  — 참조된 상위법령의 변경 여부 확인
+ *
+ * [공통]
+ *   4. classifying — AI 영향도 분류
+ *   5. summarizing — AI 종합 요약
+ *   6. complete   — 최종 결과 조립
  */
 
 import { executeTool } from '@/lib/fc-rag/tool-adapter'
@@ -20,6 +29,12 @@ import {
   parseThreeTierResult,
   type ResolvedLaw,
 } from './result-parser'
+import {
+  getFullOrdinanceArticles,
+  extractLawReferences,
+  summarizeReferences,
+  findAffectedOrdinances,
+} from './ordinance-analyzer'
 import type {
   ImpactTrackerRequest,
   ImpactSSEEvent,
@@ -37,9 +52,11 @@ export async function* executeImpactAnalysis(
 ): AsyncGenerator<ImpactSSEEvent> {
   const { lawNames, dateFrom, dateTo } = request
   const allChanges: ArticleChange[] = []
-  const allOldNewMap = new Map<string, { oldText: string; newText: string }>()
+  const allOldNew: Array<{ oldText: string; newText: string }> = []
   const allDownstreamMap = new Map<string, DownstreamImpact[]>()
   const resolvedLaws: ResolvedLaw[] = []
+  // B방향: 조례별 상위법령 참조 매핑 (classification에서 사용)
+  const ordinanceRefContext = new Map<string, { ordinanceName: string; ordinanceArticles: string[] }>()
 
   try {
     // ── Step 1: 법령 검색 (resolving) ──
@@ -65,22 +82,13 @@ export async function* executeImpactAnalysis(
       }
 
       if (parsed.length === 0) {
-        yield {
-          type: 'error',
-          message: `"${lawName}" 검색 결과가 없습니다.`,
-          recoverable: true,
-        }
+        yield { type: 'error', message: `"${lawName}" 검색 결과가 없습니다.`, recoverable: true }
         continue
       }
 
       const law = parsed[0]
       resolvedLaws.push(law)
-      yield {
-        type: 'law_resolved',
-        lawName: law.lawName,
-        lawId: law.lawId,
-        mst: law.mst,
-      }
+      yield { type: 'law_resolved', lawName: law.lawName, lawId: law.lawId, mst: law.mst }
     }
 
     if (resolvedLaws.length === 0) {
@@ -88,112 +96,24 @@ export async function* executeImpactAnalysis(
       return
     }
 
-    const progress1 = 10
+    // 조례 / 국가법령 분리
+    const ordinances = resolvedLaws.filter(l => l.kind === '조례')
+    const nationalLaws = resolvedLaws.filter(l => l.kind !== '조례')
 
-    // ── Step 2: 신구법 비교 (comparing) ──
-    yield { type: 'status', message: '신구법 비교 조회 중...', progress: progress1, step: 'comparing' }
+    // ── B방향: 조례 → 상위법령 참조 추출 + 변경 확인 ──
+    if (ordinances.length > 0) {
+      yield* processOrdinances(ordinances, dateFrom, dateTo, allChanges, allOldNew, ordinanceRefContext, options)
+    }
 
-    for (let i = 0; i < resolvedLaws.length; i++) {
-      if (options?.signal?.aborted) throw new Error('cancelled')
-
-      const law = resolvedLaws[i]
-      const progressPer = progress1 + ((i + 1) / resolvedLaws.length) * 30
-
-      yield {
-        type: 'status',
-        message: `${law.lawName} 신구법 비교 중...`,
-        progress: Math.round(progressPer),
-        step: 'comparing',
-      }
-
-      const compareResult = await executeTool('compare_old_new', {
-        lawId: law.lawId,
-        mst: law.mst,
-      })
-
-      if (compareResult.isError) {
-        yield {
-          type: 'error',
-          message: `${law.lawName} 신구법 비교 실패: ${compareResult.result.slice(0, 100)}`,
-          recoverable: true,
-        }
-        continue
-      }
-
-      // 조례 등 신구법 대조 데이터 없는 경우
-      if (compareResult.result.includes('개정 이력이 없거나') || compareResult.result.includes('데이터가 없습니다')) {
-        yield {
-          type: 'error',
-          message: `${law.lawName}: 신구법 대조 데이터가 없습니다. (${law.kind === '조례' ? '자치법규는 신구법비교를 지원하지 않을 수 있습니다' : '해당 기간 개정 이력 없음'})`,
-          recoverable: true,
-        }
-        continue
-      }
-
-      const parsed = parseCompareOldNew(compareResult.result)
-      const revisionDate = extractDateFromCompare(compareResult.result)
-      const changes = buildChangesFromOldNew(parsed, law.lawId, law.mst, revisionDate)
-
-      allChanges.push(...changes)
-
-      for (const pair of parsed.pairs) {
-        const key = `${law.lawId}:${pair.joDisplay}`
-        allOldNewMap.set(key, { oldText: pair.oldText, newText: pair.newText })
-      }
-
-      yield { type: 'changes_found', lawName: law.lawName, changes }
+    // ── A방향: 국가법령 신구법비교 + 위임법령 추적 ──
+    if (nationalLaws.length > 0) {
+      yield* processNationalLaws(nationalLaws, allChanges, allOldNew, allDownstreamMap, request, options)
     }
 
     if (allChanges.length === 0) {
-      yield {
-        type: 'status',
-        message: '조회 기간 내 변경사항이 없습니다.',
-        progress: 100,
-        step: 'complete',
-      }
-      yield {
-        type: 'complete',
-        result: {
-          items: [],
-          summary: buildEmptySummary(dateFrom, dateTo),
-          analyzedAt: new Date().toISOString(),
-        },
-      }
+      yield { type: 'status', message: '조회 기간 내 변경사항이 없습니다.', progress: 100, step: 'complete' }
+      yield { type: 'complete', result: { items: [], summary: buildEmptySummary(dateFrom, dateTo), analyzedAt: new Date().toISOString() } }
       return
-    }
-
-    // ── Step 3: 하위법령 추적 (tracing) ──
-    yield { type: 'status', message: '하위법령 영향 추적 중...', progress: 45, step: 'tracing' }
-
-    for (let i = 0; i < resolvedLaws.length; i++) {
-      if (options?.signal?.aborted) throw new Error('cancelled')
-
-      const law = resolvedLaws[i]
-
-      // 조례는 three_tier 지원 안 함 — 스킵
-      if (law.kind === '조례') continue
-
-      const progressPer = 45 + ((i + 1) / resolvedLaws.length) * 15
-
-      yield {
-        type: 'status',
-        message: `${law.lawName} 위임법령 조회 중...`,
-        progress: Math.round(progressPer),
-        step: 'tracing',
-      }
-
-      const threeTierResult = await executeTool('get_three_tier', {
-        lawId: law.lawId,
-        mst: law.mst,
-      })
-
-      if (!threeTierResult.isError) {
-        const downstream = parseThreeTierResult(threeTierResult.result)
-        for (const [joDisplay, impacts] of downstream) {
-          const key = `${law.lawId}:${joDisplay}`
-          allDownstreamMap.set(key, impacts)
-        }
-      }
     }
 
     // ── Step 4: AI 영향도 분류 (classifying) ──
@@ -202,10 +122,11 @@ export async function* executeImpactAnalysis(
     const aiSource = await getAISource()
     yield { type: 'ai_source', source: aiSource }
 
-    const classificationInputs: ClassificationInput[] = allChanges.map(change => {
+    const classificationInputs: ClassificationInput[] = allChanges.map((change, i) => {
       const key = `${change.lawId}:${change.joDisplay}`
-      const oldNew = allOldNewMap.get(key)
+      const oldNew = allOldNew[i]
       const downstream = allDownstreamMap.get(key) || []
+      const ordRef = ordinanceRefContext.get(`${change.lawName}:${change.joDisplay}`)
       return {
         lawName: change.lawName,
         jo: change.jo,
@@ -214,20 +135,18 @@ export async function* executeImpactAnalysis(
         oldText: oldNew?.oldText,
         newText: oldNew?.newText,
         downstreamCount: downstream.length,
+        referencingOrdinance: ordRef,
       }
     })
 
     const BATCH_SIZE = 10
-    const classificationResults: Map<string, { severity: ImpactSeverity; reason: string }> = new Map()
+    const classificationResults = new Map<string, { severity: ImpactSeverity; reason: string }>()
 
     for (let i = 0; i < classificationInputs.length; i += BATCH_SIZE) {
       if (options?.signal?.aborted) throw new Error('cancelled')
 
       const batch = classificationInputs.slice(i, i + BATCH_SIZE)
-      const results = await classifyImpact(batch, {
-        signal: options?.signal,
-        apiKey: options?.apiKey,
-      })
+      const results = await classifyImpact(batch, { signal: options?.signal, apiKey: options?.apiKey })
 
       for (const r of results) {
         classificationResults.set(r.jo, { severity: r.severity, reason: r.reason })
@@ -243,14 +162,15 @@ export async function* executeImpactAnalysis(
 
     // ImpactItem 조립 + 점진적 전송
     const items: ImpactItem[] = []
-    for (const change of allChanges) {
+    for (let idx = 0; idx < allChanges.length; idx++) {
+      const change = allChanges[idx]
       const key = `${change.lawId}:${change.joDisplay}`
-      const oldNew = allOldNewMap.get(key)
+      const oldNew = allOldNew[idx]
       const downstream = allDownstreamMap.get(key) || []
       const classification = classificationResults.get(change.jo)
 
       const item: ImpactItem = {
-        id: `${change.lawId}-${change.jo}-${Date.now()}`,
+        id: `${change.lawId}-${change.jo}-${idx}`,
         change,
         downstreamImpacts: downstream,
         severity: classification?.severity ?? inferSeverity(change, downstream.length),
@@ -290,14 +210,7 @@ export async function* executeImpactAnalysis(
     yield { type: 'summary', summary }
 
     // ── Step 6: 완료 ──
-    yield {
-      type: 'complete',
-      result: {
-        items,
-        summary,
-        analyzedAt: new Date().toISOString(),
-      },
-    }
+    yield { type: 'complete', result: { items, summary, analyzedAt: new Date().toISOString() } }
   } catch (error) {
     if (error instanceof Error && error.message === 'cancelled') {
       yield { type: 'error', message: '분석이 취소되었습니다.', recoverable: false }
@@ -308,15 +221,219 @@ export async function* executeImpactAnalysis(
   }
 }
 
+// ── B방향: 조례 → 상위법령 변경 추적 ──
+
+async function* processOrdinances(
+  ordinances: ResolvedLaw[],
+  dateFrom: string,
+  dateTo: string,
+  allChanges: ArticleChange[],
+  allOldNew: Array<{ oldText: string; newText: string }>,
+  ordinanceRefContext: Map<string, { ordinanceName: string; ordinanceArticles: string[] }>,
+  options?: { signal?: AbortSignal },
+): AsyncGenerator<ImpactSSEEvent> {
+  for (const ordin of ordinances) {
+    if (options?.signal?.aborted) throw new Error('cancelled')
+
+    // 2-1. 조례 전문 조회 + 상위법령 참조 추출
+    yield { type: 'status', message: `${ordin.lawName} 상위법령 참조 분석 중...`, progress: 12, step: 'extracting' }
+
+    let refMap: Map<string, Array<{ parentLawName: string; parentJo?: string; ordinanceJo: string; ordinanceJoTitle?: string }>>
+    try {
+      const { articles } = await getFullOrdinanceArticles(ordin.lawId)
+      refMap = extractLawReferences(articles)
+    } catch {
+      yield { type: 'error', message: `${ordin.lawName}: 조례 본문 조회 실패`, recoverable: true }
+      continue
+    }
+
+    if (refMap.size === 0) {
+      yield { type: 'error', message: `${ordin.lawName}: 상위법령 참조를 찾을 수 없습니다.`, recoverable: true }
+      continue
+    }
+
+    const refSummary = summarizeReferences(refMap)
+    yield { type: 'ordinance_refs', ordinanceName: ordin.lawName, refs: refSummary }
+
+    // 2-2. 각 상위법령의 변경 여부 확인
+    let parentIdx = 0
+    for (const [parentLawName, refs] of refMap) {
+      if (options?.signal?.aborted) throw new Error('cancelled')
+      parentIdx++
+
+      const progress = 15 + (parentIdx / refMap.size) * 30
+      yield { type: 'status', message: `${parentLawName} 변경사항 확인 중...`, progress: Math.round(progress), step: 'comparing' }
+
+      // 상위법령 검색
+      const lawResult = await executeTool('search_law', { query: parentLawName })
+      if (lawResult.isError) continue
+
+      const parsed = parseSearchResult(lawResult.result)
+      if (parsed.length === 0) continue
+
+      const parentLaw = parsed[0]
+
+      // 신구법 비교
+      const compareResult = await executeTool('compare_old_new', { lawId: parentLaw.lawId, mst: parentLaw.mst })
+      if (compareResult.isError) continue
+      if (compareResult.result.includes('개정 이력이 없거나') || compareResult.result.includes('데이터가 없습니다')) continue
+
+      const compParsed = parseCompareOldNew(compareResult.result)
+      const revisionDate = extractDateFromCompare(compareResult.result)
+      const changes = buildChangesFromOldNew(compParsed, parentLaw.lawId, parentLaw.mst, revisionDate)
+
+      // 조례가 참조하는 조문만 필터
+      const referencedJos = new Set(refs.filter(r => r.parentJo).map(r => r.parentJo!))
+      const hasWildcard = refs.some(r => !r.parentJo) // 법령 전체 참조
+
+      const relevantChanges = hasWildcard
+        ? changes // 전체 참조면 모든 변경 포함
+        : changes.filter(c => referencedJos.has(c.joDisplay))
+
+      if (relevantChanges.length === 0) continue
+
+      // ordinanceRefContext에 매핑 저장 (분류 시 사용)
+      for (const change of relevantChanges) {
+        const key = `${change.lawName}:${change.joDisplay}`
+        const affectedOrdArticles = refs
+          .filter(r => !r.parentJo || r.parentJo === change.joDisplay)
+          .map(r => r.ordinanceJo)
+        ordinanceRefContext.set(key, {
+          ordinanceName: ordin.lawName,
+          ordinanceArticles: [...new Set(affectedOrdArticles)],
+        })
+      }
+
+      allChanges.push(...relevantChanges)
+
+      // oldNew 텍스트도 매핑
+      for (const pair of compParsed.pairs) {
+        const isRelevant = hasWildcard || referencedJos.has(pair.joDisplay)
+        if (isRelevant) {
+          allOldNew.push({ oldText: pair.oldText, newText: pair.newText })
+        }
+      }
+
+      const affectedOrdJos = [...new Set(refs.filter(r => !r.parentJo || referencedJos.has(r.parentJo || '')).map(r => r.ordinanceJo))]
+      yield {
+        type: 'parent_law_change',
+        parentLaw: parentLawName,
+        changedArticles: [...new Set(relevantChanges.map(c => c.joDisplay))],
+        affectedOrdinanceArticles: affectedOrdJos,
+      }
+      yield { type: 'changes_found', lawName: parentLaw.lawName, changes: relevantChanges }
+    }
+  }
+}
+
+// ── A방향: 국가법령 신구법비교 + 위임법령/조례 추적 ──
+
+async function* processNationalLaws(
+  nationalLaws: ResolvedLaw[],
+  allChanges: ArticleChange[],
+  allOldNew: Array<{ oldText: string; newText: string }>,
+  allDownstreamMap: Map<string, DownstreamImpact[]>,
+  request: ImpactTrackerRequest,
+  options?: { signal?: AbortSignal },
+): AsyncGenerator<ImpactSSEEvent> {
+  // Step 2: 신구법 비교
+  yield { type: 'status', message: '신구법 비교 조회 중...', progress: 10, step: 'comparing' }
+
+  for (let i = 0; i < nationalLaws.length; i++) {
+    if (options?.signal?.aborted) throw new Error('cancelled')
+
+    const law = nationalLaws[i]
+    const progressPer = 10 + ((i + 1) / nationalLaws.length) * 25
+
+    yield { type: 'status', message: `${law.lawName} 신구법 비교 중...`, progress: Math.round(progressPer), step: 'comparing' }
+
+    const compareResult = await executeTool('compare_old_new', { lawId: law.lawId, mst: law.mst })
+
+    if (compareResult.isError) {
+      yield { type: 'error', message: `${law.lawName} 신구법 비교 실패: ${compareResult.result.slice(0, 100)}`, recoverable: true }
+      continue
+    }
+
+    if (compareResult.result.includes('개정 이력이 없거나') || compareResult.result.includes('데이터가 없습니다')) {
+      yield { type: 'error', message: `${law.lawName}: 신구법 대조 데이터가 없습니다.`, recoverable: true }
+      continue
+    }
+
+    const parsed = parseCompareOldNew(compareResult.result)
+    const revisionDate = extractDateFromCompare(compareResult.result)
+    const changes = buildChangesFromOldNew(parsed, law.lawId, law.mst, revisionDate)
+
+    allChanges.push(...changes)
+    for (const pair of parsed.pairs) {
+      allOldNew.push({ oldText: pair.oldText, newText: pair.newText })
+    }
+
+    yield { type: 'changes_found', lawName: law.lawName, changes }
+  }
+
+  // Step 3: 위임법령 추적 (three_tier)
+  yield { type: 'status', message: '하위법령 영향 추적 중...', progress: 40, step: 'tracing' }
+
+  for (let i = 0; i < nationalLaws.length; i++) {
+    if (options?.signal?.aborted) throw new Error('cancelled')
+
+    const law = nationalLaws[i]
+    yield { type: 'status', message: `${law.lawName} 위임법령 조회 중...`, progress: Math.round(40 + ((i + 1) / nationalLaws.length) * 10), step: 'tracing' }
+
+    const threeTierResult = await executeTool('get_three_tier', { lawId: law.lawId, mst: law.mst })
+    if (!threeTierResult.isError) {
+      const downstream = parseThreeTierResult(threeTierResult.result)
+      for (const [joDisplay, impacts] of downstream) {
+        const key = `${law.lawId}:${joDisplay}`
+        allDownstreamMap.set(key, impacts)
+      }
+    }
+  }
+
+  // Step 3.5: 관련 조례 영향 탐색 (A방향 확장)
+  const changedJoDisplays = [...new Set(allChanges.map(c => c.joDisplay))]
+  if (changedJoDisplays.length > 0) {
+    yield { type: 'status', message: '관련 자치법규 탐색 중...', progress: 55, step: 'tracing' }
+
+    for (const law of nationalLaws) {
+      if (options?.signal?.aborted) throw new Error('cancelled')
+
+      try {
+        const affected = await findAffectedOrdinances(
+          law.lawName,
+          changedJoDisplays,
+          { region: request.region, maxResults: 3, signal: options?.signal },
+        )
+
+        for (const ord of affected) {
+          for (const art of ord.affectedArticles) {
+            // 해당 상위법령 조문의 downstream에 자치법규 추가
+            const key = `${law.lawId}:${art.referencedParentJo}`
+            const existing = allDownstreamMap.get(key) || []
+            existing.push({
+              type: '자치법규',
+              lawName: ord.ordinanceName,
+              lawId: ord.ordinanceId,
+              joDisplay: art.ordinanceJo,
+              content: art.ordinanceJoTitle,
+            })
+            allDownstreamMap.set(key, existing)
+          }
+        }
+      } catch {
+        // 조례 탐색 실패는 무시 (비핵심 기능)
+      }
+    }
+  }
+}
+
 // ── 유틸 ──
 
-/** compare_old_new 텍스트에서 신법 공포일 추출 */
 function extractDateFromCompare(text: string): string {
   const m = text.match(/신법 공포일:\s*(\S+)/)
   return m?.[1] ?? new Date().toISOString().slice(0, 10)
 }
 
-/** AI 미응답 시 규칙 기반 폴백 분류 */
 function inferSeverity(change: ArticleChange, downstreamCount: number): ImpactSeverity {
   if (change.revisionType === '전부개정' || downstreamCount >= 3) return 'critical'
   if (change.revisionType === '삭제' || change.revisionType === '신설') return 'review'

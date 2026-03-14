@@ -93,13 +93,17 @@ export function parseCompareOldNew(text: string): {
   // [개정 전] / [개정 후] 블록 쌍 추출
   const blockRegex = /\[개정 전\]\n([\s\S]*?)\n\n\[개정 후\]\n([\s\S]*?)(?=\n━|$)/g
   let bm
+  let lastJoDisplay = ''
   while ((bm = blockRegex.exec(text)) !== null) {
     const oldText = bm[1].trim()
     const newText = bm[2].trim()
 
-    // 조문번호를 텍스트 첫 줄에서 추출
-    const joMatch = (newText || oldText).match(/^(제\d+조(?:의\d+)?)/)
-    const joDisplay = joMatch?.[1] ?? `조문${pairs.length + 1}`
+    // 조문번호를 텍스트 첫 줄에서 추출 → 없으면 직전 조문 상속
+    const joMatch = (newText || oldText).match(/^(?:<[^>]+>\s*)*?(제\d+조(?:의\d+)?)/)
+    if (joMatch) {
+      lastJoDisplay = joMatch[1]
+    }
+    const joDisplay = lastJoDisplay || `조문${pairs.length + 1}`
 
     pairs.push({ joDisplay, oldText, newText })
   }

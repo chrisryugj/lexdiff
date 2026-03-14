@@ -8,6 +8,7 @@ export interface ImpactTrackerRequest {
   lawNames: string[]       // ["국토계획법", "건축법"]
   dateFrom: string         // "2025-01-01"
   dateTo: string           // "2026-03-14"
+  region?: string          // "광진구" — A방향 조례 탐색 시 지역 필터
 }
 
 // ── 영향도 등급 ──
@@ -88,9 +89,13 @@ export type ImpactSSEEvent =
   | { type: 'ai_source'; source: 'openclaw' | 'gemini' }
   | { type: 'complete'; result: ImpactTrackerResult }
   | { type: 'error'; message: string; recoverable: boolean }
+  // B방향: 조례→상위법령 이벤트
+  | { type: 'ordinance_refs'; ordinanceName: string; refs: Array<{ lawName: string; refCount: number; articles: string[] }> }
+  | { type: 'parent_law_change'; parentLaw: string; changedArticles: string[]; affectedOrdinanceArticles: string[] }
 
 export type ImpactStep =
   | 'resolving'
+  | 'extracting'    // B방향: 상위법령 참조 추출
   | 'comparing'
   | 'tracing'
   | 'classifying'
@@ -107,6 +112,11 @@ export interface ClassificationInput {
   oldText?: string
   newText?: string
   downstreamCount: number
+  // B방향: 이 상위법령 조문을 참조하는 조례 조문 정보
+  referencingOrdinance?: {
+    ordinanceName: string
+    ordinanceArticles: string[]  // ["제1조", "제9조"]
+  }
 }
 
 export interface ClassificationResult {

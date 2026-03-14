@@ -27,6 +27,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
   const [lawNames, setLawNames] = useState<string[]>([])
   const [dateFrom, setDateFrom] = useState(getDateMonthsAgo(3))
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10))
+  const [region, setRegion] = useState('')
 
   const addLaw = () => {
     const name = lawInput.trim()
@@ -48,7 +49,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
 
   const handleSubmit = () => {
     if (lawNames.length === 0) return
-    onSubmit({ lawNames, dateFrom, dateTo })
+    onSubmit({ lawNames, dateFrom, dateTo, ...(region.trim() ? { region: region.trim() } : {}) })
   }
 
   return (
@@ -57,7 +58,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
         법령 영향 추적기
       </h3>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        상위법 개정이 하위법령에 미치는 영향을 자동으로 탐지합니다.
+        법령·조례 개정이 하위법령 및 자치법규에 미치는 영향을 양방향으로 추적합니다.
       </p>
 
       {/* 법령명 입력 */}
@@ -71,7 +72,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
             value={lawInput}
             onChange={e => setLawInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="예: 건축법, 국토계획법"
+            placeholder="예: 건축법, 광진구 도시계획 조례"
             className="flex-1 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
             disabled={isAnalyzing}
           />
@@ -103,6 +104,22 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
             ))}
           </div>
         )}
+      </div>
+
+      {/* 지역 필터 (선택) */}
+      <div className="mb-4">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+          지역 <span className="text-gray-400 font-normal">(선택)</span>
+        </label>
+        <input
+          type="text"
+          value={region}
+          onChange={e => setRegion(e.target.value)}
+          placeholder="예: 광진구, 강동구"
+          className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+          disabled={isAnalyzing}
+        />
+        <p className="text-xs text-gray-400 mt-1">상위법령 입력 시, 영향받는 조례를 이 지역 범위로 탐색합니다.</p>
       </div>
 
       {/* 기간 선택 */}

@@ -3,14 +3,17 @@
 import { useState } from 'react'
 import { Icon } from '@/components/ui/icon'
 import type { ImpactSummary as ImpactSummaryType } from '@/lib/impact-tracker/types'
+import type { OrdinanceRefInfo, ParentLawChangeInfo } from '@/hooks/use-impact-tracker'
 
 interface ImpactSummaryProps {
   summary: ImpactSummaryType | null
   isLoading: boolean
   aiSource: 'openclaw' | 'gemini' | null
+  ordinanceRefs?: OrdinanceRefInfo[]
+  parentLawChanges?: ParentLawChangeInfo[]
 }
 
-export function ImpactSummary({ summary, isLoading, aiSource }: ImpactSummaryProps) {
+export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, parentLawChanges }: ImpactSummaryProps) {
   const [expanded, setExpanded] = useState(false)
 
   if (!summary && !isLoading) return null
@@ -53,6 +56,23 @@ export function ImpactSummary({ summary, isLoading, aiSource }: ImpactSummaryPro
               </span>
             )}
           </div>
+
+          {/* B방향: 조례→상위법령 참조 통계 */}
+          {ordinanceRefs && ordinanceRefs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 text-xs text-gray-600 dark:text-gray-400">
+              <Icon name="link" size={12} />
+              {ordinanceRefs.map((ref, i) => (
+                <span key={i}>
+                  {ref.ordinanceName}: 상위법령 {ref.refs.length}건 참조
+                </span>
+              ))}
+              {parentLawChanges && parentLawChanges.length > 0 && (
+                <span className="text-orange-600 dark:text-orange-400 font-medium">
+                  → {parentLawChanges.length}건 변경 감지
+                </span>
+              )}
+            </div>
+          )}
 
           {/* AI 요약 (접기/펼치기) */}
           {summary.aiSummary && (
