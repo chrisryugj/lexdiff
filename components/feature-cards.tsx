@@ -108,7 +108,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
   let refIdx = 0
 
   return (
-    <div className="w-full space-y-12 lg:space-y-16">
+    <div className="w-full space-y-8 lg:space-y-10">
       {/* ━━ Core Competence ━━ */}
       <div>
         <div className={`mb-10 lg:mb-14 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
@@ -160,7 +160,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mb-8 lg:mb-10 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}
