@@ -91,6 +91,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     matchedCount,
     totalMunicipalities,
     search,
+    forceRefresh,
     cancel,
   } = useOrdinanceBenchmark()
 
@@ -213,10 +214,24 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                 취소
               </Button>
             ) : (
-              <Button size="sm" onClick={handleSearch} disabled={!inputValue.trim()} className="h-9 px-4">
-                <Icon name="search" size={14} className="mr-1" />
-                검색
-              </Button>
+              <>
+                <Button size="sm" onClick={handleSearch} disabled={!inputValue.trim()} className="h-9 px-4">
+                  <Icon name="search" size={14} className="mr-1" />
+                  검색
+                </Button>
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => inputValue.trim() && forceRefresh(inputValue.trim())}
+                    disabled={!inputValue.trim()}
+                    className="h-9 px-2"
+                    title="캐시 무시하고 강제 재검색"
+                  >
+                    <Icon name="refresh-cw" size={14} />
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
