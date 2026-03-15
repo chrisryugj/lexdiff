@@ -113,11 +113,12 @@ export const TimeMachineModal = memo(function TimeMachineModal({
   }, [isOpen])
 
   // 조회 실행
-  const handleSearch = useCallback(async () => {
-    if (!targetDate || (!meta.mst && !meta.lawId)) return
+  const handleSearch = useCallback(async (overrideDate?: string) => {
+    const searchDate = overrideDate || targetDate
+    if (!searchDate || (!meta.mst && !meta.lawId)) return
 
     // 캐시 체크
-    const cached = meta.mst ? getCached(meta.mst, targetDate) : null
+    const cached = meta.mst ? getCached(meta.mst, searchDate) : null
     if (cached) {
       setVersionMatch(cached.versionMatch)
       setPastText(cached.pastText)
@@ -150,9 +151,9 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       }
 
       // Step 2: 해당 날짜 버전 찾기
-      const match = findVersionByDate(histories, targetDate, meta.mst || '')
+      const match = findVersionByDate(histories, searchDate, meta.mst || '')
       if (!match) {
-        setError(`${targetDate} 이전에 유효한 법령 버전이 없습니다.`)
+        setError(`${searchDate} 이전에 유효한 법령 버전이 없습니다.`)
         return
       }
 
@@ -179,7 +180,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
 
       // 캐싱
       if (meta.mst) {
-        setCache(meta.mst, targetDate, { pastText: pText, currentText: cText, versionMatch: match })
+        setCache(meta.mst, searchDate, { pastText: pText, currentText: cText, versionMatch: match })
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return
@@ -257,7 +258,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
             <Button
               size="sm"
               className="h-8 px-4"
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={isLoading || !targetDate}
             >
               {isLoading ? (
@@ -301,6 +302,37 @@ export const TimeMachineModal = memo(function TimeMachineModal({
             )}
           </div>
 
+          {/* 빠른 선택 템플릿 */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <span className="text-xs text-muted-foreground shrink-0">빠른 선택:</span>
+            {[
+              { label: '6개월 전', months: 6 },
+              { label: '1년 전', months: 12 },
+              { label: '3년 전', months: 36 },
+              { label: '5년 전', months: 60 },
+              { label: '10년 전', months: 120 },
+            ].map(({ label, months }) => {
+              const d = new Date()
+              d.setMonth(d.getMonth() - months)
+              const dateStr = d.toISOString().slice(0, 10)
+              return (
+                <Button
+                  key={months}
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setTargetDate(dateStr)
+                    handleSearch(dateStr)
+                  }}
+                >
+                  {label}
+                </Button>
+              )
+            })}
+          </div>
+
           {/* 적용 버전 정보 */}
           {versionMatch && (
             <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
@@ -333,9 +365,15 @@ export const TimeMachineModal = memo(function TimeMachineModal({
               <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
                   {versionMatch.betweenRevisions.map((rev, i) => (
-                    <div
+                    <button
                       key={`${rev.mst}-${i}`}
-                      className="p-2.5 rounded-md border border-border bg-card hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        const d = rev.efYd
+                        const formatted = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`
+                        setTargetDate(formatted)
+                        handleSearch(formatted)
+                      }}
+                      className="w-full text-left p-2.5 rounded-md border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-1.5 mb-1">
                         <Badge variant="outline" className="text-[10px] h-4">{rev.rrCls}</Badge>
@@ -344,7 +382,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                         <div className="font-medium">{formatDateDisplay(rev.efYd)} 시행</div>
                         <div className="text-muted-foreground text-[10px]">{rev.ancNo}</div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </ScrollArea>
@@ -365,7 +403,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                 <div className="text-center space-y-3 max-w-md px-4">
                   <Icon name="alert-circle" size={40} className="mx-auto text-amber-500" />
                   <p className="text-sm text-muted-foreground">{error}</p>
-                  <Button variant="outline" size="sm" onClick={handleSearch}>
+                  <Button variant="outline" size="sm" onClick={() => handleSearch()}>
                     <Icon name="refresh" size={14} className="mr-1" />
                     다시 시도
                   </Button>
