@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { expandQuery } from '@/lib/query-expansion'
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
@@ -275,14 +276,45 @@ export async function GET(request: NextRequest) {
     // 조례 키워드 감지 (scope=all이면 항상 조례 검색)
     const isOrdinanceQuery = scope === 'all' || /조례|규칙|자치법규|시|군|구/.test(query)
 
-    // 병렬 검색: 법령 + 조례 (조례 키워드 있으면 조례도 검색)
-    const [lawResults, ordinanceResults] = await Promise.all([
+    // 동의어 확장: 원본 + 상위 2개 동의어 병렬 호출 (응답 시간 제약)
+    const expansion = expandQuery(searchQuery)
+    const expandedQueries = expansion.allExpanded
+      .filter(e => e !== searchQuery && e.length >= 2)
+      .slice(0, 2) // 최대 2개 추가 (3초 타임아웃 내 처리)
+
+    // 병렬 검색: 원본 + 확장 쿼리 (법령 + 조례)
+    const lawSearches = [
       scope === 'law-only' ? Promise.resolve([]) : searchLawNames(searchQuery),
-      isOrdinanceQuery ? searchOrdinances(searchQuery) : Promise.resolve([])
-    ])
+      ...expandedQueries.map(eq =>
+        scope === 'law-only' ? Promise.resolve([]) : searchLawNames(eq)
+      ),
+    ]
+    const ordinSearches = [
+      isOrdinanceQuery ? searchOrdinances(searchQuery) : Promise.resolve([]),
+      ...expandedQueries.map(eq =>
+        isOrdinanceQuery ? searchOrdinances(eq) : Promise.resolve([])
+      ),
+    ]
+
+    const allResults = await Promise.all([...lawSearches, ...ordinSearches])
+    const lawResults = allResults.slice(0, lawSearches.length).flat()
+    const ordinanceResults = allResults.slice(lawSearches.length).flat()
+
+    // 중복 제거 (같은 법령명)
+    const seenNames = new Set<string>()
+    const dedupLaw = lawResults.filter(r => {
+      if (seenNames.has(r.name)) return false
+      seenNames.add(r.name)
+      return true
+    })
+    const dedupOrdin = ordinanceResults.filter(r => {
+      if (seenNames.has(r.name)) return false
+      seenNames.add(r.name)
+      return true
+    })
 
     // 법령 결과 추가
-    for (const law of lawResults) {
+    for (const law of dedupLaw) {
       const matchIndex = law.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
       let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
@@ -308,7 +340,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 조례 결과 추가
-    for (const ordin of ordinanceResults) {
+    for (const ordin of dedupOrdin) {
       const matchIndex = ordin.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = ordin.name.toLowerCase().startsWith(queryLower)
       let score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수

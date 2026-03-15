@@ -161,7 +161,7 @@ const SYNONYM_GROUPS: string[][] = [
   ["교통", "도로", "대중교통", "교통안전"],
   ["전기자동차", "환경친화적자동차", "전기차"],
   ["공공자전거", "공유자전거", "자전거이용"],
-  ["개인형이동장치", "전동킥보드", "킥보드"],
+  ["개인형이동장치", "전동킥보드", "킥보드", "원동기장치자전거"],
   ["주차", "주차장", "공영주차장"],
   ["주거", "주택", "임대주택", "공공주택", "주거안정"],
   ["교육", "평생교육", "학습", "교육지원"],
@@ -192,7 +192,7 @@ const SYNONYM_GROUPS: string[][] = [
   ["인권", "인권보호", "차별금지"],
   ["다문화", "다문화가족", "외국인주민"],
   ["출산", "저출산", "출산장려", "출산지원"],
-  ["반려동물", "동물보호", "유기동물", "반려견", "반려묘", "유기견"],
+  ["반려동물", "동물보호", "유기동물", "반려견", "반려묘", "유기견", "강아지", "고양이"],
   ["미세먼지", "대기환경", "대기오염"],
   ["다자녀", "출산장려", "출산지원", "다둥이"],
   ["노점상", "노점", "행상"],
@@ -209,6 +209,91 @@ const SYNONYM_GROUPS: string[][] = [
   ["하천", "하천정비", "수해방지"],
   ["빈집", "빈집정비", "빈집관리"],
   ["드론", "무인항공기", "무인비행장치"],
+
+  // ── 의료/보건 심화 ──
+  ["응급실", "응급의료", "응급의료기관"],
+  ["약국", "약사", "의약품", "약업"],
+  ["한의원", "한의약", "한방", "한방의료"],
+  ["요양원", "요양기관", "장기요양", "노인요양"],
+  ["보건소", "보건의료", "공중보건", "건강증진"],
+  ["예방접종", "감염병예방", "방역"],
+  ["금연", "흡연", "건강증진", "담배"],
+
+  // ── 행정 절차 ──
+  ["민원", "민원처리", "행정서비스"],
+  ["인허가", "허가", "인가", "면허"],
+  ["과태료", "과징금", "질서위반"],
+  ["주민등록", "전입신고", "주소변경"],
+  ["정보공개", "행정정보", "공개청구"],
+  ["공청회", "주민참여", "주민의견", "공론화"],
+  ["주민투표", "주민참여", "주민자치", "직접민주주의"],
+  ["옴부즈만", "시민감사", "고충처리", "권익보호"],
+  ["행정심판", "불복", "이의신청", "행정소송"],
+
+  // ── 교육 심화 ──
+  ["방과후학교", "방과후", "방과후활동", "돌봄"],
+  ["돌봄교실", "아이돌봄", "돌봄서비스"],
+  ["학교폭력", "학교안전", "학생인권"],
+  ["통학버스", "어린이통학", "통학차량", "스쿨버스"],
+  ["학원", "교습소", "학원설립", "사교육"],
+  ["특수교육", "장애학생", "통합교육"],
+  ["학교급식", "급식", "식품안전"],
+
+  // ── 경제/금융 ──
+  ["소액대출", "서민금융", "금융", "융자"],
+  ["보조금", "교부금", "출연금", "지원금"],
+  ["공공요금", "사용료", "수수료", "이용료"],
+  ["지역화폐", "지역사랑상품권", "상품권", "지역경제"],
+  ["예산", "재정", "세입세출", "회계"],
+  ["수수료", "사용료", "이용료", "요금"],
+  ["기금", "기금관리", "기금운용", "기금설치"],
+
+  // ── 디지털/신기술 ──
+  ["AI", "인공지능", "지능정보"],
+  ["스마트팜", "스마트농업", "첨단농업"],
+  ["스마트시티", "스마트도시", "지능형도시"],
+  ["블록체인", "디지털", "분산원장", "핀테크"],
+  ["메타버스", "가상현실", "디지털콘텐츠"],
+  ["전자정부", "정보화", "행정정보화", "디지털정부"],
+  ["개인정보", "정보보호", "개인정보보호"],
+  ["빅데이터", "데이터", "데이터산업", "정보화"],
+  ["로봇", "지능형로봇", "로봇산업"],
+  ["자율주행", "자율주행차", "스마트모빌리티"],
+  ["ESG", "환경사회지배구조", "사회적책임", "지속가능경영"],
+  ["제로웨이스트", "자원순환", "폐기물감량", "쓰레기줄이기"],
+  ["워케이션", "원격근무", "체류형관광"],
+  ["디지털노마드", "원격근무", "체류형관광"],
+  ["푸드테크", "식품산업", "식품기술"],
+  ["유니콘기업", "벤처기업", "스타트업", "창업기업"],
+  ["그린뉴딜", "녹색성장", "탄소중립", "기후변화"],
+  ["등록", "등기", "신고"],
+  ["가구", "주거", "세대", "가정"],
+
+  // ── 환경/에너지 심화 ──
+  ["태양광", "신재생에너지", "태양에너지"],
+  ["온실가스", "탄소중립", "기후변화", "탄소"],
+  ["수질", "상수도", "하수도", "수질오염"],
+  ["석면", "슬레이트", "환경보건", "건축자재"],
+  ["악취", "악취방지", "대기환경", "대기"],
+  ["해양쓰레기", "해양환경", "해양폐기물", "해양오염"],
+
+  // ── 복지/취약계층 심화 ──
+  ["노숙자", "노숙인", "쪽방", "주거취약계층"],
+  ["탈북민", "북한이탈주민", "새터민", "탈북자"],
+  ["저소득", "기초생활", "긴급복지", "사회보장"],
+  ["한부모", "한부모가족", "한부모가정"],
+  ["외국인", "외국인주민", "이주민"],
+
+  // ── 도시/교통 심화 ──
+  ["보행자", "보행권", "보행환경", "교통약자"],
+  ["지하도", "지하보도", "보행시설"],
+  ["CCTV", "방범", "영상정보처리기기", "영상정보"],
+  ["버스", "대중교통", "시내버스", "마을버스", "노선버스"],
+  ["택시", "택시운송", "택시운수", "개인택시"],
+  ["여객자동차", "여객운수", "운수사업"],
+  ["렌터카", "렌트카", "자동차대여", "대여사업"],
+  ["도시재생", "도시정비", "재생사업"],
+  ["고속도로", "도로", "교통"],
 ]
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -297,7 +382,7 @@ const COLLOQUIAL_TO_LEGAL: Record<string, string[]> = {
   "사망": ["사망신고", "사망", "상속"],
 
   // 노동/근로 일상어
-  "알바": ["단시간근로", "시간제근로", "아르바이트"],
+  "알바": ["단시간근로", "시간제근로", "아르바이트", "기간제근로", "근로기준"],
   "계약직": ["기간제근로", "비정규직", "계약직근로자"],
   "파견": ["파견근로", "파견사업"],
   "실업": ["실업급여", "구직급여", "고용보험"],
@@ -346,9 +431,9 @@ const COLLOQUIAL_TO_LEGAL: Record<string, string[]> = {
   "드론": ["무인항공기", "무인비행장치"],
 
   // 교통/모빌리티 일상어
-  "전기차": ["전기자동차", "환경친화적자동차", "충전시설"],
+  "전기차": ["전기자동차", "환경친화적자동차", "충전시설", "친환경자동차"],
   "공유자전거": ["공공자전거", "자전거이용", "자전거"],
-  "킥보드": ["개인형이동장치", "전동킥보드", "PM"],
+  "킥보드": ["개인형이동장치", "전동킥보드", "도로교통", "자전거이용"],
   "신호등": ["교통안전", "교통신호기", "도로교통"],
 
   // 생활/의례 일상어
@@ -360,6 +445,98 @@ const COLLOQUIAL_TO_LEGAL: Record<string, string[]> = {
   "의료보험": ["건강보험", "국민건강보험"],
   "실업급여": ["구직급여", "고용보험급여"],
   "연금": ["국민연금", "공무원연금", "사학연금"],
+
+  // 의료/보건 일상어
+  "응급실": ["응급의료", "응급의료기관", "의료기관"],
+  "야간진료": ["응급의료", "보건의료", "의료기관"],
+  "한의원": ["한의약", "한방", "한방의료", "보건의료"],
+  "요양원": ["장기요양", "노인요양", "요양기관", "노인복지"],
+  "약국": ["의약품", "약사", "약업"],
+  "보건소": ["보건의료", "공중보건", "건강증진"],
+  "예방접종": ["감염병예방", "감염병", "방역", "예방"],
+  "금연": ["흡연", "건강증진", "담배"],
+
+  // 행정 절차 일상어
+  "민원": ["민원처리", "행정서비스"],
+  "인허가": ["허가", "인가", "면허"],
+  "과태료": ["과징금", "질서위반"],
+  "주민등록": ["전입신고", "주소변경"],
+  "정보공개": ["행정정보", "공개청구"],
+  "공청회": ["주민참여", "주민의견", "공론화"],
+  "주민투표": ["주민참여", "주민자치"],
+  "옴부즈만": ["시민감사", "고충처리", "권익보호"],
+  "행정심판": ["불복", "이의신청", "행정소송"],
+
+  // 교육 일상어
+  "방과후학교": ["방과후", "돌봄", "교육복지", "방과후활동"],
+  "돌봄교실": ["아이돌봄", "돌봄", "돌봄서비스", "보육"],
+  "학교폭력": ["학교안전", "학생인권"],
+  "통학버스": ["어린이통학", "통학차량", "스쿨버스"],
+  "학원": ["교습소", "학원설립", "사교육"],
+
+  // 경제/금융 일상어
+  "소액대출": ["서민금융", "금융", "융자", "자금지원"],
+  "보조금": ["교부금", "출연금", "지원금"],
+  "공공요금": ["사용료", "수수료", "이용료"],
+  "지역화폐": ["지역사랑상품권", "상품권", "지역경제"],
+  "예산": ["재정", "세입세출", "회계"],
+  "수수료": ["사용료", "이용료", "요금"],
+  "재정": ["예산", "세입세출", "회계"],
+
+  // 디지털/신기술 일상어
+  "ai": ["인공지능", "지능정보"],
+  "AI": ["인공지능", "지능정보"],
+  "스마트팜": ["스마트농업", "첨단농업", "농업"],
+  "스마트시티": ["스마트도시", "지능형도시"],
+  "블록체인": ["디지털", "분산원장", "핀테크"],
+  "메타버스": ["가상현실", "디지털콘텐츠"],
+  "전자정부": ["정보화", "행정정보화", "디지털정부"],
+  "개인정보": ["정보보호", "개인정보보호"],
+
+  // 환경/에너지 일상어
+  "태양광": ["신재생에너지", "태양에너지", "에너지"],
+  "온실가스": ["탄소중립", "기후변화", "탄소"],
+  "수질": ["상수도", "하수도", "수질오염"],
+  "석면": ["슬레이트", "환경보건", "건축자재"],
+
+  // 복지/취약계층 일상어
+  "노숙자": ["노숙인", "쪽방", "주거취약계층"],
+  "탈북민": ["북한이탈주민", "새터민"],
+  "저소득": ["기초생활", "긴급복지", "사회보장"],
+
+  // 신조어/트렌드 일상어
+  "ESG": ["환경사회지배구조", "사회적책임", "지속가능경영"],
+  "esg": ["환경사회지배구조", "사회적책임", "지속가능경영"],
+  "제로웨이스트": ["자원순환", "폐기물감량", "폐기물"],
+  "워케이션": ["원격근무", "체류형관광", "관광"],
+  "디지털노마드": ["원격근무", "체류형관광"],
+  "푸드테크": ["식품산업", "식품기술", "식품"],
+  "유니콘기업": ["벤처기업", "스타트업", "창업기업"],
+  "그린뉴딜": ["녹색성장", "탄소중립", "기후변화"],
+  "등록": ["등기", "신고"],
+  "가구": ["주거", "세대", "가정"],
+
+  // 도시/교통 일상어
+  "보행자": ["보행권", "보행환경", "교통약자"],
+  "지하도": ["지하보도", "보행시설"],
+  "CCTV": ["방범", "영상정보처리기기", "영상정보", "개인정보보호"],
+  "cctv": ["방범", "영상정보처리기기", "영상정보", "개인정보보호"],
+  "버스": ["대중교통", "시내버스", "마을버스", "노선버스", "노선"],
+  "택시": ["택시운송", "택시운수", "개인택시", "여객자동차"],
+  "렌터카": ["자동차대여", "렌트카", "대여사업"],
+
+  // Phase C/D Gap 보강 — 누락된 일상어
+  "강아지": ["반려동물", "동물보호", "반려견", "동물등록", "동물복지"],
+  "고양이": ["반려동물", "동물보호", "반려묘", "길고양이"],
+  "개": ["반려동물", "동물보호", "반려견"],
+  "식당": ["음식점", "식품위생", "공중위생", "식품접객업", "식품안전"],
+  "음식점": ["식품위생", "공중위생", "식품접객업", "위생"],
+  "카페": ["식품위생", "공중위생", "식품접객업"],
+  "위생": ["식품위생", "공중위생", "위생관리"],
+  "분양": ["분양가", "주택", "공동주택", "분양권"],
+  "자전거도로": ["자전거", "자전거이용", "자전거도로"],
+  "독거노인": ["노인", "노인복지", "홀몸어르신", "노인돌봄"],
+  "야간약국": ["약국", "의약품", "약사", "약업", "보건의료"],
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -405,8 +582,8 @@ const TOPIC_CLUSTERS: Record<string, string[]> = {
   // 환경/도시 클러스터
   "환경": ["환경보전", "환경보호", "녹색", "탄소중립", "기후", "대기", "수질", "폐기물"],
   "재개발": ["재건축", "정비사업", "도시정비", "도시계획", "도시개발"],
-  "교통": ["도로", "주차", "대중교통", "버스", "교통안전", "보행", "자전거", "전기자동차"],
-  "전기차": ["전기자동차", "환경친화적자동차", "충전시설", "충전인프라", "전기차충전"],
+  "교통": ["도로", "주차", "대중교통", "버스", "택시", "교통안전", "보행", "자전거", "전기자동차", "여객"],
+  "전기차": ["전기자동차", "환경친화적자동차", "충전시설", "충전인프라", "전기차충전", "친환경자동차"],
   "자전거": ["공공자전거", "자전거이용", "공유자전거", "자전거도로"],
   "안전": ["재난", "재해", "방재", "소방", "시민안전", "안전관리"],
 
@@ -430,6 +607,11 @@ const TOPIC_CLUSTERS: Record<string, string[]> = {
   // 주거/생활 클러스터
   "주거": ["주택", "임대주택", "공공주택", "주거안정", "주거복지", "전월세"],
   "교육": ["평생교육", "학습", "교육지원", "장학", "학교"],
+
+  // Phase C/D Gap 보강 클러스터
+  "강아지": ["반려동물", "동물보호", "반려견", "동물등록", "동물복지", "유기동물"],
+  "식당": ["음식점", "식품위생", "공중위생", "식품접객업", "위생", "식품안전"],
+  "분양": ["분양가", "주택", "공동주택", "분양권", "분양가상한제"],
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -456,7 +638,11 @@ for (const group of SYNONYM_GROUPS) {
 // 지역명 패턴 (약칭 포함, 2026년 현재 최신)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// 도+시/군/구 조합 (예: "경기 수원시", "서울 강남구")
 const REGION_PATTERN = /((?:서울특별시|서울시|서울|부산광역시|부산시|부산|대구광역시|대구시|대구|인천광역시|인천시|인천|광주광역시|광주시|광주|대전광역시|대전시|대전|울산광역시|울산시|울산|세종특별자치시|세종시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충북|충청남도|충남|전라북도|전북특별자치도|전북|전라남도|전남|경상북도|경북|경상남도|경남|제주특별자치도|제주도|제주)\s*)?([가-힣]+[시군구])/
+
+// 독립 도시/도 이름만 (시/군/구 없이도 매칭, REGION_PATTERN 실패 시 fallback)
+const STANDALONE_REGION_PATTERN = /^(서울특별시|서울시|서울|부산광역시|부산시|부산|대구광역시|대구시|대구|인천광역시|인천시|인천|광주광역시|광주시|광주|대전광역시|대전시|대전|울산광역시|울산시|울산|세종특별자치시|세종시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충북|충청남도|충남|전라북도|전북특별자치도|전북|전라남도|전남|경상북도|경북|경상남도|경남|제주특별자치도|제주도|제주)\s/
 
 // 복합어 분해용 — 사전에 등록된 모든 키를 길이 내림차순으로 정렬
 // "중소기업육성기금" → "중소기업" + "육성" + "기금" 을 각각 찾기 위해
@@ -493,6 +679,157 @@ function decomposeCompound(word: string): string[] {
   }
 
   return found
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 자연어 전처리 — 조사/어미/불용어 제거
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 한국어 조사/어미를 제거하여 어근 추출
+ * 사전을 키우지 않고 기존 사전 재활용을 극대화하는 핵심 전략
+ *
+ * "창업할" → "창업", "키우려면" → "키우", "위생관련" → "위생"
+ */
+function stripKoreanSuffix(word: string): string {
+  if (word.length < 3) return word
+  // 긴 패턴부터 매칭 (greedy)
+  const suffixes = [
+    '하려면', '으려면', '에서는', '에서의',
+    '에게는', '에게도', '까지는', '부터는',
+    '하는', '하고', '하면', '하여', '해서', '했던', '할때',
+    '받는', '받을', '받고', '되는', '되어', '되고',
+    '에게', '에서', '까지', '부터', '마다', '처럼', '같이',
+    '한테', '보다', '으로', '에는', '에도', '에만',
+    '려면', '인지', '인가',
+    '할', '한', '된',  // 용언 활용 (어근 >= 2글자 보장)
+    '은', '는', '이', '가', '을', '를', '의', '에', '로',
+    '와', '과', '도', '만', '서',
+  ]
+  for (const suf of suffixes) {
+    if (word.endsWith(suf) && word.length - suf.length >= 2) {
+      return word.slice(0, -suf.length)
+    }
+  }
+  return word
+}
+
+/** 자연어 불용어 — 검색에 무의미한 단어 */
+const NATURAL_LANG_STOPWORDS = new Set([
+  '어떤', '어떻게', '무엇', '어디', '우리', '동네', '방법',
+  '궁금해요', '궁금합니다', '알고', '싶어요', '싶습니다',
+  '찾는', '있나요', '있을까요', '뭐가', '뭘', '어디서',
+])
+
+/**
+ * 자연어 쿼리를 검색 키워드로 정제
+ * 1. 법률 불용어 제거 (조례, 규칙 등)
+ * 2. 자연어 불용어 제거 (우리, 어떤 등)
+ * 3. 조사/어미 제거 (창업할 → 창업)
+ * 4. 사전에 있는 용어 우선, 없으면 어근 시도
+ */
+function extractKeywords(text: string): string[] {
+  const legalStop = /\s*(에\s*관한|에\s*대한|에\s*관하여|관련|조례|조레|자치법규|규칙|법률|시행령|시행규칙|규정)\s*/g
+  const cleaned = text.replace(legalStop, ' ').replace(/\s+/g, ' ').trim()
+  const words = cleaned.split(/\s+/).filter(w => w.length >= 2)
+
+  const keywords: string[] = []
+  for (const w of words) {
+    // 자연어 불용어 → 스킵
+    if (NATURAL_LANG_STOPWORDS.has(w)) continue
+
+    // 사전에 있으면 그대로 사용
+    const lower = w.toLowerCase()
+    if (knownTermSet.has(lower)) {
+      keywords.push(w)
+      continue
+    }
+
+    // 어근 추출 후 재검색
+    const stem = stripKoreanSuffix(w)
+    // 어근이 불용어면 스킵 ("동네에서" → "동네" → 불용어)
+    if (NATURAL_LANG_STOPWORDS.has(stem)) continue
+
+    if (stem !== w && knownTermSet.has(stem.toLowerCase())) {
+      keywords.push(stem)
+      continue
+    }
+
+    // 복합어 분해 시도 — "식품위생" → ["식품", "위생"]
+    const target = stem.length >= 2 ? stem : w
+    if (target.length >= 4) {
+      const parts = decomposeCompound(target)
+      if (parts.length > 0) {
+        keywords.push(...parts)
+        continue
+      }
+    }
+
+    // 어근도 사전에 없으면 원본 유지 (API가 직접 검색)
+    if (stem.length >= 2) {
+      keywords.push(stem)
+    } else if (w.length >= 2) {
+      keywords.push(w)
+    }
+  }
+
+  // 중복 제거
+  return [...new Set(keywords)]
+}
+
+/**
+ * 쿼리에서 지역명과 키워드를 분리 + 자연어 전처리
+ * expandQuery와 buildOrdinanceSearchStrategies 양쪽에서 공유
+ */
+function parseQueryRegionAndKeywords(query: string): {
+  region: string
+  subRegion: string
+  keywords: string[]
+  cleaned: string
+} {
+  // 법률 불용어 제거
+  const legalStop = /\s*(에\s*관한|에\s*대한|에\s*관하여|관련|조례|조레|자치법규|규칙|법률|시행령|시행규칙|규정)\s*/g
+  const cleaned = query.replace(legalStop, ' ').replace(/\s+/g, ' ').trim()
+
+  // 지역명 추출
+  const regionMatch = cleaned.match(REGION_PATTERN)
+  let region = regionMatch ? regionMatch[0].trim() : ''
+  let subRegion = regionMatch?.[2]?.trim() || ''
+
+  if (subRegion) {
+    if (knownTermSet.has(subRegion.toLowerCase())) {
+      region = ''
+      subRegion = ''
+    }
+    if (region && regionMatch) {
+      const matchEnd = cleaned.indexOf(regionMatch[0]) + regionMatch[0].length
+      if (matchEnd < cleaned.length && /[가-힣]/.test(cleaned[matchEnd])) {
+        region = ''
+        subRegion = ''
+      }
+    }
+  }
+
+  if (!region) {
+    const standaloneMatch = cleaned.match(STANDALONE_REGION_PATTERN)
+    if (standaloneMatch) {
+      region = standaloneMatch[1].trim()
+      subRegion = ''
+    }
+  }
+
+  // 세종시 특별 처리
+  if (region === '세종시' || subRegion === '세종시') {
+    region = '세종특별자치시'
+    subRegion = ''
+  }
+
+  const keywordPart = region ? cleaned.replace(region, '').trim() : cleaned
+
+  // extractKeywords로 자연어 전처리 (불용어 제거 + 어근 추출)
+  const keywords = extractKeywords(keywordPart)
+
+  return { region, subRegion, keywords, cleaned }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -601,22 +938,13 @@ export function expandKeyword(keyword: string): QueryExpansionResult {
  * @param query 전체 검색 쿼리
  * @param excludeRegion true이면 지역명은 확장하지 않음
  */
-export function expandQuery(query: string, excludeRegion = true): {
+export function expandQuery(query: string, _excludeRegion = true): {
   /** 모든 확장 키워드 (중복 제거) */
   allExpanded: string[]
   /** 키워드별 확장 결과 */
   details: QueryExpansionResult[]
 } {
-  const stopWords = /\s*(에\s*관한|에\s*대한|에\s*관하여|관련|조례|조레|자치법규|규칙|법률|법|시행령|시행규칙)\s*/g
-  const cleaned = query.replace(stopWords, ' ').replace(/\s+/g, ' ').trim()
-
-  // 지역명 패턴
-  const regionMatch = cleaned.match(REGION_PATTERN)
-  const region = regionMatch ? regionMatch[0].trim() : ''
-  const keywordPart = region ? cleaned.replace(region, '').trim() : cleaned
-
-  // 키워드 분리 (2글자 이상)
-  const keywords = keywordPart.split(/\s+/).filter(w => w.length >= 2)
+  const { keywords } = parseQueryRegionAndKeywords(query)
 
   const details: QueryExpansionResult[] = []
   const allExpanded = new Set<string>()
@@ -645,6 +973,29 @@ export interface OrdinanceSearchStrategy {
   filterKeywords?: string[]
   /** 전략 설명 (디버깅용) */
   description: string
+  /** 우선도 (높을수록 먼저 실행, 결과 머징 시 가중치) */
+  priority: number
+}
+
+/**
+ * 검색 결과 관련도 점수 산출
+ * 원본 키워드가 결과명에 얼마나 포함되는지 측정
+ */
+export function scoreRelevance(resultName: string, originalKeywords: string[], expandedKeywords: string[]): number {
+  const name = resultName.toLowerCase()
+  let score = 0
+
+  // 원본 키워드 직접 포함 → 높은 점수
+  for (const kw of originalKeywords) {
+    if (name.includes(kw.toLowerCase())) score += 10
+  }
+
+  // 확장 키워드 포함 → 중간 점수
+  for (const kw of expandedKeywords) {
+    if (name.includes(kw.toLowerCase())) score += 3
+  }
+
+  return score
 }
 
 /**
@@ -666,34 +1017,23 @@ export function buildOrdinanceSearchStrategies(query: string): OrdinanceSearchSt
   const strategies: OrdinanceSearchStrategy[] = []
   const seenQueries = new Set<string>()
 
-  // 불용어 제거
-  const stopWords = /\s*(에\s*관한|에\s*대한|에\s*관하여|관련|조례|조레|자치법규|규칙)\s*/g
-  const cleaned = query.replace(stopWords, ' ').replace(/\s+/g, ' ').trim()
+  const { region, subRegion, keywords } = parseQueryRegionAndKeywords(query)
 
-  // 지역명 추출
-  const regionMatch = cleaned.match(REGION_PATTERN)
-  let region = regionMatch ? regionMatch[0].trim() : ''
-  // 도/광역시 없이 시/군/구만 추출 (예: "경기 수원시" → "수원시")
-  let subRegion = regionMatch?.[2]?.trim() || ''
+  let priorityCounter = 100 // 높을수록 우선
 
-  // 세종시 특별 처리: "세종시"는 API가 인식 못함 → "세종특별자치시" 사용
-  if (region === '세종시' || subRegion === '세종시') {
-    region = '세종특별자치시'
-    subRegion = ''  // 세종은 구가 없음
-  }
-  const keywordPart = region ? cleaned.replace(region, '').trim() : cleaned
-  const keywords = keywordPart.split(/\s+/).filter(w => w.length >= 2)
-
-  function addStrategy(q: string, display: number, filterKeywords: string[] | undefined, desc: string) {
+  function addStrategy(q: string, display: number, filterKeywords: string[] | undefined, desc: string, prio?: number) {
     const key = q.toLowerCase()
     if (!seenQueries.has(key)) {
       seenQueries.add(key)
-      strategies.push({ query: q, display, filterKeywords, description: desc })
+      strategies.push({ query: q, display, filterKeywords, description: desc, priority: prio ?? priorityCounter-- })
     }
   }
 
-  // ── Step 1: 원본 (불용어 제거) ──
-  addStrategy(cleaned, 20, undefined, `원본: "${cleaned}"`)
+  // ── Step 1: 원본 (추출된 키워드 기반) ──
+  const baseQuery = region
+    ? `${region} ${keywords.join(' ')}`
+    : keywords.join(' ')
+  addStrategy(baseQuery, 20, undefined, `원본: "${baseQuery}"`, 100)
   // 도+시 조합이면 시/군/구+키워드 버전도 추가
   if (subRegion && subRegion !== region && keywords.length > 0) {
     addStrategy(`${subRegion} ${keywords.join(' ')}`, 20, undefined, `원본(시군구): "${subRegion} ${keywords.join(' ')}"`)
@@ -743,12 +1083,12 @@ export function buildOrdinanceSearchStrategies(query: string): OrdinanceSearchSt
     }
     const filterArr = Array.from(allFilterKeywords)
     for (const rv of regionVariants) {
-      addStrategy(rv, 200, filterArr, `필살기: "${rv}" 전체 → [${filterArr.slice(0, 8).join(',')}${filterArr.length > 8 ? '...' : ''}] 필터`)
+      addStrategy(rv, 200, filterArr, `필살기: "${rv}" 전체 → [${filterArr.slice(0, 8).join(',')}${filterArr.length > 8 ? '...' : ''}] 필터`, 10)
     }
 
     // ── Fallback: 키워드만 (전국 범위) ──
     for (const kw of keywords) {
-      addStrategy(kw, 20, undefined, `전국: "${kw}"`)
+      addStrategy(kw, 20, undefined, `전국: "${kw}"`, 20)
     }
   } else if (keywords.length > 0) {
     // 지역명 없이 키워드만 있는 경우
@@ -783,9 +1123,12 @@ export function expandForLawSearch(query: string): string[] {
   return expansion.allExpanded.filter(e => {
     const details = expansion.details.find(d => d.expanded.includes(e))
     if (!details) return false
-    // colloquial과 synonym만 허용 (hypernym은 너무 넓어짐)
+    if (e === details.original) return true
+    // 이 특정 용어가 colloquial 또는 synonym 소스에서 왔는지 확인
+    // (hypernym 소스에서만 온 용어는 제외 — 너무 넓어짐)
     return details.sources.some(s =>
-      s.type === 'colloquial' || s.type === 'synonym'
-    ) || e === details.original
+      (s.type === 'colloquial' || s.type === 'synonym') &&
+      s.to.some(t => t.toLowerCase() === e.toLowerCase())
+    )
   })
 }

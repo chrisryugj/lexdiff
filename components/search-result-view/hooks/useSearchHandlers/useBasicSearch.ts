@@ -10,7 +10,7 @@ import { normalizeLawSearchText } from "@/lib/search-normalizer"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { buildFullQuery, isOrdinanceQuery as checkIsOrdinanceQuery } from "../../utils"
-import { buildOrdinanceSearchStrategies } from "@/lib/query-expansion"
+import { buildOrdinanceSearchStrategies, scoreRelevance, expandForLawSearch } from "@/lib/query-expansion"
 import type { HandlerDeps, SearchQuery, LawSearchResult } from "./types"
 
 interface UseBasicSearchDeps extends HandlerDeps {
@@ -110,43 +110,87 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
         let totalCount = 0
         let matchedStrategy = ''
 
-        // 전략 순차 실행 — 첫 번째 성공에서 중단
-        for (let i = 0; i < strategies.length; i++) {
-          const strategy = strategies[i]
-          const progress = 40 + Math.round((i / strategies.length) * 40)
-          actions.updateProgress('searching', Math.min(progress, 75))
+        // 전략을 우선도순으로 정렬, 상위 전략 우선 실행 + 결과 머징
+        const sortedStrategies = [...strategies].sort((a, b) => b.priority - a.priority)
+        const originalKeywords = lawName.split(/\s+/).filter((w: string) => w.length >= 2)
+        const expandedKeywords = strategies.flatMap(s => s.filterKeywords || [])
+        const seenNames = new Set<string>()
 
-          const apiUrl = `/api/ordin-search?query=${encodeURIComponent(strategy.query)}&display=${strategy.display}`
-          const response = await fetch(apiUrl)
-          apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+        // Phase 1: 상위 3개 전략 병렬 실행 (빠른 응답)
+        const topStrategies = sortedStrategies.filter(s => !s.filterKeywords).slice(0, 3)
+        const topResults = await Promise.all(
+          topStrategies.map(async (strategy) => {
+            const apiUrl = `/api/ordin-search?query=${encodeURIComponent(strategy.query)}&display=${strategy.display}`
+            const response = await fetch(apiUrl)
+            apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+            if (!response.ok) return { strategy, ordinances: [] as OrdinResult[], totalCount: 0 }
+            const xmlText = await response.text()
+            const result = parseOrdinanceSearchXML(xmlText)
+            console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
+            return { strategy, ordinances: result.ordinances, totalCount: result.totalCount }
+          })
+        )
 
-          if (!response.ok) continue
+        actions.updateProgress('searching', 60)
 
-          const xmlText = await response.text()
-          const result = parseOrdinanceSearchXML(xmlText)
-          console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
-
-          if (result.ordinances.length > 0) {
-            // 클라이언트 측 필터링
-            if (strategy.filterKeywords && strategy.filterKeywords.length > 0) {
-              const filtered = result.ordinances.filter(o =>
-                strategy.filterKeywords!.some(kw => o.ordinName.includes(kw))
-              )
-              if (filtered.length > 0) {
-                allOrdinances = filtered
-                totalCount = filtered.length
-                matchedStrategy = strategy.description
-                break
-              }
-              continue // 필터 결과 0건이면 다음 전략으로
+        // 머징: 중복 제거 + 관련도 리랭킹
+        const merged: Array<OrdinResult & { _relevance: number }> = []
+        for (const res of topResults) {
+          for (const o of res.ordinances) {
+            if (!seenNames.has(o.ordinName)) {
+              seenNames.add(o.ordinName)
+              const relevance = scoreRelevance(o.ordinName, originalKeywords, expandedKeywords)
+              merged.push({ ...o, _relevance: relevance })
             }
-
-            allOrdinances = result.ordinances
-            totalCount = result.totalCount
-            matchedStrategy = strategy.description
-            break
+          }
+          if (!matchedStrategy && res.ordinances.length > 0) {
+            matchedStrategy = res.strategy.description
           }
         }
+
+        // Phase 2: 상위 전략으로 충분하지 않으면 나머지 순차 실행
+        if (merged.length === 0) {
+          const remainingStrategies = sortedStrategies.slice(topStrategies.length)
+          for (let i = 0; i < remainingStrategies.length; i++) {
+            const strategy = remainingStrategies[i]
+            const progress = 60 + Math.round((i / remainingStrategies.length) * 15)
+            actions.updateProgress('searching', Math.min(progress, 75))
+
+            const apiUrl = `/api/ordin-search?query=${encodeURIComponent(strategy.query)}&display=${strategy.display}`
+            const response = await fetch(apiUrl)
+            apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+            if (!response.ok) continue
+
+            const xmlText = await response.text()
+            const result = parseOrdinanceSearchXML(xmlText)
+            console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
+
+            if (result.ordinances.length > 0) {
+              let ordinances = result.ordinances
+              if (strategy.filterKeywords && strategy.filterKeywords.length > 0) {
+                ordinances = ordinances.filter(o =>
+                  strategy.filterKeywords!.some(kw => o.ordinName.includes(kw))
+                )
+                if (ordinances.length === 0) continue
+              }
+
+              for (const o of ordinances) {
+                if (!seenNames.has(o.ordinName)) {
+                  seenNames.add(o.ordinName)
+                  const relevance = scoreRelevance(o.ordinName, originalKeywords, expandedKeywords)
+                  merged.push({ ...o, _relevance: relevance })
+                }
+              }
+              matchedStrategy = strategy.description
+              break
+            }
+          }
+        }
+
+        // 관련도 내림차순 정렬
+        merged.sort((a, b) => b._relevance - a._relevance)
+        allOrdinances = merged
+        totalCount = merged.length > 0 ? Math.max(merged.length, topResults.reduce((max, r) => Math.max(max, r.totalCount), 0)) : 0
 
         actions.updateProgress('parsing', 80)
 
@@ -204,32 +248,62 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           debugLogger.error('⚠️ 조례 검색 결과 저장 실패', cacheError)
         }
       } else {
-        const apiUrl = "/api/law-search?query=" + encodeURIComponent(lawName)
+        // ── 법령 검색: 원본 + 동의어 확장 병렬 검색 → 머징 ──
+        const expandedQueries = expandForLawSearch(lawName)
+        // 원본 + 상위 2개 확장 쿼리
+        const lawQueries = [lawName, ...expandedQueries.filter(e => e !== lawName).slice(0, 2)]
 
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000)
+        actions.updateProgress('searching', 50)
 
-        let response
-        try {
-          response = await fetch(apiUrl, { signal: controller.signal })
-        } catch (err: any) {
-          if (err.name === 'AbortError') {
-            throw new Error("검색 시간이 초과되었습니다. 다시 시도해주세요.")
-          }
-          throw err
-        } finally {
-          clearTimeout(timeoutId)
-        }
-
-        apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
-
-        if (!response.ok) {
-          throw new Error("법령 검색 실패")
-        }
+        const lawResults = await Promise.all(
+          lawQueries.map(async (q) => {
+            const apiUrl = "/api/law-search?query=" + encodeURIComponent(q)
+            try {
+              const controller = new AbortController()
+              const timeoutId = setTimeout(() => controller.abort(), 10000)
+              const response = await fetch(apiUrl, { signal: controller.signal })
+              clearTimeout(timeoutId)
+              apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+              if (!response.ok) return { query: q, results: [] as LawSearchResult[], xml: '' }
+              const xmlText = await response.text()
+              const results = parseLawSearchXML(xmlText)
+              console.log(`[law-search] "${q}" → ${results.length}건`)
+              return { query: q, results, xml: xmlText }
+            } catch (err: any) {
+              if (err.name === 'AbortError') {
+                console.log(`[law-search] "${q}" 타임아웃`)
+              }
+              return { query: q, results: [] as LawSearchResult[], xml: '' }
+            }
+          })
+        )
 
         actions.updateProgress('parsing', 60)
-        const xmlText = await response.text()
-        const results = parseLawSearchXML(xmlText)
+
+        // 원본 결과 우선, 확장 결과 머징 (중복 제거)
+        const seenLawNames = new Set<string>()
+        let results: LawSearchResult[] = []
+        let primaryXml = ''
+
+        for (const lr of lawResults) {
+          for (const r of lr.results) {
+            if (!seenLawNames.has(r.lawName)) {
+              seenLawNames.add(r.lawName)
+              results.push(r)
+            }
+          }
+          if (!primaryXml && lr.xml) primaryXml = lr.xml
+        }
+
+        // 원본 쿼리 매칭 결과를 상위에 배치
+        const originalKeywords = lawName.split(/\s+/).filter((w: string) => w.length >= 2)
+        results.sort((a, b) => {
+          const aMatch = originalKeywords.some(kw => a.lawName.includes(kw)) ? 1 : 0
+          const bMatch = originalKeywords.some(kw => b.lawName.includes(kw)) ? 1 : 0
+          return bMatch - aMatch
+        })
+
+        const xmlText = primaryXml
         actions.updateProgress('parsing', 70)
 
         if (results.length === 0) {
@@ -240,6 +314,13 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           actions.setShowChoiceDialog(true)
           toast({ title: "검색 결과 없음", description: "정확한 법령을 찾을 수 없어 AI 검색을 제안합니다." })
           return
+        }
+
+        if (lawQueries.length > 1 && lawResults[0].results.length === 0 && results.length > 0) {
+          toast({
+            title: "관련 법령 검색 결과",
+            description: `"${lawName}" 관련 법령 ${results.length}건을 찾았습니다.`,
+          })
         }
 
         const normalizedLawName = normalizeLawSearchText(lawName).replace(/\s+/g, "")
