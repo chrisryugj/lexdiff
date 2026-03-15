@@ -153,18 +153,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       </div>
 
       {/* ━━ 법령 분석 도구 ━━ */}
-      <div>
-        <div
-          ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mt-3 mb-3 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-          style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
-        >
-          {(() => { refIdx++; return null })()}
-          <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase">
-            Analysis Toolkit
-          </h2>
-        </div>
-
+      <div className="mt-8 lg:mt-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
           {toolCards.map((tool, index) => {
             const idx = refIdx++
