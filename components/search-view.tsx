@@ -234,18 +234,38 @@ export function SearchView({
                 isLoading={isLoading}
                 searchMode={searchMode}
               />
-              {onImpactTracker && (
-                <div className="flex justify-center mt-5">
-                  <button
-                    onClick={onImpactTracker}
-                    className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
-                  >
-                    <Icon name="file-search" size={16} className="text-brand-gold" />
-                    <span className="text-sm font-medium text-brand-navy group-hover:text-brand-navy transition-colors">
-                      법령 변경 영향 분석
-                    </span>
-                    <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
-                  </button>
+              {(onImpactTracker || onToolClick) && (
+                <div className="flex justify-center mt-5 gap-2 flex-wrap">
+                  {onImpactTracker && (
+                    <button
+                      onClick={onImpactTracker}
+                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                    >
+                      <Icon name="chart-line" size={16} className="text-brand-gold" />
+                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">변경 영향 분석</span>
+                      <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
+                    </button>
+                  )}
+                  {onToolClick && (
+                    <button
+                      onClick={() => onToolClick('ordinance-sync')}
+                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                    >
+                      <Icon name="alert-triangle" size={16} className="text-brand-gold" />
+                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">조례 미반영 탐지</span>
+                      <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
+                    </button>
+                  )}
+                  {onToolClick && (
+                    <button
+                      onClick={() => onToolClick('ordinance-benchmark')}
+                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                    >
+                      <Icon name="bar-chart" size={16} className="text-brand-gold" />
+                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">조례 벤치마킹</span>
+                      <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
+                    </button>
+                  )}
                 </div>
               )}
             </m.div>
