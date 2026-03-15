@@ -156,7 +156,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mt-6 lg:mt-8 mb-3 lg:mb-4 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mt-3 lg:mt-4 mb-3 lg:mb-4 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}
