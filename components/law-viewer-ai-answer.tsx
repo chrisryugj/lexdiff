@@ -545,11 +545,14 @@ export function AIAnswerContent({
             toolNames.set(name, (toolNames.get(name) || 0) + 1)
         })
         const tokenLog = toolCallLogs.find(l => l.type === 'token_usage')
+        const sourceLog = toolCallLogs.find(l => l.type === 'source')
+        const source = (sourceLog?.message as 'openclaw' | 'gemini') || 'gemini'
         return {
             totalCalls: calls.length,
             uniqueTools: toolNames.size,
             toolBreakdown: Array.from(toolNames.entries()),
             totalTokens: tokenLog?.totalTokens,
+            source,
         }
     }, [isStreaming, toolCallLogs])
 
@@ -572,25 +575,38 @@ export function AIAnswerContent({
                             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/30 text-[11px] text-muted-foreground/60 cursor-default hover:text-muted-foreground hover:border-border/50 transition-colors">
                                 <Icon name="zap" size={12} />
                                 <span className="tabular-nums">{streamElapsed.toFixed(1)}s</span>
-                                <span className="opacity-30">·</span>
-                                <Icon name="settings" size={10} />
-                                <span className="tabular-nums">{searchStats.totalCalls}</span>
+                                {searchStats.totalCalls > 0 && (
+                                    <>
+                                        <span className="opacity-30">·</span>
+                                        <Icon name="settings" size={10} />
+                                        <span className="tabular-nums">{searchStats.totalCalls}</span>
+                                    </>
+                                )}
                             </div>
                             {/* Hover 상세 팝업 */}
                             <div className="absolute top-full left-0 mt-1.5 hidden group-hover:block z-50">
                                 <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[190px] text-xs space-y-1.5">
+                                    {/* AI 엔진 소스 */}
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="sparkles" size={12} />AI 엔진</span>
+                                        <span className="font-medium">{searchStats.source === 'openclaw' ? 'OpenClaw' : 'Gemini'}</span>
+                                    </div>
                                     <div className="flex items-center justify-between gap-4">
                                         <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="clock" size={12} />소요 시간</span>
                                         <span className="font-medium tabular-nums">{streamElapsed.toFixed(1)}초</span>
                                     </div>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="settings" size={12} />도구 호출</span>
-                                        <span className="font-medium tabular-nums">{searchStats.totalCalls}회</span>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="database" size={12} />도구 종류</span>
-                                        <span className="font-medium tabular-nums">{searchStats.uniqueTools}개</span>
-                                    </div>
+                                    {searchStats.totalCalls > 0 && (
+                                        <>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="settings" size={12} />도구 호출</span>
+                                                <span className="font-medium tabular-nums">{searchStats.totalCalls}회</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="database" size={12} />도구 종류</span>
+                                                <span className="font-medium tabular-nums">{searchStats.uniqueTools}개</span>
+                                            </div>
+                                        </>
+                                    )}
                                     {searchStats.totalTokens && (
                                         <div className="flex items-center justify-between gap-4">
                                             <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="bar-chart" size={12} />토큰</span>
@@ -1017,7 +1033,7 @@ function HistoryEntry({ entry, fontSize, onLawClick }: {
 // ─── 영향분석 스타일 단계 타임라인 ───
 
 /** call/result 페어링 → 완료/진행 중 단계 목록 */
-function buildSteps(logs: ToolCallLogEntry[]) {
+function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
     const steps: Array<{
         name: string
         displayName: string
@@ -1068,7 +1084,7 @@ function buildSteps(logs: ToolCallLogEntry[]) {
                 name: call.name || '',
                 displayName: call.displayName,
                 query: call.query,
-                status: 'in-progress',
+                status: isStreaming ? 'in-progress' : 'completed',
                 statusMessages: msgs,
             })
         }
@@ -1083,7 +1099,7 @@ function buildSteps(logs: ToolCallLogEntry[]) {
             steps.push({
                 name: `status-${i}`,
                 displayName: statuses[i].message || statuses[i].displayName,
-                status: isLast ? 'in-progress' : 'completed',
+                status: isLast && isStreaming ? 'in-progress' : 'completed',
                 durationMs: next?.timestamp && statuses[i].timestamp ? (next.timestamp - statuses[i].timestamp) : undefined,
                 success: true,
                 statusMessages: [],
@@ -1117,7 +1133,7 @@ function AiStepTimer() {
 
 /** 영향분석 스타일 단계별 타임라인 */
 function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: ToolCallLogEntry[], isStreaming: boolean }) {
-    const { steps, lastStatusMessage } = useMemo(() => buildSteps(toolCallLogs), [toolCallLogs])
+    const { steps, lastStatusMessage } = useMemo(() => buildSteps(toolCallLogs, isStreaming), [toolCallLogs, isStreaming])
 
     return (
         <>

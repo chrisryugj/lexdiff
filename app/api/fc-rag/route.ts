@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          send({ type: 'source', source: 'gemini' })
           traceLogger.completeTrace(traceId, 'gemini')
         }
       } catch (error) {
