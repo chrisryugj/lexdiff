@@ -11,7 +11,7 @@
  * History 상태 데이터 구조
  */
 export interface HistoryState {
-  viewMode: 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
+  viewMode: 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker' | 'ordinance-benchmark'
   searchId?: string
   searchMode?: 'basic' | 'rag'  // 검색 모드 (기본/AI)
   precedentId?: string  // 판례 상세 보기 시 판례 ID

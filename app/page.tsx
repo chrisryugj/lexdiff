@@ -29,11 +29,12 @@ import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
 import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
 import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
+import { OrdinanceBenchmarkView } from "@/components/ordinance-benchmark/ordinance-benchmark-view"
 import { ComparisonModal } from "@/components/comparison-modal"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useAiGate } from "@/hooks/use-ai-gate"
 
-type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker'
+type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker' | 'ordinance-benchmark'
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('home')
@@ -45,6 +46,7 @@ export default function Home() {
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
   const [impactRequest, setImpactRequest] = useState<ImpactTrackerRequest | null>(null)
   const [impactKey, setImpactKey] = useState(0) // 진입 시마다 증가 → 리마운트로 초기화
+  const [benchmarkKeyword, setBenchmarkKeyword] = useState('')
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
@@ -131,6 +133,8 @@ export default function Home() {
       } else if (state.viewMode === 'impact-tracker') {
         setViewMode('impact-tracker')
         // key 변경 없음 → 기존 결과 보존
+      } else if (state.viewMode === 'ordinance-benchmark') {
+        setViewMode('ordinance-benchmark')
       } else if (state.viewMode === 'precedent-detail' && state.searchId && state.precedentId) {
         // 판례 상세 → 앞으로가기로 다시 판례 상세
         setViewMode('precedent-detail')
@@ -239,6 +243,12 @@ export default function Home() {
     })
   }
 
+  // 조례 벤치마킹 이동
+  const handleOrdinanceBenchmark = (lawName: string) => {
+    setBenchmarkKeyword(lawName)
+    setViewMode('ordinance-benchmark')
+  }
+
   // 홈으로 직접 이동 (로고 클릭)
   const handleHomeClick = () => {
     debugLogger.info('🏠 홈으로 이동')
@@ -269,6 +279,15 @@ export default function Home() {
         </div>
       )}
 
+      {/* 조례 벤치마킹 */}
+      {viewMode === 'ordinance-benchmark' && (
+        <OrdinanceBenchmarkView
+          initialKeyword={benchmarkKeyword}
+          onBack={() => window.history.back()}
+          onHomeClick={handleHomeClick}
+        />
+      )}
+
       {viewMode === 'home' ? (
         <SearchView
           onSearch={handleSearch}
@@ -278,7 +297,7 @@ export default function Home() {
           searchMode={searchMode}
           onImpactTracker={handleImpactTracker}
         />
-      ) : viewMode === 'impact-tracker' ? null : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
+      ) : viewMode === 'impact-tracker' || viewMode === 'ordinance-benchmark' ? null : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView
           key={`${searchId}-${historyKey}`}  // 뒤로가기 시 강제 리마운트
           searchId={searchId}
@@ -308,6 +327,7 @@ export default function Home() {
             }
           }}
           onImpactTracker={handleImpactTrackerFromViewer}
+          onOrdinanceBenchmark={handleOrdinanceBenchmark}
         />
       ) : null}
 

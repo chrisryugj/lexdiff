@@ -32,6 +32,40 @@ export interface ParentLawChangeInfo {
   affectedOrdinanceArticles: string[]
 }
 
+// ── 결과 캐싱 (24h TTL) ────────────────────────────────────
+const CACHE_TTL = 24 * 60 * 60 * 1000
+
+function buildCacheKey(req: ImpactTrackerRequest): string {
+  const names = [...req.lawNames].sort().join(',')
+  return `impact-cache:${names}:${req.dateFrom}:${req.dateTo}:${req.region || ''}`
+}
+
+interface ImpactCacheEntry {
+  items: ImpactItem[]
+  summary: ImpactSummary | null
+  cachedAt: number
+}
+
+function getCachedResult(req: ImpactTrackerRequest): ImpactCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(buildCacheKey(req))
+    if (!raw) return null
+    const entry: ImpactCacheEntry = JSON.parse(raw)
+    if (Date.now() - entry.cachedAt > CACHE_TTL) {
+      localStorage.removeItem(buildCacheKey(req))
+      return null
+    }
+    return entry
+  } catch { return null }
+}
+
+function setCacheResult(req: ImpactTrackerRequest, items: ImpactItem[], summary: ImpactSummary | null): void {
+  try {
+    const entry: ImpactCacheEntry = { items, summary, cachedAt: Date.now() }
+    localStorage.setItem(buildCacheKey(req), JSON.stringify(entry))
+  } catch { /* localStorage full */ }
+}
+
 export function useImpactTracker() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -78,9 +112,11 @@ export function useImpactTracker() {
         setStatusMessage(`${event.lawName}: ${event.changes.length}건 변경 발견`)
         break
       case 'impact_item':
+        collectedItemsRef.current = [...collectedItemsRef.current, event.item]
         setItems(prev => [...prev, event.item])
         break
       case 'summary':
+        collectedSummaryRef.current = event.summary
         setSummary(event.summary)
         break
       case 'ordinance_refs':
@@ -105,6 +141,10 @@ export function useImpactTracker() {
         setProgress(100)
         setStep('complete')
         setIsAnalyzing(false)
+        // 결과 캐싱
+        if (currentRequestRef.current && collectedItemsRef.current.length > 0) {
+          setCacheResult(currentRequestRef.current, collectedItemsRef.current, collectedSummaryRef.current)
+        }
         break
       case 'error':
         if (!event.recoverable) {
@@ -115,11 +155,36 @@ export function useImpactTracker() {
     }
   }, [])
 
+  // 캐시 저장용 ref (complete 이벤트에서 사용)
+  const currentRequestRef = useRef<ImpactTrackerRequest | null>(null)
+  const collectedItemsRef = useRef<ImpactItem[]>([])
+  const collectedSummaryRef = useRef<ImpactSummary | null>(null)
+
   const startAnalysis = useCallback((request: ImpactTrackerRequest) => {
+    // 캐시 체크
+    const cached = getCachedResult(request)
+    if (cached) {
+      setIsAnalyzing(false)
+      setProgress(100)
+      setStep('complete')
+      setStatusMessage('캐시된 결과 로드')
+      setItems(cached.items)
+      setSummary(cached.summary)
+      setError(null)
+      setAiSource(null)
+      setOrdinanceRefs([])
+      setParentLawChanges([])
+      setCompletedSteps([{ step: 'complete', message: '캐시 결과 (24h)', durationMs: 0 }])
+      return
+    }
+
     // 이전 분석 취소
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    currentRequestRef.current = request
+    collectedItemsRef.current = []
+    collectedSummaryRef.current = null
 
     // 상태 초기화
     setIsAnalyzing(true)

@@ -70,6 +70,7 @@ function SearchResultViewComponent({
   initialSearchMode,
   initialPrecedentId,
   onImpactTracker,
+  onOrdinanceBenchmark,
 }: SearchResultViewProps) {
   // ============================================================
   // 상태 관리 훅
@@ -635,6 +636,7 @@ function SearchResultViewComponent({
                       onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
                       onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
                       onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
+                      onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
                     />
                   </div>
                 )}
@@ -697,6 +699,7 @@ function SearchResultViewComponent({
                   onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
                   onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
                   onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
+                  onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
                 />
               </div>
             </div>

@@ -112,6 +112,7 @@ export interface SearchResultViewProps {
   initialPrecedentId?: string | null  // 새로고침 시 판례 상세 복원용
   // 분석 도구 → page.tsx ViewMode 전환용
   onImpactTracker?: (lawName: string, mode?: 'impact' | 'ordinance-sync') => void
+  onOrdinanceBenchmark?: (lawName: string) => void
 }
 
 export interface SearchQuery {
