@@ -84,8 +84,11 @@ export async function searchAllMunicipalities(
     onProgress?: (progress: SearchProgress) => void
   } = {},
 ): Promise<Map<string, BenchmarkOrdinanceResult[]>> {
-  // 캐시 체크
-  const cached = getCachedSearch(keyword)
+  // 키워드 정규화: 공백 제거 (법제처 API가 공백에 민감)
+  const normalizedKeyword = keyword.replace(/\s+/g, '')
+
+  // 캐시 체크 (정규화된 키워드로)
+  const cached = getCachedSearch(normalizedKeyword)
   if (cached) return cached
 
   const { batchSize = 6, delayMs = 200, signal, onProgress } = options
@@ -104,7 +107,7 @@ export async function searchAllMunicipalities(
     })
 
     const batchResults = await Promise.allSettled(
-      batch.map(muni => searchOrdinanceForMunicipality(keyword, muni, signal))
+      batch.map(muni => searchOrdinanceForMunicipality(normalizedKeyword, muni, signal))
     )
 
     batch.forEach((muni, idx) => {
@@ -122,8 +125,10 @@ export async function searchAllMunicipalities(
 
   onProgress?.({ completed: munis.length, total: munis.length, current: '완료' })
 
-  // 캐싱
-  setCacheSearch(keyword, results)
+  // 결과 있을 때만 캐싱 (빈 결과는 캐싱 안 함)
+  if (results.size > 0) {
+    setCacheSearch(normalizedKeyword, results)
+  }
 
   return results
 }
