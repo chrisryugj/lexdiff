@@ -131,6 +131,15 @@ function processSSEEvent(
         break
       }
 
+      case 'tool_call':
+        send({
+          type: 'tool_call',
+          name: parsed.name,
+          displayName: parsed.displayName || parsed.name,
+          query: parsed.query || '',
+        })
+        break
+
       case 'tool_result':
         send({
           type: 'tool_result',

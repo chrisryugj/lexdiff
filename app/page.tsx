@@ -44,7 +44,7 @@ export default function Home() {
   const [ragLoading, setRagLoading] = useState(false)
   const [searchMode, setSearchMode] = useState<'basic' | 'rag'>('basic')
   const [impactRequest, setImpactRequest] = useState<ImpactTrackerRequest | null>(null)
-  const [impactMounted, setImpactMounted] = useState(false) // 한 번 열리면 유지
+  const [impactKey, setImpactKey] = useState(0) // 진입 시마다 증가 → 리마운트로 초기화
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
@@ -130,7 +130,7 @@ export default function Home() {
         setIsSearching(false) // 검색 중 상태 초기화
       } else if (state.viewMode === 'impact-tracker') {
         setViewMode('impact-tracker')
-        setImpactMounted(true)
+        // key 변경 없음 → 기존 결과 보존
       } else if (state.viewMode === 'precedent-detail' && state.searchId && state.precedentId) {
         // 판례 상세 → 앞으로가기로 다시 판례 상세
         setViewMode('precedent-detail')
@@ -215,7 +215,7 @@ export default function Home() {
     requireAuth(() => {
       pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
       setViewMode('impact-tracker')
-      setImpactMounted(true)
+      setImpactKey(k => k + 1)
       setImpactRequest(null)
     })
   }
@@ -235,10 +235,11 @@ export default function Home() {
   return (
     <>
       {/* viewMode에 따라 SearchView 또는 SearchResultView 표시 */}
-      {/* 영향 추적기: 한 번 열리면 언마운트하지 않음 (결과 보존) */}
-      {impactMounted && (
+      {/* 영향 추적기: key 변경 시 리마운트 → 초기화 */}
+      {impactKey > 0 && (
         <div className={viewMode !== 'impact-tracker' ? 'hidden' : ''}>
           <ImpactTrackerView
+            key={impactKey}
             initialRequest={impactRequest}
             onBack={() => window.history.back()}
             onHomeClick={handleHomeClick}

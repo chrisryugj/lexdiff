@@ -749,7 +749,7 @@ export function AIAnswerContent({
                     </div>
                 )}
 
-                {/* SSE 도구 호출 로그 패널 */}
+                {/* SSE 도구 호출 로그 패널 — 영향분석 스타일 */}
                 {(showLogs || isStreaming) && (
                     <div
                         ref={logPanelRef}
@@ -757,101 +757,26 @@ export function AIAnswerContent({
                             isCollapsing ? 'max-h-0 opacity-0 -translate-y-4' : 'max-h-[600px] opacity-100'
                         }`}
                     >
-                        <div className="rounded-lg bg-slate-50/90 dark:bg-slate-900/95 border border-slate-200/60 dark:border-brand-navy/60 p-3 sm:p-4">
-                            {/* 프로그레스 바 + 경과 시간 */}
-                            <div className="mb-3 flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-brand-navy/50 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-brand-navy rounded-full transition-all duration-500 ease-out"
-                                        style={{ width: `${Math.round(searchProgress)}%` }}
-                                    />
-                                </div>
-                                <span className="text-[11px] font-mono text-slate-500 dark:text-gray-400 tabular-nums flex-shrink-0">
-                                    {Math.round(searchProgress)}%
-                                </span>
-                                {isStreaming && (
-                                    <span className="text-[11px] font-mono text-slate-400 dark:text-gray-500 tabular-nums flex-shrink-0">
-                                        {streamElapsed.toFixed(1)}s
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* 도구 호출 로그 */}
-                            <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden">
-                                {toolCallLogs.map((log, idx) => {
-                                    // result 타입에 대해 매칭되는 call의 timestamp와의 차이로 소요시간 계산
-                                    let durationText = ''
-                                    if (log.type === 'result' && log.timestamp) {
-                                        const matchingCall = [...toolCallLogs].slice(0, idx).reverse().find(l => l.type === 'call' && l.name === log.name)
-                                        if (matchingCall?.timestamp) {
-                                            const dur = (log.timestamp - matchingCall.timestamp) / 1000
-                                            durationText = `${dur.toFixed(1)}s`
-                                        }
-                                    }
-                                    return (
-                                    <div
-                                        key={log.id}
-                                        className="flex items-start gap-2 text-[12px] font-mono animate-in slide-in-from-left-2 fade-in duration-300 min-w-0"
-                                        style={{ animationDelay: `${idx * 30}ms` }}
-                                    >
-                                        {log.type === 'status' && (
-                                            <>
-                                                <Icon name="info" size={13} className="text-slate-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
-                                                <span className="text-slate-600 dark:text-gray-400 truncate">{log.displayName}</span>
-                                            </>
-                                        )}
-                                        {log.type === 'call' && (
-                                            <>
-                                                <Icon name="arrow-right" size={13} className="text-amber-600/80 dark:text-brand-gold-light/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-amber-700/90 dark:text-brand-gold-light/90 truncate min-w-0">
-                                                    {log.displayName}
-                                                    {log.query && <span className="text-slate-400 dark:text-gray-500 ml-1">: {log.query}</span>}
-                                                </span>
-                                                <span className="inline-block w-1 h-3 bg-amber-500/60 dark:bg-brand-gold-light/60 animate-pulse ml-1 flex-shrink-0" />
-                                            </>
-                                        )}
-                                        {log.type === 'result' && (
-                                            <>
-                                                {log.success ? (
-                                                    <Icon name="check" size={13} className="text-emerald-600/80 dark:text-emerald-500/80 mt-0.5 flex-shrink-0" />
-                                                ) : (
-                                                    <Icon name="x" size={13} className="text-red-500/80 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                                                )}
-                                                <span className={`truncate min-w-0 flex-1 ${log.success ? 'text-emerald-700/90 dark:text-emerald-600/90' : 'text-red-500/90 dark:text-red-400/80'}`}>
-                                                    {log.displayName}
-                                                    {log.summary && <span className="text-slate-400 dark:text-gray-500 ml-1">→ {log.summary}</span>}
-                                                </span>
-                                                {durationText && (
-                                                    <span className="text-[10px] text-slate-400 dark:text-gray-500 tabular-nums flex-shrink-0 ml-auto">
-                                                        {durationText}
-                                                    </span>
-                                                )}
-                                            </>
-                                        )}
-                                        {log.type === 'token_usage' && (
-                                            <>
-                                                <Icon name="info" size={13} className="text-amber-600/70 dark:text-brand-gold/70 mt-0.5 flex-shrink-0" />
-                                                <span className="text-amber-700/80 dark:text-brand-gold/80 truncate">{log.displayName}</span>
-                                            </>
-                                        )}
+                        <div className="rounded-xl bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 p-4 sm:p-5">
+                            {/* 헤더: 프로그레스 바 + 상태 */}
+                            {isStreaming && (
+                                <>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI 분석 진행 중</span>
+                                        <span className="text-sm font-medium text-gray-500 tabular-nums">{Math.round(searchProgress)}%</span>
                                     </div>
-                                    )
-                                })}
-
-                                {/* 마지막 줄: 현재 상태 표시 - 마지막 status 메시지 또는 대기 중 */}
-                                {isStreaming && !isCollapsing && (
-                                    <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 dark:text-gray-500 pt-1">
-                                        <div className="w-3 h-3 flex-shrink-0">
-                                            <div className="w-2 h-2 rounded-full bg-amber-500 dark:bg-brand-gold animate-pulse mx-auto" />
-                                        </div>
-                                        <span className="truncate">
-                                            {(() => {
-                                                const lastStatus = [...toolCallLogs].reverse().find(l => l.type === 'status')
-                                                return lastStatus ? lastStatus.message : '대기 중...'
-                                            })()}
-                                        </span>
+                                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-4">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-brand-navy to-brand-gold rounded-full transition-all duration-500 ease-out"
+                                            style={{ width: `${Math.round(searchProgress)}%` }}
+                                        />
                                     </div>
-                                )}
+                                </>
+                            )}
+
+                            {/* 단계별 타임라인 */}
+                            <div className="space-y-1.5">
+                                <AiStepTimeline toolCallLogs={toolCallLogs} isStreaming={isStreaming} />
                             </div>
                         </div>
                     </div>
@@ -891,16 +816,15 @@ export function AIAnswerContent({
                             </span>
                         </button>
 
-                        {/* 세부정보 펼치기 */}
+                        {/* 세부정보: 영향분석 스타일 타임라인 */}
                         <div className={`overflow-hidden transition-all duration-400 ease-out ${showDetails ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-                            <div className="rounded-lg bg-slate-50/60 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-700/40 p-3">
-                                {/* 도구별 통계 */}
+                            <div className="rounded-xl bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 p-4">
+                                {/* 도구별 통계 pill */}
                                 {searchStats.toolBreakdown.length > 0 && (
-                                    <div className="mb-3 pb-2.5 border-b border-slate-200/40 dark:border-slate-700/30">
-                                        <div className="text-[11px] font-medium text-muted-foreground/60 mb-1.5">도구별 호출</div>
+                                    <div className="mb-3 pb-2.5 border-b border-gray-100 dark:border-gray-800">
                                         <div className="flex flex-wrap gap-1.5">
                                             {searchStats.toolBreakdown.map(([name, count]) => (
-                                                <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200/50 dark:bg-slate-700/40 text-[11px] text-muted-foreground">
+                                                <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] text-muted-foreground">
                                                     {name} <span className="font-mono tabular-nums font-medium">{count}</span>
                                                 </span>
                                             ))}
@@ -908,46 +832,9 @@ export function AIAnswerContent({
                                     </div>
                                 )}
 
-                                {/* 도구 호출 타임라인 */}
-                                <div className="text-[11px] font-medium text-muted-foreground/60 mb-1.5">호출 타임라인</div>
-                                <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
-                                    {toolCallLogs.filter(l => l.type === 'call' || l.type === 'result').map((log, idx, filtered) => {
-                                        let durationText = ''
-                                        if (log.type === 'result' && log.timestamp) {
-                                            const matchingCall = [...filtered].slice(0, idx).reverse().find(l => l.type === 'call' && l.name === log.name)
-                                            if (matchingCall?.timestamp) {
-                                                durationText = `${((log.timestamp - matchingCall.timestamp) / 1000).toFixed(1)}s`
-                                            }
-                                        }
-                                        return (
-                                            <div key={log.id} className="flex items-center gap-2 text-[11px] font-mono py-0.5">
-                                                {log.type === 'call' ? (
-                                                    <>
-                                                        <Icon name="arrow-right" size={11} className="text-amber-500/70 flex-shrink-0" />
-                                                        <span className="text-muted-foreground truncate">
-                                                            {log.displayName}
-                                                            {log.query && <span className="text-muted-foreground/50 ml-1">: {log.query}</span>}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {log.success ? (
-                                                            <Icon name="check" size={11} className="text-emerald-500/80 flex-shrink-0" />
-                                                        ) : (
-                                                            <Icon name="x" size={11} className="text-red-400 flex-shrink-0" />
-                                                        )}
-                                                        <span className={`truncate flex-1 ${log.success ? 'text-emerald-600/80 dark:text-emerald-500/70' : 'text-red-400/80'}`}>
-                                                            {log.displayName}
-                                                            {log.summary && <span className="text-muted-foreground/50 ml-1">→ {log.summary}</span>}
-                                                        </span>
-                                                        {durationText && (
-                                                            <span className="text-[10px] text-muted-foreground/60 tabular-nums flex-shrink-0 ml-auto">{durationText}</span>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
+                                {/* 완료된 단계 타임라인 */}
+                                <div className="space-y-1.5">
+                                    <AiStepTimeline toolCallLogs={toolCallLogs} isStreaming={false} />
                                 </div>
                             </div>
                         </div>
@@ -1124,5 +1011,147 @@ function HistoryEntry({ entry, fontSize, onLawClick }: {
                 )}
             </div>
         </div>
+    )
+}
+
+// ─── 영향분석 스타일 단계 타임라인 ───
+
+/** call/result 페어링 → 완료/진행 중 단계 목록 */
+function buildSteps(logs: ToolCallLogEntry[]) {
+    const steps: Array<{
+        name: string
+        displayName: string
+        query?: string
+        status: 'completed' | 'in-progress'
+        durationMs?: number
+        success?: boolean
+        summary?: string
+        statusMessages: string[]
+    }> = []
+
+    // status 메시지 수집 (call 직전/직후 status들)
+    const statusBefore = new Map<number, string[]>()
+    let pendingStatuses: string[] = []
+
+    for (let i = 0; i < logs.length; i++) {
+        const log = logs[i]
+        if (log.type === 'status') {
+            pendingStatuses.push(log.message || log.displayName)
+        } else if (log.type === 'call') {
+            statusBefore.set(i, [...pendingStatuses])
+            pendingStatuses = []
+        } else {
+            pendingStatuses = []
+        }
+    }
+
+    // call/result 페어링
+    const calls = logs.map((l, i) => ({ ...l, _idx: i })).filter(l => l.type === 'call')
+    const results = logs.filter(l => l.type === 'result')
+
+    for (const call of calls) {
+        const matchResult = results.find(r => r.name === call.name && r.timestamp && call.timestamp && r.timestamp >= call.timestamp)
+        const msgs = statusBefore.get(call._idx) || []
+        if (matchResult) {
+            steps.push({
+                name: call.name || '',
+                displayName: call.displayName,
+                query: call.query,
+                status: 'completed',
+                durationMs: (matchResult.timestamp! - call.timestamp!),
+                success: matchResult.success,
+                summary: matchResult.summary,
+                statusMessages: msgs,
+            })
+        } else {
+            steps.push({
+                name: call.name || '',
+                displayName: call.displayName,
+                query: call.query,
+                status: 'in-progress',
+                statusMessages: msgs,
+            })
+        }
+    }
+
+    // call이 없는 경우 status만으로 단계 구성
+    if (calls.length === 0 && logs.length > 0) {
+        const statuses = logs.filter(l => l.type === 'status')
+        for (let i = 0; i < statuses.length; i++) {
+            const next = statuses[i + 1]
+            const isLast = i === statuses.length - 1
+            steps.push({
+                name: `status-${i}`,
+                displayName: statuses[i].message || statuses[i].displayName,
+                status: isLast ? 'in-progress' : 'completed',
+                durationMs: next?.timestamp && statuses[i].timestamp ? (next.timestamp - statuses[i].timestamp) : undefined,
+                success: true,
+                statusMessages: [],
+            })
+        }
+    }
+
+    // 마지막에 남은 status 메시지 (진행 중 단계 하위 표시용)
+    const lastStatus = [...logs].reverse().find(l => l.type === 'status')
+    return { steps, lastStatusMessage: lastStatus?.message || lastStatus?.displayName }
+}
+
+/** 실시간 경과 타이머 */
+function AiStepTimer() {
+    const [elapsed, setElapsed] = useState(0)
+    const startRef = useRef(Date.now())
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setElapsed((Date.now() - startRef.current) / 1000)
+        }, 100)
+        return () => clearInterval(interval)
+    }, [])
+
+    return (
+        <span className="text-xs text-brand-gold tabular-nums shrink-0">
+            {elapsed.toFixed(1)}초
+        </span>
+    )
+}
+
+/** 영향분석 스타일 단계별 타임라인 */
+function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: ToolCallLogEntry[], isStreaming: boolean }) {
+    const { steps, lastStatusMessage } = useMemo(() => buildSteps(toolCallLogs), [toolCallLogs])
+
+    return (
+        <>
+            {steps.map((step, i) => (
+                <div key={`${step.name}-${i}`}>
+                    <div className="flex items-center gap-2.5 text-sm">
+                        {step.status === 'completed' ? (
+                            <Icon name="check-circle" size={15} className="text-emerald-500 shrink-0" />
+                        ) : (
+                            <Icon name="loader" size={15} className="text-brand-gold animate-spin shrink-0" />
+                        )}
+                        <span className={`flex-1 truncate ${
+                            step.status === 'completed'
+                                ? 'text-gray-600 dark:text-gray-400'
+                                : 'font-medium text-gray-800 dark:text-gray-200'
+                        }`}>
+                            {step.displayName}
+                        </span>
+                        {step.status === 'completed' && step.durationMs != null ? (
+                            <span className="text-xs text-gray-400 tabular-nums shrink-0">
+                                {(step.durationMs / 1000).toFixed(1)}초
+                            </span>
+                        ) : step.status === 'in-progress' && isStreaming ? (
+                            <AiStepTimer />
+                        ) : null}
+                    </div>
+                    {/* 진행 중 단계 하위 status 메시지 */}
+                    {step.status === 'in-progress' && isStreaming && lastStatusMessage && (
+                        <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                            {lastStatusMessage}
+                        </div>
+                    )}
+                </div>
+            ))}
+        </>
     )
 }
