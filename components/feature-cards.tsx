@@ -108,7 +108,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
   let refIdx = 0
 
   return (
-    <div className="w-full space-y-4 lg:space-y-6">
+    <div className="w-full space-y-2 lg:space-y-3">
       {/* ━━ Core Competence ━━ */}
       <div>
         <div className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
@@ -160,17 +160,17 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mb-4 lg:mb-5 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}
           <h2 className="text-sm font-bold tracking-[0.2em] text-brand-navy dark:text-brand-gold uppercase mb-4">
             Analysis Toolkit
           </h2>
-          <h3 className="text-2xl lg:text-4xl font-black text-brand-navy dark:text-foreground mb-4" style={{ fontFamily: "'RIDIBatang', serif" }}>
+          <h3 className="text-lg lg:text-2xl font-black text-brand-navy dark:text-foreground mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
             법령 분석 도구
           </h3>
-          <p className="text-base text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             도구를 선택하여 바로 분석을 시작하세요.
           </p>
         </div>
