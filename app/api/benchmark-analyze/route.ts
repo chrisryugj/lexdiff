@@ -33,42 +33,48 @@ async function fetchOrdinanceText(ordinanceSeq: string): Promise<string> {
 
     return list
       .filter((a: any) => a?.조문여부 === 'Y' || a?.조문여부 === '조문' || a?.조내용 || a?.조문내용)
-      .slice(0, 20)
       .map((a: any) => {
         const title = a?.조제목 || a?.조문제목 || ''
         const content = a?.조내용 || a?.조문내용 || ''
         return `${title ? `(${title}) ` : ''}${content}`
       })
       .join('\n')
-      .slice(0, 3000)
   } catch { return '' }
 }
 
 // ── 프롬프트 빌드 ──
 
-function buildPrompt(keyword: string, texts: Array<{ orgName: string; ordinanceName: string; text: string }>): string {
+function buildPrompt(keyword: string, texts: Array<{ orgName: string; ordinanceName: string; text: string }>, focus?: string): string {
   const ordinanceList = texts.map((t, i) =>
     `### ${i + 1}. ${t.orgName} — ${t.ordinanceName}\n${t.text}`
   ).join('\n\n---\n\n')
 
-  return `당신은 한국 지방자치법 전문가입니다. 아래 ${texts.length}개 지자체의 "${keyword}" 관련 조례를 비교 분석해 주세요.
+  const focusInstruction = focus
+    ? `\n\n**비교 포커스**: "${focus}" — 이 관점을 중심으로 관련 조항을 집중 비교하세요. 다른 항목도 포함하되 이 포커스에 가중치를 두세요.`
+    : ''
 
-## 요청
-1. **비교표**: 핵심 비교 항목(지원금액, 자격요건, 신청기한, 소득기준, 거주요건 등)을 Markdown 테이블로 작성
-2. **주요 차이점**: 3~5개 항목으로 요약 (선진 사례가 있다면 표시)
+  return `당신은 한국 지방자치법 비교분석 전문가입니다.
 
-## 조례 본문
+## 과제
+아래 ${texts.length}개 지자체의 "${keyword}" 관련 조례 **전문**을 읽고 비교 분석하세요.${focusInstruction}
+
+## 분석 방법
+1. 조례 내용을 통독한 뒤, **이 주제에서 실제로 중요한 비교 축 5~8개**를 직접 도출하세요 (하드코딩된 항목 없음 — 주제에 따라 유동적으로 판단).
+2. 각 비교 축에 대해 지자체별 규정 내용을 정리하세요.
+3. 한 지자체에만 있는 독특한 조항이 있으면 반드시 포함하세요.
+
+## 조례 전문
 
 ${ordinanceList}
 
-## 출력 형식 (반드시 이 형식으로)
+## 출력 형식 (반드시 이 형식)
 ### 비교표
-| 항목 | ${texts.map(t => t.orgName).join(' | ')} |
+| 비교 항목 | ${texts.map(t => t.orgName).join(' | ')} |
 |------|${texts.map(() => '------').join('|')}|
-(핵심 항목별 비교 — 없는 정보는 "미규정"으로 표기)
+(각 항목별 실제 규정 내용 요약. 해당 규정이 없으면 "미규정")
 
 ### 주요 차이점
-- (차이점 요약)`
+- 핵심 차이 3~5개 (어느 지자체가 더 상세하거나 선진적인 규정을 두고 있는지 포함)`
 }
 
 // ── 응답 파싱 ──
@@ -134,11 +140,13 @@ async function callGemini(prompt: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   let keyword: string
+  let focus: string | undefined
   let ordinances: Array<{ orgShortName: string; orgName?: string; ordinanceName: string; ordinanceSeq: string }>
 
   try {
     const body = await request.json()
     keyword = body.keyword
+    focus = body.focus || undefined
     ordinances = body.ordinances
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
@@ -165,7 +173,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const prompt = buildPrompt(keyword, validTexts)
+  const prompt = buildPrompt(keyword, validTexts, focus)
 
   try {
     // 1) OpenClaw 우선 시도

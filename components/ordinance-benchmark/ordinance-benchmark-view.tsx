@@ -70,11 +70,14 @@ interface OrdinanceBenchmarkViewProps {
 export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: OrdinanceBenchmarkViewProps) {
   const [inputValue, setInputValue] = useState(initialKeyword || '')
 
-  // 지자체 필터
-  const [filterOrg, setFilterOrg] = useState<string | null>(null)
+  // 지자체 필터 (다중 선택)
+  const [filterOrgs, setFilterOrgs] = useState<Set<string>>(new Set())
 
   // 체크박스: AI 분석용 선택
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
+
+  // 비교 포커스
+  const [focusInput, setFocusInput] = useState('')
 
   // AI 비교 분석 상태
   const [aiAnalysis, setAiAnalysis] = useState<{ comparisonTable: string; highlights: string } | null>(null)
@@ -116,7 +119,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   const handleSearch = () => {
     if (inputValue.trim()) {
       setCheckedItems(new Set())
-      setFilterOrg(null)
+      setFilterOrgs(new Set())
       setAiAnalysis(null)
       search(inputValue.trim())
     }
@@ -139,9 +142,9 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
 
   // ── 지자체 필터된 결과 ──
   const displayResults = useMemo(() => {
-    if (!filterOrg) return flatResults
-    return flatResults.filter(r => r.orgCode === filterOrg)
-  }, [flatResults, filterOrg])
+    if (filterOrgs.size === 0) return flatResults
+    return flatResults.filter(r => filterOrgs.has(r.orgCode))
+  }, [flatResults, filterOrgs])
 
   // ── 체크박스 (최대 5개) ──
   const MAX_CHECKED = 5
@@ -209,7 +212,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
       const res = await fetch('/api/benchmark-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, ordinances: items }),
+        body: JSON.stringify({ keyword, ordinances: items, focus: focusInput.trim() || undefined }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
       setAiAnalysis(await res.json())
@@ -218,7 +221,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     } finally {
       setAiLoading(false)
     }
-  }, [checkedResults, keyword])
+  }, [checkedResults, keyword, focusInput])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -331,7 +334,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                       <Icon name="search" size={14} className="mr-1.5" /> 검색
                     </Button>
                     <Button variant="outline" size="sm"
-                      onClick={() => { if (inputValue.trim()) { setCheckedItems(new Set()); setFilterOrg(null); setAiAnalysis(null); forceRefresh(inputValue.trim()) } }}
+                      onClick={() => { if (inputValue.trim()) { setCheckedItems(new Set()); setFilterOrgs(new Set()); setAiAnalysis(null); forceRefresh(inputValue.trim()) } }}
                       disabled={!inputValue.trim()} className="h-10 px-3" title="캐시 무시">
                       <Icon name="refresh-cw" size={14} />
                     </Button>
@@ -343,7 +346,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                 {['출산장려금', '주차장 설치', '재난안전', '장애인 편의', '청년 지원'].map(kw => (
                   <Button key={kw} variant="outline" size="sm" className="h-7 px-2.5 text-xs"
                     disabled={isSearching}
-                    onClick={() => { setInputValue(kw); setCheckedItems(new Set()); setFilterOrg(null); setAiAnalysis(null); search(kw) }}>
+                    onClick={() => { setInputValue(kw); setCheckedItems(new Set()); setFilterOrgs(new Set()); setAiAnalysis(null); search(kw) }}>
                     {kw}
                   </Button>
                 ))}
@@ -405,10 +408,10 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               {orgCounts.size > 0 && orgCounts.size <= 80 && (
                 <div className="flex flex-wrap gap-1.5">
                   {/* 전체 버튼 */}
-                  <button onClick={() => { setFilterOrg(null); setCheckedItems(new Set()) }}
+                  <button onClick={() => { setFilterOrgs(new Set()); setCheckedItems(new Set()) }}
                     className={cn(
                       "text-xs px-2 py-1 rounded-md border font-medium transition-all cursor-pointer",
-                      !filterOrg
+                      filterOrgs.size === 0
                         ? "bg-brand-navy text-white border-brand-navy dark:bg-brand-gold dark:text-black dark:border-brand-gold"
                         : "bg-background text-foreground border-border hover:bg-muted/50"
                     )}>
@@ -416,10 +419,18 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                   </button>
                   {Array.from(orgCounts.entries()).map(([code, { shortName, count }]) => (
                     <button key={code}
-                      onClick={() => { setFilterOrg(filterOrg === code ? null : code); setCheckedItems(new Set()) }}
+                      onClick={() => {
+                        setFilterOrgs(prev => {
+                          const next = new Set(prev)
+                          if (next.has(code)) next.delete(code)
+                          else next.add(code)
+                          return next
+                        })
+                        setCheckedItems(new Set())
+                      }}
                       className={cn(
                         "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-all cursor-pointer",
-                        filterOrg === code
+                        filterOrgs.has(code)
                           ? "bg-sky-600 text-white border-sky-600 dark:bg-sky-500 dark:border-sky-500"
                           : "bg-background text-muted-foreground border-border hover:bg-muted/50 hover:text-foreground"
                       )}>
@@ -484,17 +495,27 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               {/* AI 비교 분석 */}
               <Card className="p-5">
                 {!aiAnalysis && !aiLoading && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon name="sparkles" size={18} className="text-brand-navy dark:text-brand-gold" />
-                      <span className="text-sm font-semibold" style={serifStyle}>AI 비교 분석</span>
-                      {checkedItems.size > 0
-                        ? <span className="text-xs text-muted-foreground">{checkedItems.size}/{MAX_CHECKED}개 선택</span>
-                        : <span className="text-xs text-muted-foreground">비교할 조례를 체크하세요 (2~{MAX_CHECKED}개)</span>}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon name="sparkles" size={18} className="text-brand-navy dark:text-brand-gold" />
+                        <span className="text-sm font-semibold" style={serifStyle}>AI 비교 분석</span>
+                        {checkedItems.size > 0
+                          ? <span className="text-xs text-muted-foreground">{checkedItems.size}/{MAX_CHECKED}개 선택</span>
+                          : <span className="text-xs text-muted-foreground">비교할 조례를 체크하세요 (2~{MAX_CHECKED}개)</span>}
+                      </div>
+                      <Button size="sm" onClick={handleAiAnalysis} disabled={checkedResults.length < 2} className="h-9">
+                        <Icon name="sparkles" size={14} className="mr-1.5" /> 비교 분석 요청
+                      </Button>
                     </div>
-                    <Button size="sm" onClick={handleAiAnalysis} disabled={checkedResults.length < 2} className="h-9">
-                      <Icon name="sparkles" size={14} className="mr-1.5" /> 비교 분석 요청
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="비교 포커스 (선택사항) — 예: 휴가, 지원금액, 자격요건"
+                        value={focusInput}
+                        onChange={(e) => setFocusInput(e.target.value)}
+                        className="flex-1 h-8 text-xs"
+                      />
+                    </div>
                   </div>
                 )}
                 {aiLoading && (
