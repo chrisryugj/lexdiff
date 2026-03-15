@@ -6,20 +6,24 @@ import { Badge } from "@/components/ui/badge"
 import type { IconName } from "@/lib/icons"
 
 // ── 브랜딩 카드 (Core Competence) ──────────────────────────
+// 기존 7개 → 3개로 통합:
+// AI 자연어 검색 + AI 법률 분석 요약 → AI 법률 분석
+// 신구법 대비표 + 3단 비교 아키텍처 + 위임법령 자동 추적 → 법령 비교·추적
+// 실시간 법제처 연동 + 법령 영향 추적기 → 실시간 법제처 데이터
 const brandingCards = [
   {
     title: "AI 법률 분석",
-    description: "자연어 질문으로 법령·판례·해석례를 검색하고, AI가 핵심 쟁점을 분석·요약합니다.",
+    description: "복잡한 법률 용어를 몰라도 일상 언어로 질문하면 관련 법령과 판례를 즉시 도출합니다. 최첨단 AI가 법조문·시행령·관련 판례의 핵심 쟁점을 분석하고, 실무에 즉시 활용할 수 있도록 일목요연하게 요약합니다.",
     icon: "brain" as IconName,
   },
   {
     title: "법령 비교·추적",
-    description: "신구법 대비, 3단 위임법령 비교, 상·하위 법령 체계를 단일 뷰에서 파악합니다.",
+    description: "개정 전후의 법령 변화를 시각적으로 대조하는 신구법 대비표, 법률·시행령·시행규칙의 유기적 위임 관계를 파악하는 3단 비교, 하위법령 네트워크를 자동 스캐닝하는 위임법령 추적까지 단일 뷰에서 지원합니다.",
     icon: "git-compare" as IconName,
   },
   {
-    title: "실시간 법제처 연동",
-    description: "법제처 API 다이렉트 연동으로 법령·조례·판례·해석례 최신 데이터를 실시간 제공합니다.",
+    title: "실시간 법제처 데이터",
+    description: "법제처 API 다이렉트 연동으로 공포 즉시 최신 법령·조례·판례·해석례를 제공하여 법적 리스크를 차단합니다. 상위법 개정이 하위법령에 미치는 영향을 자동 탐지·분석하여 긴급/검토/참고로 분류합니다.",
     icon: "zap" as IconName,
   },
 ]
@@ -104,10 +108,10 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
   let refIdx = 0
 
   return (
-    <div className="w-full space-y-20 lg:space-y-28">
+    <div className="w-full space-y-12 lg:space-y-16">
       {/* ━━ Core Competence ━━ */}
       <div>
-        <div className={`mb-16 lg:mb-24 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+        <div className={`mb-10 lg:mb-14 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
              style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
           <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase mb-4">
             Core Competence
@@ -156,7 +160,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mb-10 lg:mb-14 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mb-8 lg:mb-10 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}

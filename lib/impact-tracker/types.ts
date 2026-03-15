@@ -9,6 +9,7 @@ export interface ImpactTrackerRequest {
   dateFrom: string         // "2025-01-01"
   dateTo: string           // "2026-03-14"
   region?: string          // "광진구" — A방향 조례 탐색 시 지역 필터
+  mode?: 'impact' | 'ordinance-sync'  // 'ordinance-sync' = B방향 특화 미반영 탐지
 }
 
 // ── 영향도 등급 ──

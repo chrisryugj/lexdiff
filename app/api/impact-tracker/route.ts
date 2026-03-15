@@ -35,12 +35,16 @@ export async function POST(request: NextRequest) {
   let lawNames: string[]
   let dateFrom: string
   let dateTo: string
+  let mode: 'impact' | 'ordinance-sync' = 'impact'
+  let region: string | undefined
 
   try {
     const body = await request.json()
     lawNames = body.lawNames
     dateFrom = body.dateFrom
     dateTo = body.dateTo
+    mode = body.mode || 'impact'
+    region = body.region
   } catch {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
 
       try {
         for await (const event of executeImpactAnalysis(
-          { lawNames, dateFrom, dateTo },
+          { lawNames, dateFrom, dateTo, mode, region },
           { signal: request.signal, apiKey: userApiKey },
         )) {
           // 첫 번째 의미 있는 이벤트 수신 시 사용량 기록

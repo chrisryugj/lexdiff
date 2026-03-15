@@ -50,7 +50,8 @@ export async function* executeImpactAnalysis(
   request: ImpactTrackerRequest,
   options?: { signal?: AbortSignal; apiKey?: string },
 ): AsyncGenerator<ImpactSSEEvent> {
-  const { lawNames, dateFrom, dateTo } = request
+  const { lawNames, dateFrom, dateTo, mode = 'impact' } = request
+  const isOrdinanceSyncMode = mode === 'ordinance-sync'
   const allChanges: ArticleChange[] = []
   const allOldNew: Array<{ oldText: string; newText: string }> = []
   const allDownstreamMap = new Map<string, DownstreamImpact[]>()
@@ -109,7 +110,13 @@ export async function* executeImpactAnalysis(
 
     // ── A방향: 국가법령 신구법비교 + 위임법령 추적 ──
     if (nationalLaws.length > 0) {
-      yield* processNationalLaws(nationalLaws, allChanges, allOldNew, allDownstreamMap, request, options)
+      if (isOrdinanceSyncMode) {
+        // ordinance-sync 모드: 국가법령은 B방향으로 전환
+        // 해당 법을 참조하는 조례를 찾아서 미반영 체크
+        yield* processNationalLawsAsSync(nationalLaws, dateFrom, dateTo, allChanges, allOldNew, allDownstreamMap, ordinanceRefContext, request, options)
+      } else {
+        yield* processNationalLaws(nationalLaws, allChanges, allOldNew, allDownstreamMap, request, options)
+      }
     }
 
     // 중복 조문 제거 (같은 법령+조문이 A/B방향에서 중복 수집될 수 있음)
@@ -431,6 +438,86 @@ async function* processNationalLaws(
         }
       } catch {
         // 조례 탐색 실패는 무시 (비핵심 기능)
+      }
+    }
+  }
+}
+
+// ── ordinance-sync 모드: 국가법령 → 조례 미반영 탐지 ──
+
+async function* processNationalLawsAsSync(
+  nationalLaws: ResolvedLaw[],
+  dateFrom: string,
+  dateTo: string,
+  allChanges: ArticleChange[],
+  allOldNew: Array<{ oldText: string; newText: string }>,
+  allDownstreamMap: Map<string, DownstreamImpact[]>,
+  ordinanceRefContext: Map<string, { ordinanceName: string; ordinanceArticles: string[] }>,
+  request: ImpactTrackerRequest,
+  options?: { signal?: AbortSignal },
+): AsyncGenerator<ImpactSSEEvent> {
+  // Step 2: 신구법 비교 (변경 조문 파악)
+  yield { type: 'status', message: '상위법 변경사항 확인 중...', progress: 10, step: 'comparing' }
+
+  for (let i = 0; i < nationalLaws.length; i++) {
+    if (options?.signal?.aborted) throw new Error('cancelled')
+
+    const law = nationalLaws[i]
+    yield { type: 'status', message: `${law.lawName} 신구법 비교 중...`, progress: Math.round(10 + ((i + 1) / nationalLaws.length) * 20), step: 'comparing' }
+
+    const compareResult = await executeTool('compare_old_new', { lawId: law.lawId, mst: law.mst })
+    if (compareResult.isError) continue
+    if (compareResult.result.includes('개정 이력이 없거나') || compareResult.result.includes('데이터가 없습니다')) continue
+
+    const parsed = parseCompareOldNew(compareResult.result)
+    const revisionDate = extractDateFromCompare(compareResult.result)
+    const changes = buildChangesFromOldNew(parsed, law.lawId, law.mst, revisionDate)
+
+    allChanges.push(...changes)
+    for (const pair of parsed.pairs) {
+      allOldNew.push({ oldText: pair.oldText, newText: pair.newText })
+    }
+
+    yield { type: 'changes_found', lawName: law.lawName, changes }
+  }
+
+  // Step 3: 관련 조례 탐색 (미반영 후보)
+  const changedJoDisplays = [...new Set(allChanges.map(c => c.joDisplay))]
+  if (changedJoDisplays.length > 0) {
+    yield { type: 'status', message: '관련 조례 미반영 탐색 중...', progress: 40, step: 'tracing' }
+
+    for (const law of nationalLaws) {
+      if (options?.signal?.aborted) throw new Error('cancelled')
+
+      try {
+        const affected = await findAffectedOrdinances(
+          law.lawName,
+          changedJoDisplays,
+          { region: request.region, maxResults: 5, signal: options?.signal },
+        )
+
+        for (const ord of affected) {
+          for (const art of ord.affectedArticles) {
+            const key = `${law.lawId}:${art.referencedParentJo}`
+            const existing = allDownstreamMap.get(key) || []
+            existing.push({
+              type: '자치법규',
+              lawName: ord.ordinanceName,
+              lawId: ord.ordinanceId,
+              joDisplay: art.ordinanceJo,
+              content: art.ordinanceJoTitle,
+            })
+            allDownstreamMap.set(key, existing)
+
+            // ordinanceRefContext에 미반영 매핑
+            ordinanceRefContext.set(`${law.lawName}:${art.referencedParentJo}`, {
+              ordinanceName: ord.ordinanceName,
+              ordinanceArticles: [art.ordinanceJo],
+            })
+          }
+        }
+      } catch {
+        // 조례 탐색 실패 무시
       }
     }
   }

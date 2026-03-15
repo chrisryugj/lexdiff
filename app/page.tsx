@@ -235,6 +235,7 @@ export default function Home() {
         lawNames: [lawName],
         dateFrom: from.toISOString().slice(0, 10),
         dateTo: today,
+        mode,
       }
       pushImpactTrackerHistory(request)
       setViewMode('impact-tracker')
