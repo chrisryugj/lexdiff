@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { searchAllMunicipalities, clearBenchmarkCache, type SearchProgress } from '@/lib/ordinance-benchmark/searcher'
 import type { BenchmarkOrdinanceResult } from '@/lib/ordinance-benchmark/types'
-import { METRO_MUNICIPALITIES } from '@/lib/ordinance-benchmark/municipality-codes'
 
 export function useOrdinanceBenchmark() {
   const [isSearching, setIsSearching] = useState(false)
@@ -77,7 +76,6 @@ export function useOrdinanceBenchmark() {
   }, [])
 
   const matchedCount = results?.size || 0
-  const totalMunicipalities = METRO_MUNICIPALITIES.length
 
   // 결과를 플랫 배열로 변환 (테이블용)
   const flatResults: BenchmarkOrdinanceResult[] = []
@@ -93,7 +91,6 @@ export function useOrdinanceBenchmark() {
     keyword,
     error,
     matchedCount,
-    totalMunicipalities,
     search,
     forceRefresh,
     cancel,

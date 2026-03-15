@@ -13,7 +13,7 @@ import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 import { cn } from "@/lib/utils"
 import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
-import { METRO_MUNICIPALITIES } from "@/lib/ordinance-benchmark/municipality-codes"
+// METRO_MUNICIPALITIES는 더 이상 검색에 사용하지 않음 (전국 개별 지자체 표시)
 
 /** 간단한 Markdown → HTML (테이블 + 리스트 + 볼드) */
 function markdownToHtml(md: string): string {
@@ -89,7 +89,6 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     keyword,
     error,
     matchedCount,
-    totalMunicipalities,
     search,
     forceRefresh,
     cancel,
@@ -142,9 +141,11 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     }
   }, [flatResults, keyword])
 
-  // 지자체별 매칭 여부 맵
-  const matchedSet = new Set<string>()
-  flatResults.forEach(r => matchedSet.add(r.orgCode))
+  // 고유 지자체 목록
+  const uniqueOrgs = new Map<string, string>()
+  flatResults.forEach(r => {
+    if (!uniqueOrgs.has(r.orgCode)) uniqueOrgs.set(r.orgCode, r.orgShortName)
+  })
 
   const handleLogoClick = () => { onHomeClick?.() }
 
@@ -219,18 +220,16 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                   <Icon name="search" size={14} className="mr-1" />
                   검색
                 </Button>
-                {process.env.NODE_ENV === 'development' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => inputValue.trim() && forceRefresh(inputValue.trim())}
-                    disabled={!inputValue.trim()}
-                    className="h-9 px-2"
-                    title="캐시 무시하고 강제 재검색"
-                  >
-                    <Icon name="refresh-cw" size={14} />
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => inputValue.trim() && forceRefresh(inputValue.trim())}
+                  disabled={!inputValue.trim()}
+                  className="h-9 px-2"
+                  title="캐시 무시하고 강제 재검색"
+                >
+                  <Icon name="refresh-cw" size={14} />
+                </Button>
               </>
             )}
           </div>
@@ -285,7 +284,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">검색 결과</span>
                 <Badge variant="secondary" className="text-xs">
-                  {totalMunicipalities}개 시도 중 {matchedCount}개 매칭
+                  {matchedCount}개 지자체 매칭
                 </Badge>
               </div>
               <span className="text-xs text-muted-foreground">
@@ -293,20 +292,15 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               </span>
             </div>
 
-            {/* 지자체 매칭 히트맵 */}
+            {/* 매칭 지자체 배지 */}
             <div className="flex flex-wrap gap-1">
-              {METRO_MUNICIPALITIES.map(m => (
+              {Array.from(uniqueOrgs.entries()).map(([code, shortName]) => (
                 <Badge
-                  key={m.code}
-                  variant={matchedSet.has(m.code) ? "default" : "outline"}
-                  className={cn(
-                    "text-[10px] px-1.5 py-0.5",
-                    matchedSet.has(m.code)
-                      ? "bg-brand-navy text-white dark:bg-brand-gold dark:text-black"
-                      : "text-muted-foreground opacity-50"
-                  )}
+                  key={code}
+                  variant="default"
+                  className="text-[10px] px-1.5 py-0.5 bg-brand-navy text-white dark:bg-brand-gold dark:text-black"
                 >
-                  {m.shortName}
+                  {shortName}
                 </Badge>
               ))}
             </div>
