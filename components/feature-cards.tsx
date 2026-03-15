@@ -108,7 +108,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
   let refIdx = 0
 
   return (
-    <div className="w-full space-y-8 lg:space-y-10">
+    <div className="w-full space-y-4 lg:space-y-6">
       {/* ━━ Core Competence ━━ */}
       <div>
         <div className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
