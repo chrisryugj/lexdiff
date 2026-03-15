@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { searchAllMunicipalities, type SearchProgress } from '@/lib/ordinance-benchmark/searcher'
+import { searchAllMunicipalities, clearBenchmarkCache, type SearchProgress } from '@/lib/ordinance-benchmark/searcher'
 import type { BenchmarkOrdinanceResult } from '@/lib/ordinance-benchmark/types'
 import { METRO_MUNICIPALITIES } from '@/lib/ordinance-benchmark/municipality-codes'
 
@@ -16,6 +16,35 @@ export function useOrdinanceBenchmark() {
   const search = useCallback(async (searchKeyword: string) => {
     if (!searchKeyword.trim()) return
 
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setIsSearching(true)
+    setKeyword(searchKeyword)
+    setResults(null)
+    setError(null)
+    setProgress(null)
+
+    try {
+      const map = await searchAllMunicipalities(searchKeyword, {
+        signal: controller.signal,
+        onProgress: setProgress,
+      })
+      if (!controller.signal.aborted) {
+        setResults(map)
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return
+      setError(err.message || '검색 중 오류가 발생했습니다.')
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  const forceRefresh = useCallback(async (searchKeyword: string) => {
+    if (!searchKeyword.trim()) return
+    clearBenchmarkCache(searchKeyword)
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -66,6 +95,7 @@ export function useOrdinanceBenchmark() {
     matchedCount,
     totalMunicipalities,
     search,
+    forceRefresh,
     cancel,
   }
 }

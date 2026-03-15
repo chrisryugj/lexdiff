@@ -25,8 +25,28 @@ export function getCachedSearch(keyword: string): Map<string, BenchmarkOrdinance
       localStorage.removeItem(getBenchmarkCacheKey(keyword))
       return null
     }
-    return new Map(Object.entries(cached.results))
+    const map = new Map(Object.entries(cached.results))
+    // 빈 결과 캐시는 무시 (이전 버그로 인한 잘못된 캐시 방지)
+    if (map.size === 0) {
+      localStorage.removeItem(getBenchmarkCacheKey(keyword))
+      return null
+    }
+    return map
   } catch { return null }
+}
+
+export function clearBenchmarkCache(keyword?: string): void {
+  try {
+    if (keyword) {
+      const normalized = keyword.replace(/\s+/g, '')
+      localStorage.removeItem(getBenchmarkCacheKey(normalized))
+      localStorage.removeItem(getBenchmarkCacheKey(keyword))
+    } else {
+      // 전체 벤치마크 캐시 삭제
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('benchmark:'))
+      keys.forEach(k => localStorage.removeItem(k))
+    }
+  } catch { /* ignore */ }
 }
 
 function setCacheSearch(keyword: string, results: Map<string, BenchmarkOrdinanceResult[]>): void {
