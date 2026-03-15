@@ -149,22 +149,19 @@ export function useOrdinanceBenchmark() {
       const next = new Set(prev)
       if (next.has(metro)) next.delete(metro)
       else next.add(metro)
+
+      // 권역 상태 동기화 (업데이트된 next 기준)
+      setActiveRegions(() => {
+        const regionSet = new Set<string>()
+        for (const r of REGIONS) {
+          if (r.metros.every(m => next.has(m))) regionSet.add(r.name)
+        }
+        return regionSet
+      })
+
       return next
     })
-    // 권역 상태 동기화
-    setActiveRegions(prev => {
-      const next = new Set<string>()
-      for (const r of REGIONS) {
-        // 업데이트된 activeMetros를 반영하기 위해 현재 상태 기반
-        const allIn = r.metros.every(m => {
-          if (m === arguments[0]) return !prev.has(r.name) // toggle 반영
-          return activeMetros.has(m)
-        })
-        if (allIn) next.add(r.name)
-      }
-      return next
-    })
-  }, [activeMetros])
+  }, [])
 
   const selectAllRegions = useCallback(() => {
     setActiveRegions(new Set(REGIONS.map(r => r.name)))

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Icon } from "@/components/ui/icon"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { parseLawSearchXML } from "@/lib/law-search-parser"
 
 interface LawSearchResult {
   lawName: string
@@ -42,17 +43,17 @@ export function LawSelectionDialog({
     setSearched(true)
 
     try {
-      const res = await fetch(`/api/search-suggest?query=${encodeURIComponent(query.trim())}&display=10`)
+      const res = await fetch(`/api/law-search?query=${encodeURIComponent(query.trim())}`)
       if (!res.ok) throw new Error('검색 실패')
-      const data = await res.json()
-      const items = data.suggestions || data.results || []
-      setResults(items.map((item: any) => ({
-        lawName: item.lawName || item.title || item.name || '',
-        lawId: item.lawId || item.id || '',
+      const xml = await res.text()
+      const parsed = parseLawSearchXML(xml)
+      setResults(parsed.map(item => ({
+        lawName: item.lawName,
+        lawId: item.lawId || '',
         mst: item.mst || '',
         lawType: item.lawType || '',
         effectiveDate: item.effectiveDate || '',
-      })).filter((r: LawSearchResult) => r.lawName))
+      })))
     } catch {
       setResults([])
     } finally {
