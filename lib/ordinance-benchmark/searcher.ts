@@ -8,6 +8,7 @@
 import { METRO_MUNICIPALITIES, type Municipality } from './municipality-codes'
 import type { BenchmarkOrdinanceResult } from './types'
 import { getBenchmarkCacheKey, BENCHMARK_CACHE_TTL } from './types'
+import { parseOrdinanceSearchXML } from '../ordin-search-parser'
 
 // ── 캐시 ────────────────────────────────────────────────────
 interface CachedSearch {
@@ -53,17 +54,17 @@ async function searchOrdinanceForMunicipality(
   const res = await fetch(`/api/ordin-search?${params}`, { signal })
   if (!res.ok) return []
 
-  const data = await res.json()
-  const items = data.results || data.ordinances || []
+  const xmlText = await res.text()
+  const { ordinances } = parseOrdinanceSearchXML(xmlText)
 
-  return items.map((item: any) => ({
+  return ordinances.map((item) => ({
     orgCode: muni.code,
     orgName: muni.name,
     orgShortName: muni.shortName,
-    ordinanceName: item.ordinanceName || item.title || item.lawNm || '',
-    ordinanceSeq: item.ordinanceSeq || item.seq || '',
-    effectiveDate: item.effectiveDate || item.efYd || '',
-    revisionType: item.revisionType || item.rrCls || '',
+    ordinanceName: item.ordinName,
+    ordinanceSeq: item.ordinSeq,
+    effectiveDate: item.effectiveDate || '',
+    revisionType: item.revisionType || '',
   }))
 }
 

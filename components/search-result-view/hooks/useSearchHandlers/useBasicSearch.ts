@@ -10,6 +10,7 @@ import { normalizeLawSearchText } from "@/lib/search-normalizer"
 import { parseLawSearchXML } from "@/lib/law-search-parser"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { buildFullQuery, isOrdinanceQuery as checkIsOrdinanceQuery } from "../../utils"
+import { buildOrdinanceSearchStrategies } from "@/lib/query-expansion"
 import type { HandlerDeps, SearchQuery, LawSearchResult } from "./types"
 
 interface UseBasicSearchDeps extends HandlerDeps {
@@ -101,30 +102,75 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
       actions.updateProgress('searching', 40)
 
       if (isOrdinance) {
-        const apiUrl = "/api/ordin-search?query=" + encodeURIComponent(lawName)
-        const response = await fetch(apiUrl)
+        // 다단계 검색 전략 생성 (동의어 확장 + 필살기 포함)
+        const strategies = buildOrdinanceSearchStrategies(lawName)
 
-        apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+        type OrdinResult = import("@/lib/ordin-search-parser").OrdinanceSearchResult
+        let allOrdinances: OrdinResult[] = []
+        let totalCount = 0
+        let matchedStrategy = ''
 
-        if (!response.ok) {
-          throw new Error("조례 검색 실패")
+        // 전략 순차 실행 — 첫 번째 성공에서 중단
+        for (let i = 0; i < strategies.length; i++) {
+          const strategy = strategies[i]
+          const progress = 40 + Math.round((i / strategies.length) * 40)
+          actions.updateProgress('searching', Math.min(progress, 75))
+
+          const apiUrl = `/api/ordin-search?query=${encodeURIComponent(strategy.query)}&display=${strategy.display}`
+          const response = await fetch(apiUrl)
+          apiLogs.push({ url: apiUrl, method: "GET", status: response.status })
+
+          if (!response.ok) continue
+
+          const xmlText = await response.text()
+          const result = parseOrdinanceSearchXML(xmlText)
+          console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
+
+          if (result.ordinances.length > 0) {
+            // 클라이언트 측 필터링
+            if (strategy.filterKeywords && strategy.filterKeywords.length > 0) {
+              const filtered = result.ordinances.filter(o =>
+                strategy.filterKeywords!.some(kw => o.ordinName.includes(kw))
+              )
+              if (filtered.length > 0) {
+                allOrdinances = filtered
+                totalCount = filtered.length
+                matchedStrategy = strategy.description
+                break
+              }
+              continue // 필터 결과 0건이면 다음 전략으로
+            }
+
+            allOrdinances = result.ordinances
+            totalCount = result.totalCount
+            matchedStrategy = strategy.description
+            break
+          }
         }
 
-        actions.updateProgress('parsing', 60)
-        const xmlText = await response.text()
-        const { totalCount, ordinances } = parseOrdinanceSearchXML(xmlText)
         actions.updateProgress('parsing', 80)
 
-        console.log(`[ordin-search] API 응답: totalCount=${totalCount}, ordinances.length=${ordinances.length}`)
-
-        if (ordinances.length === 0) {
-          reportError("조례 검색", new Error(`검색 결과를 찾을 수 없습니다: ${query.lawName}`), { query: query.lawName }, apiLogs)
+        if (allOrdinances.length === 0) {
+          toast({
+            title: "조례 검색 결과 없음",
+            description: `"${lawName}"에 해당하는 조례를 찾을 수 없습니다. AI 검색을 시도해보세요.`,
+          })
+          actions.setPendingQuery(query)
+          actions.setShowChoiceDialog(true)
           actions.updateProgress('complete', 0)
           actions.setIsSearching(false)
           return
         }
 
-        actions.setOrdinanceSelectionState({ results: ordinances, totalCount, query: { lawName } })
+        // 원본 검색어와 다른 전략으로 찾은 경우 알림
+        if (matchedStrategy && !matchedStrategy.startsWith('원본')) {
+          toast({
+            title: "관련 조례 검색 결과",
+            description: `"${lawName}" 관련 조례 ${totalCount}건을 찾았습니다.`,
+          })
+        }
+
+        actions.setOrdinanceSelectionState({ results: allOrdinances, totalCount, query: { lawName } })
         actions.setMobileView("list")
         actions.updateProgress('complete', 100)
         actions.setIsSearching(false)
@@ -142,7 +188,7 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
               searchId: currentSearchId,
               query: { lawName },
               ordinanceSelectionState: {
-                results: ordinances.map(o => ({
+                results: allOrdinances.map((o: import("@/lib/ordin-search-parser").OrdinanceSearchResult) => ({
                   자치법규ID: o.ordinId || o.ordinSeq,
                   자치법규명: o.ordinName,
                   공포일자: o.promulgationDate || '',
@@ -152,7 +198,7 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
               timestamp: Date.now(),
               expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
             })
-            debugLogger.success('💾 조례 검색 결과 IndexedDB 저장', { searchId: currentSearchId, count: ordinances.length })
+            debugLogger.success('💾 조례 검색 결과 IndexedDB 저장', { searchId: currentSearchId, count: allOrdinances.length })
           }
         } catch (cacheError) {
           debugLogger.error('⚠️ 조례 검색 결과 저장 실패', cacheError)
