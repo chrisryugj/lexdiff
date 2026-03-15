@@ -1,14 +1,20 @@
 /**
- * korean-law-mcp 도구 → Gemini Function Calling 어댑터
+ * korean-law-mcp 도구 → LLM Function Calling 어댑터
  *
  * korean-law-mcp의 개별 도구를 직접 import하여
- * Gemini FunctionDeclaration으로 변환 + 실행하는 얇은 브릿지 레이어
+ * FunctionDeclaration으로 변환 + 실행하는 얇은 브릿지 레이어.
+ *
+ * ── LLM 구성 ──
+ * Primary : Sonnet 4.6 (Claude) — OpenClaw Bridge 경유
+ * Fallback: Gemini Flash — Bridge 불능 시 engine.ts에서 직접 호출
+ *
+ * 도구 스키마/핸들러는 양쪽 LLM이 공유.
  */
 
 import { LawApiClient } from 'korean-law-mcp/build/lib/api-client.js'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 
-// Tier 1 도구: 항상 제공
+// ── Tier 0: Core search & retrieval ──
 import { searchLaw, SearchLawSchema } from 'korean-law-mcp/build/tools/search.js'
 import { getLawText, GetLawTextSchema } from 'korean-law-mcp/build/tools/law-text.js'
 import { searchPrecedents, searchPrecedentsSchema, getPrecedentText, getPrecedentTextSchema } from 'korean-law-mcp/build/tools/precedents.js'
@@ -16,24 +22,50 @@ import { searchInterpretations, searchInterpretationsSchema, getInterpretationTe
 import { searchAiLaw, searchAiLawSchema } from 'korean-law-mcp/build/tools/life-law.js'
 import { getBatchArticles, GetBatchArticlesSchema } from 'korean-law-mcp/build/tools/batch-articles.js'
 
-// Tier 2 도구: 위임법령/신구법비교/조문이력
+// ── Tier 1-2: Comparison / Structure / History ──
 import { getThreeTier, GetThreeTierSchema } from 'korean-law-mcp/build/tools/three-tier.js'
 import { compareOldNew, CompareOldNewSchema } from 'korean-law-mcp/build/tools/comparison.js'
 import { getArticleHistory, ArticleHistorySchema } from 'korean-law-mcp/build/tools/article-history.js'
-
-// Tier 2 도구: 자치법규(조례)
 import { searchOrdinance, SearchOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance-search.js'
 import { getOrdinance, GetOrdinanceSchema } from 'korean-law-mcp/build/tools/ordinance.js'
-
-// Tier 3 도구: 확장 (고급검색, 별표, 유사판례, 체계도, 통합검색)
 import { advancedSearch, AdvancedSearchSchema } from 'korean-law-mcp/build/tools/advanced-search.js'
 import { getAnnexes, GetAnnexesSchema } from 'korean-law-mcp/build/tools/annex.js'
 import { findSimilarPrecedents, FindSimilarPrecedentsSchema } from 'korean-law-mcp/build/tools/similar-precedents.js'
 import { getLawTree, GetLawTreeSchema } from 'korean-law-mcp/build/tools/law-tree.js'
 import { searchAll, SearchAllSchema } from 'korean-law-mcp/build/tools/search-all.js'
 
+// ── Composite: 조문+판례 동시 조회 ──
+import { getArticleWithPrecedents, GetArticleWithPrecedentsSchema } from 'korean-law-mcp/build/tools/article-with-precedents.js'
+
+// ── Admin rules (행정규칙: 훈령/예규/고시) ──
+import { searchAdminRule, SearchAdminRuleSchema, getAdminRule, GetAdminRuleSchema } from 'korean-law-mcp/build/tools/admin-rule.js'
+
+// ── Chain tools (multi-step macros — 내부에서 여러 도구 자동 연쇄, 턴 수 절감) ──
+import {
+  chainFullResearch, chainFullResearchSchema,
+  chainDisputePrep, chainDisputePrepSchema,
+  chainProcedureDetail, chainProcedureDetailSchema,
+  chainActionBasis, chainActionBasisSchema,
+  chainLawSystem, chainLawSystemSchema,
+  chainAmendmentTrack, chainAmendmentTrackSchema,
+  chainOrdinanceCompare, chainOrdinanceCompareSchema,
+} from 'korean-law-mcp/build/tools/chains.js'
+
+// ── Domain specialist tools ──
+import { searchAdminAppeals, searchAdminAppealsSchema, getAdminAppealText, getAdminAppealTextSchema } from 'korean-law-mcp/build/tools/admin-appeals.js'
+import { searchConstitutionalDecisions, searchConstitutionalDecisionsSchema, getConstitutionalDecisionText, getConstitutionalDecisionTextSchema } from 'korean-law-mcp/build/tools/constitutional-decisions.js'
+import { searchTaxTribunalDecisions, searchTaxTribunalDecisionsSchema, getTaxTribunalDecisionText, getTaxTribunalDecisionTextSchema } from 'korean-law-mcp/build/tools/tax-tribunal-decisions.js'
+import { searchCustomsInterpretations, searchCustomsInterpretationsSchema, getCustomsInterpretationText, getCustomsInterpretationTextSchema } from 'korean-law-mcp/build/tools/customs-interpretations.js'
+import {
+  searchFtcDecisions, searchFtcDecisionsSchema, getFtcDecisionText, getFtcDecisionTextSchema,
+  searchPipcDecisions, searchPipcDecisionsSchema, getPipcDecisionText, getPipcDecisionTextSchema,
+  searchNlrcDecisions, searchNlrcDecisionsSchema, getNlrcDecisionText, getNlrcDecisionTextSchema,
+} from 'korean-law-mcp/build/tools/committee-decisions.js'
+
+// ── Historical ──
+import { getLawHistory, LawHistorySchema } from 'korean-law-mcp/build/tools/law-history.js'
+
 import type { FunctionDeclaration } from '@google/genai'
-import type { ZodSchema } from 'zod'
 
 // ─── API 클라이언트 (모듈 레벨 싱글턴) ───
 
@@ -53,6 +85,7 @@ interface CacheEntry {
 const apiCache = new Map<string, CacheEntry>()
 
 const CACHE_TTL: Record<string, number> = {
+  // 조회 결과 (24시간)
   get_law_text: 24 * 3600_000,
   get_batch_articles: 24 * 3600_000,
   get_precedent_text: 24 * 3600_000,
@@ -63,6 +96,16 @@ const CACHE_TTL: Record<string, number> = {
   get_article_history: 24 * 3600_000,
   get_annexes: 24 * 3600_000,
   get_law_tree: 24 * 3600_000,
+  get_article_with_precedents: 12 * 3600_000,
+  get_admin_rule: 24 * 3600_000,
+  get_admin_appeal_text: 24 * 3600_000,
+  get_constitutional_decision_text: 24 * 3600_000,
+  get_tax_tribunal_decision_text: 24 * 3600_000,
+  get_customs_interpretation_text: 24 * 3600_000,
+  get_ftc_decision_text: 24 * 3600_000,
+  get_pipc_decision_text: 24 * 3600_000,
+  get_nlrc_decision_text: 24 * 3600_000,
+  // 검색 결과 (6-12시간)
   search_law: 6 * 3600_000,
   search_precedents: 12 * 3600_000,
   search_interpretations: 12 * 3600_000,
@@ -71,6 +114,23 @@ const CACHE_TTL: Record<string, number> = {
   advanced_search: 6 * 3600_000,
   search_all: 6 * 3600_000,
   find_similar_precedents: 12 * 3600_000,
+  search_admin_rule: 6 * 3600_000,
+  search_admin_appeals: 12 * 3600_000,
+  search_constitutional_decisions: 12 * 3600_000,
+  search_tax_tribunal_decisions: 12 * 3600_000,
+  search_customs_interpretations: 12 * 3600_000,
+  search_ftc_decisions: 12 * 3600_000,
+  search_pipc_decisions: 12 * 3600_000,
+  search_nlrc_decisions: 12 * 3600_000,
+  get_law_history: 12 * 3600_000,
+  // Chain tools (집계 결과, moderate TTL)
+  chain_full_research: 6 * 3600_000,
+  chain_dispute_prep: 6 * 3600_000,
+  chain_procedure_detail: 6 * 3600_000,
+  chain_action_basis: 6 * 3600_000,
+  chain_law_system: 6 * 3600_000,
+  chain_amendment_track: 6 * 3600_000,
+  chain_ordinance_compare: 6 * 3600_000,
 }
 
 const CACHE_MAX_SIZE = 2000
@@ -97,119 +157,308 @@ function stableStringify(obj: Record<string, unknown>): string {
 interface ToolDef {
   name: string
   description: string
-  schema: ZodSchema
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schema: { parse: (data: unknown) => any; [key: string]: any }
   handler: (client: LawApiClient, input: any) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
 }
 
+/**
+ * 등록된 전체 도구 목록.
+ * selectToolsForQuery()가 쿼리별로 필터링하여 LLM에 필요한 것만 전달.
+ *
+ * Description은 토큰 절약을 위해 압축 (40자 내외).
+ */
 const TOOLS: ToolDef[] = [
+  // ══════════════════════════════════════
+  // Core search (의미검색/키워드검색)
+  // ══════════════════════════════════════
   {
     name: 'search_ai_law',
-    description: '자연어 질문으로 관련 법령 조문을 검색합니다. 법령명을 몰라도 "관세 신고납부 요건", "음주운전 처벌" 같은 자연어로 관련 조문을 찾을 수 있습니다. 조문 내용 기반 의미 검색이므로 search_law보다 먼저 사용하세요. search: 0=법령조문(기본), 2=행정규칙 조문.',
+    description: '자연어로 관련 조문 의미검색. 법령명 몰라도 사용 가능. search: 0=법령(기본), 2=행정규칙.',
     schema: searchAiLawSchema,
     handler: searchAiLaw,
   },
   {
     name: 'search_law',
-    description: '한국 법령을 키워드로 검색합니다. 약칭 자동 인식(예: 화관법→화학물질관리법). 결과에 법령ID와 MST(법령일련번호)가 포함됩니다. 법령명을 알 때 MST를 확인하는 용도. 조문 내용 검색은 search_ai_law를 사용하세요.',
+    description: '법령명 키워드검색. 약칭 자동인식. MST 확인용.',
     schema: SearchLawSchema,
     handler: searchLaw,
   },
   {
+    name: 'search_all',
+    description: '법령+판례+해석례+행정규칙 통합검색. 도메인 불명확 시.',
+    schema: SearchAllSchema,
+    handler: searchAll,
+  },
+
+  // ══════════════════════════════════════
+  // Core retrieval (조문/판례/해석례 조회)
+  // ══════════════════════════════════════
+  {
     name: 'get_law_text',
-    description: '특정 법령의 조문 전문을 조회합니다. search_law 결과에서 얻은 mst 값을 사용하세요. jo 파라미터로 특정 조문만 조회 가능(예: jo="제38조"). 여러 조문이 필요하면 get_batch_articles를 사용하세요.',
+    description: '법령 조문 조회. mst+jo 지정. jo 없으면 전문.',
     schema: GetLawTextSchema,
     handler: getLawText,
   },
   {
     name: 'get_batch_articles',
-    description: '여러 조문을 한번에 조회합니다. search_law 결과에서 얻은 mst와 조문번호 배열을 사용하세요. 예: mst="268725", articles=["제38조", "제39조", "제9조"]. 관련 조문을 정밀 조회할 때 사용.',
+    description: '여러 조문 일괄 조회. mst+articles 배열.',
     schema: GetBatchArticlesSchema,
     handler: getBatchArticles,
   },
   {
+    name: 'get_article_with_precedents',
+    description: '조문+관련판례 한번에 조회. mst/lawId+jo.',
+    schema: GetArticleWithPrecedentsSchema,
+    handler: getArticleWithPrecedents,
+  },
+  {
     name: 'search_precedents',
-    description: '법원 판례를 키워드로 검색합니다. 법원명/사건번호 필터 가능. 결과에 판례 id가 포함됩니다.',
+    description: '판례 키워드검색. 결과에 id 포함.',
     schema: searchPrecedentsSchema,
     handler: searchPrecedents,
   },
   {
     name: 'get_precedent_text',
-    description: '특정 판례의 전문(판시사항, 판결요지, 전문)을 조회합니다. search_precedents 결과에서 얻은 id를 사용하세요.',
+    description: '판례 전문 조회. id 필요.',
     schema: getPrecedentTextSchema,
     handler: getPrecedentText,
   },
   {
     name: 'search_interpretations',
-    description: '법제처 유권해석(법령해석례)을 키워드로 검색합니다.',
+    description: '법령해석례 키워드검색. 결과에 id 포함.',
     schema: searchInterpretationsSchema,
     handler: searchInterpretations,
   },
   {
     name: 'get_interpretation_text',
-    description: '특정 해석례의 전문(회신내용, 이유)을 조회합니다. search_interpretations 결과에서 얻은 id를 사용하세요.',
+    description: '해석례 전문 조회. id 필요.',
     schema: getInterpretationTextSchema,
     handler: getInterpretationText,
   },
+
+  // ══════════════════════════════════════
+  // Structure / Comparison / History
+  // ══════════════════════════════════════
   {
     name: 'get_three_tier',
-    description: '법률→시행령→시행규칙 위임법령 3단비교를 조회합니다. search_law 결과에서 얻은 mst와 lawId를 사용하세요. knd: "2"(법률→시행령, 기본값), "3"(시행령→시행규칙).',
+    description: '법률→시행령→시행규칙 3단비교. mst+knd.',
     schema: GetThreeTierSchema,
     handler: getThreeTier,
   },
   {
     name: 'compare_old_new',
-    description: '법령의 신구법 대조표(개정 전후 비교)를 조회합니다. search_law 결과에서 얻은 mst, lawId를 사용하세요. 최근 개정 내역을 확인할 때 사용합니다.',
+    description: '신구법 대조표(개정 전후 비교). mst 필요.',
     schema: CompareOldNewSchema,
     handler: compareOldNew,
   },
   {
     name: 'get_article_history',
-    description: '특정 조문의 개정 이력을 조회합니다. search_law 결과에서 얻은 lawId와 조문번호(jo)를 사용하세요. 예: lawId="001556", jo="38".',
+    description: '조문별 개정 이력 조회. lawId+jo.',
     schema: ArticleHistorySchema,
     handler: getArticleHistory,
   },
   {
+    name: 'get_law_history',
+    description: '법령 연혁(개정 이력 목록). 날짜별 변경 확인.',
+    schema: LawHistorySchema,
+    handler: getLawHistory,
+  },
+
+  // ══════════════════════════════════════
+  // Ordinance (자치법규/조례)
+  // ══════════════════════════════════════
+  {
     name: 'search_ordinance',
-    description: '자치법규(조례·규칙)를 키워드로 검색합니다. 시·도/시·군·구 조례가 필요할 때 사용합니다. 결과에 자치법규일련번호(ordinSeq)가 포함됩니다. 예: query="광진구 복무".',
+    description: '자치법규(조례) 검색. 지역명 포함 필수.',
     schema: SearchOrdinanceSchema,
     handler: searchOrdinance,
   },
   {
     name: 'get_ordinance',
-    description: '자치법규(조례) 전문을 조회합니다. search_ordinance 결과에서 얻은 자치법규일련번호(ordinSeq)를 사용하세요.',
+    description: '자치법규 전문 조회. ordinSeq 필요.',
     schema: GetOrdinanceSchema,
     handler: getOrdinance,
   },
-  // Tier 3: 확장 도구
+
+  // ══════════════════════════════════════
+  // Admin rules (행정규칙: 훈령/예규/고시)
+  // ══════════════════════════════════════
+  {
+    name: 'search_admin_rule',
+    description: '행정규칙(훈령/예규/고시) 검색. 결과에 id 포함.',
+    schema: SearchAdminRuleSchema,
+    handler: searchAdminRule,
+  },
+  {
+    name: 'get_admin_rule',
+    description: '행정규칙 전문 조회. id 필요.',
+    schema: GetAdminRuleSchema,
+    handler: getAdminRule,
+  },
+
+  // ══════════════════════════════════════
+  // Advanced / Auxiliary
+  // ══════════════════════════════════════
   {
     name: 'advanced_search',
-    description: '고급 법령 검색. 법령종류(법률/시행령/시행규칙), 소관부처, 시행일 등 필터로 정밀 검색합니다. search_ai_law나 search_law로 부족할 때 사용.',
+    description: '고급 법령검색. 법령종류/부처/시행일 필터.',
     schema: AdvancedSearchSchema,
     handler: advancedSearch,
   },
   {
     name: 'get_annexes',
-    description: '법령의 별표·서식을 조회합니다. "관세법 별표 1", "부가가치세법 서식" 등 별표/서식이 필요할 때 사용. mst 필요.',
+    description: '별표/서식 조회. 금액/기준은 별표에 있는 경우 많음.',
     schema: GetAnnexesSchema,
     handler: getAnnexes,
   },
   {
     name: 'find_similar_precedents',
-    description: '특정 판례와 유사한 판례를 찾습니다. 판례 id를 입력하면 유사 판례 목록을 반환합니다.',
+    description: '유사 판례 검색. 판례 id 입력.',
     schema: FindSimilarPrecedentsSchema,
     handler: findSimilarPrecedents,
   },
   {
     name: 'get_law_tree',
-    description: '법령의 체계도(목차 구조)를 조회합니다. 법령의 편/장/절/조 구조를 한눈에 파악할 때 사용. mst 필요.',
+    description: '법령 체계도(목차) 조회. mst 필요.',
     schema: GetLawTreeSchema,
     handler: getLawTree,
   },
+
+  // ══════════════════════════════════════
+  // ⛓️ Chain tools (multi-step macros)
+  // 내부에서 여러 도구를 자동 연쇄/병렬 호출.
+  // LLM 턴 수를 대폭 줄여 시간·토큰 절감.
+  // ══════════════════════════════════════
   {
-    name: 'search_all',
-    description: '법령·판례·해석례·행정규칙을 통합 검색합니다. 도메인이 불명확할 때 한 번에 검색. 결과에 각 카테고리별 건수와 상위 항목이 포함됩니다.',
-    schema: SearchAllSchema,
-    handler: searchAll,
+    name: 'chain_full_research',
+    description: '⛓️ 종합 리서치. AI검색+법령+판례+해석례 병렬 수집. 복합 질문 시 1턴에 전체 자료 확보.',
+    schema: chainFullResearchSchema,
+    handler: chainFullResearch,
+  },
+  {
+    name: 'chain_dispute_prep',
+    description: '⛓️ 쟁송 대비. 판례+행정심판+도메인별 결정례 병렬. 불복/소송 질문 시.',
+    schema: chainDisputePrepSchema,
+    handler: chainDisputePrep,
+  },
+  {
+    name: 'chain_procedure_detail',
+    description: '⛓️ 절차/비용. 법령+3단비교+별표/서식 자동 연쇄. 신청/절차 질문 시.',
+    schema: chainProcedureDetailSchema,
+    handler: chainProcedureDetail,
+  },
+  {
+    name: 'chain_action_basis',
+    description: '⛓️ 처분근거. 3단비교+해석례+판례+행정심판 병렬. 허가/처분 질문 시.',
+    schema: chainActionBasisSchema,
+    handler: chainActionBasis,
+  },
+  {
+    name: 'chain_law_system',
+    description: '⛓️ 법체계 파악. 법령검색+3단비교+조문+별표 연쇄. 법 구조 질문 시.',
+    schema: chainLawSystemSchema,
+    handler: chainLawSystem,
+  },
+  {
+    name: 'chain_amendment_track',
+    description: '⛓️ 개정 추적. 신구대조+조문이력 연쇄. 개정/변경 질문 시.',
+    schema: chainAmendmentTrackSchema,
+    handler: chainAmendmentTrack,
+  },
+  {
+    name: 'chain_ordinance_compare',
+    description: '⛓️ 조례 비교. 상위법령+위임체계+전국 조례검색. 자치법규 질문 시.',
+    schema: chainOrdinanceCompareSchema,
+    handler: chainOrdinanceCompare,
+  },
+
+  // ══════════════════════════════════════
+  // Domain specialist tools
+  // ══════════════════════════════════════
+  {
+    name: 'search_admin_appeals',
+    description: '행정심판례 검색. 결과에 id 포함.',
+    schema: searchAdminAppealsSchema,
+    handler: searchAdminAppeals,
+  },
+  {
+    name: 'get_admin_appeal_text',
+    description: '행정심판례 전문 조회. id 필요.',
+    schema: getAdminAppealTextSchema,
+    handler: getAdminAppealText,
+  },
+  {
+    name: 'search_constitutional_decisions',
+    description: '헌법재판소 결정 검색. 위헌/헌법소원 시.',
+    schema: searchConstitutionalDecisionsSchema,
+    handler: searchConstitutionalDecisions,
+  },
+  {
+    name: 'get_constitutional_decision_text',
+    description: '헌재 결정 전문 조회. id 필요.',
+    schema: getConstitutionalDecisionTextSchema,
+    handler: getConstitutionalDecisionText,
+  },
+  {
+    name: 'search_tax_tribunal_decisions',
+    description: '조세심판원 재결례 검색. 세무 쟁송 시.',
+    schema: searchTaxTribunalDecisionsSchema,
+    handler: searchTaxTribunalDecisions,
+  },
+  {
+    name: 'get_tax_tribunal_decision_text',
+    description: '조세심판 재결 전문 조회. id 필요.',
+    schema: getTaxTribunalDecisionTextSchema,
+    handler: getTaxTribunalDecisionText,
+  },
+  {
+    name: 'search_customs_interpretations',
+    description: '관세청 법령해석 검색. 관세/통관 질문 시.',
+    schema: searchCustomsInterpretationsSchema,
+    handler: searchCustomsInterpretations,
+  },
+  {
+    name: 'get_customs_interpretation_text',
+    description: '관세 해석 전문 조회. id 필요.',
+    schema: getCustomsInterpretationTextSchema,
+    handler: getCustomsInterpretationText,
+  },
+  {
+    name: 'search_ftc_decisions',
+    description: '공정위 결정 검색. 공정거래/하도급 시.',
+    schema: searchFtcDecisionsSchema,
+    handler: searchFtcDecisions,
+  },
+  {
+    name: 'get_ftc_decision_text',
+    description: '공정위 결정 전문 조회. id 필요.',
+    schema: getFtcDecisionTextSchema,
+    handler: getFtcDecisionText,
+  },
+  {
+    name: 'search_pipc_decisions',
+    description: '개인정보위 결정 검색. 개인정보 질문 시.',
+    schema: searchPipcDecisionsSchema,
+    handler: searchPipcDecisions,
+  },
+  {
+    name: 'get_pipc_decision_text',
+    description: '개인정보위 결정 전문 조회. id 필요.',
+    schema: getPipcDecisionTextSchema,
+    handler: getPipcDecisionText,
+  },
+  {
+    name: 'search_nlrc_decisions',
+    description: '노동위 결정 검색. 부당해고/노동 시.',
+    schema: searchNlrcDecisionsSchema,
+    handler: searchNlrcDecisions,
+  },
+  {
+    name: 'get_nlrc_decision_text',
+    description: '노동위 결정 전문 조회. id 필요.',
+    schema: getNlrcDecisionTextSchema,
+    handler: getNlrcDecisionText,
   },
 ]
 
@@ -225,7 +474,8 @@ export function getToolDeclarations(): FunctionDeclaration[] {
   if (_cachedDeclarations) return _cachedDeclarations
 
   _cachedDeclarations = TOOLS.map(tool => {
-    const jsonSchema = zodToJsonSchema(tool.schema, { target: 'openApi3' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jsonSchema = zodToJsonSchema(tool.schema as any, { target: 'openApi3' })
 
     // zodToJsonSchema는 최상위에 $schema, additionalProperties 등을 포함하는데
     // Gemini는 순수 properties/required/type만 원함
@@ -235,6 +485,16 @@ export function getToolDeclarations(): FunctionDeclaration[] {
     }
     if ((jsonSchema as any).required?.length) {
       params.required = (jsonSchema as any).required
+    }
+
+    // apiKey는 LLM이 사용할 필요 없는 내부 파라미터 — 토큰 절약을 위해 제거
+    if (params.properties && typeof params.properties === 'object' && 'apiKey' in (params.properties as Record<string, unknown>)) {
+      const props = { ...(params.properties as Record<string, unknown>) }
+      delete props.apiKey
+      params.properties = props
+      if (Array.isArray(params.required)) {
+        params.required = (params.required as string[]).filter(k => k !== 'apiKey')
+      }
     }
 
     return {
@@ -275,7 +535,7 @@ export async function executeTool(
   }
 
   try {
-    // Zod parse로 기본값 적용 (Gemini가 optional 파라미터 생략 시)
+    // Zod parse로 기본값 적용 (LLM이 optional 파라미터 생략 시)
     const parsedArgs = tool.schema.parse(args)
     const response = await tool.handler(apiClient, parsedArgs)
     const text = response.content.map(c => c.text).join('\n')
@@ -323,6 +583,8 @@ const TOOL_RESULT_LIMITS: Record<string, number> = {
   get_precedent_text: 8000,
   get_interpretation_text: 6000,
   get_ordinance: 8000,
+  get_article_with_precedents: 10000,
+  get_admin_rule: 8000,
   // 검색 결과 — 상위 결과가 중요, 하위는 노이즈
   search_ai_law: 6000,
   search_precedents: 4000,
@@ -333,6 +595,31 @@ const TOOL_RESULT_LIMITS: Record<string, number> = {
   get_article_history: 4000,
   get_law_tree: 4000,
   get_annexes: 6000,
+  get_law_history: 4000,
+  // Chain tools — 여러 도구 결과를 합산하므로 넉넉하게
+  chain_full_research: 12000,
+  chain_dispute_prep: 10000,
+  chain_procedure_detail: 10000,
+  chain_action_basis: 10000,
+  chain_law_system: 8000,
+  chain_amendment_track: 8000,
+  chain_ordinance_compare: 8000,
+  // Domain specialist (조회 결과)
+  get_admin_appeal_text: 6000,
+  get_constitutional_decision_text: 6000,
+  get_tax_tribunal_decision_text: 6000,
+  get_customs_interpretation_text: 6000,
+  get_ftc_decision_text: 6000,
+  get_pipc_decision_text: 6000,
+  get_nlrc_decision_text: 6000,
+  // Domain specialist (검색 결과)
+  search_admin_appeals: 4000,
+  search_constitutional_decisions: 4000,
+  search_tax_tribunal_decisions: 4000,
+  search_customs_interpretations: 4000,
+  search_ftc_decisions: 4000,
+  search_pipc_decisions: 4000,
+  search_nlrc_decisions: 4000,
 }
 const DEFAULT_RESULT_LIMIT = 3000
 

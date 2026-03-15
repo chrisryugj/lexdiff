@@ -1,24 +1,81 @@
 /**
- * Fast Path — 단순 조문 질문 바이패스
+ * Fast Path — 단순 질문 바이패스
  *
- * 복잡한 키워드 없이 법명+조문번호가 명확한 질문은
- * Gemini 멀티턴 없이 직접 API 호출로 처리.
+ * 복잡한 키워드 없이 패턴이 명확한 질문은
+ * LLM 멀티턴 없이 직접 API 호출로 처리.
+ *
+ * 지원 패턴:
+ * 1. 법명+조문번호 → search_law + get_batch_articles
+ * 2. 판례 검색 → search_precedents (직접)
+ * 3. 해석례 검색 → search_interpretations (직접)
+ * 4. 행정규칙 검색 → search_admin_rule (직접)
+ * 5. 별표 조회 → search_law + get_annexes
  */
 
 // ─── KNOWN_MST 런타임 캐시 ───
-// search_law 호출 결과에서 자동 축적. 서버 프로세스 수명 동안 유지.
+// search_law 호출 결과에서 자동 축적 + 상위 법령 프리로드.
+// 서버 프로세스 수명 동안 유지.
 export const KNOWN_MST = new Map<string, string>()
 const KNOWN_MST_MAX = 5000
+
+// ─── 프리로드: 빈도 높은 법령 50개 (Fast Path hit rate 향상) ───
+const PRELOAD_LAWS: Array<[string, string]> = [
+  // 기본법
+  ['헌법', '287566'], ['민법', '268439'], ['형법', '268457'], ['상법', '268548'],
+  ['민사소송법', '268458'], ['형사소송법', '268460'], ['행정소송법', '268478'],
+  // 행정기본법
+  ['행정절차법', '268496'], ['행정기본법', '287540'], ['행정심판법', '268479'],
+  ['국가공무원법', '268469'], ['지방공무원법', '268487'], ['공직자윤리법', '268483'],
+  // 세법
+  ['국세기본법', '268530'], ['소득세법', '268534'], ['법인세법', '268535'],
+  ['부가가치세법', '268536'], ['상속세 및 증여세법', '268537'], ['지방세법', '268498'],
+  ['관세법', '268725'], ['조세특례제한법', '268538'],
+  // 노동
+  ['근로기준법', '268569'], ['노동조합 및 노동관계조정법', '268575'],
+  ['산업안전보건법', '268572'], ['고용보험법', '268577'], ['최저임금법', '268571'],
+  // 부동산/건설
+  ['국토의 계획 및 이용에 관한 법률', '268600'], ['건축법', '268599'],
+  ['주택임대차보호법', '268606'], ['공동주택관리법', '286321'],
+  // 환경
+  ['환경영향평가법', '268660'], ['대기환경보전법', '268661'],
+  // 공정거래
+  ['독점규제 및 공정거래에 관한 법률', '268623'],
+  ['하도급거래 공정화에 관한 법률', '268624'],
+  // 정보/개인정보
+  ['개인정보 보호법', '286035'], ['정보통신망 이용촉진 및 정보보호 등에 관한 법률', '268638'],
+  // 형사특별법
+  ['특정범죄 가중처벌 등에 관한 법률', '268461'], ['도로교통법', '268747'],
+  // 금융
+  ['자본시장과 금융투자업에 관한 법률', '286025'],
+  // 기타 빈도 높은 법령
+  ['식품위생법', '268663'], ['의료법', '268664'], ['약사법', '268665'],
+  ['학교폭력예방 및 대책에 관한 법률', '286068'],
+  ['정보공개법', '286095'], ['민원 처리에 관한 법률', '286096'],
+  ['지방자치법', '268485'], ['공익신고자 보호법', '286127'],
+  ['전자상거래 등에서의 소비자보호에 관한 법률', '268626'],
+  ['화학물질관리법', '286254'], ['폐기물관리법', '268658'],
+  ['여권법', '268753'], ['병역법', '268755'],
+]
+
+for (const [name, mst] of PRELOAD_LAWS) {
+  KNOWN_MST.set(name, mst)
+}
 
 // ─── 타입 ───
 
 export interface LawEntry { name: string; mst: string }
 
+export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'annex_resolve' | 'none'
+
 interface FastPathDetection {
-  type: 'hit' | 'resolve' | 'none'
+  type: FastPathType
   lawName?: string
   articles?: string[]
   mst?: string
+  /** 판례/해석례/행정규칙 검색 시 사용할 키워드 */
+  searchQuery?: string
+  /** 도구 이름 (precedent_search 등에서 사용) */
+  toolName?: string
 }
 
 interface OrdinEntry { seq: string; name: string }
@@ -41,14 +98,48 @@ export function cacheMSTEntries(entries: LawEntry[]) {
 
 // ─── Fast Path 감지 ───
 
-/** 복잡한 키워드가 없고 법명+조문번호가 명확한 단순 질문인지 판단 */
+/**
+ * 패턴 매칭으로 Fast Path 감지.
+ * 단순 패턴이면 LLM 없이 직접 도구 호출.
+ */
 export function detectFastPath(query: string): FastPathDetection {
-  // 복잡한 질문은 full pipeline으로
+  // 100자 초과면 복잡 질문으로 간주
+  if (query.length > 100) return { type: 'none' }
+
+  // ── 패턴 1: 판례 검색 ("OO 판례", "OO 판결") ──
+  const precedentMatch = query.match(/^(.+?)(?:\s+(?:판례|판결|사례))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
+  if (precedentMatch && !/비교|분석|요약/.test(query)) {
+    return { type: 'precedent_search', searchQuery: precedentMatch[1].trim(), toolName: 'search_precedents' }
+  }
+
+  // ── 패턴 2: 해석례 검색 ("OO 해석례", "OO 유권해석") ──
+  const interpMatch = query.match(/^(.+?)(?:\s+(?:해석례|유권해석|질의회신))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
+  if (interpMatch && !/비교|분석/.test(query)) {
+    return { type: 'interpretation_search', searchQuery: interpMatch[1].trim(), toolName: 'search_interpretations' }
+  }
+
+  // ── 패턴 3: 행정규칙 검색 ("OO 훈령/예규/고시") ──
+  const adminRuleMatch = query.match(/^(.+?)(?:\s+(?:훈령|예규|고시|행정규칙))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
+  if (adminRuleMatch && !/비교|분석/.test(query)) {
+    return { type: 'admin_rule_search', searchQuery: adminRuleMatch[1].trim(), toolName: 'search_admin_rule' }
+  }
+
+  // ── 패턴 4: 별표 조회 ("OO법 별표 N") ──
+  const annexMatch = query.match(/^(.+?(?:법|령|규칙))\s+별표\s*(\d+)?/)
+  if (annexMatch && !/비교|분석|개정/.test(query)) {
+    const lawName = annexMatch[1].trim()
+    const mst = KNOWN_MST.get(lawName)
+    if (mst) {
+      return { type: 'annex_resolve', lawName, mst, searchQuery: `${lawName} 별표${annexMatch[2] || ''}` }
+    }
+    return { type: 'annex_resolve', lawName, searchQuery: `${lawName} 별표${annexMatch[2] || ''}` }
+  }
+
+  // ── 패턴 5: 법명+조문번호 (기존 로직) ──
+  // 복잡한 키워드가 있으면 full pipeline으로
   if (/(?:비교|판례|해석례|개정|위임|시행령|시행규칙|신구|대조|이력|조례|자치법규|처벌|벌칙|과태료|면제|감면|특례|예외)/.test(query)) {
     return { type: 'none' }
   }
-  // 100자 초과면 복잡 질문으로 간주 (inferComplexity의 기준과 통일)
-  if (query.length > 100) return { type: 'none' }
 
   // 법명 추출: 「법명」 > ~법 패턴
   const lawNameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+(?:법|령|규칙))(?:\s|$|의|에|을|를|이|가|은|는)/)
@@ -63,9 +154,9 @@ export function detectFastPath(query: string): FastPathDetection {
   // KNOWN_MST 조회
   const mst = KNOWN_MST.get(lawName)
   if (mst) {
-    return { type: 'hit', lawName, articles, mst }
+    return { type: 'article_hit', lawName, articles, mst }
   }
-  return { type: 'resolve', lawName, articles }
+  return { type: 'article_resolve', lawName, articles }
 }
 
 // ─── search_law 결과 파싱 유틸 ───

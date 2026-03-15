@@ -1,9 +1,12 @@
-// Tier 0: Always loaded (10 tools) — every query
+// Tier 0: Always loaded (9 tools) — every query
+// search_all은 Tier 1 general로 이동 (도메인 불명확 시만)
+// get_article_with_precedents는 유용하지만 Tier 0이면 과다 → Tier 1
 export const TIER_0 = [
   'search_ai_law', 'search_law', 'get_law_text',
-  'get_batch_articles', 'get_article_with_precedents',
-  'search_precedents', 'get_precedent_text', 'search_all',
+  'get_batch_articles',
+  'search_precedents', 'get_precedent_text',
   'search_interpretations', 'get_interpretation_text',
+  'get_annexes',
 ] as const
 
 // Tier 1: Domain-activated (15 tools) — based on query classification
@@ -88,8 +91,10 @@ export function selectToolsForQuery(query: string): string[] {
     for (const tool of TIER_1[domain]) tools.add(tool)
   }
 
-  // Default chain tools when no domain matched
+  // Default tools when no domain matched
   if (domain === 'general') {
+    tools.add('search_all')
+    tools.add('get_article_with_precedents')
     tools.add('chain_full_research')
     tools.add('chain_procedure_detail')
   }
@@ -108,6 +113,30 @@ export function selectToolsForQuery(query: string): string[] {
   }
 
   // search_interpretations, get_interpretation_text are already in TIER_0 — no need to add again
+
+  // ── Chain-aware deduplication ──
+  // chain 도구가 포함되면, 해당 chain이 내부에서 호출하는 기본 도구를 제거하여
+  // LLM이 chain 1회로 처리하도록 유도 (토큰 + 턴 수 절감)
+  const chainCovers: Record<string, string[]> = {
+    chain_full_research: ['search_ai_law', 'search_precedents', 'search_interpretations'],
+    chain_dispute_prep: ['search_precedents', 'search_admin_appeals', 'search_tax_tribunal_decisions', 'search_nlrc_decisions', 'search_pipc_decisions'],
+    chain_action_basis: ['get_three_tier', 'search_interpretations', 'search_precedents', 'search_admin_appeals'],
+    chain_procedure_detail: ['get_three_tier', 'get_annexes', 'search_ai_law'],
+    chain_law_system: ['get_three_tier', 'get_annexes'],
+    chain_amendment_track: ['compare_old_new', 'get_article_history'],
+    chain_ordinance_compare: ['search_ordinance', 'get_three_tier'],
+  }
+
+  for (const [chain, covered] of Object.entries(chainCovers)) {
+    if (tools.has(chain)) {
+      for (const basic of covered) {
+        // TIER_0 도구는 제거하지 않음 (항상 필요한 기본 도구)
+        if (!TIER_0.includes(basic as any)) {
+          tools.delete(basic)
+        }
+      }
+    }
+  }
 
   // Cap at 25
   return Array.from(tools).slice(0, 25)

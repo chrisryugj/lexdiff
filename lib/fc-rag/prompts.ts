@@ -112,17 +112,17 @@ A 유리한 경우 / B 유리한 경우
 // ─── 도메인별 도구 힌트 ───
 
 const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
-  customs: '- 관세 도메인: search_customs_interpretations 로 관세청 해석 먼저, get_three_tier 로 위임 구조 확인',
-  labor: '- 노동 도메인: search_nlrc_decisions 로 노동위 결정 확인 가능',
-  tax: '- 세무 도메인: search_tax_tribunal_decisions 로 조세심판 재결례 확인 가능',
-  privacy: '- 개인정보 도메인: search_pipc_decisions 로 개인정보위 결정 확인 가능',
-  competition: '- 공정거래 도메인: search_ftc_decisions 로 공정위 결정 확인 가능',
-  constitutional: '- 헌법 도메인: search_constitutional_decisions 로 헌재 결정 확인 가능',
-  admin: '- 행정 도메인: search_admin_appeals 로 행정심판례, search_admin_rule 로 행정규칙 확인 가능',
-  public_servant: '- 공무원 도메인: search_admin_rule, get_annexes(별표/급여표) 활용. 금액은 별표 조회 필수',
-  housing: '- 주택·임대차 도메인: search_ordinance 로 지방 조례 확인',
-  construction: '- 건설 도메인: search_admin_rule, get_three_tier 활용',
-  environment: '- 환경 도메인: search_ordinance, search_admin_rule 활용',
+  customs: '- 관세 도메인: chain_action_basis 1회로 법체계+관세해석+판례 수집. 개별 조회 시 search_customs_interpretations.',
+  labor: '- 노동 도메인: chain_dispute_prep 1회로 판례+노동위 결정 수집. 개별 조회 시 search_nlrc_decisions.',
+  tax: '- 세무 도메인: chain_dispute_prep 1회로 판례+조세심판 재결 수집. 개별 조회 시 search_tax_tribunal_decisions.',
+  privacy: '- 개인정보 도메인: chain_dispute_prep 1회로 판례+개인정보위 결정 수집. 개별 조회 시 search_pipc_decisions.',
+  competition: '- 공정거래 도메인: search_ftc_decisions 로 공정위 결정 확인.',
+  constitutional: '- 헌법 도메인: search_constitutional_decisions 로 헌재 결정 확인.',
+  admin: '- 행정 도메인: chain_action_basis 1회로 법체계+행정심판례+해석례 수집. 개별: search_admin_appeals, search_admin_rule.',
+  public_servant: '- 공무원 도메인: search_admin_rule(훈령/예규/고시)이 핵심 근거. 금액/수당은 get_annexes(별표) 필수.',
+  housing: '- 주택·임대차 도메인: chain_ordinance_compare 로 조례 비교. 개별: search_ordinance.',
+  construction: '- 건설 도메인: chain_procedure_detail 로 절차/비용 확인. 개별: search_admin_rule, get_three_tier.',
+  environment: '- 환경 도메인: search_ordinance, search_admin_rule 활용.',
 }
 
 // ─── 시스템 프롬프트 생성 ───
@@ -163,17 +163,29 @@ export function buildSystemPrompt(
 ${SPECIALIST_INSTRUCTIONS[queryType]}
 
 ## 도구 사용 (우선순위)
-0. **조문번호 지정 질문** (예: "국가공무원법 제78조"): search_law로 MST 확인 → get_batch_articles로 해당 조문 직접 조회. search_ai_law는 의미검색이므로 특정 조문 조회에 부적합.
-1. **search_ai_law 우선**: 관련 법령·조문을 모를 때 자연어로 검색. 조문 내용 기반 의미 검색이므로 가장 먼저 사용.
-2. **search_law**: 법령명을 정확히 알 때 MST 확인용. search_ai_law로 이미 관련 조문을 찾았다면 생략 가능.
-3. **get_batch_articles**: 여러 조문을 한번에 조회. 전문이 필요한 조문번호를 배열로 지정. 예: articles=["제38조", "제39조"].
-4. **get_law_text(jo 지정)**: 단일 조문 전문 조회. jo 없이 전체 법령을 가져오지 말 것.
-5. 판례 필요 시 search_precedents로 검색.
-6. 조례/자치법규 질문 시 search_ordinance 사용 (search_law 금지). 지역명 포함 필수.
+
+### ⛓️ Chain 도구 (복합 질문 시 최우선)
+- 복합 질문이면 chain 도구 1회로 여러 자료를 한 번에 수집. 개별 도구를 여러 번 호출하지 말 것.
+- **chain_full_research**: 종합 리서치 (AI검색+법령+판례+해석례 병렬 수집)
+- **chain_dispute_prep**: 쟁송/불복 질문 (판례+행정심판+도메인 결정례)
+- **chain_procedure_detail**: 절차/비용/신청 질문 (법령+3단비교+별표/서식)
+- **chain_action_basis**: 처분/허가 근거 (3단비교+해석례+판례+심판례)
+- **chain_law_system**: 법 구조 파악 (3단비교+조문+별표)
+- **chain_amendment_track**: 개정/변경 추적 (신구대조+이력)
+- **chain_ordinance_compare**: 조례 비교 연구
+
+### 개별 도구 (단순 질문 또는 chain 후 보충)
+0. **조문번호 지정 질문** (예: "국가공무원법 제78조"): search_law로 MST 확인 → get_batch_articles로 해당 조문 직접 조회.
+1. **search_ai_law 우선**: 관련 법령·조문을 모를 때 자연어로 검색.
+2. **search_law**: 법령명을 정확히 알 때 MST 확인용.
+3. **get_batch_articles**: 여러 조문 한번에 조회. articles=["제38조", "제39조"].
+4. **get_law_text(jo 지정)**: 단일 조문 조회. jo 없이 전체를 가져오지 말 것.
+5. 판례 필요 시 search_precedents. 조례 질문 시 search_ordinance (지역명 필수).
+6. 공무원/행정규칙 관련 시 search_admin_rule (훈령/예규/고시).
 7. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
-8. search_ai_law 결과가 불충분하면 get_batch_articles로 핵심 조문 원문을 반드시 추가 조회.
-9. 처벌 기준·수치·금액 등 구체적 데이터는 조문 원문을 확인한 후에만 답변.
-10. 조문에 '별표 N'이 언급되면 get_annexes로 해당 별표 내용을 반드시 조회. 금액/기준/가액 질문은 별표에 답이 있는 경우가 많음.
+8. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.
+9. 처벌 기준·수치·금액은 조문 원문을 확인한 후에만 답변.
+10. 조문에 '별표 N'이 언급되면 get_annexes로 반드시 조회.
 ${queryType === 'consequence' ? `
 ## 벌칙조 자동 조회 지침
 - 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.

@@ -59,6 +59,52 @@ export function summarizeToolResult(name: string, result: ToolCallResult): strin
       const name = text.match(/자치법규명:\s*(.+)/)?.[1]?.trim()
       return name || '자치법규 조회 완료'
     }
+    // Admin rules
+    case 'search_admin_rule': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      return count ? `${count}건 검색됨` : '행정규칙 검색 완료'
+    }
+    case 'get_admin_rule': return '행정규칙 전문 조회 완료'
+    // Chain tools
+    case 'chain_full_research': return '종합 리서치 완료'
+    case 'chain_dispute_prep': return '쟁송 자료 수집 완료'
+    case 'chain_procedure_detail': return '절차/비용 조회 완료'
+    case 'chain_action_basis': return '처분근거 조회 완료'
+    case 'chain_law_system': return '법체계 파악 완료'
+    case 'chain_amendment_track': return '개정 추적 완료'
+    case 'chain_ordinance_compare': return '조례 비교 완료'
+    // Domain specialists
+    case 'search_admin_appeals': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      return count ? `행정심판례 ${count}건` : '행정심판례 검색 완료'
+    }
+    case 'get_admin_appeal_text': return '행정심판례 조회 완료'
+    case 'search_constitutional_decisions': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      return count ? `헌재 결정 ${count}건` : '헌재 결정 검색 완료'
+    }
+    case 'get_constitutional_decision_text': return '헌재 결정 조회 완료'
+    case 'search_tax_tribunal_decisions': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      return count ? `조세심판 ${count}건` : '조세심판 검색 완료'
+    }
+    case 'get_tax_tribunal_decision_text': return '조세심판 재결 조회 완료'
+    case 'search_customs_interpretations': {
+      const count = text.match(/총 (\d+)건/)?.[1]
+      return count ? `관세 해석 ${count}건` : '관세 해석 검색 완료'
+    }
+    case 'get_customs_interpretation_text': return '관세 해석 조회 완료'
+    case 'search_ftc_decisions': return '공정위 결정 검색 완료'
+    case 'get_ftc_decision_text': return '공정위 결정 조회 완료'
+    case 'search_pipc_decisions': return '개인정보위 결정 검색 완료'
+    case 'get_pipc_decision_text': return '개인정보위 결정 조회 완료'
+    case 'search_nlrc_decisions': return '노동위 결정 검색 완료'
+    case 'get_nlrc_decision_text': return '노동위 결정 조회 완료'
+    case 'get_article_with_precedents': {
+      const lawName = text.match(/법령명: (.+?)\n/)?.[1]?.trim()
+      return lawName ? `${lawName} 조문+판례` : '조문+판례 조회 완료'
+    }
+    case 'get_law_history': return '법령 연혁 조회 완료'
     default: return '완료'
   }
 }
@@ -76,6 +122,25 @@ export function getToolCallQuery(name: string, args: Record<string, unknown>): s
     case 'search_interpretations': return args.query as string
     case 'search_ordinance': return args.query as string
     case 'get_ordinance': return args.ordinSeq ? `#${args.ordinSeq}` : undefined
+    // Admin rules
+    case 'search_admin_rule': return args.query as string
+    case 'get_admin_rule': return args.id as string
+    // Chain tools
+    case 'chain_full_research': return args.query as string
+    case 'chain_dispute_prep': return args.query as string
+    case 'chain_procedure_detail': return args.query as string
+    case 'chain_action_basis': return args.query as string
+    case 'chain_law_system': return args.query as string
+    case 'chain_amendment_track': return args.query as string
+    case 'chain_ordinance_compare': return args.query as string
+    // Domain specialists
+    case 'search_admin_appeals': return args.query as string
+    case 'search_constitutional_decisions': return args.query as string
+    case 'search_tax_tribunal_decisions': return args.query as string
+    case 'search_customs_interpretations': return args.query as string
+    case 'search_ftc_decisions': return args.query as string
+    case 'search_pipc_decisions': return args.query as string
+    case 'search_nlrc_decisions': return args.query as string
     default: return undefined
   }
 }

@@ -1,8 +1,15 @@
 /**
  * FC-RAG Engine - Function Calling 기반 RAG 엔진
  *
- * korean-law-mcp 도구를 Gemini Function Calling으로 호출하여
+ * korean-law-mcp 도구를 LLM Function Calling으로 호출하여
  * 법제처 API 실시간 데이터 기반 답변 생성.
+ *
+ * ── LLM 구성 ──
+ * Primary : Sonnet 4.6 (Claude) — OpenClaw Bridge 경유 (route.ts에서 분기)
+ * Fallback: Gemini Flash — Bridge 불능 시 이 엔진이 직접 Gemini 호출
+ *
+ * 도구 어댑터(tool-adapter), Tier 시스템(tool-tiers), 프롬프트(prompts)는
+ * 양쪽 LLM이 공유하는 인프라.
  *
  * SSE 스트리밍 지원: executeRAGStream()으로 도구 호출 과정을 실시간 전송
  */
@@ -101,53 +108,112 @@ export async function* executeRAGStream(
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
-  // ── Fast Path: 단순 조문 조회는 Gemini 없이 직접 처리 ──
+  // ── Fast Path: 단순 패턴은 LLM 없이 직접 도구 호출 ──
   const fastPath = detectFastPath(query)
   if (fastPath.type !== 'none') {
-    let mst = fastPath.mst
-    const articles = fastPath.articles!
-
-    if (fastPath.type === 'resolve') {
-      // KNOWN_MST에 없음 → search_law로 MST 탐색
-      yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
-      yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
-      const searchResult = await executeTool('search_law', { query: fastPath.lawName })
-      if (searchResult.isError) {
-        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
-        // fast path 실패 → full pipeline으로 폴백 (아래로 계속)
-      } else {
-        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
-        const entries = parseLawEntries(searchResult.result)
-        cacheMSTEntries(entries)
-        mst = findBestMST(entries, query) || undefined
-      }
-    }
-
-    if (mst) {
-      // MST 확보 → get_batch_articles 직접 호출
-      yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
-      yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
-      const articlesResult = await executeTool('get_batch_articles', { mst, articles })
-      yield {
-        type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
-        success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
-      }
-
-      if (!articlesResult.isError) {
+    // ── 패턴 A: 판례/해석례/행정규칙 검색 (직접 도구 호출) ──
+    if (fastPath.type === 'precedent_search' || fastPath.type === 'interpretation_search' || fastPath.type === 'admin_rule_search') {
+      const toolName = fastPath.toolName!
+      const displayName = TOOL_DISPLAY_NAMES[toolName] || toolName
+      yield { type: 'tool_call', name: toolName, displayName, query: fastPath.searchQuery }
+      yield { type: 'status', message: '검색 중...', progress: 40 }
+      const searchResult = await executeTool(toolName, { query: fastPath.searchQuery })
+      yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult) }
+      if (!searchResult.isError) {
         yield { type: 'status', message: '완료', progress: 100 }
         yield {
           type: 'answer',
           data: {
-            answer: articlesResult.result,
-            citations: buildCitations([articlesResult]),
-            confidenceLevel: 'high',
+            answer: searchResult.result,
+            citations: buildCitations([searchResult]),
+            confidenceLevel: 'medium',
             complexity: 'simple',
             queryType,
           },
         }
         return
       }
-      // get_batch_articles 실패 → full pipeline으로 폴백
+      // 실패 시 full pipeline으로 폴백
+    }
+
+    // ── 패턴 B: 별표 조회 ──
+    if (fastPath.type === 'annex_resolve') {
+      let mst = fastPath.mst
+      if (!mst) {
+        yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
+        const searchResult = await executeTool('search_law', { query: fastPath.lawName })
+        if (!searchResult.isError) {
+          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
+          const entries = parseLawEntries(searchResult.result)
+          cacheMSTEntries(entries)
+          mst = findBestMST(entries, query) || undefined
+        }
+      }
+      if (mst) {
+        yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: fastPath.searchQuery }
+        yield { type: 'status', message: '별표를 조회하고 있습니다...', progress: 50 }
+        const annexResult = await executeTool('get_annexes', { lawName: fastPath.searchQuery })
+        yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: !annexResult.isError, summary: summarizeToolResult('get_annexes', annexResult) }
+        if (!annexResult.isError) {
+          yield { type: 'status', message: '완료', progress: 100 }
+          yield {
+            type: 'answer',
+            data: {
+              answer: annexResult.result,
+              citations: buildCitations([annexResult]),
+              confidenceLevel: 'high',
+              complexity: 'simple',
+              queryType,
+            },
+          }
+          return
+        }
+      }
+    }
+
+    // ── 패턴 C: 법명+조문번호 (기존 로직) ──
+    if (fastPath.type === 'article_hit' || fastPath.type === 'article_resolve') {
+      let mst = fastPath.mst
+      const articles = fastPath.articles!
+
+      if (fastPath.type === 'article_resolve') {
+        yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
+        yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
+        const searchResult = await executeTool('search_law', { query: fastPath.lawName })
+        if (searchResult.isError) {
+          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
+        } else {
+          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
+          const entries = parseLawEntries(searchResult.result)
+          cacheMSTEntries(entries)
+          mst = findBestMST(entries, query) || undefined
+        }
+      }
+
+      if (mst) {
+        yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
+        yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
+        const articlesResult = await executeTool('get_batch_articles', { mst, articles })
+        yield {
+          type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
+          success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
+        }
+
+        if (!articlesResult.isError) {
+          yield { type: 'status', message: '완료', progress: 100 }
+          yield {
+            type: 'answer',
+            data: {
+              answer: articlesResult.result,
+              citations: buildCitations([articlesResult]),
+              confidenceLevel: 'high',
+              complexity: 'simple',
+              queryType,
+            },
+          }
+          return
+        }
+      }
     }
     // fast path 실패 시 아래 full pipeline으로 자연스럽게 진행
   }
@@ -437,24 +503,30 @@ export async function* executeRAGStream(
         if (bestMST) autoChains.push({ name: 'compare_old_new', args: { mst: bestMST } })
       }
 
-      for (const chain of autoChains) {
-        yield {
-          type: 'tool_call',
-          name: chain.name,
-          displayName: TOOL_DISPLAY_NAMES[chain.name] || chain.name,
-          query: getToolCallQuery(chain.name, chain.args),
+      // Auto-chain 병렬 실행 (독립적인 호출이므로 동시 처리 → 시간 절약)
+      if (autoChains.length > 0) {
+        for (const chain of autoChains) {
+          yield {
+            type: 'tool_call',
+            name: chain.name,
+            displayName: TOOL_DISPLAY_NAMES[chain.name] || chain.name,
+            query: getToolCallQuery(chain.name, chain.args),
+          }
         }
-        const autoResult = await executeTool(chain.name, chain.args)
-        allToolResults.push(autoResult)
-        yield {
-          type: 'tool_result',
-          name: chain.name,
-          displayName: TOOL_DISPLAY_NAMES[chain.name] || chain.name,
-          success: !autoResult.isError,
-          summary: summarizeToolResult(chain.name, autoResult),
+
+        const autoResults = await executeToolsParallel(autoChains)
+
+        for (const autoResult of autoResults) {
+          allToolResults.push(autoResult)
+          yield {
+            type: 'tool_result',
+            name: autoResult.name,
+            displayName: TOOL_DISPLAY_NAMES[autoResult.name] || autoResult.name,
+            success: !autoResult.isError,
+            summary: summarizeToolResult(autoResult.name, autoResult),
+          }
+          results.push(autoResult)
         }
-        // Always push to results so functionCall/functionResponse pairs stay symmetric
-        results.push(autoResult)
       }
 
       // 에러 경고
