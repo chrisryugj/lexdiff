@@ -15,6 +15,8 @@ import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
 import { REGIONS } from "@/lib/ordinance-benchmark/municipality-codes"
 import { ReferenceModal } from "@/components/reference-modal"
+import { parseOrdinanceXML } from "@/lib/ordin-parser"
+import { extractArticleText } from "@/lib/law-xml-parser"
 
 // ── 유틸 ──────────────────────────────────────────────────
 
@@ -152,7 +154,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     })
   }
 
-  // ── 조례 모달 ──
+  // ── 조례 모달 (기존 법령뷰어와 동일한 방식) ──
   const openOrdinanceModal = useCallback(async (r: BenchmarkOrdinanceResult) => {
     if (!r.ordinanceSeq) {
       setModalTitle(r.ordinanceName)
@@ -165,9 +167,23 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     setModalLoading(true)
     setModalHtml(undefined)
     try {
-      const res = await fetch(`/api/ordin-detail?seq=${r.ordinanceSeq}`)
+      // 기존 조례 조회 파이프라인 사용: /api/ordin → XML → parseOrdinanceXML → extractArticleText
+      const res = await fetch(`/api/ordin?ordinSeq=${r.ordinanceSeq}`)
       if (!res.ok) throw new Error('조회 실패')
-      setModalHtml(await res.text())
+      const xml = await res.text()
+      const { articles } = parseOrdinanceXML(xml)
+
+      if (articles.length === 0) {
+        setModalHtml('<p class="text-center py-8 text-muted-foreground">조문 데이터가 없습니다.</p>')
+      } else {
+        const html = articles.map(article => {
+          const titlePart = article.title ? ` (${article.title})` : ''
+          const header = `<div class="font-semibold text-primary mb-1">${article.joNum}${titlePart}</div>`
+          const content = extractArticleText(article, true, r.ordinanceName)
+          return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed">${content}</div></div>`
+        }).join('')
+        setModalHtml(`<div class="space-y-2">${html}</div>`)
+      }
     } catch {
       setModalHtml('<p class="text-center py-8 text-muted-foreground">조례 본문을 불러올 수 없습니다.</p>')
     } finally {
