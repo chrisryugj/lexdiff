@@ -368,13 +368,23 @@ export function AIAnswerContent({
     // 도구 로그 접힘 애니메이션
     const [isCollapsing, setIsCollapsing] = useState(false)
     const [showLogs, setShowLogs] = useState(false)
+    const [showDetails, setShowDetails] = useState(false)  // 완료 후 세부정보 토글
     const logPanelRef = useRef<HTMLDivElement>(null)
     const prevStreamingRef = useRef(isStreaming)
 
-    // 스트리밍 시작 시 로그 표시 (접기 비활성화 - 디버깅용)
+    // 스트리밍 시작 시 로그 표시, 완료 시 자동 접기
     useEffect(() => {
       if (isStreaming) {
         setShowLogs(true)
+        setShowDetails(false)
+      } else if (prevStreamingRef.current && !isStreaming) {
+        // 스트리밍 완료: 로그 접기 애니메이션
+        setIsCollapsing(true)
+        const timer = setTimeout(() => {
+          setShowLogs(false)
+          setIsCollapsing(false)
+        }, 600)
+        return () => clearTimeout(timer)
       }
       prevStreamingRef.current = isStreaming
     }, [isStreaming])
@@ -842,6 +852,103 @@ export function AIAnswerContent({
                                         </span>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 완료 후 요약 바 + 세부정보 토글 */}
+                {!isStreaming && searchStats && streamElapsed > 0 && (
+                    <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-400">
+                        {/* 요약 바 */}
+                        <button
+                            type="button"
+                            onClick={() => setShowDetails(prev => !prev)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors text-left group"
+                        >
+                            <Icon name="check-circle" size={15} className="text-emerald-500 flex-shrink-0" />
+                            <span className="text-[12px] font-medium text-foreground/80">완료</span>
+                            <span className="text-[12px] font-mono tabular-nums text-muted-foreground">{streamElapsed.toFixed(1)}s</span>
+                            <span className="text-muted-foreground/30">·</span>
+                            <span className="text-[12px] text-muted-foreground">
+                                <Icon name="settings" size={11} className="inline mr-0.5" />
+                                {searchStats.totalCalls}회 호출
+                            </span>
+                            {searchStats.totalTokens && (
+                                <>
+                                    <span className="text-muted-foreground/30">·</span>
+                                    <span className="text-[12px] text-muted-foreground tabular-nums">
+                                        {searchStats.totalTokens.toLocaleString()} 토큰
+                                    </span>
+                                </>
+                            )}
+                            <span className="ml-auto flex-shrink-0">
+                                <Icon
+                                    name={showDetails ? 'chevron-up' : 'chevron-down'}
+                                    size={14}
+                                    className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors"
+                                />
+                            </span>
+                        </button>
+
+                        {/* 세부정보 펼치기 */}
+                        <div className={`overflow-hidden transition-all duration-400 ease-out ${showDetails ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+                            <div className="rounded-lg bg-slate-50/60 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-700/40 p-3">
+                                {/* 도구별 통계 */}
+                                {searchStats.toolBreakdown.length > 0 && (
+                                    <div className="mb-3 pb-2.5 border-b border-slate-200/40 dark:border-slate-700/30">
+                                        <div className="text-[11px] font-medium text-muted-foreground/60 mb-1.5">도구별 호출</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {searchStats.toolBreakdown.map(([name, count]) => (
+                                                <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200/50 dark:bg-slate-700/40 text-[11px] text-muted-foreground">
+                                                    {name} <span className="font-mono tabular-nums font-medium">{count}</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 도구 호출 타임라인 */}
+                                <div className="text-[11px] font-medium text-muted-foreground/60 mb-1.5">호출 타임라인</div>
+                                <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
+                                    {toolCallLogs.filter(l => l.type === 'call' || l.type === 'result').map((log, idx, filtered) => {
+                                        let durationText = ''
+                                        if (log.type === 'result' && log.timestamp) {
+                                            const matchingCall = [...filtered].slice(0, idx).reverse().find(l => l.type === 'call' && l.name === log.name)
+                                            if (matchingCall?.timestamp) {
+                                                durationText = `${((log.timestamp - matchingCall.timestamp) / 1000).toFixed(1)}s`
+                                            }
+                                        }
+                                        return (
+                                            <div key={log.id} className="flex items-center gap-2 text-[11px] font-mono py-0.5">
+                                                {log.type === 'call' ? (
+                                                    <>
+                                                        <Icon name="arrow-right" size={11} className="text-amber-500/70 flex-shrink-0" />
+                                                        <span className="text-muted-foreground truncate">
+                                                            {log.displayName}
+                                                            {log.query && <span className="text-muted-foreground/50 ml-1">: {log.query}</span>}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {log.success ? (
+                                                            <Icon name="check" size={11} className="text-emerald-500/80 flex-shrink-0" />
+                                                        ) : (
+                                                            <Icon name="x" size={11} className="text-red-400 flex-shrink-0" />
+                                                        )}
+                                                        <span className={`truncate flex-1 ${log.success ? 'text-emerald-600/80 dark:text-emerald-500/70' : 'text-red-400/80'}`}>
+                                                            {log.displayName}
+                                                            {log.summary && <span className="text-muted-foreground/50 ml-1">→ {log.summary}</span>}
+                                                        </span>
+                                                        {durationText && (
+                                                            <span className="text-[10px] text-muted-foreground/60 tabular-nums flex-shrink-0 ml-auto">{durationText}</span>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </div>
                     </div>
