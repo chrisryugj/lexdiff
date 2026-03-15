@@ -1,18 +1,17 @@
 /**
- * 조례 벤치마킹 — 전국 병렬 검색
+ * 조례 벤치마킹 — 전국 일괄 검색
  *
- * 17개 광역시도를 배치(6개씩)로 병렬 검색하여
- * 동일 주제 조례를 수집한다.
+ * org 파라미터 없이 전국 조례를 한 번에 검색하고,
+ * 지자체기관명 기준으로 개별 표시한다.
  */
 
-import { METRO_MUNICIPALITIES, type Municipality } from './municipality-codes'
 import type { BenchmarkOrdinanceResult } from './types'
 import { getBenchmarkCacheKey, BENCHMARK_CACHE_TTL } from './types'
 import { parseOrdinanceSearchXML } from '../ordin-search-parser'
 
 // ── 캐시 ────────────────────────────────────────────────────
 interface CachedSearch {
-  results: Record<string, BenchmarkOrdinanceResult[]>  // JSON-safe (Map 대신 Record)
+  results: Record<string, BenchmarkOrdinanceResult[]>
   cachedAt: number
 }
 
@@ -26,7 +25,6 @@ export function getCachedSearch(keyword: string): Map<string, BenchmarkOrdinance
       return null
     }
     const map = new Map(Object.entries(cached.results))
-    // 빈 결과 캐시는 무시 (이전 버그로 인한 잘못된 캐시 방지)
     if (map.size === 0) {
       localStorage.removeItem(getBenchmarkCacheKey(keyword))
       return null
@@ -42,7 +40,6 @@ export function clearBenchmarkCache(keyword?: string): void {
       localStorage.removeItem(getBenchmarkCacheKey(normalized))
       localStorage.removeItem(getBenchmarkCacheKey(keyword))
     } else {
-      // 전체 벤치마크 캐시 삭제
       const keys = Object.keys(localStorage).filter(k => k.startsWith('benchmark:'))
       keys.forEach(k => localStorage.removeItem(k))
     }
@@ -58,37 +55,7 @@ function setCacheSearch(keyword: string, results: Map<string, BenchmarkOrdinance
   } catch { /* full */ }
 }
 
-// ── 단일 지자체 검색 ────────────────────────────────────────
-async function searchOrdinanceForMunicipality(
-  keyword: string,
-  muni: Municipality,
-  signal?: AbortSignal,
-): Promise<BenchmarkOrdinanceResult[]> {
-  const params = new URLSearchParams({
-    query: keyword,
-    org: muni.code,
-    knd: '30001',   // 조례
-    display: '5',
-  })
-
-  const res = await fetch(`/api/ordin-search?${params}`, { signal })
-  if (!res.ok) return []
-
-  const xmlText = await res.text()
-  const { ordinances } = parseOrdinanceSearchXML(xmlText)
-
-  return ordinances.map((item) => ({
-    orgCode: muni.code,
-    orgName: muni.name,
-    orgShortName: muni.shortName,
-    ordinanceName: item.ordinName,
-    ordinanceSeq: item.ordinSeq,
-    effectiveDate: item.effectiveDate || '',
-    revisionType: item.revisionType || '',
-  }))
-}
-
-// ── 전국 병렬 검색 ──────────────────────────────────────────
+// ── 전국 일괄 검색 ──────────────────────────────────────────
 export interface SearchProgress {
   completed: number
   total: number
@@ -98,54 +65,60 @@ export interface SearchProgress {
 export async function searchAllMunicipalities(
   keyword: string,
   options: {
-    batchSize?: number
-    delayMs?: number
     signal?: AbortSignal
     onProgress?: (progress: SearchProgress) => void
   } = {},
 ): Promise<Map<string, BenchmarkOrdinanceResult[]>> {
-  // 키워드 정규화: 공백 제거 (법제처 API가 공백에 민감)
   const normalizedKeyword = keyword.replace(/\s+/g, '')
 
-  // 캐시 체크 (정규화된 키워드로)
   const cached = getCachedSearch(normalizedKeyword)
   if (cached) return cached
 
-  const { batchSize = 6, delayMs = 200, signal, onProgress } = options
+  const { signal, onProgress } = options
   const results = new Map<string, BenchmarkOrdinanceResult[]>()
-  const munis = METRO_MUNICIPALITIES
 
-  for (let i = 0; i < munis.length; i += batchSize) {
-    if (signal?.aborted) break
+  onProgress?.({ completed: 0, total: 3, current: '전국 조례 검색 중...' })
 
-    const batch = munis.slice(i, i + batchSize)
+  // org 없이 전국 검색, display=100
+  const params = new URLSearchParams({
+    query: normalizedKeyword,
+    knd: '30001',
+    display: '100',
+  })
 
-    onProgress?.({
-      completed: i,
-      total: munis.length,
-      current: batch.map(m => m.shortName).join(', '),
-    })
+  const res = await fetch(`/api/ordin-search?${params}`, { signal })
+  if (!res.ok) return results
 
-    const batchResults = await Promise.allSettled(
-      batch.map(muni => searchOrdinanceForMunicipality(normalizedKeyword, muni, signal))
-    )
+  onProgress?.({ completed: 1, total: 3, current: '결과 분석 중...' })
 
-    batch.forEach((muni, idx) => {
-      const result = batchResults[idx]
-      if (result.status === 'fulfilled' && result.value.length > 0) {
-        results.set(muni.code, result.value)
-      }
-    })
+  const xmlText = await res.text()
+  const { ordinances } = parseOrdinanceSearchXML(xmlText)
 
-    // Rate limiting: 다음 배치 전 대기 (마지막 배치 제외)
-    if (i + batchSize < munis.length && !signal?.aborted) {
-      await new Promise(r => setTimeout(r, delayMs))
+  onProgress?.({ completed: 2, total: 3, current: '지역별 분류 중...' })
+
+  // 지자체기관명 기준 그룹핑 (개별 지자체 모두 표시)
+  for (const item of ordinances) {
+    const orgName = item.orgName || '기타'
+    // 교육청 제외
+    if (orgName.includes('교육청')) continue
+
+    const entry: BenchmarkOrdinanceResult = {
+      orgCode: orgName,  // orgName을 키로 사용
+      orgName,
+      orgShortName: orgName.replace(/특별자치|특별|광역/g, '').replace(/시$|도$/, ''),
+      ordinanceName: item.ordinName,
+      ordinanceSeq: item.ordinSeq,
+      effectiveDate: item.effectiveDate || '',
+      revisionType: item.revisionType || '',
     }
+
+    const existing = results.get(orgName) || []
+    existing.push(entry)
+    results.set(orgName, existing)
   }
 
-  onProgress?.({ completed: munis.length, total: munis.length, current: '완료' })
+  onProgress?.({ completed: 3, total: 3, current: '완료' })
 
-  // 결과 있을 때만 캐싱 (빈 결과는 캐싱 안 함)
   if (results.size > 0) {
     setCacheSearch(normalizedKeyword, results)
   }
