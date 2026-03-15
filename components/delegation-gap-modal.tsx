@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/icon"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import type { LawMeta, LawArticle, ThreeTierArticle } from "@/lib/law-types"
+import { parseLawJSON } from "@/lib/law-json-parser"
 import { extractClauses, crossCheck, buildAnalysis, getCachedAnalysis } from "@/lib/delegation-gap/analyzer"
 import type { DelegationGapAnalysis, DelegationGapStep, DelegationGapResult } from "@/lib/delegation-gap/types"
 
@@ -91,7 +92,8 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       const eflawRes = await fetch(`/api/eflaw?${eflawParams}`, { signal })
       if (!eflawRes.ok) throw new Error('법률 전문 조회 실패')
       const eflawData = await eflawRes.json()
-      const articles: LawArticle[] = eflawData.articles || []
+      const lawData = parseLawJSON(eflawData)
+      const articles: LawArticle[] = lawData.articles
 
       if (signal.aborted) return
 

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import type { LawMeta, LawArticle } from "@/lib/law-types"
+import { parseLawJSON } from "@/lib/law-json-parser"
 import { highlightDifferences } from "@/lib/oldnew-parser"
 import {
   findVersionByDate,
@@ -167,8 +168,10 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       if (!pastRes.ok || !currentRes.ok) throw new Error('법령 텍스트 조회 실패')
 
       const [pastData, currentData] = await Promise.all([pastRes.json(), currentRes.json()])
-      const pastArticles: LawArticle[] = pastData.articles || []
-      const currentArticles: LawArticle[] = currentData.articles || []
+      const pastLaw = parseLawJSON(pastData)
+      const currentLaw = parseLawJSON(currentData)
+      const pastArticles: LawArticle[] = pastLaw.articles
+      const currentArticles: LawArticle[] = currentLaw.articles
 
       const pText = articlesToText(pastArticles)
       const cText = articlesToText(currentArticles)
