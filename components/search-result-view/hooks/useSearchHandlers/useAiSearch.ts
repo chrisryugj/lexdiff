@@ -377,6 +377,16 @@ export function useAiSearch(deps: HandlerDeps) {
           }
           break
         }
+        case 'source': {
+          actions.addToolCallLog({
+            id: `log-${++logIdCounter}`,
+            type: 'source',
+            displayName: event.source === 'openclaw' ? 'OpenClaw Bridge' : 'Gemini',
+            message: event.source,
+            timestamp: Date.now(),
+          })
+          break
+        }
         case 'error': {
           debugLogger.error('FC-RAG 서버 오류', event.message)
           actions.addToolCallLog({

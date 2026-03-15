@@ -240,7 +240,7 @@ export interface RagAnswer {
 
 export interface ToolCallLogEntry {
   id: string
-  type: 'call' | 'result' | 'status' | 'token_usage'
+  type: 'call' | 'result' | 'status' | 'token_usage' | 'source'
   name?: string
   displayName: string
   query?: string
