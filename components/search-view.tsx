@@ -257,7 +257,7 @@ export function SearchView({
       <main className="flex-1 bg-white dark:bg-[#121620] border-t border-gray-200 dark:border-gray-800">
         <section
           ref={featuresRef}
-          className={`py-20 lg:py-32 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
+          className={`py-10 lg:py-16 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
         >
           <div className="container mx-auto max-w-7xl px-6 lg:px-8">
             <FeatureCards revealed={featuresRevealed} onToolClick={onToolClick} />
