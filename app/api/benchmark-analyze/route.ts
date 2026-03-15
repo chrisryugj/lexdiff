@@ -21,21 +21,23 @@ const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET || ''
 async function fetchOrdinanceText(ordinanceSeq: string): Promise<string> {
   try {
     const OC = process.env.LAW_OC || ''
-    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=ordin&ID=${ordinanceSeq}&type=JSON`
+    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=ordin&MST=${ordinanceSeq}&type=JSON`
     const res = await fetch(url, { next: { revalidate: 86400 } })
     if (!res.ok) return ''
     const data = await res.json()
 
-    const articles = data?.조례?.조문?.조문단위 || []
-    if (!Array.isArray(articles)) return ''
+    // JSON 구조: data.LawService.조문.조[] (각 조: 조문번호, 조제목, 조내용)
+    const articles = data?.LawService?.조문?.조 || data?.자치법규?.조문?.조문단위 || data?.조례?.조문?.조문단위 || []
+    const list = Array.isArray(articles) ? articles : [articles]
+    if (list.length === 0) return ''
 
-    return articles
+    return list
+      .filter((a: any) => a?.조문여부 === 'Y' || a?.조문여부 === '조문' || a?.조내용 || a?.조문내용)
       .slice(0, 20)
       .map((a: any) => {
-        const joNum = a?.조문번호 || ''
-        const title = a?.조문제목 || ''
-        const content = a?.조문내용 || ''
-        return `제${joNum}조${title ? `(${title})` : ''} ${content}`
+        const title = a?.조제목 || a?.조문제목 || ''
+        const content = a?.조내용 || a?.조문내용 || ''
+        return `${title ? `(${title}) ` : ''}${content}`
       })
       .join('\n')
       .slice(0, 3000)
