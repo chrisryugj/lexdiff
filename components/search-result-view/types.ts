@@ -110,6 +110,8 @@ export interface SearchResultViewProps {
   onPrecedentSelect?: (precedentId: string | null) => void  // 판례 선택/해제 시 부모에 알림
   initialSearchMode?: 'basic' | 'rag'
   initialPrecedentId?: string | null  // 새로고침 시 판례 상세 복원용
+  // 분석 도구 → page.tsx ViewMode 전환용
+  onImpactTracker?: (lawName: string, mode?: 'impact' | 'ordinance-sync') => void
 }
 
 export interface SearchQuery {

@@ -220,6 +220,25 @@ export default function Home() {
     })
   }
 
+  // 법령 뷰어 → 영향 추적기 (법령명 자동 입력)
+  const handleImpactTrackerFromViewer = (lawName: string, mode: 'impact' | 'ordinance-sync' = 'impact') => {
+    requireAuth(() => {
+      const today = new Date().toISOString().slice(0, 10)
+      const monthsAgo = mode === 'ordinance-sync' ? 12 : 3
+      const from = new Date()
+      from.setMonth(from.getMonth() - monthsAgo)
+      const request: ImpactTrackerRequest = {
+        lawNames: [lawName],
+        dateFrom: from.toISOString().slice(0, 10),
+        dateTo: today,
+      }
+      pushImpactTrackerHistory(request)
+      setViewMode('impact-tracker')
+      setImpactKey(k => k + 1)
+      setImpactRequest(request)
+    })
+  }
+
   // 홈으로 직접 이동 (로고 클릭)
   const handleHomeClick = () => {
     debugLogger.info('🏠 홈으로 이동')
@@ -288,6 +307,7 @@ export default function Home() {
               setPrecedentId(null)
             }
           }}
+          onImpactTracker={handleImpactTrackerFromViewer}
         />
       ) : null}
 
