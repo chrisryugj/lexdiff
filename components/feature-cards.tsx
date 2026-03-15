@@ -156,19 +156,13 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mt-2 lg:mt-3 mb-2 lg:mb-3 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mt-0 mb-1 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}
-          <h2 className="text-sm font-bold tracking-[0.2em] text-brand-navy dark:text-brand-gold uppercase mb-4">
+          <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase">
             Analysis Toolkit
           </h2>
-          <h3 className="text-lg lg:text-2xl font-black text-brand-navy dark:text-foreground mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
-            법령 분석 도구
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            도구를 선택하여 바로 분석을 시작하세요.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
