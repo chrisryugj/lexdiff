@@ -32,3 +32,20 @@ export const METRO_MUNICIPALITIES: Municipality[] = [
 export function getMunicipalityByCode(code: string): Municipality | undefined {
   return METRO_MUNICIPALITIES.find(m => m.code === code)
 }
+
+/** 권역 정의 */
+export interface Region {
+  name: string
+  metros: string[] // shortName 배열
+}
+
+export const REGIONS: Region[] = [
+  { name: '수도권', metros: ['서울', '경기', '인천'] },
+  { name: '영남', metros: ['부산', '대구', '울산', '경남', '경북'] },
+  { name: '충청', metros: ['대전', '세종', '충남', '충북'] },
+  { name: '호남', metros: ['광주', '전남', '전북'] },
+  { name: '강원/제주', metros: ['강원', '제주'] },
+]
+
+/** 기본 활성 권역 */
+export const DEFAULT_REGIONS = new Set(['수도권'])

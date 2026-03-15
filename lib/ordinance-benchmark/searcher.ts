@@ -1,9 +1,8 @@
 /**
- * 조례 벤치마킹 — 전국 일괄 검색 (페이지네이션 + 광역시도 그룹)
+ * 조례 벤치마킹 — 점진적 로딩
  *
- * 1) 1페이지 fetch → totalCnt 파악
- * 2) 나머지 페이지 병렬 fetch
- * 3) 지자체기관명 → 광역시도 매핑 + 개별 지자체 표시
+ * 1) searchFirstPage: 1페이지만 fetch → 빠른 초기 렌더 + totalCount
+ * 2) loadRemainingPages: 나머지 페이지 병렬 fetch → 전체 데이터
  */
 
 import { METRO_MUNICIPALITIES } from './municipality-codes'
@@ -14,7 +13,6 @@ import { parseOrdinanceSearchXML, type OrdinanceSearchResult } from '../ordin-se
 const PAGE_SIZE = 100
 
 // ── 광역시도 매핑 ────────────────────────────────────────────
-/** "경기도 가평군" → "경기", "서울특별시 강남구" → "서울" */
 export function getMetroArea(orgName: string): string | null {
   for (const m of METRO_MUNICIPALITIES) {
     if (orgName.startsWith(m.name)) return m.shortName
@@ -25,10 +23,12 @@ export function getMetroArea(orgName: string): string | null {
 // ── 캐시 ────────────────────────────────────────────────────
 interface CachedSearch {
   results: Record<string, BenchmarkOrdinanceResult[]>
+  totalCount: number
+  isComplete: boolean
   cachedAt: number
 }
 
-export function getCachedSearch(keyword: string): Map<string, BenchmarkOrdinanceResult[]> | null {
+export function getCachedSearch(keyword: string): { results: Map<string, BenchmarkOrdinanceResult[]>; totalCount: number; isComplete: boolean } | null {
   try {
     const raw = localStorage.getItem(getBenchmarkCacheKey(keyword))
     if (!raw) return null
@@ -42,7 +42,7 @@ export function getCachedSearch(keyword: string): Map<string, BenchmarkOrdinance
       localStorage.removeItem(getBenchmarkCacheKey(keyword))
       return null
     }
-    return map
+    return { results: map, totalCount: cached.totalCount, isComplete: cached.isComplete }
   } catch { return null }
 }
 
@@ -59,11 +59,11 @@ export function clearBenchmarkCache(keyword?: string): void {
   } catch { /* ignore */ }
 }
 
-function setCacheSearch(keyword: string, results: Map<string, BenchmarkOrdinanceResult[]>): void {
+function setCacheSearch(keyword: string, results: Map<string, BenchmarkOrdinanceResult[]>, totalCount: number, isComplete: boolean): void {
   try {
     const record: Record<string, BenchmarkOrdinanceResult[]> = {}
     results.forEach((v, k) => { record[k] = v })
-    const cached: CachedSearch = { results: record, cachedAt: Date.now() }
+    const cached: CachedSearch = { results: record, totalCount, isComplete, cachedAt: Date.now() }
     localStorage.setItem(getBenchmarkCacheKey(keyword), JSON.stringify(cached))
   } catch { /* full */ }
 }
@@ -111,63 +111,104 @@ function groupOrdinances(
   }
 }
 
-// ── 전국 일괄 검색 (페이지네이션) ────────────────────────────
+// ── 검색 결과 ──────────────────────────────────────────────
+export interface SearchResult {
+  results: Map<string, BenchmarkOrdinanceResult[]>
+  totalCount: number
+  loadedCount: number
+  isComplete: boolean
+}
+
 export interface SearchProgress {
   completed: number
   total: number
   current: string
 }
 
-export async function searchAllMunicipalities(
+// ── 1) 첫 페이지만 검색 (빠른 초기 렌더) ────────────────────
+export async function searchFirstPage(
   keyword: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<SearchResult> {
+  const normalizedKeyword = keyword.replace(/\s+/g, '')
+
+  // 캐시 체크
+  const cached = getCachedSearch(normalizedKeyword)
+  if (cached) {
+    let loadedCount = 0
+    cached.results.forEach(v => loadedCount += v.length)
+    return { results: cached.results, totalCount: cached.totalCount, loadedCount, isComplete: cached.isComplete }
+  }
+
+  const results = new Map<string, BenchmarkOrdinanceResult[]>()
+  const first = await fetchPage(normalizedKeyword, 1, options.signal)
+
+  if (first.ordinances.length === 0) {
+    return { results, totalCount: 0, loadedCount: 0, isComplete: true }
+  }
+
+  groupOrdinances(first.ordinances, results)
+
+  let loadedCount = 0
+  results.forEach(v => loadedCount += v.length)
+  const isComplete = first.totalCount <= PAGE_SIZE
+
+  // 1페이지로 완결되면 캐싱
+  if (isComplete && results.size > 0) {
+    setCacheSearch(normalizedKeyword, results, first.totalCount, true)
+  }
+
+  return { results, totalCount: first.totalCount, loadedCount, isComplete }
+}
+
+// ── 2) 나머지 페이지 로드 ────────────────────────────────────
+export async function loadRemainingPages(
+  keyword: string,
+  existingResults: Map<string, BenchmarkOrdinanceResult[]>,
+  totalCount: number,
   options: {
     signal?: AbortSignal
     onProgress?: (progress: SearchProgress) => void
   } = {},
-): Promise<Map<string, BenchmarkOrdinanceResult[]>> {
+): Promise<SearchResult> {
   const normalizedKeyword = keyword.replace(/\s+/g, '')
-
-  const cached = getCachedSearch(normalizedKeyword)
-  if (cached) return cached
-
   const { signal, onProgress } = options
-  const results = new Map<string, BenchmarkOrdinanceResult[]>()
 
-  // 1) 첫 페이지 → totalCount 확인
-  onProgress?.({ completed: 0, total: 1, current: '전국 조례 검색 중...' })
-  const first = await fetchPage(normalizedKeyword, 1, signal)
-  if (first.ordinances.length === 0) return results
-
-  groupOrdinances(first.ordinances, results)
-
-  const totalPages = Math.ceil(first.totalCount / PAGE_SIZE)
-  const maxPages = Math.min(totalPages, 10) // 최대 1000건 (10페이지)
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+  const maxPages = Math.min(totalPages, 10) // 최대 1000건
 
   if (maxPages <= 1) {
-    onProgress?.({ completed: 1, total: 1, current: '완료' })
-    if (results.size > 0) setCacheSearch(normalizedKeyword, results)
-    return results
+    let loadedCount = 0
+    existingResults.forEach(v => loadedCount += v.length)
+    return { results: existingResults, totalCount, loadedCount, isComplete: true }
   }
 
-  // 2) 나머지 페이지 병렬 fetch
-  onProgress?.({ completed: 1, total: maxPages, current: `${first.totalCount}건 수집 중 (${maxPages}페이지)...` })
+  // 기존 결과 복사
+  const results = new Map(existingResults)
+
+  onProgress?.({ completed: 0, total: maxPages - 1, current: `나머지 ${maxPages - 1}페이지 로드 중...` })
 
   const remainingPages = Array.from({ length: maxPages - 1 }, (_, i) => i + 2)
   const pageResults = await Promise.allSettled(
     remainingPages.map(p => fetchPage(normalizedKeyword, p, signal))
   )
 
+  let completedPages = 0
   for (const pr of pageResults) {
     if (pr.status === 'fulfilled') {
       groupOrdinances(pr.value.ordinances, results)
     }
+    completedPages++
+    onProgress?.({ completed: completedPages, total: maxPages - 1, current: `${completedPages}/${maxPages - 1} 페이지 완료` })
   }
 
-  onProgress?.({ completed: maxPages, total: maxPages, current: '완료' })
+  let loadedCount = 0
+  results.forEach(v => loadedCount += v.length)
 
+  // 전체 캐싱
   if (results.size > 0) {
-    setCacheSearch(normalizedKeyword, results)
+    setCacheSearch(normalizedKeyword, results, totalCount, true)
   }
 
-  return results
+  return { results, totalCount, loadedCount, isComplete: true }
 }
