@@ -235,7 +235,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
   return (
     <div className="max-w-6xl mx-auto mt-8 p-4 md:p-6 bg-card/30 backdrop-blur-sm border border-border/50 rounded-2xl">
       <div className="flex items-center gap-2 mb-4">
-        <Icon name="sparkles" className="w-5 h-5 text-[#b5952f] dark:text-[#e2a85d]" />
+        <Icon name="sparkles" className="w-5 h-5 text-brand-gold" />
         <h3 className="text-lg font-semibold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
           관련 검색어
         </h3>
@@ -244,7 +244,7 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
         {relatedSearches.map(({ keyword, results }) => (
           <div key={keyword}>
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className="text-xs bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] border-[#d4af37]/20 dark:border-[#e2a85d]/30">
+              <Badge variant="outline" className="text-xs bg-brand-gold/10 text-brand-gold border-brand-gold/20">
                 {keyword}
               </Badge>
               <span className="text-xs text-muted-foreground">{results.length}건</span>
@@ -254,19 +254,19 @@ const RelatedSearchesSection = memo(function RelatedSearchesSection({
                 <button
                   key={law.lawId || law.mst}
                   onClick={() => onSelect(law)}
-                  className="group relative p-4 bg-card/50 border border-border/50 rounded-xl hover:border-[#d4af37]/50 hover:shadow-lg transition-all duration-200 text-left"
+                  className="group relative p-4 bg-card/50 border border-border/50 rounded-xl hover:border-brand-gold/50 hover:shadow-lg transition-all duration-200 text-left"
                   style={{ fontFamily: "Pretendard, sans-serif" }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm leading-snug mb-1 group-hover:text-[#b5952f] dark:group-hover:text-[#e2a85d] transition-colors">
+                      <h4 className="font-medium text-sm leading-snug mb-1 group-hover:text-brand-gold transition-colors">
                         {String(law.lawName)}
                       </h4>
                       <Badge variant="secondary" className={`text-xs ${getLawTypeBadgeClass(String(law.lawType))}`}>
                         {String(law.lawType)}
                       </Badge>
                     </div>
-                    <Icon name="chevron-left" className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-[#b5952f] dark:group-hover:text-[#e2a85d] transition-colors flex-shrink-0" />
+                    <Icon name="chevron-left" className="w-4 h-4 rotate-180 text-muted-foreground group-hover:text-brand-gold transition-colors flex-shrink-0" />
                   </div>
                 </button>
               ))}
@@ -553,7 +553,7 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
         {ordinance.ordinKind && (
           <Badge
             variant="outline"
-            className="text-xs px-2 py-0.5 bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border"
+            className="text-xs px-2 py-0.5 bg-brand-navy/10 text-brand-navy border-border"
           >
             {String(ordinance.ordinKind)}
           </Badge>

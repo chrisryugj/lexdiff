@@ -336,8 +336,8 @@ export function parseRelatedLawTitle(title: string, source: 'excerpt' | 'related
     .replace(/📜|📋|📖/g, '')
     .trim()
 
-  // 법령명 + 제N조 + (제목) 패턴
-  const pattern = /^(.+?)\s+(제\d+조(?:의\d+)?)\s*(\([^)]+\))?/
+  // 법령명 + 제N조 + (제목) 패턴 (leading zero 허용)
+  const pattern = /^(.+?)\s+(제0*(\d+)조(?:의0*(\d+))?)\s*(\([^)]+\))?/
   const match = cleanTitle.match(pattern)
 
   if (!match) {
@@ -345,7 +345,11 @@ export function parseRelatedLawTitle(title: string, source: 'excerpt' | 'related
     return null
   }
 
-  const [, lawName, article, titlePart] = match
+  const [, lawName, _rawArticle, artNum, branchNum, titlePart] = match
+  // leading zero 제거하여 정규화: "제0014조의02" → "제14조의2"
+  const article = branchNum
+    ? `제${parseInt(artNum, 10)}조의${parseInt(branchNum, 10)}`
+    : `제${parseInt(artNum, 10)}조`
 
   // 법령명이 너무 긴 경우 파싱 오류로 판단 (정상적인 법령명은 50자 이하)
   if (lawName.trim().length > 50) {
@@ -436,22 +440,23 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
   // 패턴 3: 인라인 「법령명」 제N조 (제목) 패턴 (인용 괄호)
   // 예: 「도로법」 제61조, 「도로법 시행령」 제63조 (신고납부)
   // Phase 7: (제목) 패턴도 캡처
-  const quotedLawPattern = /「([^」]+)」\s*제(\d+)조(의(\d+))?\s*(\([^)]+\))?/g
+  const quotedLawPattern = /「([^」]+)」\s*제0*(\d+)조(?:의0*(\d+))?\s*(\([^)]+\))?/g
   let quotedMatch
 
   while ((quotedMatch = quotedLawPattern.exec(markdown)) !== null) {
     const lawName = quotedMatch[1].trim()
-    const articleNum = quotedMatch[2] + (quotedMatch[4] ? `의${quotedMatch[4]}` : '')
-    const jo = buildJO(articleNum)
-    const titlePart = quotedMatch[5]?.trim()  // (제목) 부분
+    // leading zero 제거: "제0014조의02" → "14의2"
+    const normalizedNum = parseInt(quotedMatch[2], 10) + (quotedMatch[3] ? `의${parseInt(quotedMatch[3], 10)}` : '')
+    const jo = buildJO(String(normalizedNum))
+    const titlePart = quotedMatch[4]?.trim()  // (제목) 부분
 
     if (jo) {
       laws.push({
         lawName,
-        article: `제${articleNum}조`,
+        article: `제${normalizedNum}조`,
         jo,
         title: titlePart,  // ✅ 조문 제목 추가
-        display: `${lawName} 제${articleNum}조${titlePart ? ' ' + titlePart : ''}`,
+        display: `${lawName} 제${normalizedNum}조${titlePart ? ' ' + titlePart : ''}`,
         source: 'related'
       })
     }
@@ -464,29 +469,29 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
   // 패턴 4: 인라인 법령명 제N조 패턴 (인용 괄호 없음)
   // 예: 도로법 제61조, 도로법 시행령 제63조
   // 주의: 이미 「」로 캡처된 것은 제외
-  const unquotedLawPattern = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법률|법|령|규칙|조례)(?:\s*시행령|\s*시행규칙)?)\s*제(\d+)조(의(\d+))?/g
+  const unquotedLawPattern = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법률|법|령|규칙|조례)(?:\s*시행령|\s*시행규칙)?)\s*제0*(\d+)조(?:의0*(\d+))?/g
   let unquotedMatch
 
   while ((unquotedMatch = unquotedLawPattern.exec(markdown)) !== null) {
     const lawName = unquotedMatch[1].trim()
-    const articleNum = unquotedMatch[2] + (unquotedMatch[4] ? `의${unquotedMatch[4]}` : '')
-    const jo = buildJO(articleNum)
+    // leading zero 제거
+    const normalizedNum = parseInt(unquotedMatch[2], 10) + (unquotedMatch[3] ? `의${parseInt(unquotedMatch[3], 10)}` : '')
+    const jo = buildJO(String(normalizedNum))
 
     // 단독 '시행령', '시행규칙' 등 부모 법령명 없이 불완전한 법령명 제외
-    // 예: "관세법 시행령 제20조"에서 "시행령" 위치를 별도 추출하는 오매칭 방지
     if (/^시행(령|규칙)$/.test(lawName)) continue
 
     // 중복 체크: 같은 법령+조문이 이미 있는지 확인
     const isDuplicate = laws.some(l =>
-      l.lawName === lawName && l.article === `제${articleNum}조`
+      l.lawName === lawName && l.article === `제${normalizedNum}조`
     )
 
     if (jo && !isDuplicate) {
       laws.push({
         lawName,
-        article: `제${articleNum}조`,
+        article: `제${normalizedNum}조`,
         jo,
-        display: `${lawName} 제${articleNum}조`,
+        display: `${lawName} 제${normalizedNum}조`,
         source: 'related'
       })
     }

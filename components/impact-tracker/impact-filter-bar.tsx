@@ -20,7 +20,7 @@ const SEVERITY_OPTIONS: Array<{
   {
     value: 'all',
     label: '전체',
-    activeClass: 'bg-[#1a2b4c] text-white dark:bg-[#e2a85d] dark:text-[#0c0e14]',
+    activeClass: 'bg-brand-navy text-white dark:text-background',
   },
   {
     value: 'critical',
@@ -72,7 +72,7 @@ export function ImpactFilterBar({
         <select
           value={lawFilter}
           onChange={e => onLawChange(e.target.value)}
-          className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#d4af37]/50"
+          className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold/50"
         >
           <option value="all">전체 법령</option>
           {availableLaws.map(law => (

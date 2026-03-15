@@ -337,7 +337,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
                   {/* 섹션 헤더 */}
                   <div className="mb-1.5 flex items-center justify-between">
                     <h3 className="text-base font-bold text-foreground m-0 flex items-center gap-1.5 font-maruburi">
-                      <span className="text-[#d4af37] dark:text-[#e2a85d]">•</span>
+                      <span className="text-brand-gold">•</span>
                       {item.article.joNum || item.article.title}
                     </h3>
                     {/* 복사 버튼만 표시 (즐겨찾기 없음) */}

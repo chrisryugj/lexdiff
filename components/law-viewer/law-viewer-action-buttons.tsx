@@ -106,7 +106,7 @@ export function LawViewerActionButtons({
   }
 
   const hasRelatedCases = relatedCases.length > 0
-  const activeBtnCls = "bg-[#1a2b4c] border-[#1a2b4c] text-white hover:bg-[#0f192e] hover:text-white dark:bg-[#1a2b4c] dark:border-[#1a2b4c] dark:text-[#e2a85d] dark:hover:bg-[#0f192e] dark:hover:text-[#e2a85d]"
+  const activeBtnCls = "bg-brand-navy border-brand-navy text-white hover:bg-brand-navy/90 hover:text-white"
 
   return (
     <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">

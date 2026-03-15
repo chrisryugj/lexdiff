@@ -678,12 +678,14 @@ function extractLawNameBeforeAnnex(text: string, annexIndex: number): string | u
  * 앞에 「법령명」이 있으면 data-law 속성 추가
  */
 function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
-  // 패턴 1: [별표 X] 또는 [별표 X의Y] (대괄호 포함)
-  const bracketPattern = /\[별표\s*(\d+)(?:의(\d+))?\]/g
+  // 패턴 1: [별표 X] 또는 [별표 X의Y] 또는 [별표] (대괄호 포함, 숫자 선택적)
+  const bracketPattern = /\[별표\s*(\d+)?(?:의(\d+))?\]/g
   let match: RegExpExecArray | null
 
   while ((match = bracketPattern.exec(text)) !== null) {
-    const annexNum = match[2] ? `${match[1]}의${match[2]}` : match[1]
+    const annexNum = match[1]
+      ? (match[2] ? `${match[1]}의${match[2]}` : match[1])
+      : '1' // [별표] 숫자 없으면 기본값 1
     const lawName = extractLawNameBeforeAnnex(text, match.index)
 
     // 이미 처리된 영역인지 확인
@@ -978,9 +980,15 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     (match, lawName, firstArticle, restArticles) => {
       const encodedLaw = encodeURIComponent(lawName.trim())
 
+      // leading zero 제거 헬퍼: "제0014조의02" → "제14조의2"
+      const normalizeArticle = (art: string) =>
+        art.replace(/제0*(\d+)/g, (_, n) => `제${parseInt(n, 10)}`)
+           .replace(/의0*(\d+)/g, (_, n) => `의${parseInt(n, 10)}`)
+           .replace(/\s+/g, '')
+
       // 첫 번째 조문 링크
-      const normalizedFirst = firstArticle.replace(/\s+/g, '')
-      let result = `[「${lawName}」 ${firstArticle}](law://${encodedLaw}/${encodeURIComponent(normalizedFirst)})`
+      const displayFirst = normalizeArticle(firstArticle)
+      let result = `[「${lawName}」 ${displayFirst}](law://${encodedLaw}/${encodeURIComponent(displayFirst)})`
 
       // 나머지 조문들 (쉼표/및/과/와로 구분)
       if (restArticles) {
@@ -989,9 +997,9 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
         while ((pair = pairRegex.exec(restArticles)) !== null) {
           const connector = pair[1]
           const article = pair[2]
-          const normalizedArticle = article.replace(/\s+/g, '')
+          const displayArticle = normalizeArticle(article)
           const sep = connector === ',' ? ',' : ` ${connector}`
-          result += `${sep} [${article}](law://${encodedLaw}/${encodeURIComponent(normalizedArticle)})`
+          result += `${sep} [${displayArticle}](law://${encodedLaw}/${encodeURIComponent(displayArticle)})`
         }
       }
 
@@ -999,7 +1007,29 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     }
   )
 
-  // 패턴 2: 「법령명」 별표/별지 (명시적 법령명)
+  // 패턴 2a: 「법령명」 [별표] 또는 「법령명」 [별표 N] (대괄호 포함, 숫자 선택적)
+  // 예: 「여권법 시행령」 제39조 [별표] → [별표](annex://여권법 시행령/1)
+  //     「관세법」 [별표 2] → [별표 2](annex://관세법/2)
+  result = result.replace(
+    /「([^」]+)」(?:[^「」\n]{0,30})\[별표\s*(\d+)?(?:의(\d+))?\]/g,
+    (match, lawName, num1, num2) => {
+      const encodedLaw = encodeURIComponent(lawName.trim())
+      let annexId: string
+      let displayText: string
+
+      if (num1) {
+        annexId = num2 ? `${num1}의${num2}` : num1
+        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+      } else {
+        annexId = '1'
+        displayText = '별표'
+      }
+
+      return `[${displayText}](annex://${encodedLaw}/${encodeURIComponent(annexId)})`
+    }
+  )
+
+  // 패턴 2b: 「법령명」 별표/별지 (명시적 법령명, 대괄호 없음)
   // 예: 「도로법 시행령」 별표3 → [별표3](annex://도로법 시행령/3)
   //     「조례」 별표 1 → [별표 1](annex://조례/1)
   //     「규칙」 별지 제2호서식 → [별지 제2호서식](annex://규칙/별지제2호서식)
@@ -1012,9 +1042,14 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
       let displayText: string
 
       if (type === '별표') {
-        // 별표: "별표 1", "별표 2의3"
-        annexId = num2 ? `${num1}의${num2}` : num1
-        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+        // 별표: "별표 1", "별표 2의3", 숫자 없으면 기본값 "1"
+        if (num1) {
+          annexId = num2 ? `${num1}의${num2}` : num1
+          displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+        } else {
+          annexId = '1'
+          displayText = '별표'
+        }
       } else {
         // 별지: "별지 제2호서식"
         if (formNum) {
@@ -1030,7 +1065,38 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     }
   )
 
-  // 패턴 3: 별표/별지 단독 (문맥 추론)
+  // 패턴 3a: [별표] 또는 [별표 N] 단독 (대괄호 포함, 문맥 추론)
+  // 가장 가까운 「법령명」을 찾아서 링크 생성
+  result = result.replace(
+    /\[(별표)\s*(\d+)?(?:의(\d+))?\]/g,
+    (match, _type, num1, num2, offset: number, fullString: string) => {
+      // 이미 링크로 변환된 부분 제외
+      const beforeText = fullString.substring(Math.max(0, offset - 150), offset)
+      if (beforeText.includes('](annex://')) return match
+
+      const lawNamePattern = /「([^」]+)」/g
+      let lawName: string | undefined
+      let lastMatch: RegExpExecArray | null = null
+      while ((lastMatch = lawNamePattern.exec(beforeText)) !== null) {
+        lawName = lastMatch[1]
+      }
+      if (!lawName) return match
+
+      const encodedLaw = encodeURIComponent(lawName.trim())
+      let annexId: string
+      let displayText: string
+      if (num1) {
+        annexId = num2 ? `${num1}의${num2}` : num1
+        displayText = num2 ? `별표 ${num1}의${num2}` : `별표 ${num1}`
+      } else {
+        annexId = '1'
+        displayText = '별표'
+      }
+      return `[${displayText}](annex://${encodedLaw}/${encodeURIComponent(annexId)})`
+    }
+  )
+
+  // 패턴 3b: 별표/별지 단독 (대괄호 없음, 문맥 추론)
   // "조례 별표1", "별표 1에 따르며", "별지 제2호서식", "별표와 같다" → 가장 가까운 「법령명」 찾기
   // ✅ 수정: "별지 제X호서식" 순서 지원 + 숫자 선택적 (별표와 같다)
   result = result.replace(

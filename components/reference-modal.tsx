@@ -148,42 +148,37 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
 
   // Attach event listener to the content div
   useEffect(() => {
-    // ⚠️ CRITICAL: isOpen이 false거나 loading 중이면 스킵
     if (!isOpen || loading) return
 
-    // 🔥 CRITICAL FIX: DOM 렌더링 완료 대기
+    let handleClick: ((e: MouseEvent) => void) | null = null
+    let contentEl: HTMLDivElement | null = null
+
     const timer = setTimeout(() => {
-      const contentEl = contentRef.current
+      contentEl = contentRef.current
       if (!contentEl) return
 
-      const handleClick = (e: MouseEvent) => {
+      handleClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement
-
-        // ✅ CRITICAL: 링크인 경우에만 처리
         if (target && target.tagName === "A") {
           e.preventDefault()
           e.stopPropagation()
-
-          // onContentClick이 있으면 호출 (ref 사용으로 의존성 제거)
           if (onContentClickRef.current) {
-            const reactEvent = e as any as React.MouseEvent<HTMLDivElement>
+            const reactEvent = e as unknown as React.MouseEvent<HTMLDivElement>
             onContentClickRef.current(reactEvent)
           }
         }
       }
 
-      contentEl.addEventListener("click", handleClick, true) // useCapture = true
-
-      // Cleanup function
-      return () => {
-        contentEl.removeEventListener("click", handleClick, true)
-      }
-    }, 100) // 100ms 대기 (Dialog 애니메이션 완료 대기)
+      contentEl.addEventListener("click", handleClick, true)
+    }, 100)
 
     return () => {
       clearTimeout(timer)
+      if (contentEl && handleClick) {
+        contentEl.removeEventListener("click", handleClick, true)
+      }
     }
-  }, [isOpen, loading, html]) // onContentClick은 ref로 관리
+  }, [isOpen, loading, html])
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>

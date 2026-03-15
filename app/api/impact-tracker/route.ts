@@ -68,14 +68,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  await recordAIUsage(clientIP)
-
   const usageHeaders = await getUsageHeaders(clientIP)
   const userApiKey = request.headers.get('X-User-API-Key') || undefined
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     async start(controller) {
+      let usageRecorded = false
       const send = (data: unknown) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
       }
@@ -85,6 +84,11 @@ export async function POST(request: NextRequest) {
           { lawNames, dateFrom, dateTo },
           { signal: request.signal, apiKey: userApiKey },
         )) {
+          // 첫 번째 의미 있는 이벤트 수신 시 사용량 기록
+          if (!usageRecorded && (event as { type?: string }).type !== 'error') {
+            await recordAIUsage(clientIP)
+            usageRecorded = true
+          }
           send(event)
         }
       } catch (error) {

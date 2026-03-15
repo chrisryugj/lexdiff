@@ -38,7 +38,7 @@ export function AiGateDialog({ open, onSubmit, onClose }: AiGateDialogProps) {
       <DialogContent className="max-w-xs p-6" showCloseButton={false}>
         <DialogHeader className="gap-1">
           <DialogTitle className="text-base font-semibold flex items-center gap-2">
-            <Icon name="lock" size={18} className="text-[#d4af37]" />
+            <Icon name="lock" size={18} className="text-brand-gold" />
             AI 기능 접근
           </DialogTitle>
           <DialogDescription className="text-xs text-gray-500">
@@ -59,7 +59,7 @@ export function AiGateDialog({ open, onSubmit, onClose }: AiGateDialogProps) {
               error
                 ? 'border-red-400 dark:border-red-600 animate-shake'
                 : 'border-gray-200 dark:border-gray-700'
-            } focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40`}
+            } focus:outline-none focus:ring-2 focus:ring-brand-gold/40`}
           />
           {error && (
             <p className="text-xs text-red-500 text-center">비밀번호가 올바르지 않습니다.</p>
@@ -68,7 +68,7 @@ export function AiGateDialog({ open, onSubmit, onClose }: AiGateDialogProps) {
             <Button variant="outline" size="sm" onClick={onClose} className="flex-1">
               취소
             </Button>
-            <Button size="sm" onClick={handleSubmit} disabled={!pin} className="flex-1 bg-[#1a2b4c] hover:bg-[#1a2b4c]/90 dark:bg-[#e2a85d] dark:hover:bg-[#e2a85d]/90 dark:text-[#0c0e14]">
+            <Button size="sm" onClick={handleSubmit} disabled={!pin} className="flex-1 bg-brand-navy hover:bg-brand-navy/90 dark:text-background">
               확인
             </Button>
           </div>

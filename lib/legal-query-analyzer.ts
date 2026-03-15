@@ -578,7 +578,6 @@ export function analyzeLegalQuery(query: string): LegalQueryAnalysis {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   for (const { pattern, type, confidence } of DEFINITIVE_ENDING_PATTERNS) {
     if (pattern.test(query)) {
-      console.log(`[LegalQueryAnalyzer] 확정 패턴 매칭: ${type} (${confidence})`)
       return {
         type,
         confidence,

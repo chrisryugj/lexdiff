@@ -128,7 +128,12 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
     }
   }
 
-  const loadComparison = async (revisionDate?: string, revisionNumber?: string) => {
+  const loadComparison = async (revisionDate?: string, revisionNumber?: string, depth = 0) => {
+    if (depth >= 5) {
+      setError("비교 데이터를 찾을 수 없습니다. 적절한 개정 버전이 없습니다.")
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     setError(null)
 
@@ -162,7 +167,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
       const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`
 
       if (comparisonData.newVersion.effectiveDate && comparisonData.newVersion.effectiveDate > todayStr) {
-        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber)
+        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber, depth + 1)
         return
       }
 
@@ -171,7 +176,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
         comparisonData.newVersion.promulgationDate &&
         comparisonData.oldVersion.promulgationDate === comparisonData.newVersion.promulgationDate
       ) {
-        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber)
+        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber, depth + 1)
         return
       }
 
@@ -180,7 +185,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
         comparisonData.newVersion.effectiveDate &&
         comparisonData.oldVersion.effectiveDate > comparisonData.newVersion.effectiveDate
       ) {
-        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber)
+        await loadComparison(comparisonData.oldVersion.promulgationDate, comparisonData.oldVersion.promulgationNumber, depth + 1)
         return
       }
 
