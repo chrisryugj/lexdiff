@@ -40,16 +40,17 @@ import { getArticleWithPrecedents, GetArticleWithPrecedentsSchema } from 'korean
 // ── Admin rules (행정규칙: 훈령/예규/고시) ──
 import { searchAdminRule, SearchAdminRuleSchema, getAdminRule, GetAdminRuleSchema } from 'korean-law-mcp/build/tools/admin-rule.js'
 
-// ── Chain tools (multi-step macros — 내부에서 여러 도구 자동 연쇄, 턴 수 절감) ──
-import {
-  chainFullResearch, chainFullResearchSchema,
-  chainDisputePrep, chainDisputePrepSchema,
-  chainProcedureDetail, chainProcedureDetailSchema,
-  chainActionBasis, chainActionBasisSchema,
-  chainLawSystem, chainLawSystemSchema,
-  chainAmendmentTrack, chainAmendmentTrackSchema,
-  chainOrdinanceCompare, chainOrdinanceCompareSchema,
-} from 'korean-law-mcp/build/tools/chains.js'
+// ── Chain tools (multi-step macros) ──
+// TODO: korean-law-mcp에 chains 모듈 빌드 후 활성화
+// import {
+//   chainFullResearch, chainFullResearchSchema,
+//   chainDisputePrep, chainDisputePrepSchema,
+//   chainProcedureDetail, chainProcedureDetailSchema,
+//   chainActionBasis, chainActionBasisSchema,
+//   chainLawSystem, chainLawSystemSchema,
+//   chainAmendmentTrack, chainAmendmentTrackSchema,
+//   chainOrdinanceCompare, chainOrdinanceCompareSchema,
+// } from 'korean-law-mcp/build/tools/chains.js'
 
 // ── Domain specialist tools ──
 import { searchAdminAppeals, searchAdminAppealsSchema, getAdminAppealText, getAdminAppealTextSchema } from 'korean-law-mcp/build/tools/admin-appeals.js'
@@ -330,48 +331,14 @@ const TOOLS: ToolDef[] = [
   // 내부에서 여러 도구를 자동 연쇄/병렬 호출.
   // LLM 턴 수를 대폭 줄여 시간·토큰 절감.
   // ══════════════════════════════════════
-  {
-    name: 'chain_full_research',
-    description: '⛓️ 종합 리서치. AI검색+법령+판례+해석례 병렬 수집. 복합 질문 시 1턴에 전체 자료 확보.',
-    schema: chainFullResearchSchema,
-    handler: chainFullResearch,
-  },
-  {
-    name: 'chain_dispute_prep',
-    description: '⛓️ 쟁송 대비. 판례+행정심판+도메인별 결정례 병렬. 불복/소송 질문 시.',
-    schema: chainDisputePrepSchema,
-    handler: chainDisputePrep,
-  },
-  {
-    name: 'chain_procedure_detail',
-    description: '⛓️ 절차/비용. 법령+3단비교+별표/서식 자동 연쇄. 신청/절차 질문 시.',
-    schema: chainProcedureDetailSchema,
-    handler: chainProcedureDetail,
-  },
-  {
-    name: 'chain_action_basis',
-    description: '⛓️ 처분근거. 3단비교+해석례+판례+행정심판 병렬. 허가/처분 질문 시.',
-    schema: chainActionBasisSchema,
-    handler: chainActionBasis,
-  },
-  {
-    name: 'chain_law_system',
-    description: '⛓️ 법체계 파악. 법령검색+3단비교+조문+별표 연쇄. 법 구조 질문 시.',
-    schema: chainLawSystemSchema,
-    handler: chainLawSystem,
-  },
-  {
-    name: 'chain_amendment_track',
-    description: '⛓️ 개정 추적. 신구대조+조문이력 연쇄. 개정/변경 질문 시.',
-    schema: chainAmendmentTrackSchema,
-    handler: chainAmendmentTrack,
-  },
-  {
-    name: 'chain_ordinance_compare',
-    description: '⛓️ 조례 비교. 상위법령+위임체계+전국 조례검색. 자치법규 질문 시.',
-    schema: chainOrdinanceCompareSchema,
-    handler: chainOrdinanceCompare,
-  },
+  // TODO: chain tools — korean-law-mcp에 chains 모듈 빌드 후 활성화
+  // { name: 'chain_full_research', schema: chainFullResearchSchema, handler: chainFullResearch, ... },
+  // { name: 'chain_dispute_prep', ... },
+  // { name: 'chain_procedure_detail', ... },
+  // { name: 'chain_action_basis', ... },
+  // { name: 'chain_law_system', ... },
+  // { name: 'chain_amendment_track', ... },
+  // { name: 'chain_ordinance_compare', ... },
 
   // ══════════════════════════════════════
   // Domain specialist tools
