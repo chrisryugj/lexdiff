@@ -36,7 +36,6 @@ const toolCards: Array<{
   title: string
   description: string
   icon: IconName
-  badge?: string
 }> = [
   {
     id: 'impact-tracker',
@@ -49,14 +48,12 @@ const toolCards: Array<{
     title: '위임 미비 탐지',
     description: '법률이 위임했으나 하위법령이 미제정된 조항을 찾습니다.',
     icon: 'file-search',
-    badge: 'New',
   },
   {
     id: 'time-machine',
     title: '법령 타임머신',
     description: '특정 시점의 법령 상태를 복원하고 현행법과 비교합니다.',
     icon: 'clock',
-    badge: 'New',
   },
   {
     id: 'ordinance-sync',
@@ -69,7 +66,6 @@ const toolCards: Array<{
     title: '조례 벤치마킹',
     description: '동일 주제 조례를 전국 지자체별로 비교 분석합니다.',
     icon: 'bar-chart',
-    badge: 'New',
   },
 ]
 
@@ -108,7 +104,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
   let refIdx = 0
 
   return (
-    <div className="w-full space-y-2 lg:space-y-3">
+    <div className="w-full space-y-0">
       {/* ━━ Core Competence ━━ */}
       <div>
         <div className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
@@ -160,7 +156,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
       <div>
         <div
           ref={el => { itemRefs.current[refIdx] = el }}
-          className={`mb-4 lg:mb-5 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mt-8 lg:mt-12 mb-4 lg:mb-5 text-center transition-all duration-1000 ${itemsRevealed[refIdx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
           {(() => { refIdx++; return null })()}
@@ -175,7 +171,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 lg:gap-12">
           {toolCards.map((tool, index) => {
             const idx = refIdx++
             return (
@@ -183,38 +179,32 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
                 key={tool.id}
                 ref={el => { itemRefs.current[idx] = el }}
                 onClick={() => onToolClick?.(tool.id)}
-                className={`group relative text-left p-6 border border-gray-200 dark:border-gray-800 transition-all duration-500 cursor-pointer
-                  bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-[#1a222c] dark:via-[#1e2836] dark:to-[#1a222c]
-                  hover:shadow-xl hover:-translate-y-1 hover:border-brand-navy/30 dark:hover:border-brand-gold/30
+                className={`group relative text-left bg-white dark:bg-[#1a222c] border border-gray-200 dark:border-gray-800 p-8 lg:p-10 transition-all duration-700 hover:shadow-2xl hover:-translate-y-1 cursor-pointer
                   ${itemsRevealed[idx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)',
-                  transitionDelay: `${index * 80}ms`
+                  transitionDelay: `${index * 100}ms`
                 }}
               >
-                {/* 호버 시 상단 그래디언트 바 */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-navy to-brand-gold scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-brand-navy/10 dark:bg-brand-gold/10 text-brand-navy dark:text-brand-gold group-hover:bg-brand-navy/20 dark:group-hover:bg-brand-gold/20 transition-colors">
-                      <Icon name={tool.icon} size={20} />
+                <div className="absolute top-0 left-0 right-0 h-1 bg-brand-gold scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-50 dark:bg-background border border-gray-100 dark:border-gray-800 text-brand-navy dark:text-brand-gold">
+                      <Icon name={tool.icon} size={24} />
                     </div>
-                    {tool.badge && (
-                      <Badge className="bg-brand-gold/20 text-brand-navy dark:text-brand-gold border-brand-gold/30 text-[10px] px-1.5 py-0">
-                        {tool.badge}
-                      </Badge>
-                    )}
+                    <Badge className="bg-brand-gold/20 text-brand-navy dark:text-brand-gold border-brand-gold/30 text-[10px] px-1.5 py-0">
+                      New
+                    </Badge>
                   </div>
-                  <h4 className="text-sm font-bold text-brand-navy dark:text-foreground">
+                  <h4 className="text-xl font-bold text-brand-navy dark:text-foreground mb-4" style={{ fontFamily: "'RIDIBatang', serif" }}>
                     {tool.title}
                   </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed break-keep">
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm lg:text-base break-keep mb-4">
                     {tool.description}
                   </p>
-                  <div className="flex items-center gap-1 text-xs text-brand-navy/60 dark:text-brand-gold/60 group-hover:text-brand-navy dark:group-hover:text-brand-gold transition-colors">
+                  <div className="flex items-center gap-1 text-sm text-brand-navy/60 dark:text-brand-gold/60 group-hover:text-brand-navy dark:group-hover:text-brand-gold transition-colors mt-auto">
                     <span>시작하기</span>
-                    <Icon name="arrow-right" size={12} className="group-hover:translate-x-1 transition-transform" />
+                    <Icon name="arrow-right" size={14} className="group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </button>
