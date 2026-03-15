@@ -56,8 +56,8 @@ function markdownToHtml(md: string): string {
   return html
 }
 
-/** 세리프 폰트 스타일 */
-const serifStyle = { fontFamily: "'Libre Bodoni', 'Noto Serif KR', serif" }
+/** 세리프 폰트 스타일 (홈과 동일: RIDIBatang) */
+const serifStyle = { fontFamily: "'RIDIBatang', serif" }
 
 // ── 컴포넌트 ──────────────────────────────────────────────
 
@@ -458,7 +458,8 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                             </td>
                             <td className="px-3 py-3">
                               <button onClick={() => openOrdinanceModal(r)}
-                                className="text-sm font-medium text-left hover:text-brand-navy dark:hover:text-brand-gold hover:underline underline-offset-2 transition-colors">
+                                className="text-sm font-medium text-left hover:text-brand-navy dark:hover:text-brand-gold hover:underline underline-offset-2 transition-colors"
+                                style={serifStyle}>
                                 {r.ordinanceName}
                               </button>
                             </td>
