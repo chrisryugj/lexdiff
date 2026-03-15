@@ -15,6 +15,7 @@ import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
 import { REGIONS } from "@/lib/ordinance-benchmark/municipality-codes"
 import { ReferenceModal } from "@/components/reference-modal"
+import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { extractArticleText } from "@/lib/law-xml-parser"
 
@@ -31,29 +32,6 @@ function revisionBadgeClass(type: string): string {
   if (type.includes('일부개정')) return 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400'
   if (type.includes('폐지')) return 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
   return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-}
-
-function markdownToHtml(md: string): string {
-  if (!md) return ''
-  let html = md
-    .replace(/^\|(.+)\|$/gm, (_, row) => {
-      const cells = row.split('|').map((c: string) => c.trim())
-      return `<tr>${cells.map((c: string) => `<td>${c}</td>`).join('')}</tr>`
-    })
-    .replace(/(<tr>[\s\S]*?<\/tr>)/g, (match) => match)
-  html = html.replace(/<tr><td>[-:]+<\/td>(?:<td>[-:]+<\/td>)*<\/tr>/g, '')
-  html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, '<table>$1</table>')
-  html = html.replace(/<table><tr>(.*?)<\/tr>/, '<table><thead><tr>$1</tr></thead><tbody>')
-  html = html.replace(/<\/table>/, '</tbody></table>')
-  html = html.replace(/<thead><tr>(.*?)<\/tr><\/thead>/g, (_, inner) =>
-    `<thead><tr>${inner.replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>')}</tr></thead>`)
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>')
-  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\n/g, '<br/>')
-  html = html.replace(/<br\/><ul>/g, '<ul>').replace(/<\/ul><br\/>/g, '</ul>')
-  html = html.replace(/<br\/><table>/g, '<table>').replace(/<\/table><br\/>/g, '</table>')
-  return html
 }
 
 /** 세리프 폰트 스타일 (홈과 동일: RIDIBatang) */
@@ -542,15 +520,18 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                       <Button variant="ghost" size="sm" className="h-7 px-3 text-xs"
                         onClick={() => { setAiAnalysis(null); setAiError(null) }}>닫기</Button>
                     </div>
-                    <div className="overflow-x-auto prose prose-sm dark:prose-invert max-w-none
-                      [&_table]:w-full [&_table]:border-collapse
-                      [&_th]:bg-muted/50 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:border [&_th]:border-border
-                      [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm [&_td]:border [&_td]:border-border">
-                      <div dangerouslySetInnerHTML={{ __html: markdownToHtml(aiAnalysis.comparisonTable) }} />
+                    <div className="bg-content-bg rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                      <LegalMarkdownRenderer
+                        content={aiAnalysis.comparisonTable}
+                        disabledLink
+                      />
                     </div>
                     {aiAnalysis.highlights && (
-                      <div className="bg-muted/30 rounded-lg p-4 prose prose-sm dark:prose-invert max-w-none">
-                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(aiAnalysis.highlights) }} />
+                      <div className="bg-content-bg rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                        <LegalMarkdownRenderer
+                          content={aiAnalysis.highlights}
+                          disabledLink
+                        />
                       </div>
                     )}
                   </div>
