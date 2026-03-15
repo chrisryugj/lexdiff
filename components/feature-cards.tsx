@@ -183,7 +183,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
                 key={tool.id}
                 ref={el => { itemRefs.current[idx] = el }}
                 onClick={() => onToolClick?.(tool.id)}
-                className={`group relative text-left p-6 rounded-xl border border-gray-200 dark:border-gray-800 transition-all duration-500 cursor-pointer
+                className={`group relative text-left p-6 border border-gray-200 dark:border-gray-800 transition-all duration-500 cursor-pointer
                   bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-[#1a222c] dark:via-[#1e2836] dark:to-[#1a222c]
                   hover:shadow-xl hover:-translate-y-1 hover:border-brand-navy/30 dark:hover:border-brand-gold/30
                   ${itemsRevealed[idx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
@@ -193,7 +193,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
                 }}
               >
                 {/* 호버 시 상단 그래디언트 바 */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-navy to-brand-gold scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left rounded-t-xl" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-navy to-brand-gold scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
 
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
