@@ -76,6 +76,7 @@
     "motion": "^12.23.26",
     "next": "^16.0.7",
     "next-themes": "latest",
+    "radix-ui": "^1.4.3",
     "react": "19.2.0",
     "react-day-picker": "latest",
     "react-dom": "19.2.0",
