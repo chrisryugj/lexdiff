@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +13,43 @@ import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
 import { METRO_MUNICIPALITIES } from "@/lib/ordinance-benchmark/municipality-codes"
 
+/** 간단한 Markdown → HTML (테이블 + 리스트 + 볼드) */
+function markdownToHtml(md: string): string {
+  if (!md) return ''
+  let html = md
+    // 테이블
+    .replace(/^\|(.+)\|$/gm, (_, row) => {
+      const cells = row.split('|').map((c: string) => c.trim())
+      return `<tr>${cells.map((c: string) => `<td>${c}</td>`).join('')}</tr>`
+    })
+    .replace(/(<tr>[\s\S]*?<\/tr>)/g, (match) => {
+      if (!match.includes('<table>')) return match
+      return match
+    })
+  // 구분선 행 제거
+  html = html.replace(/<tr><td>[-:]+<\/td>(?:<td>[-:]+<\/td>)*<\/tr>/g, '')
+  // 연속 tr을 table로 감싸기
+  html = html.replace(/((?:<tr>.*?<\/tr>\s*)+)/g, '<table>$1</table>')
+  // 첫 tr을 thead로
+  html = html.replace(/<table><tr>(.*?)<\/tr>/, '<table><thead><tr>$1</tr></thead><tbody>')
+  html = html.replace(/<\/table>/, '</tbody></table>')
+  // td → th (thead 내)
+  html = html.replace(/<thead><tr>(.*?)<\/tr><\/thead>/g, (_, inner) => {
+    return `<thead><tr>${inner.replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>')}</tr></thead>`
+  })
+  // 리스트
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>')
+  // 볼드
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  // 줄바꿈
+  html = html.replace(/\n/g, '<br/>')
+  // 정리
+  html = html.replace(/<br\/><ul>/g, '<ul>').replace(/<\/ul><br\/>/g, '</ul>')
+  html = html.replace(/<br\/><table>/g, '<table>').replace(/<\/table><br\/>/g, '</table>')
+  return html
+}
+
 interface OrdinanceBenchmarkViewProps {
   initialKeyword?: string
   onBack: () => void
@@ -21,6 +58,10 @@ interface OrdinanceBenchmarkViewProps {
 
 export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: OrdinanceBenchmarkViewProps) {
   const [inputValue, setInputValue] = useState(initialKeyword || '')
+  // AI 비교 분석 상태
+  const [aiAnalysis, setAiAnalysis] = useState<{ comparisonTable: string; highlights: string } | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const {
     isSearching,
     progress,
@@ -42,6 +83,43 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch()
   }
+
+  // AI 비교 분석 실행
+  const handleAiAnalysis = useCallback(async () => {
+    if (flatResults.length < 2) return
+    setAiLoading(true)
+    setAiError(null)
+    setAiAnalysis(null)
+
+    try {
+      const ordinancesForAnalysis = flatResults
+        .filter(r => r.ordinanceSeq)
+        .slice(0, 8)
+        .map(r => ({
+          orgShortName: r.orgShortName,
+          ordinanceName: r.ordinanceName,
+          ordinanceSeq: r.ordinanceSeq!,
+        }))
+
+      const res = await fetch('/api/benchmark-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, ordinances: ordinancesForAnalysis }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(data.error)
+      }
+
+      const data = await res.json()
+      setAiAnalysis(data)
+    } catch (err: any) {
+      setAiError(err.message || 'AI 분석 실패')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [flatResults, keyword])
 
   // 지자체별 매칭 여부 맵
   const matchedSet = new Set<string>()
@@ -213,6 +291,69 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                   </tbody>
                 </table>
               </div>
+            </Card>
+
+            {/* AI 비교 분석 */}
+            <Card className="p-4">
+              {!aiAnalysis && !aiLoading && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon name="sparkles" size={16} className="text-brand-navy dark:text-brand-gold" />
+                    <span className="text-sm font-medium">AI 비교 분석</span>
+                    <span className="text-xs text-muted-foreground">상위 조례의 핵심 항목을 비교합니다</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleAiAnalysis}
+                    disabled={flatResults.length < 2}
+                    className="h-8"
+                  >
+                    <Icon name="sparkles" size={14} className="mr-1" />
+                    비교 분석 요청
+                  </Button>
+                </div>
+              )}
+
+              {aiLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center space-y-2">
+                    <Icon name="loader" size={24} className="animate-spin text-brand-navy dark:text-brand-gold mx-auto" />
+                    <p className="text-sm text-muted-foreground">AI가 조례 본문을 비교 분석하고 있습니다...</p>
+                  </div>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                  <Icon name="alert-circle" size={16} />
+                  {aiError}
+                  <Button variant="outline" size="sm" className="h-6 px-2 text-xs ml-2" onClick={handleAiAnalysis}>
+                    다시 시도
+                  </Button>
+                </div>
+              )}
+
+              {aiAnalysis && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon name="sparkles" size={16} className="text-brand-navy dark:text-brand-gold" />
+                    <span className="text-sm font-medium">AI 비교 분석 결과</span>
+                  </div>
+                  {/* 비교표 (Markdown 렌더링) */}
+                  <div className="overflow-x-auto text-sm prose prose-sm dark:prose-invert max-w-none
+                    [&_table]:w-full [&_table]:border-collapse
+                    [&_th]:bg-muted/50 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:border [&_th]:border-border
+                    [&_td]:px-3 [&_td]:py-2 [&_td]:text-xs [&_td]:border [&_td]:border-border">
+                    <div dangerouslySetInnerHTML={{ __html: markdownToHtml(aiAnalysis.comparisonTable) }} />
+                  </div>
+                  {/* 주요 차이점 */}
+                  {aiAnalysis.highlights && (
+                    <div className="bg-muted/30 rounded-lg p-4 text-sm prose prose-sm dark:prose-invert max-w-none">
+                      <div dangerouslySetInnerHTML={{ __html: markdownToHtml(aiAnalysis.highlights) }} />
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </>
         )}
