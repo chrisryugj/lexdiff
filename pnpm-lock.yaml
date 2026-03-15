@@ -175,7 +175,7 @@ importers:
         version: 3.10.1
       korean-law-mcp:
         specifier: latest
-        version: 1.7.0
+        version: 1.9.0
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -2334,6 +2334,10 @@ packages:
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
 
+  commander@14.0.3:
+    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
+    engines: {node: '>=20'}
+
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
@@ -3076,8 +3080,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  korean-law-mcp@1.7.0:
-    resolution: {integrity: sha512-WDab4EMHiEkY0bXwUUJOl/wvQGn42nHfpC064qvM50clBOAJPnFhQxEbwEvNn0gQs0t4/W64PGbg4ErJEvmu9g==}
+  korean-law-mcp@1.9.0:
+    resolution: {integrity: sha512-iBsHtbtS5zZyNXrsXz1WAprdOzR5t6EZdiLQRpaSxoQpfCGRuY4Y/SMaCDY+ysOOso22KXsDt0VqWBe9BLFDFQ==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -6221,6 +6225,8 @@ snapshots:
 
   comma-separated-tokens@2.0.3: {}
 
+  commander@14.0.3: {}
+
   concat-map@0.0.1: {}
 
   content-disposition@1.0.0:
@@ -7088,10 +7094,11 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  korean-law-mcp@1.7.0:
+  korean-law-mcp@1.9.0:
     dependencies:
       '@modelcontextprotocol/sdk': 1.27.1(zod@3.25.76)
       '@xmldom/xmldom': 0.9.8
+      commander: 14.0.3
       dotenv: 17.3.1
       express: 5.2.1
       hwp.js: 0.0.3
