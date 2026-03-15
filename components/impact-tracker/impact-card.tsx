@@ -15,19 +15,16 @@ const SEVERITY_ACCENT = {
     dot: 'bg-red-500',
     badge: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/60',
     border: 'border-red-200 dark:border-red-900/50',
-    left: 'bg-red-500',
   },
   review: {
     dot: 'bg-amber-500',
     badge: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60',
     border: 'border-amber-200 dark:border-amber-900/50',
-    left: 'bg-amber-500',
   },
   info: {
     dot: 'bg-emerald-500',
     badge: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60',
     border: 'border-emerald-200 dark:border-emerald-900/50',
-    left: 'bg-emerald-500',
   },
 }
 
@@ -45,19 +42,14 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
 
   return (
     <div className={`group relative overflow-hidden rounded-lg border ${accent.border} bg-white dark:bg-gray-900/80 transition-shadow hover:shadow-md`}>
-      {/* 좌측 컬러 바 */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${accent.left}`} />
-
-      <div className="pl-4 pr-4 pt-3.5 pb-3">
-        {/* 1행: 분류배지 + 우측에 개정일|개정이유 배지 2열 */}
+      <div className="px-4 pt-3.5 pb-3">
+        {/* 1행: 분류배지 + 우측에 개정이유|개정일 배지 */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          {/* 분류 배지 */}
           <span className={`inline-flex items-center gap-1.5 text-[13px] font-bold px-2.5 py-1 rounded border shrink-0 ${accent.badge}`}>
             <span className={`w-2 h-2 rounded-full ${accent.dot}`} />
             {config.label}
           </span>
 
-          {/* 우측: 개정일 + 개정이유 배지 */}
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700">
               {item.change.revisionType}
@@ -113,13 +105,13 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
         </div>
       </div>
 
-      {/* 액션 버튼 */}
-      <div className="flex gap-1.5 px-4 py-2 border-t border-gray-50 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/20">
+      {/* 액션 버튼 — 테마 일관성 */}
+      <div className="flex gap-1.5 px-4 py-2 border-t border-gray-100 dark:border-gray-800/60">
         {onCompare && (
           <Button
             variant="ghost"
             size="sm"
-            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] dark:hover:text-[#e2a85d] transition-colors"
+            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] hover:bg-[#1a2b4c]/5 dark:hover:text-[#e2a85d] dark:hover:bg-[#e2a85d]/10 transition-colors"
             onClick={() => onCompare(item.change.lawName, item.change.lawId, item.change.mst)}
           >
             <Icon name="git-compare" size={13} />
@@ -130,7 +122,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] dark:hover:text-[#e2a85d] transition-colors"
+            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] hover:bg-[#1a2b4c]/5 dark:hover:text-[#e2a85d] dark:hover:bg-[#e2a85d]/10 transition-colors"
             onClick={() => onViewLaw(item.change.lawName, item.change.jo, item.change.joDisplay)}
           >
             <Icon name="file-text" size={13} />
