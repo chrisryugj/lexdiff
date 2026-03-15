@@ -292,10 +292,10 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                 })}
               </div>
 
-              {/* 광역시도 칩 */}
-              {activeRegions.size > 0 && (
+              {/* 광역시도 칩 — 권역이 활성이거나 개별 metro가 활성인 경우 표시 */}
+              {(activeRegions.size > 0 || activeMetros.size > 0) && (
                 <div className="flex flex-wrap gap-1.5 mt-3 pl-0.5">
-                  {REGIONS.filter(r => activeRegions.has(r.name)).flatMap(r => r.metros).map(metro => {
+                  {REGIONS.filter(r => activeRegions.has(r.name) || r.metros.some(m => activeMetros.has(m))).flatMap(r => r.metros).map(metro => {
                     const isActive = activeMetros.has(metro)
                     return (
                       <button key={metro} onClick={() => toggleMetro(metro)}
