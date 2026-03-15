@@ -33,7 +33,7 @@ export function ChatMessage({ message, isLast }: ChatMessageProps) {
       <div className={cn(
         "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
         isUser
-          ? "bg-[#1a2b4c] dark:bg-muted"
+          ? "bg-brand-navy dark:bg-muted"
           : "bg-primary"
       )}>
         {isUser ? (

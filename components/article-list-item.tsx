@@ -62,14 +62,14 @@ export const ArticleListItem = React.memo(function ArticleListItem({
         isPrecedent ? "py-1" : "py-2"
       } ${
         isActive
-          ? "bg-[#1a2b4c] text-white dark:bg-[#1a2b4c] dark:text-[#e2a85d] font-bold shadow-sm"
+          ? "bg-brand-navy text-white dark:text-brand-gold-light font-bold shadow-sm"
           : "hover:bg-secondary text-foreground font-medium"
       } ${isLoading ? "opacity-50 cursor-wait" : ""} ${isDeleted ? "opacity-40 text-muted-foreground" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 font-bold text-base font-ridi">
-            {isPrecedent && <span className="text-[#d4af37] dark:text-[#e2a85d]">•</span>}
+            {isPrecedent && <span className="text-brand-gold">•</span>}
             <span className="whitespace-nowrap">{article.joNum || formatSimpleJo(article.jo, isOrdinance)}</span>
             {isDeleted && (
               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 text-muted-foreground rounded font-pretendard">
@@ -95,7 +95,7 @@ export const ArticleListItem = React.memo(function ArticleListItem({
           {article.hasChanges && (
             <Icon
               name="alert-circle"
-              className="h-3 w-3 text-[#e2a85d]"
+              className="h-3 w-3 text-brand-gold-light"
               title="변경된 조문"
             />
           )}

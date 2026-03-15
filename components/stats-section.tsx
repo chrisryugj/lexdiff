@@ -23,7 +23,6 @@ const FALLBACK: LawStats = {
 }
 
 function formatCount(n: number): string {
-  if (n >= 100000) return `${(n / 10000).toFixed(1)}만`
   if (n >= 10000) return `${(n / 10000).toFixed(1)}만`
   return n.toLocaleString()
 }

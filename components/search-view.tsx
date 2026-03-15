@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { ApiKeyInput } from "@/components/settings/api-key-input"
 import { useApiKey } from "@/hooks/use-api-key"
+import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 
 const FavoritesDialog = dynamic(
   () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
@@ -23,45 +24,6 @@ const HelpGuideSheet = dynamic(
   () => import("@/components/help-guide-sheet").then(m => m.HelpGuideSheet),
   { ssr: false }
 )
-
-/** 0에서 target까지 카운트업 애니메이션 (뷰포트 진입 시 시작) */
-function AnimatedNumber({ value, duration = 600, delay = 0 }: { value: number; duration?: number; delay?: number }) {
-  const [display, setDisplay] = useState(0)
-  const [started, setStarted] = useState(false)
-  const spanRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    const el = spanRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setStarted(true); observer.disconnect() } },
-      { threshold: 0.1 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!started || value <= 0) return
-    const timer = setTimeout(() => {
-      let start: number | null = null
-      let raf: number
-
-      const step = (ts: number) => {
-        if (!start) start = ts
-        const progress = Math.min((ts - start) / duration, 1)
-        const eased = 1 - Math.pow(1 - progress, 3)
-        setDisplay(Math.round(eased * value))
-        if (progress < 1) raf = requestAnimationFrame(step)
-      }
-
-      raf = requestAnimationFrame(step)
-    }, delay)
-    return () => clearTimeout(timer)
-  }, [started, value, duration, delay])
-
-  return <span ref={spanRef}>{display.toLocaleString()}</span>
-}
 
 export interface SearchViewProps {
   onSearch: (query: { lawName: string; article?: string; jo?: string }) => Promise<void>
@@ -85,7 +47,6 @@ export function SearchView({
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const [lawStats, setLawStats] = useState<{ constitution: number; statutes: number; delegated: number; adminRules: number; laws: number; ordinances: number; precedents: number; asOf?: string } | null>(null)
 
   const featuresRef = useRef<HTMLElement>(null)
   const lastScrollY = useRef(0)
@@ -125,15 +86,6 @@ export function SearchView({
       window.removeEventListener("scroll", handleScroll)
       if (scrollTimer.current) clearTimeout(scrollTimer.current)
     }
-  }, [])
-
-  useEffect(() => {
-    fetch("/api/law-stats")
-      .then(r => r.json())
-      .then(data => {
-        if (data.laws || data.ordinances) setLawStats(data)
-      })
-      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -180,7 +132,7 @@ export function SearchView({
     },
   }
   return (
-    <div className="min-h-screen bg-[#faf9f7] dark:bg-[#0c0e14]">
+    <div className="min-h-screen bg-content-bg">
       {/* Header - 솔리드하고 정제된 스타일 */}
       <m.header
         initial={{ y: -40, opacity: 0 }}
@@ -189,7 +141,7 @@ export function SearchView({
           opacity: isHeaderVisible ? 1 : 0,
         }}
         transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
-        className="sticky top-0 z-50 shadow-sm border-b border-gray-200 dark:border-gray-800/60 bg-[#faf9f7] dark:bg-[#0c0e14]"
+        className="sticky top-0 z-50 shadow-sm border-b border-gray-200 dark:border-gray-800/60 bg-content-bg"
       >
         <div className="container mx-auto max-w-7xl px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
@@ -198,11 +150,11 @@ export function SearchView({
               onClick={handleLogoClick}
               className="flex items-center gap-3 group"
             >
-              <div className="flex h-10 w-10 items-center justify-center bg-[#1a2b4c] dark:bg-[#e2a85d] text-white dark:text-[#0c0e14] shadow-md transition-transform duration-300 group-hover:scale-105">
+              <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
                 <Icon name="scale" size={22} />
               </div>
               <span
-                className="text-xl lg:text-2xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
+                className="text-xl lg:text-2xl font-medium italic text-brand-navy tracking-tight"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}
               >
                 LexDiff
@@ -215,7 +167,7 @@ export function SearchView({
 
               {favoritesCount > 0 && (
                 <Button variant="ghost" size="sm" onClick={handleFavoritesClick} className="flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-800">
-                  <Icon name="star" size={18} className="text-[#d4af37] fill-[#d4af37]" />
+                  <Icon name="star" size={18} className="text-brand-gold fill-brand-gold" />
                   <span className="font-semibold text-gray-800 dark:text-gray-200">{favoritesCount}</span>
                 </Button>
               )}
@@ -241,7 +193,7 @@ export function SearchView({
           >
             {/* Elegant Badge */}
             <m.div variants={itemVariants} className="mb-6 lg:mb-8">
-              <span className="inline-flex items-center gap-2 px-4 py-1.5 border border-[#1a2b4c]/20 dark:border-[#e2a85d]/30 text-[#1a2b4c] dark:text-[#e2a85d] text-xs font-bold tracking-widest uppercase bg-transparent">
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 border border-brand-navy/20 text-brand-navy text-xs font-bold tracking-widest uppercase bg-transparent">
                 <Icon name="scale" size={14} />
                 Premium Legal AI
               </span>
@@ -250,7 +202,7 @@ export function SearchView({
             {/* Title */}
             <m.div variants={titleVariants} className="w-full overflow-visible">
               <h1
-                className="overflow-visible text-6xl lg:text-8xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight lg:tracking-tighter"
+                className="overflow-visible text-6xl lg:text-8xl font-medium italic text-brand-navy tracking-tight lg:tracking-tighter"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', lineHeight: 1.1 }}
               >
                 LexDiff
@@ -260,7 +212,7 @@ export function SearchView({
             {/* Accent Line */}
             <m.div
               variants={itemVariants}
-              className="mt-6 mb-6 w-16 h-1 bg-[#d4af37] dark:bg-[#e2a85d]"
+              className="mt-6 mb-6 w-16 h-1 bg-brand-gold"
             />
 
             {/* Subtitle */}
@@ -284,13 +236,13 @@ export function SearchView({
                 <div className="flex justify-center mt-5">
                   <button
                     onClick={onImpactTracker}
-                    className="group flex items-center gap-2 px-4 py-2 rounded-full border border-[#1a2b4c]/15 dark:border-[#e2a85d]/20 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-[#d4af37] dark:hover:border-[#e2a85d] hover:shadow-md hover:shadow-[#d4af37]/10 transition-all duration-300"
+                    className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
                   >
-                    <Icon name="file-search" size={16} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-sm font-medium text-[#1a2b4c] dark:text-gray-300 group-hover:text-[#1a2b4c] dark:group-hover:text-[#e2a85d] transition-colors">
+                    <Icon name="file-search" size={16} className="text-brand-gold" />
+                    <span className="text-sm font-medium text-brand-navy group-hover:text-brand-navy transition-colors">
                       법령 변경 영향 분석
                     </span>
-                    <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-[#d4af37] dark:group-hover:text-[#e2a85d] group-hover:translate-x-0.5 transition-all" />
+                    <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
                   </button>
                 </div>
               )}
@@ -312,70 +264,14 @@ export function SearchView({
       </main>
 
       {/* Footer */}
-      <footer className="bg-[#f8f9fa] dark:bg-[#080b0f] text-gray-600 dark:text-gray-400 py-12 border-t border-gray-200 dark:border-gray-800">
-        <div className="container mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="pb-8 border-b border-gray-200 dark:border-gray-700/50 space-y-5">
-            <div className="flex items-center justify-center gap-2">
-              <Icon name="scale" size={24} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
-              <span className="text-xl font-medium italic text-[#1a2b4c] dark:text-white tracking-tight" style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}>LexDiff</span>
-            </div>
-            {/* Live stats */}
-            {lawStats && (
-              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-medium">
-                {lawStats.constitution > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="shield" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">헌법 <span className="tabular-nums"><AnimatedNumber value={lawStats.constitution} delay={0} /></span></span>
-                  </span>
-                )}
-                {lawStats.statutes > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="scale" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">법률 <span className="tabular-nums"><AnimatedNumber value={lawStats.statutes} delay={100} /></span></span>
-                  </span>
-                )}
-                {lawStats.delegated > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="file-text" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">위임법령 <span className="tabular-nums"><AnimatedNumber value={lawStats.delegated} delay={200} /></span></span>
-                  </span>
-                )}
-                {lawStats.adminRules > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="clipboard-check" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">행정규칙 <span className="tabular-nums"><AnimatedNumber value={lawStats.adminRules} delay={300} /></span></span>
-                  </span>
-                )}
-                {lawStats.ordinances > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="landmark" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">자치법규 <span className="tabular-nums"><AnimatedNumber value={lawStats.ordinances} delay={400} /></span></span>
-                  </span>
-                )}
-                {lawStats.precedents > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <Icon name="gavel" size={13} className="text-[#d4af37] dark:text-[#e2a85d]" />
-                    <span className="text-gray-600 dark:text-gray-400">판례 <span className="tabular-nums"><AnimatedNumber value={lawStats.precedents} delay={500} /></span></span>
-                  </span>
-                )}
-              </div>
-            )}
-            {lawStats?.asOf && (
-              <p className="text-center text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{lawStats.asOf} 기준 · 법제처</p>
-            )}
-          </div>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 text-xs text-gray-500">
-            <div className="flex gap-4">
-              <button onClick={handleHelpClick} className="hover:text-[#1a2b4c] dark:hover:text-white transition-colors font-medium">이용 안내</button>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span>Built with 법제처 Open API</span>
-            </div>
-            <p>
-              © 2025–2026 Chris ryu. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <LawStatsFooter
+        extraLinks={
+          <>
+            <button onClick={handleHelpClick} className="hover:text-brand-navy transition-colors font-medium">이용 안내</button>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+          </>
+        }
+      />
 
       <FavoritesDialog
         isOpen={favoritesDialogOpen}

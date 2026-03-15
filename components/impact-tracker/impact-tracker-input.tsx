@@ -208,7 +208,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
 
   return (
     <div className="bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 rounded-xl p-6 sm:p-8">
-      <h3 className="text-xl font-bold text-[#1a2b4c] dark:text-white mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
+      <h3 className="text-xl font-bold text-brand-navy mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
         법령 변경 영향 분석
       </h3>
       <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-6">
@@ -373,7 +373,7 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
       <Button
         onClick={handleSubmit}
         disabled={lawNames.length === 0 || isAnalyzing}
-        className="w-full bg-[#1a2b4c] hover:bg-[#1a2b4c]/90 dark:bg-[#e2a85d] dark:hover:bg-[#e2a85d]/90 dark:text-[#0c0e14]"
+        className="w-full bg-brand-navy hover:bg-brand-navy/90 dark:text-background"
       >
         {isAnalyzing ? (
           <>

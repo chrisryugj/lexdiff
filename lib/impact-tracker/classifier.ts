@@ -80,7 +80,6 @@ async function classifyWithGemini(
 ): Promise<ClassificationResult[]> {
   const key = apiKey || process.env.GEMINI_API_KEY
   if (!key) {
-    console.error('[impact-classifier] GEMINI_API_KEY 미설정')
     return []
   }
 
@@ -98,7 +97,6 @@ async function classifyWithGemini(
     const text = response.text || ''
     return parseClassificationJSON(text) || []
   } catch (error) {
-    console.error('[impact-classifier] Gemini 호출 실패:', error)
     return []
   }
 }
@@ -167,7 +165,6 @@ async function summarizeWithGemini(
     })
     return response.text?.trim() || '요약을 생성할 수 없습니다.'
   } catch (error) {
-    console.error('[impact-classifier] Gemini 요약 실패:', error)
     return '요약 생성 중 오류가 발생했습니다.'
   }
 }

@@ -68,7 +68,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
             onClick={() => actions.setForceAiMode(!forceAiMode)}
             className={cn(
               "h-16 w-16 !rounded-none border-r border-gray-300 dark:border-gray-700 transition-colors hidden sm:flex",
-              forceAiMode ? "bg-[#1a2b4c] text-white hover:bg-[#1a2b4c]/90 dark:bg-[#e2a85d] dark:text-[#0c0e14]" : "text-gray-500 hover:text-[#1a2b4c] dark:hover:text-[#e2a85d] hover:bg-gray-100 dark:hover:bg-gray-800"
+              forceAiMode ? "bg-brand-navy text-white hover:bg-brand-navy/90 dark:text-background" : "text-gray-500 hover:text-brand-navy hover:bg-gray-100 dark:hover:bg-gray-800"
             )}
             title={forceAiMode ? "일반 검색으로 전환" : "AI 모드로 전환"}
           >
@@ -77,11 +77,11 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
 
           <div className="relative flex-1">
             {isAiMode ? (
-               <Icon name="brain" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-[#1a2b4c] dark:text-[#e2a85d] z-10 pointer-events-none" />
+               <Icon name="brain" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-brand-navy z-10 pointer-events-none" />
             ) : searchType === "ordinance" ? (
-               <Icon name="building-2" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-[#1a2b4c] dark:text-[#e2a85d] z-10 pointer-events-none" />
+               <Icon name="building-2" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-brand-navy z-10 pointer-events-none" />
             ) : searchType === "law" ? (
-               <Icon name="scale" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-[#1a2b4c] dark:text-[#e2a85d] z-10 pointer-events-none" />
+               <Icon name="scale" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-brand-navy z-10 pointer-events-none" />
             ) : (
                <Icon name="search" className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-gray-400 z-10 pointer-events-none" />
             )}
@@ -130,7 +130,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
             disabled={isLoading || !query.trim()}
             className={cn(
               "h-16 px-8 !rounded-none text-lg font-bold transition-all",
-              "bg-[#1a2b4c] hover:bg-[#121e36] text-white dark:bg-[#e2a85d] dark:hover:bg-[#d4994f] dark:text-[#0c0e14]"
+              "bg-brand-navy hover:bg-brand-navy/90 text-white dark:text-background"
             )}
           >
             {isLoading ? (

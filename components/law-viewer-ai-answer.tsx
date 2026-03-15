@@ -139,7 +139,7 @@ export function AIAnswerSidebar({
                 <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                            <Icon name="link-2" size={20} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
+                            <Icon name="link-2" size={20} className="text-brand-navy" />
                             <h3 className="text-xl font-bold text-foreground">관련 법령</h3>
                         </div>
                         {onCollapseClick && (
@@ -549,7 +549,7 @@ export function AIAnswerContent({
             <div className="border-b border-border px-3 sm:px-4 pt-4 sm:pt-6 pb-1 flex-shrink-0 flex flex-col gap-1 lg:gap-2">
                 {/* 1줄: 타이틀+배지+신뢰도 */}
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <Icon name="sparkles" size={20} className="text-[#1a2b4c] dark:text-[#e2a85d] flex-shrink-0" />
+                    <Icon name="sparkles" size={20} className="text-brand-navy flex-shrink-0" />
                     <h3 className="text-xl font-bold text-foreground whitespace-nowrap">AI 답변</h3>
                     <Badge variant="outline" className="text-xs whitespace-nowrap">
                         Real-time Legal AI
@@ -747,12 +747,12 @@ export function AIAnswerContent({
                             isCollapsing ? 'max-h-0 opacity-0 -translate-y-4' : 'max-h-[600px] opacity-100'
                         }`}
                     >
-                        <div className="rounded-lg bg-slate-50/90 dark:bg-[#0c162c]/95 border border-slate-200/60 dark:border-[#1a2b4c]/60 p-3 sm:p-4">
+                        <div className="rounded-lg bg-slate-50/90 dark:bg-slate-900/95 border border-slate-200/60 dark:border-brand-navy/60 p-3 sm:p-4">
                             {/* 프로그레스 바 + 경과 시간 */}
                             <div className="mb-3 flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-[#1a2b4c]/50 rounded-full overflow-hidden">
+                                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-brand-navy/50 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-[#1a2b4c] dark:bg-transparent dark:bg-gradient-to-r dark:from-[#d4af37] dark:to-[#e2a85d] rounded-full transition-all duration-500 ease-out"
+                                        className="h-full bg-brand-navy rounded-full transition-all duration-500 ease-out"
                                         style={{ width: `${Math.round(searchProgress)}%` }}
                                     />
                                 </div>
@@ -792,12 +792,12 @@ export function AIAnswerContent({
                                         )}
                                         {log.type === 'call' && (
                                             <>
-                                                <Icon name="arrow-right" size={13} className="text-amber-600/80 dark:text-[#e2a85d]/80 mt-0.5 flex-shrink-0" />
-                                                <span className="text-amber-700/90 dark:text-[#e2a85d]/90 truncate min-w-0">
+                                                <Icon name="arrow-right" size={13} className="text-amber-600/80 dark:text-brand-gold-light/80 mt-0.5 flex-shrink-0" />
+                                                <span className="text-amber-700/90 dark:text-brand-gold-light/90 truncate min-w-0">
                                                     {log.displayName}
                                                     {log.query && <span className="text-slate-400 dark:text-gray-500 ml-1">: {log.query}</span>}
                                                 </span>
-                                                <span className="inline-block w-1 h-3 bg-amber-500/60 dark:bg-[#e2a85d]/60 animate-pulse ml-1 flex-shrink-0" />
+                                                <span className="inline-block w-1 h-3 bg-amber-500/60 dark:bg-brand-gold-light/60 animate-pulse ml-1 flex-shrink-0" />
                                             </>
                                         )}
                                         {log.type === 'result' && (
@@ -820,8 +820,8 @@ export function AIAnswerContent({
                                         )}
                                         {log.type === 'token_usage' && (
                                             <>
-                                                <Icon name="info" size={13} className="text-amber-600/70 dark:text-[#d4af37]/70 mt-0.5 flex-shrink-0" />
-                                                <span className="text-amber-700/80 dark:text-[#d4af37]/80 truncate">{log.displayName}</span>
+                                                <Icon name="info" size={13} className="text-amber-600/70 dark:text-brand-gold/70 mt-0.5 flex-shrink-0" />
+                                                <span className="text-amber-700/80 dark:text-brand-gold/80 truncate">{log.displayName}</span>
                                             </>
                                         )}
                                     </div>
@@ -832,7 +832,7 @@ export function AIAnswerContent({
                                 {isStreaming && !isCollapsing && (
                                     <div className="flex items-center gap-2 text-[12px] font-mono text-slate-500 dark:text-gray-500 pt-1">
                                         <div className="w-3 h-3 flex-shrink-0">
-                                            <div className="w-2 h-2 rounded-full bg-amber-500 dark:bg-[#d4af37] animate-pulse mx-auto" />
+                                            <div className="w-2 h-2 rounded-full bg-amber-500 dark:bg-brand-gold animate-pulse mx-auto" />
                                         </div>
                                         <span className="truncate">
                                             {(() => {

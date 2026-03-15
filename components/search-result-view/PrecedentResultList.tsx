@@ -84,7 +84,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
           {/* 필터 배지 + 키워드 검색 + 표시개수 */}
           <div className="flex flex-wrap items-center gap-3">
             {courtFilter && (
-              <Badge variant="outline" className="text-sm px-3 py-1 bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border">
+              <Badge variant="outline" className="text-sm px-3 py-1 bg-brand-navy/10 text-brand-navy border-border">
                 <Icon name="gavel" className="h-3.5 w-3.5 mr-1.5" />
                 {courtFilter}
               </Badge>
@@ -274,15 +274,15 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
 
   // 법원 배지 색상
   const getCourtBadgeClass = (court: string) => {
-    if (court?.includes('대법원')) return 'bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] border-[#d4af37]/20 dark:border-[#e2a85d]/30'
-    if (court?.includes('고등') || court?.includes('고법')) return 'bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border'
+    if (court?.includes('대법원')) return 'bg-brand-gold/10 text-brand-gold border-brand-gold/20'
+    if (court?.includes('고등') || court?.includes('고법')) return 'bg-brand-navy/10 text-brand-navy border-border'
     if (court?.includes('지방') || court?.includes('지법')) return 'bg-muted text-muted-foreground border-border'
     return 'bg-muted text-muted-foreground border-border'
   }
 
   // 판결유형 배지 색상
   const getTypeBadgeClass = (type: string) => {
-    if (type?.includes('전원합의체')) return 'bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-muted dark:text-muted-foreground border-border'
+    if (type?.includes('전원합의체')) return 'bg-brand-navy/10 text-brand-navy border-border'
     if (type?.includes('파기')) return 'bg-destructive/10 text-destructive border-destructive/20'
     if (type?.includes('승')) return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
     if (type?.includes('패')) return 'bg-destructive/10 text-destructive border-destructive/20'

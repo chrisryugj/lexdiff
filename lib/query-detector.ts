@@ -13,6 +13,9 @@ import { analyzeEnhancedLegalQuery, type LegalQueryType } from './legal-query-an
 export type QueryType = 'structured' | 'natural'
 export type SearchMode = 'law' | 'ordinance' | 'ai'
 
+// 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
+const PURE_LAW_NAME_PATTERN = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
+
 interface QueryDetectionResult {
   type: QueryType
   confidence: number // 0-1 범위
@@ -64,11 +67,8 @@ export function detectQueryType(query: string): QueryDetectionResult {
     // 조문 번호를 제거한 후 남은 텍스트 확인
     const textWithoutArticle = trimmedQuery.replace(articlePattern, '').trim()
 
-    // 순수 법령명 패턴 (법령 키워드로 끝나거나 법령명만 있는 경우)
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
-
     // 법령명만 있는 경우 → 구조화 검색
-    if (pureLawNamePattern.test(textWithoutArticle)) {
+    if (PURE_LAW_NAME_PATTERN.test(textWithoutArticle)) {
       return {
         type: 'structured',
         confidence: 0.98,
@@ -89,7 +89,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
 
     // 그 외의 경우 (조문번호 앞에 법령명이 아닌 다른 텍스트가 있는 경우)
     // 예: "수출통관 시 관세법 제38조" → 자연어
-    if (textWithoutArticle && !pureLawNamePattern.test(textWithoutArticle)) {
+    if (textWithoutArticle && !PURE_LAW_NAME_PATTERN.test(textWithoutArticle)) {
       return {
         type: 'natural',
         confidence: 0.85,
@@ -159,10 +159,7 @@ export function detectQueryType(query: string): QueryDetectionResult {
   // 패턴 5: 긴 쿼리 (15자 이상) → 자연어일 가능성 높음
   if (trimmedQuery.length >= 15) {
     // 단, 법령명이 길 수도 있으므로 신중하게
-    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우) - 길이와 관계없이 우선 체크
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
-
-    if (pureLawNamePattern.test(trimmedQuery)) {
+    if (PURE_LAW_NAME_PATTERN.test(trimmedQuery)) {
       // "자유무역협정의 이행을 위한 관세법의 특례에 관한 법률" 같은 긴 법령명도 처리
       return {
         type: 'structured',
@@ -181,14 +178,23 @@ export function detectQueryType(query: string): QueryDetectionResult {
   // 패턴 6: 짧은 단어 나열 (법령명 검색으로 추정)
   // 예: "관세법", "지방세법", "FTA특례법"
   if (trimmedQuery.length < 15) {
-    // 순수 법령명 패턴 (법령 키워드로 끝나는 경우)
-    const pureLawNamePattern = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|법률|법|령|규칙|규정|조례|지침|고시|훈령|예규)$/
-
-    if (pureLawNamePattern.test(trimmedQuery)) {
+    // "~관련 법률/규정" 같은 일반 표현은 법령명이 아님
+    const generalExpression = /관련\s*(법률|규정|법|규칙)$/
+    if (PURE_LAW_NAME_PATTERN.test(trimmedQuery) && !generalExpression.test(trimmedQuery)) {
       return {
         type: 'structured',
         confidence: 0.95,
         reason: '순수 법령명 (짧은 쿼리)'
+      }
+    }
+
+    // AI 시그널 키워드: 이런 키워드가 포함되면 자연어로 판단
+    const aiSignalKeywords = /판례|해석례|과태료|벌칙|처벌|개정|최근|최신|변경|위반|기준|절차|방법|요건|조건|대상|관련/
+    if (aiSignalKeywords.test(trimmedQuery)) {
+      return {
+        type: 'natural',
+        confidence: 0.8,
+        reason: 'AI 시그널 키워드 포함'
       }
     }
 

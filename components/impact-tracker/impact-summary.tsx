@@ -26,13 +26,13 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/80 mb-6">
       {/* 상단 골드 라인 */}
-      <div className="h-0.5 bg-gradient-to-r from-[#d4af37] via-[#e2a85d] to-[#d4af37]" />
+      <div className="h-0.5 bg-gradient-to-r from-brand-gold via-brand-gold-light to-brand-gold" />
 
       <div className="p-5">
         {isLoading ? (
           <div className="flex items-center gap-3 text-gray-500">
             <div className="relative">
-              <Icon name="loader" size={18} className="animate-spin text-[#d4af37]" />
+              <Icon name="loader" size={18} className="animate-spin text-brand-gold" />
             </div>
             <span className="text-sm">종합 요약 생성 중...</span>
           </div>
@@ -42,7 +42,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
             <div className="flex flex-col gap-3 mb-4">
               {/* 첫 줄: 기간 + 총건수 */}
               <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-2xl font-bold text-[#1a2b4c] dark:text-white tabular-nums">
+                <span className="text-2xl font-bold text-brand-navy tabular-nums">
                   {summary.totalChanges}건
                 </span>
                 <span className="text-sm text-gray-400 dark:text-gray-500">
@@ -75,7 +75,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
               {/* 셋째 줄: 조례→상위법령 참조 통계 (있을 때만, 배지와 통합) */}
               {hasOrdinanceInfo && (
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-3">
-                  <Icon name="link" size={14} className="text-[#d4af37] shrink-0" />
+                  <Icon name="link" size={14} className="text-brand-gold shrink-0" />
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {ordinanceRefs!.map((ref, i) => (
                       <span key={i} className="whitespace-nowrap">
@@ -84,7 +84,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
                       </span>
                     ))}
                     {hasParentChanges && (
-                      <span className="inline-flex items-center gap-1 bg-[#d4af37]/10 dark:bg-[#e2a85d]/15 text-[#b8941f] dark:text-[#e2a85d] font-semibold px-2 py-0.5 rounded text-xs">
+                      <span className="inline-flex items-center gap-1 bg-brand-gold/10 text-brand-gold font-semibold px-2 py-0.5 rounded text-xs">
                         <Icon name="alert-triangle" size={12} />
                         {parentLawChanges!.length}건 변경 감지
                       </span>
@@ -99,13 +99,13 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
               <div>
                 <button
                   onClick={() => setExpanded(!expanded)}
-                  className="text-[15px] text-[#1a2b4c] dark:text-[#e2a85d] hover:opacity-80 flex items-center gap-1.5 font-medium transition-opacity"
+                  className="text-[15px] text-brand-navy hover:opacity-80 flex items-center gap-1.5 font-medium transition-opacity"
                 >
                   <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
                   AI 종합 요약
                 </button>
                 {expanded && (
-                  <div className="mt-3 bg-[#faf9f7] dark:bg-gray-800/30 rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                  <div className="mt-3 bg-content-bg rounded-lg p-5 border border-gray-100 dark:border-gray-800">
                     <LegalMarkdownRenderer
                       content={summary.aiSummary}
                       disabledLink

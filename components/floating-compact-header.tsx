@@ -128,11 +128,11 @@ export function FloatingCompactHeader({
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
                     title="홈으로 이동"
                   >
-                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-sm bg-[#1a2b4c] dark:bg-[#e2a85d] transition-transform duration-300 group-hover:scale-105">
-                      <Icon name="scale" size={18} className="text-white dark:text-[#0c0e14]" />
+                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-sm bg-brand-navy transition-transform duration-300 group-hover:scale-105">
+                      <Icon name="scale" size={18} className="text-white dark:text-background" />
                     </div>
                     <span
-                      className="hidden md:block text-lg lg:text-xl font-medium italic text-[#1a2b4c] dark:text-[#e2a85d] tracking-tight"
+                      className="hidden md:block text-lg lg:text-xl font-medium italic text-brand-navy tracking-tight"
                       style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}
                     >
                       LexDiff
@@ -173,8 +173,8 @@ export function FloatingCompactHeader({
                       className="flex items-center gap-1.5 lg:gap-2 hover:bg-gray-200 dark:hover:bg-gray-800"
                       title="즐겨찾기"
                     >
-                      <Icon name="star" size={16} className="text-[#d4af37] fill-[#d4af37]" />
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-transparent border-[#1a2b4c]/20 dark:border-[#e2a85d]/30 text-[#1a2b4c] dark:text-[#e2a85d]">
+                      <Icon name="star" size={16} className="text-brand-gold fill-brand-gold" />
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-transparent border-brand-navy/20 text-brand-navy">
                         {favoritesCount}
                       </Badge>
                     </Button>

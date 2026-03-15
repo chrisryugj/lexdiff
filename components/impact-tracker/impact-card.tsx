@@ -68,14 +68,14 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
           >
             {item.change.lawName}
           </span>
-          <span className="text-[15px] text-[#1a2b4c] dark:text-[#e2a85d] font-semibold shrink-0">
+          <span className="text-[15px] text-brand-navy font-semibold shrink-0">
             {item.change.joDisplay}
           </span>
         </div>
 
         {/* 하위법령 영향 (있을 때만) */}
         {item.downstreamImpacts.length > 0 && (
-          <div className="flex items-center gap-1 mb-2 text-[13px] text-[#1a2b4c] dark:text-[#e2a85d]">
+          <div className="flex items-center gap-1 mb-2 text-[13px] text-brand-navy">
             <Icon name="git-compare" size={13} />
             <span>하위법령 {item.downstreamImpacts.length}건 영향</span>
           </div>
@@ -111,7 +111,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] hover:bg-[#1a2b4c]/5 dark:hover:text-[#e2a85d] dark:hover:bg-[#e2a85d]/10 transition-colors"
+            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-brand-navy hover:bg-brand-navy/5 transition-colors"
             onClick={() => onCompare(item.change.lawName, item.change.lawId, item.change.mst)}
           >
             <Icon name="git-compare" size={13} />
@@ -122,7 +122,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-[#1a2b4c] hover:bg-[#1a2b4c]/5 dark:hover:text-[#e2a85d] dark:hover:bg-[#e2a85d]/10 transition-colors"
+            className="text-[13px] h-8 px-3 gap-1 text-gray-500 hover:text-brand-navy hover:bg-brand-navy/5 transition-colors"
             onClick={() => onViewLaw(item.change.lawName, item.change.jo, item.change.joDisplay)}
           >
             <Icon name="file-text" size={13} />

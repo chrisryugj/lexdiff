@@ -81,13 +81,13 @@ export function AISearchLoading({
             </span>
           )}
           {meta.domain && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#1a2b4c]/10 text-[#1a2b4c] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] rounded-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-navy/10 text-brand-navy rounded-full">
               <Icon name="book-open" className="h-3.5 w-3.5" />
               {meta.domain}
             </span>
           )}
           {meta.keywords && meta.keywords.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#d4af37]/10 text-[#b5952f] dark:bg-[#e2a85d]/10 dark:text-[#e2a85d] rounded-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-gold/10 text-brand-gold rounded-full">
               <Icon name="zap" className="h-3.5 w-3.5" />
               {meta.keywords.slice(0, 3).join(", ")}
               {meta.keywords.length > 3 && ` +${meta.keywords.length - 3}`}

@@ -76,10 +76,10 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
       {/* Header */}
       <div className={`mb-16 lg:mb-24 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
            style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
-        <h2 className="text-sm font-bold tracking-[0.2em] text-[#d4af37] dark:text-[#e2a85d] uppercase mb-4">
+        <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase mb-4">
           Core Competence
         </h2>
-        <h3 className="text-3xl lg:text-5xl font-black text-[#1a2b4c] dark:text-white mb-6" style={{ fontFamily: "'RIDIBatang', serif" }}>
+        <h3 className="text-3xl lg:text-5xl font-black text-brand-navy mb-6" style={{ fontFamily: "'RIDIBatang', serif" }}>
           법령에서 찾고,<br/>근거로 답합니다.
         </h3>
         <p className="text-lg text-gray-500 max-w-3xl mx-auto">
@@ -103,14 +103,14 @@ export function FeatureCards({ revealed = false }: FeatureCardsProps) {
             }}
           >
             {/* Top Accent Line on Hover */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-[#d4af37] dark:bg-[#e2a85d] scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-brand-gold scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
 
             <div className="flex flex-col h-full">
-              <div className="mb-6 inline-flex items-center justify-center w-14 h-14 bg-gray-50 dark:bg-[#0c0e14] border border-gray-100 dark:border-gray-800 text-[#1a2b4c] dark:text-[#e2a85d]">
+              <div className="mb-6 inline-flex items-center justify-center w-14 h-14 bg-gray-50 dark:bg-background border border-gray-100 dark:border-gray-800 text-brand-navy">
                 <Icon name={feature.icon} size={24} />
               </div>
 
-              <h4 className="text-xl font-bold text-[#1a2b4c] dark:text-white mb-4" style={{ fontFamily: "'RIDIBatang', serif" }}>
+              <h4 className="text-xl font-bold text-brand-navy mb-4" style={{ fontFamily: "'RIDIBatang', serif" }}>
                 {feature.title}
               </h4>
 

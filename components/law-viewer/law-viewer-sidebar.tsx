@@ -162,7 +162,7 @@ export function LawViewerSidebar({
                       variant={isActive ? "default" : "ghost"}
                       size="sm"
                       onClick={() => handleArticleClick(article.jo)}
-                      className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${isActive ? 'ring-2 ring-[#1a2b4c] dark:ring-[#e2a85d] ring-offset-1' : ''
+                      className={`w-12 h-12 p-0 text-xs flex flex-col items-center justify-center relative ${isActive ? 'ring-2 ring-brand-navy ring-offset-1' : ''
                         }`}
                       title={`${formatSimpleJo(article.jo)}${article.title ? ` ${article.title}` : ''}`}
                     >
@@ -183,7 +183,7 @@ export function LawViewerSidebar({
             <div className="border-b border-border px-4 pt-6 pb-3 flex-shrink-0">
               <div className="flex items-center gap-2 mb-1 justify-between">
                 <div className="flex items-center gap-2">
-                  <Icon name={isPrecedent ? "list-checks" : "list-ordered"} size={20} className="text-[#1a2b4c] dark:text-[#e2a85d]" />
+                  <Icon name={isPrecedent ? "list-checks" : "list-ordered"} size={20} className="text-brand-navy" />
                   <h3 className="text-xl font-bold text-foreground">{isPrecedent ? "목차" : "조문 목록"}</h3>
                 </div>
                 <Button

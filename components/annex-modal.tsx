@@ -152,15 +152,25 @@ export function AnnexModal({
       const data = await res.json()
       const annexes: LawAnnex[] = data.annexes || []
 
-      // 3. 별표 번호로 매칭 (숫자만 비교)
+      // 3. 별표 매칭 (lawName + annexNumber 우선, 번호만 매칭 후순위)
       const targetNum = extractAnnexNum(annexNumber)
-      const targetAnnex = annexes.find((a) => {
+
+      // 3a. lawName이 정확히 일치하는 별표 필터링
+      const sameLawAnnexes = annexes.filter((a) =>
+        a.lawName === lawName || a.lawName.includes(lawName) || lawName.includes(a.lawName)
+      )
+      const searchPool = sameLawAnnexes.length > 0 ? sameLawAnnexes : annexes
+
+      // 3b. 번호 매칭
+      const targetAnnex = searchPool.find((a) => {
         const num = extractAnnexNum(a.annexNumber)
         return num === targetNum
       })
 
-      // 별표를 찾지 못하면 폴백
-      const finalAnnex = targetAnnex || (annexes.length > 0 ? annexes[0] : null)
+      // 3c. 폴백: 같은 법령의 첫 번째 별표, 없으면 전체 첫 번째
+      const finalAnnex = targetAnnex
+        || (sameLawAnnexes.length > 0 ? sameLawAnnexes[0] : null)
+        || (annexes.length > 0 ? annexes[0] : null)
 
       if (!finalAnnex) {
         throw new Error(`「${lawName}」에서 별표를 찾을 수 없습니다.\n해당 법령에 별표가 없거나 API에서 제공되지 않을 수 있습니다.`)
