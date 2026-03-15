@@ -31,8 +31,12 @@ import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
 import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
 import { OrdinanceBenchmarkView } from "@/components/ordinance-benchmark/ordinance-benchmark-view"
 import { ComparisonModal } from "@/components/comparison-modal"
+import { DelegationGapModal } from "@/components/delegation-gap-modal"
+import { TimeMachineModal } from "@/components/time-machine-modal"
+import { LawSelectionDialog } from "@/components/law-selection-dialog"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useAiGate } from "@/hooks/use-ai-gate"
+import type { LawMeta } from "@/lib/law-types"
 
 type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker' | 'ordinance-benchmark'
 
@@ -47,6 +51,14 @@ export default function Home() {
   const [impactRequest, setImpactRequest] = useState<ImpactTrackerRequest | null>(null)
   const [impactKey, setImpactKey] = useState(0) // 진입 시마다 증가 → 리마운트로 초기화
   const [benchmarkKeyword, setBenchmarkKeyword] = useState('')
+
+  // 홈 도구 카드 → 법령 선택 다이얼로그 + 모달
+  const [lawSelectionDialog, setLawSelectionDialog] = useState<{
+    isOpen: boolean
+    tool: 'delegation-gap' | 'time-machine' | null
+  }>({ isOpen: false, tool: null })
+  const [homeDelegationGap, setHomeDelegationGap] = useState<{ isOpen: boolean; meta: LawMeta | null }>({ isOpen: false, meta: null })
+  const [homeTimeMachine, setHomeTimeMachine] = useState<{ isOpen: boolean; meta: LawMeta | null }>({ isOpen: false, meta: null })
 
   // 프로그레스 상태 (SearchResultView에서 전달받음)
   const [searchStage, setSearchStage] = useState<SearchStage>('searching')
@@ -303,16 +315,31 @@ export default function Home() {
                 handleImpactTracker()
                 break
               case 'ordinance-sync':
-                handleImpactTracker()  // 같은 뷰, 모드만 다름
+                // 미반영 탐지: 영향 추적기를 ordinance-sync 모드로
+                requireAuth(() => {
+                  const today = new Date().toISOString().slice(0, 10)
+                  const from = new Date()
+                  from.setMonth(from.getMonth() - 12)
+                  const request: ImpactTrackerRequest = {
+                    lawNames: [],
+                    dateFrom: from.toISOString().slice(0, 10),
+                    dateTo: today,
+                    mode: 'ordinance-sync',
+                  }
+                  pushImpactTrackerHistory(request)
+                  setViewMode('impact-tracker')
+                  setImpactKey(k => k + 1)
+                  setImpactRequest(request)
+                })
                 break
               case 'ordinance-benchmark':
                 handleOrdinanceBenchmark('')
                 break
               case 'delegation-gap':
+                setLawSelectionDialog({ isOpen: true, tool: 'delegation-gap' })
+                break
               case 'time-machine':
-                // 모달 도구는 법령 선택이 필요 — 홈에서는 검색으로 유도
-                // 검색 후 법령 뷰어에서 분석 메뉴 사용
-                handleSearch({ lawName: '' })  // 검색바로 포커스 유도
+                setLawSelectionDialog({ isOpen: true, tool: 'time-machine' })
                 break
             }
           }}
@@ -358,6 +385,46 @@ export default function Home() {
         lawTitle={compareModal.lawTitle}
         mst={compareModal.mst}
       />
+
+      {/* 홈 도구 카드 → 법령 선택 다이얼로그 */}
+      <LawSelectionDialog
+        isOpen={lawSelectionDialog.isOpen}
+        onClose={() => setLawSelectionDialog({ isOpen: false, tool: null })}
+        title={lawSelectionDialog.tool === 'delegation-gap' ? '위임 미비 탐지 — 법령 선택' : '법령 타임머신 — 법령 선택'}
+        description="분석할 법령을 검색하여 선택하세요."
+        onSelect={(law) => {
+          const meta: LawMeta = {
+            lawTitle: law.lawName,
+            lawId: law.lawId,
+            mst: law.mst,
+            fetchedAt: new Date().toISOString(),
+            lawType: law.lawType,
+          }
+          if (lawSelectionDialog.tool === 'delegation-gap') {
+            setHomeDelegationGap({ isOpen: true, meta })
+          } else {
+            setHomeTimeMachine({ isOpen: true, meta })
+          }
+        }}
+      />
+
+      {/* 홈 → 위임 미비 탐지 모달 */}
+      {homeDelegationGap.isOpen && homeDelegationGap.meta && (
+        <DelegationGapModal
+          isOpen={homeDelegationGap.isOpen}
+          onClose={() => setHomeDelegationGap({ isOpen: false, meta: null })}
+          meta={homeDelegationGap.meta}
+        />
+      )}
+
+      {/* 홈 → 타임머신 모달 */}
+      {homeTimeMachine.isOpen && homeTimeMachine.meta && (
+        <TimeMachineModal
+          isOpen={homeTimeMachine.isOpen}
+          onClose={() => setHomeTimeMachine({ isOpen: false, meta: null })}
+          meta={homeTimeMachine.meta}
+        />
+      )}
 
       {/* AI 비밀번호 게이트 */}
       <AiGateDialog

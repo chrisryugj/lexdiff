@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,8 @@ import { Icon } from "@/components/ui/icon"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 import { cn } from "@/lib/utils"
 import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
@@ -62,6 +64,24 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   const [aiAnalysis, setAiAnalysis] = useState<{ comparisonTable: string; highlights: string } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+
+  // 헤더 스크롤 표시/숨김
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
+  const lastScrollY = useRef(0)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const y = window.scrollY
+      if (y < 30) { setIsHeaderVisible(true); lastScrollY.current = y; return }
+      const delta = y - lastScrollY.current
+      if (Math.abs(delta) > 8) { setIsHeaderVisible(delta <= 0); lastScrollY.current = y }
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+      scrollTimer.current = setTimeout(() => setIsHeaderVisible(true), 200)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
   const {
     isSearching,
     progress,
@@ -125,30 +145,52 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   const matchedSet = new Set<string>()
   flatResults.forEach(r => matchedSet.add(r.orgCode))
 
+  const handleLogoClick = () => { onHomeClick?.() }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* 헤더 */}
-      <div className="border-b border-border bg-card/50 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
-              <Icon name="arrow-left" size={16} className="mr-1" />
-              뒤로
-            </Button>
-            <div className="flex items-center gap-2">
-              <Icon name="bar-chart" size={18} className="text-brand-navy dark:text-brand-gold" />
-              <h1 className="font-semibold text-sm sm:text-base">조례 벤치마킹</h1>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* 헤더 — 영향 추적기와 동일한 패턴 */}
+      <header
+        className="sticky top-0 z-50 shadow-sm border-b border-gray-200 dark:border-gray-800/60 bg-content-bg transition-transform duration-400"
+        style={{ transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)' }}
+      >
+        <div className="container mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            <button onClick={handleLogoClick} className="flex items-center gap-3 group">
+              <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
+                <Icon name="scale" size={22} />
+              </div>
+              <span
+                className="text-xl lg:text-2xl font-medium italic text-brand-navy tracking-tight"
+                style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}
+              >
+                LexDiff
+              </span>
+            </button>
+            <div className="flex items-center gap-2 lg:gap-4">
+              <ThemeToggle />
+              <Button variant="ghost" size="sm" onClick={onBack} title="뒤로가기" className="hover:bg-gray-200 dark:hover:bg-gray-800">
+                <Icon name="arrow-left" size={18} className="text-gray-600 dark:text-gray-400" />
+              </Button>
             </div>
           </div>
-          {onHomeClick && (
-            <Button variant="ghost" size="sm" onClick={onHomeClick} className="h-8 px-2">
-              <Icon name="home" size={16} />
-            </Button>
-          )}
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      {/* 메인 콘텐츠 */}
+      <div className="flex-1">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* 페이지 타이틀 */}
+        <div className="pt-2">
+          <h1 className="text-2xl lg:text-3xl font-bold text-brand-navy dark:text-foreground flex items-center gap-3">
+            <Icon name="bar-chart" size={28} className="text-brand-gold" />
+            조례 벤치마킹
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            전국 17개 광역시도의 동일 주제 조례를 검색하고, AI로 핵심 항목을 비교 분석합니다.
+          </p>
+        </div>
+
         {/* 검색 입력 */}
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -385,7 +427,11 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
             </div>
           </div>
         )}
+        </div>
       </div>
+
+      {/* 푸터 */}
+      <LawStatsFooter />
     </div>
   )
 }
