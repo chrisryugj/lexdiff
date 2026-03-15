@@ -111,7 +111,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
     <div className="w-full space-y-8 lg:space-y-10">
       {/* ━━ Core Competence ━━ */}
       <div>
-        <div className={`mb-10 lg:mb-14 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+        <div className={`mb-6 lg:mb-8 text-center transition-all duration-1000 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
              style={{ transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
           <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase mb-4">
             Core Competence
