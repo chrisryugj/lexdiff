@@ -164,6 +164,8 @@ export interface SearchResultsState {
 export interface ComparisonModalState {
   isOpen: boolean
   jo?: string
+  mode?: 'compare' | 'timemachine'
+  meta?: import("@/lib/law-types").LawMeta
 }
 
 export interface SummaryDialogState {

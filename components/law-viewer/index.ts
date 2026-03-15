@@ -1,4 +1,5 @@
 export { LawViewerActionButtons } from './law-viewer-action-buttons'
+export { LawViewerAnalysisMenu } from './law-viewer-analysis-menu'
 export { LawViewerRelatedCases } from './law-viewer-related-cases'
 export { LawViewerOrdinanceActions } from './law-viewer-ordinance-actions'
 export { LawViewerSidebar } from './law-viewer-sidebar'

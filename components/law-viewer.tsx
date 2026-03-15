@@ -73,6 +73,13 @@ interface LawViewerProps {
 
   // ✅ 강제 새로고침 (법령/판례 뷰용)
   onRefresh?: () => void
+
+  // 📊 분석 도구 콜백
+  onDelegationGap?: (meta: LawMeta) => void
+  onTimeMachine?: (meta: LawMeta) => void
+  onImpactTracker?: (lawName: string) => void
+  onOrdinanceSync?: (lawName: string) => void
+  onOrdinanceBenchmark?: (lawName: string) => void
 }
 
 function LawViewerComponent({
@@ -104,6 +111,11 @@ function LawViewerComponent({
   onNewConversation,
   isPrecedent = false,
   onRefresh,
+  onDelegationGap,
+  onTimeMachine,
+  onImpactTracker,
+  onOrdinanceSync,
+  onOrdinanceBenchmark,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full" || isPrecedent  // 판례는 항상 전체 뷰
   const { toast } = useToast()
@@ -818,6 +830,12 @@ function LawViewerComponent({
               isPrecedent={isPrecedent}
               isOrdinance={isOrdinance}
               aiAnswerMode={aiAnswerMode}
+              meta={meta}
+              onDelegationGap={onDelegationGap}
+              onTimeMachine={onTimeMachine}
+              onImpactTracker={onImpactTracker}
+              onOrdinanceSync={onOrdinanceSync}
+              onOrdinanceBenchmark={onOrdinanceBenchmark}
               activeArticle={activeArticle ?? null}
               actualArticles={actualArticles}
               hasLevelSection={hasLevelSection}
@@ -873,6 +891,11 @@ function LawViewerComponent({
               openLawCenter={openLawCenter}
               onRefresh={onRefresh}
               formatSimpleJo={formatSimpleJo}
+              meta={meta}
+              onTimeMachine={onTimeMachine}
+              onImpactTracker={onImpactTracker}
+              onOrdinanceSync={onOrdinanceSync}
+              onOrdinanceBenchmark={onOrdinanceBenchmark}
             />
 
             <LawViewerMainContent

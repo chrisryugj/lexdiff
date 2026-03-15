@@ -21,6 +21,7 @@ import { Icon } from "@/components/ui/icon"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
+import type { LawMeta } from "@/lib/law-types"
 
 // Dynamic imports for modals
 const ComparisonModal = dynamic(
@@ -37,6 +38,14 @@ const FavoritesDialog = dynamic(
 )
 const HelpGuideSheet = dynamic(
   () => import("@/components/help-guide-sheet").then(m => m.HelpGuideSheet),
+  { ssr: false }
+)
+const DelegationGapModal = dynamic(
+  () => import("@/components/delegation-gap-modal").then(m => m.DelegationGapModal),
+  { ssr: false }
+)
+const TimeMachineModal = dynamic(
+  () => import("@/components/time-machine-modal").then(m => m.TimeMachineModal),
   { ssr: false }
 )
 
@@ -72,6 +81,14 @@ function SearchResultViewComponent({
 
   // 도움말 Sheet 상태
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
+
+  // 📊 분석 도구 모달 상태
+  const [delegationGapModal, setDelegationGapModal] = useState<{ isOpen: boolean; meta: LawMeta | null }>({
+    isOpen: false, meta: null,
+  })
+  const [timeMachineModal, setTimeMachineModal] = useState<{ isOpen: boolean; meta: LawMeta | null }>({
+    isOpen: false, meta: null,
+  })
 
   // ============================================================
   // 핸들러 훅
@@ -613,6 +630,8 @@ function SearchResultViewComponent({
                       onAiRefresh={handlers.handleAiRefresh}
                       isPrecedent={state.lawData.isPrecedent}
                       onRefresh={handlers.handleRefresh}
+                      onDelegationGap={(meta) => setDelegationGapModal({ isOpen: true, meta })}
+                      onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
                     />
                   </div>
                 )}
@@ -671,6 +690,8 @@ function SearchResultViewComponent({
                   onAiRefresh={handlers.handleAiRefresh}
                   isPrecedent={state.lawData.isPrecedent}
                   onRefresh={handlers.handleRefresh}
+                  onDelegationGap={(meta) => setDelegationGapModal({ isOpen: true, meta })}
+                  onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
                 />
               </div>
             </div>
@@ -700,6 +721,24 @@ function SearchResultViewComponent({
               newContent={state.summaryDialog.newContent}
               effectiveDate={state.summaryDialog.effectiveDate}
               isPrecedent={state.summaryDialog.isPrecedent}
+            />
+          )}
+
+          {/* 위임 미비 탐지 모달 */}
+          {delegationGapModal.isOpen && delegationGapModal.meta && (
+            <DelegationGapModal
+              isOpen={delegationGapModal.isOpen}
+              onClose={() => setDelegationGapModal({ isOpen: false, meta: null })}
+              meta={delegationGapModal.meta}
+            />
+          )}
+
+          {/* 법령 타임머신 모달 */}
+          {timeMachineModal.isOpen && timeMachineModal.meta && (
+            <TimeMachineModal
+              isOpen={timeMachineModal.isOpen}
+              onClose={() => setTimeMachineModal({ isOpen: false, meta: null })}
+              meta={timeMachineModal.meta}
             />
           )}
         </>

@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
-import type { LawArticle } from "@/lib/law-types"
+import { LawViewerAnalysisMenu } from "./law-viewer-analysis-menu"
+import type { LawArticle, LawMeta } from "@/lib/law-types"
 
 interface LawViewerOrdinanceActionsProps {
   isOrdinance: boolean
@@ -15,6 +16,12 @@ interface LawViewerOrdinanceActionsProps {
   openLawCenter: () => void
   onRefresh?: () => void
   formatSimpleJo: (jo: string, forceOrdinance?: boolean) => string
+  // 분석 도구
+  meta?: LawMeta
+  onTimeMachine?: (meta: LawMeta) => void
+  onImpactTracker?: (lawName: string) => void
+  onOrdinanceSync?: (lawName: string) => void
+  onOrdinanceBenchmark?: (lawName: string) => void
 }
 
 export function LawViewerOrdinanceActions({
@@ -27,6 +34,11 @@ export function LawViewerOrdinanceActions({
   openLawCenter,
   onRefresh,
   formatSimpleJo,
+  meta,
+  onTimeMachine,
+  onImpactTracker,
+  onOrdinanceSync,
+  onOrdinanceBenchmark,
 }: LawViewerOrdinanceActionsProps) {
   if (!isOrdinance) {
     return null
@@ -35,11 +47,22 @@ export function LawViewerOrdinanceActions({
   return (
     <div className="border-b border-border px-3 sm:px-4 py-0.5 pt-2 sm:pt-3 pb-2 sm:pb-3">
       <div className="flex items-center justify-between gap-1">
-        {/* 좌측: 원문 보기 */}
-        <Button variant="outline" size="sm" onClick={openLawCenter} className="bg-transparent h-7 px-2">
-          <Icon name="external-link" size={14} className="mr-1" />
-          원문 보기
-        </Button>
+        {/* 좌측: 원문 보기 + 분석 도구 */}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={openLawCenter} className="bg-transparent h-7 px-2">
+            <Icon name="external-link" size={14} className="mr-1" />
+            원문 보기
+          </Button>
+          <LawViewerAnalysisMenu
+            meta={meta}
+            isOrdinance={isOrdinance}
+            isPrecedent={false}
+            onTimeMachine={onTimeMachine}
+            onImpactTracker={onImpactTracker}
+            onOrdinanceSync={onOrdinanceSync}
+            onOrdinanceBenchmark={onOrdinanceBenchmark}
+          />
+        </div>
 
         {/* 우측: 새로고침 + 글자크기 + 복사 */}
         <div className="flex items-center gap-0.5">

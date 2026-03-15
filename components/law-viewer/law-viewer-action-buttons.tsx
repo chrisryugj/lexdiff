@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
+import { LawViewerAnalysisMenu, type LawViewerAnalysisMenuProps } from "./law-viewer-analysis-menu"
 import { cn } from "@/lib/utils"
-import type { LawArticle } from "@/lib/law-types"
+import type { LawArticle, LawMeta } from "@/lib/law-types"
 import type { PrecedentSearchResult } from "@/lib/precedent-parser"
 
 interface LawViewerActionButtonsProps {
@@ -13,6 +14,16 @@ interface LawViewerActionButtonsProps {
   isPrecedent: boolean
   isOrdinance: boolean
   aiAnswerMode: boolean
+
+  // 법령 메타 (분석 도구 드롭다운용)
+  meta?: LawMeta
+
+  // 분석 도구 콜백
+  onDelegationGap?: (meta: LawMeta) => void
+  onTimeMachine?: (meta: LawMeta) => void
+  onImpactTracker?: (lawName: string) => void
+  onOrdinanceSync?: (lawName: string) => void
+  onOrdinanceBenchmark?: (lawName: string) => void
 
   // 데이터
   activeArticle: LawArticle | null
@@ -66,6 +77,12 @@ export function LawViewerActionButtons({
   isPrecedent,
   isOrdinance,
   aiAnswerMode,
+  meta,
+  onDelegationGap,
+  onTimeMachine,
+  onImpactTracker,
+  onOrdinanceSync,
+  onOrdinanceBenchmark,
   activeArticle,
   actualArticles,
   hasLevelSection,
@@ -247,6 +264,17 @@ export function LawViewerActionButtons({
               <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
               <span className="sm:hidden">{showPrecedents ? "닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
             </Button>
+            {/* 📊 분석 도구 드롭다운 */}
+            <LawViewerAnalysisMenu
+              meta={meta}
+              isOrdinance={isOrdinance}
+              isPrecedent={isPrecedent}
+              onDelegationGap={onDelegationGap}
+              onTimeMachine={onTimeMachine}
+              onImpactTracker={onImpactTracker}
+              onOrdinanceSync={onOrdinanceSync}
+              onOrdinanceBenchmark={onOrdinanceBenchmark}
+            />
             {/* 즐겨찾기 - PC에서만 표시 (모바일은 제목줄에 있음) */}
             <Button
               key={`fav-btn-${activeArticle.jo}-${isFavorite(activeArticle.jo)}`}
