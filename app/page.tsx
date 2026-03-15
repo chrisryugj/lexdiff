@@ -296,6 +296,25 @@ export default function Home() {
           ragLoading={ragLoading}
           searchMode={searchMode}
           onImpactTracker={handleImpactTracker}
+          onToolClick={(toolId) => {
+            switch (toolId) {
+              case 'impact-tracker':
+                handleImpactTracker()
+                break
+              case 'ordinance-sync':
+                handleImpactTracker()  // 같은 뷰, 모드만 다름
+                break
+              case 'ordinance-benchmark':
+                handleOrdinanceBenchmark('')
+                break
+              case 'delegation-gap':
+              case 'time-machine':
+                // 모달 도구는 법령 선택이 필요 — 홈에서는 검색으로 유도
+                // 검색 후 법령 뷰어에서 분석 메뉴 사용
+                handleSearch({ lawName: '' })  // 검색바로 포커스 유도
+                break
+            }
+          }}
         />
       ) : viewMode === 'impact-tracker' || viewMode === 'ordinance-benchmark' ? null : (viewMode === 'search-result' || viewMode === 'precedent-detail') && searchId ? (
         <SearchResultView

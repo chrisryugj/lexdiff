@@ -2,7 +2,7 @@
 
 import { SearchBarHome } from "@/components/search-bar-home"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
-import { FeatureCards } from "@/components/feature-cards"
+import { FeatureCards, type ToolCardId } from "@/components/feature-cards"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
@@ -32,6 +32,7 @@ export interface SearchViewProps {
   ragLoading: boolean
   searchMode: 'basic' | 'rag'
   onImpactTracker?: () => void
+  onToolClick?: (toolId: ToolCardId) => void
 }
 
 export function SearchView({
@@ -41,6 +42,7 @@ export function SearchView({
   ragLoading,
   searchMode,
   onImpactTracker,
+  onToolClick,
 }: SearchViewProps) {
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
@@ -258,7 +260,7 @@ export function SearchView({
           className={`py-20 lg:py-32 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
         >
           <div className="container mx-auto max-w-7xl px-6 lg:px-8">
-            <FeatureCards revealed={featuresRevealed} />
+            <FeatureCards revealed={featuresRevealed} onToolClick={onToolClick} />
           </div>
         </section>
       </main>
