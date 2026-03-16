@@ -350,20 +350,20 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input
             type="date"
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 flex-1 min-w-0"
             disabled={isAnalyzing}
           />
-          <span className="text-gray-400 text-xs">~</span>
+          <span className="text-gray-400 text-xs text-center">~</span>
           <input
             type="date"
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 flex-1 min-w-0"
             disabled={isAnalyzing}
           />
         </div>

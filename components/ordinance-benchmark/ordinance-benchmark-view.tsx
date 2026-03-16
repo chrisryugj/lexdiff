@@ -208,7 +208,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         className="sticky top-0 z-50 shadow-sm border-b border-gray-200 dark:border-gray-800/60 bg-content-bg transition-transform duration-400"
         style={{ transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)' }}
       >
-        <div className="container mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <button onClick={() => onHomeClick?.()} className="flex items-center gap-3 group">
               <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
@@ -233,8 +233,8 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
           {/* 타이틀 */}
           <div className="pt-2">
-            <h1 className="text-3xl lg:text-4xl font-bold text-brand-navy dark:text-foreground flex items-center gap-3" style={serifStyle}>
-              <Icon name="bar-chart" size={32} className="text-brand-gold" />
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-brand-navy dark:text-foreground flex items-center gap-2 sm:gap-3" style={serifStyle}>
+              <Icon name="bar-chart" size={28} className="text-brand-gold shrink-0" />
               조례 벤치마킹
             </h1>
             <p className="text-base text-muted-foreground mt-3">
@@ -424,11 +424,11 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
-                        <th className="px-3 py-3 w-10 text-center text-xs font-medium text-muted-foreground">비교</th>
-                        <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground w-32">지자체</th>
-                        <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground">조례명</th>
-                        <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground w-28">시행일</th>
-                        <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground w-24">개정유형</th>
+                        <th className="px-2 sm:px-3 py-3 w-10 text-center text-xs font-medium text-muted-foreground">비교</th>
+                        <th className="text-left px-2 sm:px-3 py-3 text-xs font-medium text-muted-foreground w-20 sm:w-32">지자체</th>
+                        <th className="text-left px-2 sm:px-3 py-3 text-xs font-medium text-muted-foreground">조례명</th>
+                        <th className="text-left px-2 sm:px-3 py-3 text-xs font-medium text-muted-foreground w-24 sm:w-28 hidden sm:table-cell">시행일</th>
+                        <th className="text-left px-2 sm:px-3 py-3 text-xs font-medium text-muted-foreground w-20 sm:w-24 hidden sm:table-cell">개정유형</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -437,25 +437,25 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                         return (
                           <tr key={`${r.orgCode}-${r.ordinanceSeq}-${i}`}
                             className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                            <td className="px-3 py-3 text-center">
+                            <td className="px-2 sm:px-3 py-3 text-center">
                               <Checkbox checked={checkedItems.has(key)}
                                 disabled={!checkedItems.has(key) && checkedItems.size >= MAX_CHECKED}
                                 onCheckedChange={() => toggleCheck(key)} />
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 sm:px-3 py-3">
                               <Badge variant="outline" className="text-[11px]">{r.orgShortName}</Badge>
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 sm:px-3 py-3">
                               <button onClick={() => openOrdinanceModal(r)}
-                                className="text-sm font-medium text-left hover:text-brand-navy dark:hover:text-brand-gold hover:underline underline-offset-2 transition-colors"
+                                className="text-sm font-medium text-left hover:text-brand-navy dark:hover:text-brand-gold hover:underline underline-offset-2 transition-colors break-keep"
                                 style={serifStyle}>
                                 {r.ordinanceName}
                               </button>
                             </td>
-                            <td className="px-3 py-3 text-muted-foreground text-xs tabular-nums">
+                            <td className="px-2 sm:px-3 py-3 text-muted-foreground text-xs tabular-nums hidden sm:table-cell">
                               {formatDate(r.effectiveDate ?? '')}
                             </td>
-                            <td className="px-3 py-3">
+                            <td className="px-2 sm:px-3 py-3 hidden sm:table-cell">
                               {r.revisionType && (
                                 <span className={cn("text-[11px] px-2 py-0.5 rounded", revisionBadgeClass(r.revisionType))}>
                                   {r.revisionType}
@@ -474,15 +474,15 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               <Card className="p-5">
                 {!aiAnalysis && !aiLoading && (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon name="sparkles" size={18} className="text-brand-navy dark:text-brand-gold" />
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Icon name="sparkles" size={18} className="text-brand-navy dark:text-brand-gold shrink-0" />
                         <span className="text-sm font-semibold" style={serifStyle}>AI 비교 분석</span>
                         {checkedItems.size > 0
                           ? <span className="text-xs text-muted-foreground">{checkedItems.size}/{MAX_CHECKED}개 선택</span>
                           : <span className="text-xs text-muted-foreground">비교할 조례를 체크하세요 (2~{MAX_CHECKED}개)</span>}
                       </div>
-                      <Button size="sm" onClick={handleAiAnalysis} disabled={checkedResults.length < 2} className="h-9">
+                      <Button size="sm" onClick={handleAiAnalysis} disabled={checkedResults.length < 2} className="h-9 w-full sm:w-auto">
                         <Icon name="sparkles" size={14} className="mr-1.5" /> 비교 분석 요청
                       </Button>
                     </div>
@@ -520,7 +520,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                       <Button variant="ghost" size="sm" className="h-7 px-3 text-xs"
                         onClick={() => { setAiAnalysis(null); setAiError(null) }}>닫기</Button>
                     </div>
-                    <div className="bg-content-bg rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                    <div className="bg-content-bg rounded-lg p-3 sm:p-5 border border-gray-100 dark:border-gray-800">
                       <LegalMarkdownRenderer
                         content={aiAnalysis.comparisonTable}
                         disabledLink
