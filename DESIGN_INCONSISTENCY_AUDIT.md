@@ -65,30 +65,40 @@
 
 ## 진짜 불일치: 파일 간 교차 비교에서 발견된 것들
 
-### 불일치 1: 같은 "로고 아이콘 박스"의 radius가 다르다
+### 불일치 1: 같은 "로고 아이콘 박스"가 3곳에서 모두 다르다
 
-**search-view.tsx** (홈 헤더):
+프로젝트에 헤더가 3개 존재하며, 각각의 로고 아이콘 박스 스타일이 전부 다르다:
+
+**search-view.tsx:155** (홈 헤더):
 ```tsx
-// line 155 — 각진 사각형
 <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md">
+  <Icon name="scale" size={22} />
 ```
 
-**header.tsx** (검색결과 헤더):
+**header.tsx:48** (검색결과 헤더):
 ```tsx
-// line 48 — 둥근 사각형
 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+  <Icon name="scale" size={20} className="text-primary-foreground" />
 ```
 
-| | search-view (홈) | header (검색결과) |
-|---|---|---|
-| 크기 | `h-10 w-10` | `h-9 w-9` |
-| 모서리 | 없음 (각짐) | `rounded-lg` |
-| 색상 | `bg-brand-navy` | `bg-primary` |
-| 텍스트 | `text-white dark:text-background` | `text-primary-foreground` |
+**floating-compact-header.tsx:131** (법령 뷰어 헤더):
+```tsx
+<div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-sm bg-brand-navy ...">
+  <Icon name="scale" size={18} className="text-white dark:text-background" />
+```
 
-**왜 진짜 불일치인가**: 이 둘은 모두 **LexDiff 로고 아이콘**이다. 같은 브랜드 요소가 페이지에 따라 사이즈, 모서리, 색상 참조 방식이 모두 다르다. 사용자가 홈에서 검색결과로 넘어갈 때 로고의 미묘한 변화를 느낀다.
+| | search-view (홈) | header (검색결과) | floating-compact-header (법령 뷰어) |
+|---|---|---|---|
+| 크기 | `h-10 w-10` | `h-9 w-9` | `h-8 w-8 lg:h-9 lg:w-9` |
+| 모서리 | 없음 (각짐) | `rounded-lg` (8px) | `rounded-sm` (2px) |
+| 색상 | `bg-brand-navy` | `bg-primary` | `bg-brand-navy` |
+| 텍스트 | `text-white dark:text-background` | `text-primary-foreground` | `text-white dark:text-background` |
+| 아이콘 크기 | 22 | 20 | 18 |
+| 호버 | `group-hover:scale-105` | `hover:opacity-80` | `group-hover:scale-105` |
 
-**의도 가능성 검토**: 홈은 "프리미엄 랜딩" 느낌을 위해 각진 디자인, 검색결과는 "작업 모드"라서 부드러운 디자인? — 가능하지만, 같은 브랜드 로고가 컨텍스트마다 형태가 변하면 **브랜드 일관성**이 훼손된다.
+**왜 진짜 불일치인가**: 3곳 모두 **같은 LexDiff 로고 아이콘**인데, 모서리가 각각 `없음(0px)`, `rounded-lg(8px)`, `rounded-sm(2px)`으로 전부 다르다. 색상 참조도 `bg-brand-navy`(2곳) vs `bg-primary`(1곳)로 나뉘고, 호버 효과도 `scale`(2곳) vs `opacity`(1곳)으로 갈린다.
+
+**의도 가능성 검토**: 홈→검색결과→법령뷰어로 갈수록 로고가 작아지는 것은 "점점 콘텐츠에 집중"이라는 의도로 읽힌다. 하지만 **모서리 radius가 3가지**인 것은 의도라기보다 각 헤더를 별도로 만들면서 생긴 편차다. `header.tsx`만 `bg-primary`를 쓰고 나머지는 `bg-brand-navy`인 것도 통일이 안 된 것이다.
 
 ---
 
@@ -216,19 +226,18 @@ vs
 |---|---|---|
 | search-view.tsx:171 | `hover:bg-gray-200 dark:hover:bg-gray-800` | 즐겨찾기 버튼 |
 | search-view.tsx:177 | `hover:bg-gray-200 dark:hover:bg-gray-800` | 도움말 버튼 |
-| header.tsx:81 | `hover:text-foreground` (배경 변화 없음) | 도움말 버튼 |
-| header.tsx:47 | `hover:opacity-80` | 로고 버튼 |
-| search-view.tsx:155 | `group-hover:scale-105` | 로고 아이콘 |
+| floating-compact-header.tsx:173 | `hover:bg-gray-200 dark:hover:bg-gray-800` | 즐겨찾기 버튼 |
+| header.tsx:66 | 호버 없음 (Button ghost 기본만) | 즐겨찾기 버튼 |
+| header.tsx:81 | `hover:text-foreground` (아이콘에 직접) | 도움말 버튼 |
 
-**같은 "도움말 버튼"**인데:
-- 홈(search-view): `hover:bg-gray-200 dark:hover:bg-gray-800` (배경색 변화)
-- 검색결과(header): 호버 효과 없음 (Button ghost 기본만)
+**로고 호버도 나뉨**:
+| 파일 | 호버 방식 |
+|---|---|
+| search-view.tsx:155 | `group-hover:scale-105` |
+| floating-compact-header.tsx:131 | `group-hover:scale-105` |
+| header.tsx:46 | `hover:opacity-80` |
 
-**같은 "로고"**인데:
-- 홈: 아이콘에 `scale(1.05)` 효과
-- 검색결과: `opacity: 0.8` 효과
-
-이것은 "홈은 화려하게, 작업 화면은 절제하게"라는 의도일 수 있다. 하지만 **같은 기능의 같은 버튼**이 화면에 따라 다르게 반응하면, 사용자는 "이 버튼이 아까 그 버튼 맞나?" 하고 혼란을 느낀다.
+홈과 법령뷰어는 같은 패턴(`bg-gray-200` 호버, `scale-105` 로고)을 공유하지만, **검색결과 헤더(header.tsx)만 다른 패턴**을 쓴다. 즐겨찾기 버튼은 커스텀 호버 없이 ghost 기본, 로고는 opacity 변화. 이것은 header.tsx가 별도로 만들어지면서 생긴 편차로 보인다.
 
 ---
 
@@ -281,26 +290,38 @@ vs
 
 ---
 
-### 불일치 7: Header 컴포넌트가 두 개, 스타일이 다르다
+### 불일치 7: Header 컴포넌트가 세 개, 스타일이 각각 다르다
 
-프로젝트에 헤더가 두 개 존재한다:
+프로젝트에 헤더가 세 개 존재한다:
 
-| 파일 | 사용처 | 배경 | 높이 | max-width | 로고 스타일 |
-|---|---|---|---|---|---|
-| `search-view.tsx` 내장 헤더 | 홈 화면 | `bg-content-bg` | `h-16 lg:h-20` | `max-w-7xl` | 각진, brand-navy, h-10 w-10 |
-| `header.tsx` | 검색결과 화면 | `bg-card/50 backdrop-blur-sm` | `h-16` | `max-w-[1280px]` | 둥근(rounded-lg), primary, h-9 w-9 |
+| 파일 | 사용처 | 배경 | 높이 | max-width | 즐겨찾기 별 | 즐겨찾기 카운트 |
+|---|---|---|---|---|---|---|
+| `search-view.tsx` 내장 헤더 | 홈 화면 | `bg-content-bg` (불투명) | `h-16 lg:h-20` | `max-w-7xl` | `text-brand-gold` | `<span>` font-semibold |
+| `header.tsx` | 검색결과 화면 | `bg-card/50 backdrop-blur-sm` | `h-16` | `max-w-[1280px]` | `text-[var(--color-warning)]` | `<Badge>` secondary |
+| `floating-compact-header.tsx` | 법령 뷰어 | `bg-background/95 backdrop-blur-xl` | `h-12 lg:h-16` | `max-w-[1280px]` | `text-brand-gold` | `<Badge>` secondary + 커스텀 |
 
-눈에 띄는 차이:
-1. **max-width**: `max-w-7xl`(1280px) vs `max-w-[1280px]` — 같은 값인데 표기가 다름 (실질적 차이 없음)
-2. **높이**: 홈은 데스크탑에서 `h-20`(80px), 검색결과는 `h-16`(64px) — 홈이 더 높음
-3. **배경**: 홈은 불투명(`bg-content-bg`), 검색결과는 반투명(`bg-card/50 backdrop-blur-sm`)
-4. **색상 시스템**: 홈은 `bg-brand-navy`, 검색결과는 `bg-primary` — 라이트 모드에서 동일하지만 다크에서 다름
-5. **즐겨찾기 카운트 표시**: 홈은 `font-semibold text-gray-800`, 검색결과는 `Badge variant="secondary"`
-6. **즐겨찾기 별 색상**: 홈은 `text-brand-gold fill-brand-gold`, 검색결과는 `text-[var(--color-warning)] fill-[var(--color-warning)]`
+**높이 계층은 의도적**: 홈(80px) → 검색결과(64px) → 법령뷰어(48-64px)로 점점 컴팩트해지는 것은 "홈은 여유롭게, 작업 중에는 콘텐츠 집중"이라는 합리적 의도다.
 
-**의도 가능성**: 홈은 "랜딩 페이지"이므로 프리미엄 전용 헤더, 검색결과는 "작업 앱"이므로 기능적 헤더. 높이 차이(80px vs 64px)도 "홈은 여유롭게, 작업 중에는 컴팩트하게"라는 의도일 수 있다.
+**배경도 의도적**: 홈은 불투명(랜딩 느낌), 검색결과/법령뷰어는 반투명+블러(콘텐츠 뒤비침)로 역할이 다르다.
 
-**진짜 문제**: 즐겨찾기 별의 색상이 `brand-gold`(홈) vs `warning`(검색결과)인 것. 이 두 색은 라이트 모드에서도 다크 모드에서도 **다른 색상**이다. 같은 즐겨찾기 기능인데 색이 달라지면 안 된다.
+**진짜 문제 1 — 즐겨찾기 별 색상**:
+- 홈 + 법령뷰어: `text-brand-gold fill-brand-gold`
+- 검색결과: `text-[var(--color-warning)] fill-[var(--color-warning)]`
+
+3곳 중 `header.tsx`만 `--color-warning`을 사용한다. `brand-gold`와 `warning`은 라이트/다크 모드 모두에서 **다른 색상**이다. 같은 즐겨찾기 기능인데 검색결과 화면에서만 별 색이 달라진다.
+
+**진짜 문제 2 — 즐겨찾기 카운트 표시**:
+- 홈: `<span className="font-semibold text-gray-800 dark:text-gray-200">` (일반 텍스트)
+- 검색결과: `<Badge variant="secondary">` (뱃지)
+- 법령뷰어: `<Badge variant="secondary" className="bg-transparent border-brand-navy/20 text-brand-navy">` (커스텀 뱃지)
+
+3곳 모두 다른 방식으로 숫자를 표시한다. 홈만 plain text이고, 검색결과는 기본 Badge, 법령뷰어는 투명 배경 커스텀 Badge다.
+
+**진짜 문제 3 — 테두리 참조 방식**:
+- 홈: `border-gray-200 dark:border-gray-800/60` (Tailwind 직접)
+- 검색결과 + 법령뷰어: `border-border` (CSS 변수)
+
+같은 "헤더 하단 테두리"인데 홈만 다른 방식을 쓴다.
 
 ---
 
@@ -336,21 +357,23 @@ vs
 | # | 내용 | 위치 | 심각도 |
 |---|---|---|---|
 | 1 | `--brand-navy` = `--brand-gold` = `--brand-gold-light` 동일값 | theme-variables.css:138-140 | Critical |
-| 2 | 로고 아이콘 radius/크기/색상 참조가 홈 vs 검색결과 간 다름 | search-view.tsx:155 vs header.tsx:48 | Medium |
-| 3 | 즐겨찾기 별 색상이 `brand-gold`(홈) vs `warning`(검색결과) | search-view.tsx:172 vs header.tsx:67 | Medium |
-| 4 | 다크 카드 배경 `#1a222c`가 `--card`(oklch 0.16)와 거의 동일한데 변수 미사용 | feature-cards.tsx:131,165 | Low |
-| 5 | 서브타이틀 `dark:text-gray-300` vs 설명 `dark:text-gray-400` 의도 불명확 | search-view.tsx:223 vs feature-cards.tsx:145 | Low |
+| 2 | 로고 아이콘 radius/크기/색상 참조가 3곳 모두 다름 | search-view:155, header:48, floating-compact-header:131 | Medium |
+| 3 | 즐겨찾기 별 색상 `brand-gold`(홈+뷰어) vs `warning`(검색결과) | header.tsx:67만 다름 | Medium |
+| 4 | 즐겨찾기 카운트 표시 방식이 3곳 모두 다름 (span vs Badge vs 커스텀 Badge) | search-view:173, header:68, floating-compact-header:177 | Low-Medium |
+| 5 | 다크 카드 배경 `#1a222c`가 `--card`(oklch 0.16)와 거의 동일한데 변수 미사용 | feature-cards.tsx:131,165 | Low |
+| 6 | 헤더 테두리 `border-gray-200`(홈) vs `border-border`(나머지 2곳) | search-view:146 vs header:42, floating-compact-header:109 | Low |
 
 ### 의도적 차이로 판단 (유지 가능)
 
 | # | 내용 | 의도 |
 |---|---|---|
 | 1 | 브랜딩 카드(큰 gap) vs 도구 카드(작은 gap) | 카드 크기에 비례 |
-| 2 | 홈 헤더(h-20) vs 검색결과 헤더(h-16) | 랜딩 vs 작업 모드 |
+| 2 | 헤더 높이 h-20 → h-16 → h-12 (홈→검색→뷰어) | 점진적 컴팩트화 — 콘텐츠 집중 |
 | 3 | 홈 각진 카드 vs 판례 둥근 아이템 | 홈(법의 엄격함) vs 콘텐츠(부드러운 탐색) |
 | 4 | 호버 easing 차이 (페이지 레벨 vs 마이크로) | 역할별 분리 |
 | 5 | Feature 카드 3개 동일 크기 | 핵심 역량 대등 소개 |
 | 6 | Duration 범위 (0.2s~2s) | 마이크로 → 루프 점진 스케일 |
+| 7 | 헤더 배경 불투명(홈) vs 반투명+블러(작업화면) | 랜딩 vs 앱 컨텍스트 구분 |
 
 ### 개선하면 좋지만 급하지 않은 것
 
@@ -361,6 +384,8 @@ vs
 | 3 | Easing `(0.25,1,0.5,1)` vs `(0.16,1,0.3,1)` 통합 검토 | 차이가 극히 미묘 |
 | 4 | `precedent` `rounded-2xl` vs `Card` `rounded-xl` 통일 검토 | 기능적 문제 없음 |
 | 5 | 도구 바로가기 pill 형태 재검토 | 기능 무게 vs 시각적 가벼움 |
+| 6 | Pretendard 폰트 400(Regular)만 로드, 600/700 미로드 | `font-semibold`/`font-bold`가 73개 파일 182곳에서 사용 중인데 브라우저 합성 볼드에 의존 |
+| 7 | 서브타이틀 `dark:text-gray-300` vs 설명 `dark:text-gray-400` 미세 차이 | 의도 가능성 있으나 `text-muted-foreground`와도 다른 값 |
 
 ---
 
