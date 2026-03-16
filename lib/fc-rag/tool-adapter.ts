@@ -520,8 +520,14 @@ export interface ToolCallResult {
  */
 export async function executeTool(
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<ToolCallResult> {
+  // 클라이언트 취소 시 즉시 반환
+  if (signal?.aborted) {
+    return { name, result: '요청이 취소되었습니다.', isError: true }
+  }
+
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) {
     return { name, result: `알 수 없는 도구: ${name}`, isError: true }
@@ -535,6 +541,10 @@ export async function executeTool(
   }
 
   try {
+    // 실행 전 취소 재확인
+    if (signal?.aborted) {
+      return { name, result: '요청이 취소되었습니다.', isError: true }
+    }
     // Zod parse로 기본값 적용 (LLM이 optional 파라미터 생략 시)
     const parsedArgs = tool.schema.parse(args)
     const response = await tool.handler(apiClient, parsedArgs)
@@ -568,9 +578,10 @@ export async function executeTool(
  * 여러 도구 병렬 실행
  */
 export async function executeToolsParallel(
-  calls: Array<{ name: string; args: Record<string, unknown> }>
+  calls: Array<{ name: string; args: Record<string, unknown> }>,
+  signal?: AbortSignal
 ): Promise<ToolCallResult[]> {
-  return Promise.all(calls.map(c => executeTool(c.name, c.args)))
+  return Promise.all(calls.map(c => executeTool(c.name, c.args, signal)))
 }
 
 // ─── 유틸 ───

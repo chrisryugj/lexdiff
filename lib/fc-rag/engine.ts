@@ -70,6 +70,24 @@ const MAX_TOKENS: Record<QueryComplexity, number> = {
   complex: 6144,
 }
 
+/** Gemini API complexity별 타임아웃 (ms) */
+const GEMINI_TIMEOUT: Record<QueryComplexity, number> = {
+  simple: 30_000,
+  moderate: 45_000,
+  complex: 60_000,
+}
+
+/** Promise에 타임아웃을 적용하는 유틸 */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} 타임아웃 (${ms}ms)`)), ms)
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val) },
+      (err) => { clearTimeout(timer); reject(err) },
+    )
+  })
+}
+
 /** complexity 기반 최대 도구 턴 수 */
 function getMaxToolTurns(complexity: QueryComplexity): number {
   switch (complexity) {
@@ -117,7 +135,7 @@ export async function* executeRAGStream(
       const displayName = TOOL_DISPLAY_NAMES[toolName] || toolName
       yield { type: 'tool_call', name: toolName, displayName, query: fastPath.searchQuery }
       yield { type: 'status', message: '검색 중...', progress: 40 }
-      const searchResult = await executeTool(toolName, { query: fastPath.searchQuery })
+      const searchResult = await executeTool(toolName, { query: fastPath.searchQuery }, signal)
       yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult) }
       if (!searchResult.isError) {
         yield { type: 'status', message: '완료', progress: 100 }
@@ -141,7 +159,7 @@ export async function* executeRAGStream(
       let mst = fastPath.mst
       if (!mst) {
         yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
-        const searchResult = await executeTool('search_law', { query: fastPath.lawName })
+        const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
         if (!searchResult.isError) {
           yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
           const entries = parseLawEntries(searchResult.result)
@@ -152,7 +170,7 @@ export async function* executeRAGStream(
       if (mst) {
         yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: fastPath.searchQuery }
         yield { type: 'status', message: '별표를 조회하고 있습니다...', progress: 50 }
-        const annexResult = await executeTool('get_annexes', { lawName: fastPath.searchQuery })
+        const annexResult = await executeTool('get_annexes', { lawName: fastPath.searchQuery }, signal)
         yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: !annexResult.isError, summary: summarizeToolResult('get_annexes', annexResult) }
         if (!annexResult.isError) {
           yield { type: 'status', message: '완료', progress: 100 }
@@ -179,7 +197,7 @@ export async function* executeRAGStream(
       if (fastPath.type === 'article_resolve') {
         yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
         yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
-        const searchResult = await executeTool('search_law', { query: fastPath.lawName })
+        const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
         if (searchResult.isError) {
           yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
         } else {
@@ -193,7 +211,7 @@ export async function* executeRAGStream(
       if (mst) {
         yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
         yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
-        const articlesResult = await executeTool('get_batch_articles', { mst, articles })
+        const articlesResult = await executeTool('get_batch_articles', { mst, articles }, signal)
         yield {
           type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
           success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
@@ -225,7 +243,7 @@ export async function* executeRAGStream(
     return
   }
 
-  const systemPrompt = buildSystemPrompt(complexity, queryType, query)
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query, true /* isGemini */)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const selectedTools = new Set(selectToolsForQuery(query))
   const toolDeclarations = getToolDeclarations().filter(d => selectedTools.has(d.name!))
@@ -236,6 +254,7 @@ export async function* executeRAGStream(
   ]
 
   let allToolResults: ToolCallResult[] = []
+  const MAX_TOOL_RESULTS = 30
   let turnCount = 0
   let latestSearchEntries: LawEntry[] = []
   const failureCount = new Map<string, number>()
@@ -265,16 +284,20 @@ export async function* executeRAGStream(
         return
       }
 
-      const response = await ai.models.generateContent({
-        model: MODEL,
-        contents: messages,
-        config: {
-          systemInstruction: systemPrompt,
-          tools: [{ functionDeclarations: activeDeclarations }],
-          temperature: 0,
-          maxOutputTokens: MAX_TOKENS[complexity],
-        },
-      })
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: MODEL,
+          contents: messages,
+          config: {
+            systemInstruction: systemPrompt,
+            tools: [{ functionDeclarations: activeDeclarations }],
+            temperature: 0,
+            maxOutputTokens: MAX_TOKENS[complexity],
+          },
+        }),
+        GEMINI_TIMEOUT[complexity],
+        'Gemini API',
+      )
 
       const candidate = response.candidates?.[0]
 
@@ -338,11 +361,15 @@ export async function* executeRAGStream(
           role: 'user',
           parts: [{ text: '수집된 정보를 바탕으로 한국어로 답변해주세요. 추가 도구 호출 없이 바로 답변하세요.' }],
         })
-        const retry = await ai.models.generateContent({
-          model: MODEL,
-          contents: messages,
-          config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
-        })
+        const retry = await withTimeout(
+          ai.models.generateContent({
+            model: MODEL,
+            contents: messages,
+            config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
+          }),
+          GEMINI_TIMEOUT[complexity],
+          'Gemini API (마지막 턴)',
+        )
         const retryUsage = (retry as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
         if (retryUsage) {
           totalInputTokens += retryUsage.promptTokenCount || 0
@@ -402,7 +429,7 @@ export async function* executeRAGStream(
         }
       }
 
-      const results = await executeToolsParallel(calls)
+      const results = await executeToolsParallel(calls, signal)
 
       // ── Context Precision 향상: search_ai_law 결과를 쿼리 관련성 기준으로 재정렬 ──
       for (const r of results) {
@@ -412,6 +439,12 @@ export async function* executeRAGStream(
       }
 
       allToolResults.push(...results)
+
+      // 메모리 누수 방지: 에러 결과 우선 제거하여 제한 유지
+      while (allToolResults.length > MAX_TOOL_RESULTS) {
+        const errIdx = allToolResults.findIndex(r => r.isError)
+        allToolResults.splice(errIdx >= 0 ? errIdx : 0, 1)
+      }
 
       currentProgress = Math.min(8 + ((turnCount + 0.5) * progressPerTurn), 85)
 
@@ -514,7 +547,7 @@ export async function* executeRAGStream(
           }
         }
 
-        const autoResults = await executeToolsParallel(autoChains)
+        const autoResults = await executeToolsParallel(autoChains, signal)
 
         for (const autoResult of autoResults) {
           allToolResults.push(autoResult)
