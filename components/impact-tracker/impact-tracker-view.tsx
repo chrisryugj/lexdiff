@@ -164,7 +164,7 @@ export function ImpactTrackerView({
         className="sticky top-0 z-50 shadow-sm border-b border-gray-200 dark:border-gray-800/60 bg-content-bg transition-transform duration-400"
         style={{ transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)' }}
       >
-        <div className="container mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <button onClick={handleLogoClick} className="flex items-center gap-3 group">

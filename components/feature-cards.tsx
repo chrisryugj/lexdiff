@@ -117,7 +117,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
           </h3>
           <p className="text-lg text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
             <span className="hidden sm:inline whitespace-nowrap">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지, 지어낸 답은 없는 행정AI.</span>
-            <span className="sm:hidden">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지,<br/>지어낸 답은 없는 행정AI.</span>
+            <span className="sm:hidden text-[15px]">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색<br/>· 전국 조례까지, 지어낸 답은 없는 행정AI.</span>
           </p>
         </div>
 
@@ -128,7 +128,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
               <div
                 key={card.title}
                 ref={el => { itemRefs.current[idx] = el }}
-                className={`group relative bg-white dark:bg-[#1a222c] border border-gray-200 dark:border-gray-800 p-8 lg:p-10 transition-all duration-700 hover:shadow-2xl hover:-translate-y-1 ${itemsRevealed[idx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+                className={`group relative bg-white dark:bg-[#1a222c] border border-gray-200 dark:border-gray-800 p-5 sm:p-8 lg:p-10 transition-all duration-700 hover:shadow-2xl hover:-translate-y-1 ${itemsRevealed[idx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)',
                   transitionDelay: `${index * 100}ms`
@@ -162,7 +162,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
                 key={tool.id}
                 ref={el => { itemRefs.current[idx] = el }}
                 onClick={() => onToolClick?.(tool.id)}
-                className={`group relative text-left bg-white dark:bg-[#1a222c] border border-gray-200 dark:border-gray-800 p-6 transition-all duration-700 hover:shadow-2xl hover:-translate-y-1 cursor-pointer
+                className={`group relative text-left bg-white dark:bg-[#1a222c] border border-gray-200 dark:border-gray-800 p-4 sm:p-6 transition-all duration-700 hover:shadow-2xl hover:-translate-y-1 cursor-pointer
                   ${itemsRevealed[idx] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)',

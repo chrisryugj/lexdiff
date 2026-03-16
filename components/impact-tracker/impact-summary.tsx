@@ -28,7 +28,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
       {/* 상단 골드 라인 */}
       <div className="h-0.5 bg-gradient-to-r from-brand-gold via-brand-gold-light to-brand-gold" />
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {isLoading ? (
           <div className="flex items-center gap-3 text-gray-500">
             <div className="relative">
@@ -51,7 +51,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
               </div>
 
               {/* 둘째 줄: 등급 배지 바 */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {summary.bySeverity.critical > 0 && (
                   <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-lg px-3 py-1.5">
                     <div className="w-2 h-2 rounded-full bg-red-500" />
@@ -78,7 +78,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
                   <Icon name="link" size={14} className="text-brand-gold shrink-0" />
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {ordinanceRefs!.map((ref, i) => (
-                      <span key={i} className="whitespace-nowrap">
+                      <span key={i} className="whitespace-nowrap sm:whitespace-normal">
                         <span className="font-medium text-gray-700 dark:text-gray-300">{ref.ordinanceName}</span>
                         <span className="text-gray-400 dark:text-gray-500"> · 상위법령 {ref.refs.length}건 참조</span>
                       </span>
@@ -105,7 +105,7 @@ export function ImpactSummary({ summary, isLoading, aiSource, ordinanceRefs, par
                   AI 종합 요약
                 </button>
                 {expanded && (
-                  <div className="mt-3 bg-content-bg rounded-lg p-5 border border-gray-100 dark:border-gray-800">
+                  <div className="mt-3 bg-content-bg rounded-lg p-3 sm:p-5 border border-gray-100 dark:border-gray-800">
                     <LegalMarkdownRenderer
                       content={summary.aiSummary}
                       disabledLink
