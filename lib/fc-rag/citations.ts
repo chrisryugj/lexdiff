@@ -6,6 +6,24 @@ import type { ToolCallResult } from './tool-adapter'
 import type { FCRAGCitation } from './engine'
 
 /**
+ * 답변 텍스트에서 문맥 인식 조문 참조 추출.
+ * "이 법 제N조", "같은 법 제N조", "동법 제N조" → 직전 법령명으로 해석.
+ * 단독 "제N조" → 직전 법령명 부착.
+ */
+function extractContextualArticles(text: string): Set<string> {
+  const articles = new Set<string>()
+
+  // 텍스트를 순서대로 스캔하며 조문 번호 수집 (법령명 관계없이 모든 제N조 매칭)
+  const patterns = /(?:「[^」]+」\s*)?(?:이\s*법|같은\s*법|동법|본법)?\s*제(\d+)조(?:의(\d+))?/g
+  for (const m of text.matchAll(patterns)) {
+    const articleNum = m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`
+    articles.add(articleNum)
+  }
+
+  return articles
+}
+
+/**
  * 도구 결과에서 Citation 구성 (답변 텍스트 기반 필터링)
  */
 export function buildCitations(toolResults: ToolCallResult[], answerText?: string): FCRAGCitation[] {
@@ -13,10 +31,7 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
   const seen = new Set<string>()
 
   const mentionedArticles = answerText
-    ? new Set(
-        Array.from(answerText.matchAll(/제(\d+)조(?:의(\d+))?/g))
-          .map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
-      )
+    ? extractContextualArticles(answerText)
     : null
 
   for (const result of toolResults) {

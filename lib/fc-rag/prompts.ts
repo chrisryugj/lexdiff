@@ -123,18 +123,24 @@ const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
   housing: '- 주택·임대차 도메인: chain_ordinance_compare 로 조례 비교. 개별: search_ordinance.',
   construction: '- 건설 도메인: chain_procedure_detail 로 절차/비용 확인. 개별: search_admin_rule, get_three_tier.',
   environment: '- 환경 도메인: search_ordinance, search_admin_rule 활용.',
+  medical: '- 의료 도메인: chain_law_system 또는 chain_full_research 로 의료법+약사법 등 법체계 수집.',
+  education: '- 교육 도메인: chain_law_system 또는 chain_full_research 로 교육기본법+초중등교육법 등 법체계 수집.',
+  finance: '- 금융 도메인: chain_full_research 또는 chain_dispute_prep 로 자본시장법+금소법 등 수집.',
+  military: '- 병역 도메인: chain_law_system 또는 chain_full_research 로 병역법+군인사법 등 법체계 수집.',
 }
 
 // ─── 시스템 프롬프트 생성 ───
 
 /**
  * complexity + queryType + domain 기반 통합 시스템 프롬프트 생성.
- * Bridge(Claude)와 Gemini 양쪽에서 동일 구조로 사용.
+ * Bridge(Claude)와 Gemini(Fallback) 양쪽에서 사용.
+ * isGemini=true 시 할루시네이션 방지 추가 제약 적용.
  */
 export function buildSystemPrompt(
   complexity: QueryComplexity,
   queryType: LegalQueryType,
-  query?: string
+  query?: string,
+  isGemini?: boolean
 ): string {
   const domain = query ? detectDomain(query) : 'general'
   const domainHint = DOMAIN_TOOL_HINTS[domain] || ''
@@ -190,5 +196,12 @@ ${queryType === 'consequence' ? `
 ## 벌칙조 자동 조회 지침
 - 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.
 - 방법: get_batch_articles로 벌칙 조항을 조회하거나, search_ai_law에 "[법령명] 벌칙 과태료"로 추가 검색.
-` : ''}${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}`
+` : ''}${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}${isGemini ? `
+
+## 🔴 Gemini Fallback 추가 제약 (최우선)
+- 도구 결과에 **정확히 포함된 조문번호와 법령명만** 답변에 인용할 것. 추론으로 유추한 조문번호를 절대 생성하지 마라.
+- 도구 결과 원문에 없는 법률 지식(벌금액, 시행일, 적용 범위 등)을 학습 데이터에서 가져와 답변하지 마라.
+- 확실하지 않은 정보는 반드시 "해당 내용을 확인하지 못했습니다"라고 답변하라.
+- 도구 결과가 부족하면 추가 도구 호출을 시도하되, 호출 없이 추측 답변하지 마라.
+- 검색 결과에서 반환된 법령명·조문번호를 그대로 사용하고, 유사한 다른 법령명으로 대체하지 마라.` : ''}`
 }

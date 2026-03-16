@@ -23,6 +23,10 @@ export const TIER_1: Record<string, readonly string[]> = {
   environment: ['search_ordinance', 'search_admin_rule', 'chain_law_system', 'chain_action_basis', 'chain_amendment_track'],
   construction: ['search_admin_rule', 'get_three_tier', 'chain_ordinance_compare', 'chain_action_basis', 'chain_procedure_detail'],
   civil_service: ['search_ordinance', 'get_ordinance'],
+  medical: ['chain_law_system', 'chain_full_research', 'chain_procedure_detail'],
+  education: ['chain_law_system', 'chain_full_research', 'chain_procedure_detail'],
+  finance: ['chain_law_system', 'chain_full_research', 'chain_dispute_prep'],
+  military: ['chain_law_system', 'chain_full_research', 'chain_procedure_detail'],
 }
 
 // Tier 2: Context-activated (12 tools) — structural/historical/comparison needs
@@ -47,7 +51,7 @@ export const TIER_3 = [
 // Domain detection for query classification
 export type LegalDomain = 'tax' | 'customs' | 'labor' | 'privacy' | 'competition' |
   'constitutional' | 'admin' | 'public_servant' | 'housing' | 'environment' |
-  'construction' | 'civil_service' | 'general'
+  'construction' | 'civil_service' | 'medical' | 'education' | 'finance' | 'military' | 'general'
 
 export function detectDomain(query: string): LegalDomain {
   const src = query.toLowerCase()
@@ -63,6 +67,10 @@ export function detectDomain(query: string): LegalDomain {
   if (/환경|대기|수질|폐기물|오염/.test(src)) return 'environment'
   if (/공정거래|하도급|독점|카르텔|납품단가/.test(src)) return 'competition'
   if (/헌법|기본권|위헌|헌법소원|헌법재판/.test(src)) return 'constitutional'
+  if (/의료|의사|병원|환자|진료|약사|약국|의료기기|감염병|응급의료/.test(src)) return 'medical'
+  if (/교육|학교|학생|교사|교원|입학|졸업|학교폭력|평생교육/.test(src)) return 'education'
+  if (/금융|은행|보험|자본시장|증권|투자|여신|대출|금융소비자/.test(src)) return 'finance'
+  if (/병역|군인|군복무|입영|징집|전역|군형법|예비군|사회복무요원/.test(src)) return 'military'
   return 'general'
 }
 
