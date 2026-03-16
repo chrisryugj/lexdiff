@@ -44,17 +44,17 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
     <div className={`group relative overflow-hidden rounded-lg border ${accent.border} bg-white dark:bg-gray-900/80 transition-shadow hover:shadow-md`}>
       <div className="px-4 pt-3.5 pb-3">
         {/* 1행: 분류배지 + 우측에 개정이유|개정일 배지 */}
-        <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-start justify-between gap-1.5 sm:gap-2 mb-2 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 text-[13px] font-bold px-2.5 py-1 rounded border shrink-0 ${accent.badge}`}>
             <span className={`w-2 h-2 rounded-full ${accent.dot}`} />
             {config.label}
           </span>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] sm:text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700">
               {item.change.revisionType}
             </span>
-            <span className="text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700 tabular-nums">
+            <span className="text-[11px] sm:text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700 tabular-nums">
               {formatDate(item.change.revisionDate)}
             </span>
           </div>
@@ -96,7 +96,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
                 {item.downstreamImpacts.map((d, i) => (
                   <li key={i} className="flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                    <span className="truncate">[{d.type}] {d.lawName} {d.joDisplay || ''}</span>
+                    <span className="break-keep line-clamp-1">[{d.type}] {d.lawName} {d.joDisplay || ''}</span>
                   </li>
                 ))}
               </ul>

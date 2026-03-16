@@ -235,34 +235,34 @@ export function SearchView({
                 searchMode={searchMode}
               />
               {(onImpactTracker || onToolClick) && (
-                <div className="flex justify-center mt-5 gap-2 flex-wrap">
+                <div className="flex justify-center mt-5 gap-1.5 sm:gap-2 flex-wrap">
                   {onImpactTracker && (
                     <button
                       onClick={onImpactTracker}
-                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                      className="group flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
                     >
                       <Icon name="chart-line" size={16} className="text-brand-gold" />
-                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">변경 영향 분석</span>
+                      <span className="text-xs sm:text-sm font-medium text-brand-navy dark:text-foreground">변경 영향 분석</span>
                       <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
                     </button>
                   )}
                   {onToolClick && (
                     <button
                       onClick={() => onToolClick('ordinance-sync')}
-                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                      className="group flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
                     >
                       <Icon name="alert-triangle" size={16} className="text-brand-gold" />
-                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">조례 미반영 탐지</span>
+                      <span className="text-xs sm:text-sm font-medium text-brand-navy dark:text-foreground">조례 미반영 탐지</span>
                       <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
                     </button>
                   )}
                   {onToolClick && (
                     <button
                       onClick={() => onToolClick('ordinance-benchmark')}
-                      className="group flex items-center gap-2 px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
+                      className="group flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full border border-brand-navy/15 bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm hover:border-brand-gold hover:shadow-md hover:shadow-brand-gold/10 transition-all duration-300"
                     >
                       <Icon name="bar-chart" size={16} className="text-brand-gold" />
-                      <span className="text-sm font-medium text-brand-navy dark:text-foreground">조례 벤치마킹</span>
+                      <span className="text-xs sm:text-sm font-medium text-brand-navy dark:text-foreground">조례 벤치마킹</span>
                       <Icon name="arrow-right" size={14} className="text-gray-300 dark:text-gray-600 group-hover:text-brand-gold group-hover:translate-x-0.5 transition-all" />
                     </button>
                   )}
@@ -279,7 +279,7 @@ export function SearchView({
           ref={featuresRef}
           className={`py-10 lg:py-16 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
         >
-          <div className="container mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <FeatureCards revealed={featuresRevealed} onToolClick={onToolClick} />
           </div>
         </section>

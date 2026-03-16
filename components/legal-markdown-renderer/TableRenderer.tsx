@@ -24,8 +24,8 @@ interface TdProps {
 
 export function TableRenderer({ children }: TableProps) {
   return (
-    <div className="overflow-x-auto my-4 mx-3 rounded-md border border-border/50 bg-card/50">
-      <table className="w-full border-collapse table-auto" style={{ fontSize: 'inherit' }}>
+    <div className="overflow-x-auto my-4 mx-0 sm:mx-3 rounded-md border border-border/50 bg-card/50 -mx-1">
+      <table className="w-full border-collapse table-auto" style={{ fontSize: 'inherit', minWidth: '320px' }}>
         {children}
       </table>
     </div>
@@ -53,10 +53,10 @@ export function ThRenderer({ children, ...props }: ThProps) {
   return (
     <th
       className={`
-        px-4 py-2.5 text-left font-semibold text-foreground/80 align-middle
+        px-2 sm:px-4 py-2 sm:py-2.5 text-left font-semibold text-foreground/80 align-middle
         ${isShortColumn
           ? 'whitespace-nowrap text-center w-px'
-          : 'min-w-[100px]'
+          : 'min-w-[60px] sm:min-w-[100px]'
         }
       `}
       style={{ fontSize: 'inherit' }}
@@ -69,7 +69,7 @@ export function ThRenderer({ children, ...props }: ThProps) {
 
 export function TdRenderer({ children }: TdProps) {
   return (
-    <td className="px-4 py-2.5 border-b border-border/50 text-foreground/90 align-top leading-relaxed break-keep" style={{ fontSize: 'inherit' }}>
+    <td className="px-2 sm:px-4 py-2 sm:py-2.5 border-b border-border/50 text-foreground/90 align-top leading-relaxed break-keep" style={{ fontSize: 'inherit' }}>
       {children}
     </td>
   )
