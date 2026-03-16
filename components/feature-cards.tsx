@@ -117,7 +117,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
           </h3>
           <p className="text-lg text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
             <span className="hidden sm:inline whitespace-nowrap">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지, 지어낸 답은 없는 행정AI.</span>
-            <span className="sm:hidden">위임법령 3단 비교 · 신구법 대조 · 판례 통합 검색 · 전국 조례까지,<br/>지어낸 답은 없는 행정AI.</span>
+            <span className="sm:hidden text-[15px]">법령 비교 · 판례 검색 · 전국 조례까지<br/>지어낸 답은 없는 행정AI.</span>
           </p>
         </div>
 
