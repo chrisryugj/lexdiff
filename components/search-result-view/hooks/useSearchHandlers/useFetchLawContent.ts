@@ -15,6 +15,7 @@ export function useFetchLawContent(deps: HandlerDeps) {
   const fetchLawContent = useCallback(async (
     selectedLaw: LawSearchResult,
     query: SearchQuery,
+    skipCache?: boolean,
   ) => {
     debugLogger.info("법령 ID 확인", { lawId: selectedLaw.lawId, lawName: selectedLaw.lawName })
 
@@ -32,9 +33,9 @@ export function useFetchLawContent(deps: HandlerDeps) {
         throw new Error("선택한 법령에 대한 식별자를 찾을 수 없습니다")
       }
 
-      // IndexedDB 캐시 체크
+      // IndexedDB 캐시 체크 (skipCache 시 무시)
       const { getLawContentCache, setLawContentCache } = await import('@/lib/law-content-cache')
-      const lawContentCache = await getLawContentCache(selectedLaw.lawId || '', '')
+      const lawContentCache = skipCache ? null : await getLawContentCache(selectedLaw.lawId || '', '')
 
       let meta
       let articles

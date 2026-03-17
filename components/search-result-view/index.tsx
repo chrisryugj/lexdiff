@@ -353,6 +353,8 @@ function SearchResultViewComponent({
       } catch (error) {
         if (!isSubscribed) return
         debugLogger.error('❌ 검색 결과 로드 실패', error)
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 0)
       }
     }
 
@@ -569,8 +571,31 @@ function SearchResultViewComponent({
               onBack={handlers.handleReset}
             />
           ) : !state.lawData ? (
-            /* 데이터 없음 */
-            null
+            /* 검색 결과 없음 - 홈으로 복귀 안내 */
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+              <Icon name="search" className="h-16 w-16 text-muted-foreground/40 mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">검색 결과를 표시할 수 없습니다</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                검색 중 문제가 발생했거나 결과가 없습니다.<br />
+                다른 검색어로 다시 시도해보세요.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => actions.setShowSearchModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <Icon name="search" className="h-4 w-4" />
+                  다시 검색
+                </button>
+                <button
+                  onClick={handlers.handleReset}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-accent transition-colors"
+                >
+                  <Icon name="home" className="h-4 w-4" />
+                  홈으로
+                </button>
+              </div>
+            </div>
           ) : (
             /* 법령 뷰어 */
             <div className="space-y-2 sm:space-y-4">
@@ -769,7 +794,15 @@ function SearchResultViewComponent({
       {/* 검색 모드 선택 다이얼로그 */}
       <SearchChoiceDialog
         open={state.showChoiceDialog}
-        onOpenChange={actions.setShowChoiceDialog}
+        onOpenChange={(open) => {
+          actions.setShowChoiceDialog(open)
+          // X 버튼으로 닫힐 때 홈으로 복귀 (빈화면 방지)
+          if (!open && state.pendingQuery) {
+            actions.setPendingQuery(null)
+            actions.resetToHome()
+            onBack()
+          }
+        }}
         pendingQuery={state.pendingQuery}
         onChoice={handlers.handleSearchChoice}
       />
@@ -777,7 +810,15 @@ function SearchResultViewComponent({
       {/* 법령 검색 결과 없음 다이얼로그 */}
       <NoResultDialog
         open={state.showNoResultDialog}
-        onOpenChange={actions.setShowNoResultDialog}
+        onOpenChange={(open) => {
+          actions.setShowNoResultDialog(open)
+          // X 버튼으로 닫힐 때 홈으로 복귀 (빈화면 방지)
+          if (!open && state.noResultQuery) {
+            actions.setNoResultQuery(null)
+            actions.resetToHome()
+            onBack()
+          }
+        }}
         noResultQuery={state.noResultQuery}
         onChoice={handlers.handleNoResultChoice}
       />

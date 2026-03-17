@@ -156,7 +156,7 @@ export function useSearchHandlers({
       const aiQuery = (query as any).rawQuery || fullQuery
       await handleAiSearch(aiQuery, signal, skipCache)
     } else {
-      await handleBasicSearch(query, fullQuery)
+      await handleBasicSearch(query, fullQuery, skipCache)
     }
   }, [actions, handleAiSearch, handleBasicSearch])
 

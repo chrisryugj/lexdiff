@@ -14,7 +14,7 @@ import { buildOrdinanceSearchStrategies, scoreRelevance, expandForLawSearch } fr
 import type { HandlerDeps, SearchQuery, LawSearchResult } from "./types"
 
 interface UseBasicSearchDeps extends HandlerDeps {
-  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
+  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery, skipCache?: boolean) => Promise<void>
 }
 
 export function useBasicSearch(deps: UseBasicSearchDeps) {
@@ -22,7 +22,8 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
 
   const handleBasicSearch = useCallback(async (
     query: SearchQuery,
-    fullQuery: string
+    fullQuery: string,
+    skipCache?: boolean
   ) => {
     actions.setIsSearching(true)
     actions.updateProgress('searching', 10)
@@ -34,8 +35,8 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
 
     debugLogger.info(isOrdinance ? "조례 검색 시작" : "법령 검색 시작", { lawName })
 
-    // IndexedDB 우선 체크 (법령만)
-    if (!isOrdinance) {
+    // IndexedDB 우선 체크 (법령만, skipCache 시 스킵)
+    if (!isOrdinance && !skipCache) {
       const rawQuery = buildFullQuery(query.lawName, query.article)
 
       try {
@@ -358,7 +359,7 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
 
         if (exactMatch && !query.jo) {
           try {
-            await fetchLawContent(exactMatch, { lawName, article: query.article, jo: undefined })
+            await fetchLawContent(exactMatch, { lawName, article: query.article, jo: undefined }, skipCache)
             actions.setMobileView("content")
             return
           } catch (error) {
@@ -368,7 +369,7 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
 
         if (exactMatch && query.jo) {
           try {
-            await fetchLawContent(exactMatch, { lawName, article: query.article, jo: query.jo })
+            await fetchLawContent(exactMatch, { lawName, article: query.article, jo: query.jo }, skipCache)
             actions.setMobileView("content")
           } catch (error) {
             toast({ title: "법령 조회 실패", description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.", variant: "destructive" })

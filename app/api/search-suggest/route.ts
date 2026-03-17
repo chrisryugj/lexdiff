@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { expandQuery } from '@/lib/query-expansion'
-import { containsLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
+import { containsLocalGovName, extractLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
@@ -314,11 +314,18 @@ export async function GET(request: NextRequest) {
       return true
     })
 
+    // 지자체 관련 변수 (법령·조례 양쪽에서 사용)
+    const hasLocalGovName = containsLocalGovName(query)
+    const localGovName = extractLocalGovName(query)
+    const queryKeywords = query.split(/\s+/).filter((w: string) => w.length >= 2)
+
     // 법령 결과 추가
+    // 지자체명 쿼리일 때: 법령 결과는 점수 대폭 하향 (조례가 우선)
+    const lawScorePenalty = localGovName ? 200 : 0
     for (const law of dedupLaw) {
       const matchIndex = law.name.toLowerCase().indexOf(queryLower)
       const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
-      let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
+      let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0) - lawScorePenalty
       let suggestionText = law.name
 
       // 조문 패턴 감지 시: "법령명 + 제X조" 형태로 제안
@@ -341,11 +348,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 조례 결과 추가
-    // 지역명 포함 쿼리 = 거의 확실히 조례 의도 → 조례 최우선 배치
-    const hasLocalGovName = containsLocalGovName(query)
-    const queryKeywords = query.split(/\s+/).filter((w: string) => w.length >= 2)
+    // 지역명 포함 쿼리 = 거의 확실히 조례 의도 → 해당 지자체만 필터링
+    // 지자체명이 쿼리에 있으면 해당 지자체 조례만 표시
+    const filteredOrdin = localGovName
+      ? dedupOrdin.filter(r => r.name.includes(localGovName))
+      : dedupOrdin
 
-    for (const ordin of dedupOrdin) {
+    for (const ordin of filteredOrdin) {
       const ordinLower = ordin.name.toLowerCase()
       const matchIndex = ordinLower.indexOf(queryLower)
       const startsWithQuery = ordinLower.startsWith(queryLower)

@@ -99,7 +99,7 @@ export function LawViewerSingleArticle({
           {/* 버튼 그룹 */}
           <div className="flex items-center gap-0 shrink-0">
             {onRefresh && (
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={onRefresh} title="최신 정보로 새로고침">
                 <Icon name="refresh-cw" size={14} />
               </Button>
             )}

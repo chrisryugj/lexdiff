@@ -72,6 +72,29 @@ export function containsLocalGovName(query: string): boolean {
 }
 
 /**
+ * 쿼리에서 지자체명을 추출 (가장 긴 매칭 우선)
+ *
+ * "광진구 복무" → "광진구"
+ * "서울특별시 강남구 조례" → "강남구" (구 단위 우선)
+ * "복무규정" → null
+ */
+export function extractLocalGovName(query: string): string | null {
+  // 구/군/시 단위를 먼저 (더 구체적), 그 다음 광역시/도
+  let best: string | null = null
+  for (const name of ALL_LOCAL_GOV_NAMES) {
+    if (query.includes(name)) {
+      if (!best || name.length > best.length) best = name
+    }
+  }
+  if (best) return best
+
+  for (const city of [...METRO_CITIES, ...PROVINCES]) {
+    if (query.includes(city)) return city
+  }
+  return null
+}
+
+/**
  * 조례 쿼리인지 판별
  */
 export function isOrdinanceQuery(query: string): boolean {

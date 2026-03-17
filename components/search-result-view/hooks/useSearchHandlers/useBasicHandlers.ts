@@ -14,7 +14,7 @@ import { buildJO } from "@/lib/law-parser"
 import type { HandlerDeps, SearchQuery, LawSearchResult, OrdinanceSearchResult, Favorite } from "./types"
 
 interface UseBasicHandlersDeps extends HandlerDeps {
-  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
+  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery, skipCache?: boolean) => Promise<void>
   handleSearchInternal: (query: SearchQuery, signal?: AbortSignal, forcedMode?: 'law' | 'ai', skipCache?: boolean) => Promise<void>
 }
 
@@ -45,8 +45,11 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
     } else {
       actions.setNoResultQuery(null)
       actions.setIsSearching(false)
+      // 취소 시 홈으로 복귀 (빈화면 방지)
+      actions.resetToHome()
+      onBack()
     }
-  }, [actions, state.noResultQuery, handleSearchInternal])
+  }, [actions, state.noResultQuery, handleSearchInternal, onBack])
 
   // ============================================================
   // 법령/조례 선택
@@ -67,6 +70,8 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
     } catch (error) {
       debugLogger.error("법령 조회 실패", error)
       toast({ title: "법령 조회 실패", description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.", variant: "destructive" })
+      // 에러 시 선택 목록으로 복귀 (lawSelectionState 유지하되 isSearching 해제)
+      // → 사용자가 다른 법령을 선택하거나 취소할 수 있음
     } finally {
       actions.setIsSearching(false)
     }

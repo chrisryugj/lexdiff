@@ -310,7 +310,16 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       return
     }
 
-    void handleSearchInternal({ lawName: state.lawData.meta.lawTitle }, undefined, "law", true)
+    // 현재 selectedJo를 유지하여 새로고침 후에도 조문 위치 보존
+    void handleSearchInternal(
+      {
+        lawName: state.lawData.meta.lawTitle,
+        jo: state.lawData.selectedJo || undefined,
+      },
+      undefined,
+      "law",
+      true
+    )
   }, [handlePrecedentSelect, handleSearchInternal, state.lawData, toast])
 
   const handleInterpretationSearch = useCallback(

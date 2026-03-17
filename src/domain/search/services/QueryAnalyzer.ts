@@ -86,7 +86,8 @@ export function detectQueryType(query: string): QueryDetectionResult {
   }
 
   // 패턴 1: 조문 번호가 명시된 경우
-  const articlePattern = /제?\s*\d+\s*조(?:의\s*\d+)?/
+  // "제38조", "제38조의2", "제38조 제1항", "제38조 제1항 제2호" 모두 매칭
+  const articlePattern = /제?\s*\d+\s*조(?:의\s*\d+)?(?:\s*제?\s*\d+\s*항)?(?:\s*제?\s*\d+\s*호)?/
   const hasArticleNumber = articlePattern.test(trimmedQuery)
 
   if (hasArticleNumber) {

@@ -45,7 +45,7 @@ export interface SearchHandlers {
   handleAiFollowUp: (followUpQuery: string) => void  // 연속 대화 추가 질문
   handleNewConversation: () => void  // 새 대화 시작
   handleRefresh: () => void  // 법령/판례 강제 새로고침 (캐시 무시)
-  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery) => Promise<void>
+  fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery, skipCache?: boolean) => Promise<void>
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
   // 통합검색 핸들러
   handlePrecedentSearch: (query: SearchQuery) => Promise<boolean>

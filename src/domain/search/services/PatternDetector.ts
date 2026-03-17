@@ -97,8 +97,12 @@ export function detectCompoundQuery(query: string): {
 } {
   const types: string[] = []
 
-  const hasPrecedent = PRECEDENT_PATTERNS.some(p => p.test(query))
-  const hasLaw = /법|령|규칙/.test(query)
+  const hasPrecedent = PRECEDENT_PATTERNS.some(p => p.test(query)) || /판례|판결|결정/.test(query)
+  // 법률 의도: 법령명/조문 패턴 + 법률 주제 키워드
+  // "공무원 징계 판례" → hasLaw=true(징계는 법률 주제)
+  const queryWithoutPrecedent = query.replace(/판례|판결|결정|해석례|예규|고시|훈령|지침/g, '').trim()
+  const hasLaw = /법|령|규칙|제\d+조|조례/.test(query) ||
+    (queryWithoutPrecedent.length >= 2 && /징계|해임|파면|처분|허가|면허|인가|등록|과세|부과|환급|통관|공무원|근로|임대|건축|관세|세금|소득/.test(queryWithoutPrecedent))
   const hasInterpretation = INTERPRETATION_PATTERNS.some(p => p.test(query))
 
   if (hasPrecedent) types.push('precedent')
