@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAnthropicClient, CLAUDE_MODEL } from '@/lib/fc-rag/anthropic-client'
+import { callGateway } from '@/lib/fc-rag/anthropic-client'
 
 // ── 조례 본문 조회 ──
 
@@ -87,18 +87,10 @@ function parseAnalysisResponse(text: string): { comparisonTable: string; highlig
 
 async function callClaude(prompt: string): Promise<string | null> {
   try {
-    const client = getAnthropicClient()
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 8192,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-    })
-    const text = response.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-    return text || null
+    const response = await callGateway([
+      { role: 'user', content: prompt },
+    ], { maxTokens: 8192, temperature: 0 })
+    return response.choices?.[0]?.message?.content || null
   } catch {
     return null
   }

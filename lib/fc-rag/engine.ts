@@ -22,8 +22,7 @@ import { KNOWN_MST, cacheMSTEntries, detectFastPath, parseLawEntries, findBestMS
 import { buildCitations, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { evaluateResponseQuality } from './quality-evaluator'
-import { getAnthropicClient, CLAUDE_MODEL } from './anthropic-client'
-import type Anthropic from '@anthropic-ai/sdk'
+import { callGateway, type GatewayMessage } from './anthropic-client'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -234,11 +233,12 @@ async function* handleFastPath(
   return false
 }
 
-// ─── Claude Primary 엔진 ───
+// ─── Claude Primary 엔진 (OpenClaw Gateway 경유) ───
 
 /**
  * Claude FC-RAG 스트리밍 실행 (Primary)
- * Anthropic SDK + OpenClaw OAuth 토큰으로 Claude Sonnet 4.6 호출
+ * OpenClaw Gateway /v1/chat/completions 호출.
+ * Gateway 에이전트가 korean-law MCP 도구를 내부적으로 처리.
  */
 export async function* executeClaudeRAGStream(
   query: string,
@@ -248,12 +248,11 @@ export async function* executeClaudeRAGStream(
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
-  const maxToolTurns = getMaxToolTurns(complexity)
   const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
-  // ── Fast Path ──
+  // ── Fast Path: LLM 없이 직접 도구 호출 ──
   const fastPathGen = handleFastPath(query, queryType, signal)
   let fastPathNext = await fastPathGen.next()
   while (!fastPathNext.done) {
@@ -262,255 +261,86 @@ export async function* executeClaudeRAGStream(
   }
   if (fastPathNext.value === true) return
 
-  // ── Full Pipeline: Claude 멀티턴 ──
-  const client = getAnthropicClient()
+  // ── Full Pipeline: OpenClaw Gateway → Claude Sonnet 4.6 ──
   const systemPrompt = buildSystemPrompt(complexity, queryType, query, false /* isGemini */)
-  const selectedTools = new Set(selectToolsForQuery(query))
-  const allToolDefs = getAnthropicToolDefinitions()
-  const toolDefs = allToolDefs.filter(d => selectedTools.has(d.name))
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: query },
-  ]
+  yield { type: 'status', message: 'AI가 분석하고 있습니다...', progress: 15 }
 
-  let allToolResults: ToolCallResult[] = []
-  const MAX_TOOL_RESULTS = 30
-  let turnCount = 0
-  let latestSearchEntries: LawEntry[] = []
-  const failureCount = new Map<string, number>()
-  let totalInputTokens = 0
-  let totalOutputTokens = 0
-
-  const progressRange = 80
-  const progressPerTurn = progressRange / (maxToolTurns + 1)
-
-  /** Claude 타임아웃 (ms) */
-  const CLAUDE_TIMEOUT: Record<QueryComplexity, number> = {
-    simple: 45_000,
-    moderate: 90_000,
-    complex: 150_000,
+  if (signal?.aborted) {
+    yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
+    return
   }
 
-  while (turnCount <= maxToolTurns) {
-    try {
-      const isLastTurn = turnCount === maxToolTurns
-      const currentProgress = Math.min(8 + (turnCount * progressPerTurn), 85)
-      yield { type: 'status', message: 'AI가 분석하고 있습니다...', progress: currentProgress }
+  /** Gateway 타임아웃 (ms) — 에이전트가 MCP 도구까지 실행하므로 넉넉하게 */
+  const GATEWAY_TIMEOUT: Record<QueryComplexity, number> = {
+    simple: 60_000,
+    moderate: 120_000,
+    complex: 180_000,
+  }
 
-      // 실패 2회 이상인 도구 제외
-      const activeTools = toolDefs.filter(d => (failureCount.get(d.name) || 0) < 2)
+  try {
+    const messages: GatewayMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query },
+    ]
 
-      if (signal?.aborted) {
-        yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
-        return
-      }
+    const response = await withTimeout(
+      callGateway(messages, {
+        maxTokens: MAX_TOKENS[complexity],
+        temperature: 0,
+        signal,
+      }),
+      GATEWAY_TIMEOUT[complexity],
+      'OpenClaw Gateway',
+    )
 
-      const response = await withTimeout(
-        client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: MAX_TOKENS[complexity],
-          system: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tools: activeTools as any,
-          messages,
-          temperature: 0,
-        }),
-        CLAUDE_TIMEOUT[complexity],
-        'Claude API',
-      )
+    const answer = response.choices?.[0]?.message?.content || ''
 
-      // 토큰 사용량
-      totalInputTokens += response.usage.input_tokens
-      totalOutputTokens += response.usage.output_tokens
-      yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
-
-      const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      const toolUseBlocks = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
-
-      // 텍스트 답변 (도구 호출 없음) → 완료
-      if (toolUseBlocks.length === 0 || response.stop_reason === 'end_turn') {
-        const answer = textBlocks.map(b => b.text).join('')
-        if (answer) {
-          // Quality Gate 평가
-          const quality = evaluateResponseQuality(allToolResults, answer)
-          if (quality.warnings.length > 0) warnings.push(...quality.warnings)
-
-          yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
-          yield {
-            type: 'answer',
-            data: {
-              answer,
-              citations: buildCitations(allToolResults, answer),
-              confidenceLevel: quality.level === 'fail' ? 'low' : calcConfidence(allToolResults),
-              complexity,
-              queryType,
-              warnings: warnings.length > 0 ? warnings : undefined,
-            },
-          }
-          return
-        }
-      }
-
-      // 마지막 턴: 도구 호출 무시, 텍스트 답변 강제
-      if (isLastTurn) {
-        const answer = textBlocks.map(b => b.text).join('')
-        if (answer) {
-          yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
-          yield {
-            type: 'answer',
-            data: {
-              answer,
-              citations: buildCitations(allToolResults, answer),
-              confidenceLevel: calcConfidence(allToolResults),
-              complexity,
-              queryType,
-              warnings: warnings.length > 0 ? warnings : undefined,
-            },
-          }
-          return
-        }
-        // 텍스트 없으면 답변 강제 요청
-        if (signal?.aborted) return
-        yield { type: 'status', message: '답변 생성을 요청하고 있습니다...', progress: 88 }
-        messages.push({ role: 'assistant', content: response.content })
-        messages.push({
-          role: 'user',
-          content: '수집된 정보를 바탕으로 한국어로 답변해주세요. 추가 도구 호출 없이 바로 답변하세요.',
-        })
-        const retry = await withTimeout(
-          client.messages.create({
-            model: CLAUDE_MODEL,
-            max_tokens: MAX_TOKENS[complexity],
-            system: systemPrompt,
-            messages,
-            temperature: 0,
-          }),
-          CLAUDE_TIMEOUT[complexity],
-          'Claude API (마지막 턴)',
-        )
-        totalInputTokens += retry.usage.input_tokens
-        totalOutputTokens += retry.usage.output_tokens
-        yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
-        const retryText = retry.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
-        yield {
-          type: 'answer',
-          data: {
-            answer: retryText || '답변 생성에 실패했습니다.',
-            citations: buildCitations(allToolResults, retryText),
-            confidenceLevel: calcConfidence(allToolResults),
-            complexity,
-            queryType,
-            warnings: warnings.length > 0 ? warnings : undefined,
-          },
-        }
-        return
-      }
-
-      // ── Tool Use 실행 ──
-      const calls = toolUseBlocks.map(b => ({
-        name: b.name,
-        args: (b.input || {}) as Record<string, unknown>,
-        id: b.id,
-      }))
-
-      // MST 보정
-      const fallbackEvents: FCRAGStreamEvent[] = []
-      await correctToolArgs(calls, latestSearchEntries, query, (entries, searchResult) => {
-        fallbackEvents.push({
-          type: 'tool_call', name: 'search_law',
-          displayName: '법령 검색 (MST 자동 확인)',
-          query: entries[0]?.name,
-        })
-        fallbackEvents.push({
-          type: 'tool_result', name: 'search_law',
-          displayName: '법령 검색 (MST 자동 확인)',
-          success: true,
-          summary: summarizeToolResult('search_law', searchResult),
-        })
-        allToolResults.push(searchResult)
-      })
-      for (const evt of fallbackEvents) yield evt
-
-      // 도구 호출 이벤트
-      for (const call of calls) {
-        yield {
-          type: 'tool_call',
-          name: call.name,
-          displayName: TOOL_DISPLAY_NAMES[call.name] || call.name,
-          query: getToolCallQuery(call.name, call.args),
-        }
-      }
-
-      const results = await executeToolsParallel(calls, signal)
-
-      // search_ai_law 결과 재정렬
-      for (const r of results) {
-        if (r.name === 'search_ai_law' && !r.isError) {
-          r.result = rerankAiSearchResult(r.result, query)
-        }
-      }
-
-      allToolResults.push(...results)
-      while (allToolResults.length > MAX_TOOL_RESULTS) {
-        const errIdx = allToolResults.findIndex(r => r.isError)
-        allToolResults.splice(errIdx >= 0 ? errIdx : 0, 1)
-      }
-
-      // 도구 결과 이벤트
-      for (const r of results) {
-        yield {
-          type: 'tool_result',
-          name: r.name,
-          displayName: TOOL_DISPLAY_NAMES[r.name] || r.name,
-          success: !r.isError,
-          summary: summarizeToolResult(r.name, r),
-        }
-        if (r.isError) failureCount.set(r.name, (failureCount.get(r.name) || 0) + 1)
-        else failureCount.delete(r.name)
-      }
-
-      // search_law 결과 추적
-      for (const r of results) {
-        if (r.name === 'search_law' && !r.isError) {
-          latestSearchEntries = parseLawEntries(r.result)
-          cacheMSTEntries(latestSearchEntries)
-        }
-      }
-
-      // ── 히스토리 추가 (Anthropic 형식) ──
-      messages.push({ role: 'assistant', content: response.content })
-      messages.push({
-        role: 'user',
-        content: calls.map((call, i) => ({
-          type: 'tool_result' as const,
-          tool_use_id: call.id,
-          content: results[i].result,
-        })),
-      })
-
-      turnCount++
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      warnings.push(`Claude API 오류: ${message}`)
-      yield { type: 'error', message }
-      break
+    if (!answer || answer.length < 10) {
+      throw new Error('Gateway 응답이 비어있습니다.')
     }
-  }
 
-  // 루프 종료 (에러/예외)
-  if (turnCount > maxToolTurns) {
-    warnings.push('도구 호출 횟수 제한에 도달했습니다.')
-  }
-  yield {
-    type: 'answer',
-    data: {
-      answer: '죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
-      citations: buildCitations(allToolResults),
-      confidenceLevel: 'low',
-      complexity,
-      queryType,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    },
+    // Quality Gate 평가
+    const quality = evaluateResponseQuality([], answer)
+    if (quality.warnings.length > 0) warnings.push(...quality.warnings)
+
+    // 토큰 사용량 (Gateway가 제공하면)
+    if (response.usage) {
+      yield {
+        type: 'token_usage',
+        inputTokens: response.usage.prompt_tokens,
+        outputTokens: response.usage.completion_tokens,
+        totalTokens: response.usage.total_tokens,
+      }
+    }
+
+    yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+    yield {
+      type: 'answer',
+      data: {
+        answer,
+        citations: buildCitations([], answer),
+        confidenceLevel: quality.level === 'fail' ? 'low' : quality.level === 'pass' ? 'high' : 'medium',
+        complexity,
+        queryType,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      },
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    warnings.push(`OpenClaw 오류: ${message}`)
+    yield { type: 'error', message }
+    yield {
+      type: 'answer',
+      data: {
+        answer: '죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+        citations: [],
+        confidenceLevel: 'low',
+        complexity,
+        queryType,
+        warnings,
+      },
+    }
   }
 }
 

@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
-import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/fc-rag/anthropic-client"
+import { callGateway } from "@/lib/fc-rag/anthropic-client"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -118,19 +118,12 @@ export async function POST(request: Request) {
       isPrecedent,
     })
 
-    // 1) Claude 우선 시도
+    // 1) Claude(Gateway) 우선 시도
     try {
-      const client = getAnthropicClient()
-      const response = await client.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0,
-      })
-      const claudeText = response.content
-        .filter(b => b.type === 'text')
-        .map(b => (b as { type: 'text'; text: string }).text)
-        .join('')
+      const response = await callGateway([
+        { role: 'user', content: prompt },
+      ], { maxTokens: 4096, temperature: 0 })
+      const claudeText = response.choices?.[0]?.message?.content || ''
       if (claudeText) {
         await recordAITokens(clientIP, claudeText.length)
         debugLogger.success("AI summary complete (Claude)", { length: claudeText.length })

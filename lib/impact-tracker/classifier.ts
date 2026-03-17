@@ -1,16 +1,16 @@
 /**
- * AI 영향도 분류기 - Claude 우선, Gemini 폴백
+ * AI 영향도 분류기 - Claude(Gateway) 우선, Gemini 폴백
  *
  * 법령 변경사항의 영향도(critical/review/info)를 AI로 분류하고
  * 종합 요약을 생성한다.
  *
  * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
- * Fallback: Gemini Flash Lite — Claude 불능 시
+ * Primary : Sonnet 4.6 (Claude) — OpenClaw Gateway /v1/chat/completions
+ * Fallback: Gemini Flash Lite — Gateway 불능 시
  */
 
 import { GoogleGenAI } from '@google/genai'
-import { getAnthropicClient, CLAUDE_MODEL } from '@/lib/fc-rag/anthropic-client'
+import { callGateway } from '@/lib/fc-rag/anthropic-client'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import {
   buildClassificationQuery,
@@ -29,7 +29,7 @@ export async function classifyImpact(
 
   const query = buildClassificationQuery(changes)
 
-  // 1) Claude 시도
+  // 1) Claude(Gateway) 시도
   const claudeResult = await classifyViaClaude(query)
   if (claudeResult) return claudeResult
 
@@ -38,38 +38,24 @@ export async function classifyImpact(
 }
 
 /**
- * AI 엔진이 Claude인지 Gemini인지 판별
- * (SSE에서 ai_source 이벤트 전송용)
+ * AI 엔진 판별 (SSE ai_source 이벤트용)
  */
 export async function getAISource(): Promise<'openclaw' | 'gemini'> {
-  try {
-    getAnthropicClient()
-    return 'openclaw'
-  } catch {
-    return 'gemini'
-  }
+  return 'openclaw'
 }
 
-// ── Claude 경로 ──
+// ── Claude 경로 (Gateway) ──
 
 async function classifyViaClaude(
   query: string,
 ): Promise<ClassificationResult[] | null> {
   try {
-    const client = getAnthropicClient()
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: buildClassificationSystemPrompt(),
-      messages: [{ role: 'user', content: query }],
-      temperature: 0.1,
-    })
+    const response = await callGateway([
+      { role: 'system', content: buildClassificationSystemPrompt() },
+      { role: 'user', content: query },
+    ], { temperature: 0.1 })
 
-    const text = response.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-
+    const text = response.choices?.[0]?.message?.content || ''
     return parseClassificationJSON(text)
   } catch {
     return null
@@ -83,9 +69,7 @@ async function classifyWithGemini(
   apiKey?: string,
 ): Promise<ClassificationResult[]> {
   const key = apiKey || process.env.GEMINI_API_KEY
-  if (!key) {
-    return []
-  }
+  if (!key) return []
 
   try {
     const ai = new GoogleGenAI({ apiKey: key })
@@ -97,10 +81,9 @@ async function classifyWithGemini(
         temperature: 0.1,
       },
     })
-
     const text = response.text || ''
     return parseClassificationJSON(text) || []
-  } catch (error) {
+  } catch {
     return []
   }
 }
@@ -116,7 +99,7 @@ export async function generateImpactSummary(
 
   const query = buildSummaryQuery(items, dateRange)
 
-  // 1) Claude 시도
+  // 1) Claude(Gateway) 시도
   const claudeResult = await summarizeViaClaude(query)
   if (claudeResult) return claudeResult
 
@@ -128,20 +111,12 @@ async function summarizeViaClaude(
   query: string,
 ): Promise<string | null> {
   try {
-    const client = getAnthropicClient()
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: buildSummarySystemPrompt(),
-      messages: [{ role: 'user', content: query }],
-      temperature: 0.3,
-    })
+    const response = await callGateway([
+      { role: 'system', content: buildSummarySystemPrompt() },
+      { role: 'user', content: query },
+    ], { temperature: 0.3 })
 
-    const text = response.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-
+    const text = response.choices?.[0]?.message?.content || ''
     return text.trim() || null
   } catch {
     return null
@@ -166,7 +141,7 @@ async function summarizeWithGemini(
       },
     })
     return response.text?.trim() || '요약을 생성할 수 없습니다.'
-  } catch (error) {
+  } catch {
     return '요약 생성 중 오류가 발생했습니다.'
   }
 }
@@ -174,7 +149,6 @@ async function summarizeWithGemini(
 // ── JSON 파싱 유틸 ──
 
 function parseClassificationJSON(text: string): ClassificationResult[] | null {
-  // JSON 배열 추출 (마크다운 코드블록 또는 순수 JSON)
   const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '')
   const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
   if (!jsonMatch) return null

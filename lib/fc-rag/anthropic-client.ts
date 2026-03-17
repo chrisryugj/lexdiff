@@ -1,75 +1,151 @@
 /**
- * Anthropic SDK 클라이언트 제공 모듈.
+ * OpenClaw Gateway를 OpenAI-compatible LLM 엔드포인트로 사용.
  *
- * 토큰 소스 우선순위:
- * 1. ANTHROPIC_API_KEY 환경변수 (Vercel 등 클라우드 배포용)
- * 2. OpenClaw auth-profiles.json (로컬 개발용, 토큰 갱신 자동 반영)
+ * Gateway가 내부적으로 Anthropic OAuth 처리 + Claude Sonnet 4.6 호출.
+ * 이 모듈은 Gateway의 /v1/chat/completions를 호출하는 얇은 래퍼.
+ *
+ * 환경변수:
+ * - OPENCLAW_GATEWAY_URL (기본: http://127.0.0.1:18789)
+ * - OPENCLAW_GATEWAY_TOKEN (필수)
  */
 
-import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
+export const CLAUDE_MODEL = 'anthropic/claude-sonnet-4-6'
 
-const AUTH_PROFILES_PATH = join(
-  homedir(), '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json',
-)
+const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789'
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '27034d1e40c21276201d2e06eeae276841c90cb94e3fecdc'
 
-export const CLAUDE_MODEL = 'claude-sonnet-4-6-20250514'
+export interface GatewayMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
 
-interface AuthProfiles {
-  profiles: Record<string, { type: string; provider: string; token?: string }>
-  lastGood?: Record<string, string>
+export interface GatewayResponse {
+  id: string
+  choices: Array<{
+    index: number
+    message: { role: string; content: string }
+    finish_reason: string
+  }>
+  usage?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
 }
 
 /**
- * Anthropic 토큰 획득.
- * 1) ANTHROPIC_API_KEY 환경변수 (Vercel 등 클라우드)
- * 2) OpenClaw auth-profiles.json (로컬)
+ * Gateway /v1/chat/completions 호출 (non-streaming)
  */
-function getAnthropicToken(): string {
-  // 1) 환경변수 우선 (Vercel 배포)
-  const envKey = process.env.ANTHROPIC_API_KEY
-  if (envKey) return envKey
+export async function callGateway(
+  messages: GatewayMessage[],
+  options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal },
+): Promise<GatewayResponse> {
+  const { maxTokens = 4096, temperature = 0, signal } = options || {}
 
-  // 2) OpenClaw auth-profiles.json (로컬 개발)
-  if (!existsSync(AUTH_PROFILES_PATH)) {
-    throw new Error(
-      'ANTHROPIC_API_KEY 환경변수가 없고, OpenClaw auth-profiles.json도 없습니다.',
-    )
+  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GATEWAY_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+      agent_id: 'lexdiff-law',
+    }),
+    signal,
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Gateway 오류 (${res.status}): ${text.slice(0, 200)}`)
   }
 
-  const raw = readFileSync(AUTH_PROFILES_PATH, 'utf-8')
-  const data: AuthProfiles = JSON.parse(raw)
+  return res.json()
+}
 
-  const lastGoodId = data.lastGood?.anthropic
-  if (lastGoodId) {
-    const profile = data.profiles[lastGoodId]
-    if (profile?.token) return profile.token
+/**
+ * Gateway /v1/chat/completions 스트리밍 호출
+ * SSE 청크를 AsyncGenerator로 yield
+ */
+export async function* streamGateway(
+  messages: GatewayMessage[],
+  options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal },
+): AsyncGenerator<string> {
+  const { maxTokens = 4096, temperature = 0, signal } = options || {}
+
+  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GATEWAY_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+      stream: true,
+      agent_id: 'lexdiff-law',
+    }),
+    signal,
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Gateway 스트리밍 오류 (${res.status}): ${text.slice(0, 200)}`)
   }
 
-  for (const [id, profile] of Object.entries(data.profiles)) {
-    if (id.startsWith('anthropic:') && profile.token) {
-      return profile.token
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('Gateway 응답에 body가 없습니다.')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data: ')) continue
+        const data = trimmed.slice(6)
+        if (data === '[DONE]') return
+
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) yield content
+        } catch {
+          // 파싱 불가능한 청크 무시
+        }
+      }
     }
+
+    // 잔여 버퍼 처리
+    if (buffer.trim()) {
+      for (const line of buffer.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data: ')) continue
+        const data = trimmed.slice(6)
+        if (data === '[DONE]') return
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) yield content
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
   }
-
-  throw new Error(
-    'OpenClaw auth-profiles.json에 Anthropic 토큰이 없습니다.',
-  )
-}
-
-let _client: Anthropic | null = null
-let _lastToken: string | null = null
-
-/**
- * Anthropic 클라이언트 반환.
- * 토큰이 변경되었으면 클라이언트를 재생성.
- */
-export function getAnthropicClient(): Anthropic {
-  const token = getAnthropicToken()
-  if (_client && _lastToken === token) return _client
-  _client = new Anthropic({ apiKey: token })
-  _lastToken = token
-  return _client
 }
