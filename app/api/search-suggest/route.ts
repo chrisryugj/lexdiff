@@ -341,11 +341,24 @@ export async function GET(request: NextRequest) {
     }
 
     // 조례 결과 추가
+    // 지역명 포함 쿼리 = 거의 확실히 조례 의도 → 조례 최우선 배치
+    const hasLocalGovName = containsLocalGovName(query)
+    const queryKeywords = query.split(/\s+/).filter((w: string) => w.length >= 2)
+
     for (const ordin of dedupOrdin) {
-      const matchIndex = ordin.name.toLowerCase().indexOf(queryLower)
-      const startsWithQuery = ordin.name.toLowerCase().startsWith(queryLower)
-      let score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)  // 법령보다 약간 낮은 기본 점수
+      const ordinLower = ordin.name.toLowerCase()
+      const matchIndex = ordinLower.indexOf(queryLower)
+      const startsWithQuery = ordinLower.startsWith(queryLower)
+      let score = 95 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0)
       let suggestionText = ordin.name
+
+      // 지역명 포함 쿼리면 조례 대폭 보너스
+      if (hasLocalGovName) score += 200
+
+      // 키워드 부분 매칭 보너스
+      for (const kw of queryKeywords) {
+        if (ordinLower.includes(kw)) score += 30
+      }
 
       // 조문 패턴 감지 시: "조례명 + 제X조" 형태로 제안
       if (articleMatch) {
