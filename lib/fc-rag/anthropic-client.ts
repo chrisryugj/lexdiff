@@ -1,12 +1,13 @@
 /**
- * OpenClaw auth-profiles.json에서 Anthropic OAuth 토큰을 동적으로 읽어
- * @anthropic-ai/sdk 클라이언트를 제공하는 모듈.
+ * Anthropic SDK 클라이언트 제공 모듈.
  *
- * 토큰이 갱신되면 다음 호출에서 자동으로 새 토큰을 사용.
+ * 토큰 소스 우선순위:
+ * 1. ANTHROPIC_API_KEY 환경변수 (Vercel 등 클라우드 배포용)
+ * 2. OpenClaw auth-profiles.json (로컬 개발용, 토큰 갱신 자동 반영)
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
@@ -22,21 +23,31 @@ interface AuthProfiles {
 }
 
 /**
- * auth-profiles.json에서 최신 Anthropic 토큰 읽기.
- * lastGood 프로필 우선, 없으면 아무 anthropic 프로필 사용.
+ * Anthropic 토큰 획득.
+ * 1) ANTHROPIC_API_KEY 환경변수 (Vercel 등 클라우드)
+ * 2) OpenClaw auth-profiles.json (로컬)
  */
 function getAnthropicToken(): string {
+  // 1) 환경변수 우선 (Vercel 배포)
+  const envKey = process.env.ANTHROPIC_API_KEY
+  if (envKey) return envKey
+
+  // 2) OpenClaw auth-profiles.json (로컬 개발)
+  if (!existsSync(AUTH_PROFILES_PATH)) {
+    throw new Error(
+      'ANTHROPIC_API_KEY 환경변수가 없고, OpenClaw auth-profiles.json도 없습니다.',
+    )
+  }
+
   const raw = readFileSync(AUTH_PROFILES_PATH, 'utf-8')
   const data: AuthProfiles = JSON.parse(raw)
 
-  // lastGood 프로필 우선
   const lastGoodId = data.lastGood?.anthropic
   if (lastGoodId) {
     const profile = data.profiles[lastGoodId]
     if (profile?.token) return profile.token
   }
 
-  // fallback: 아무 anthropic 토큰
   for (const [id, profile] of Object.entries(data.profiles)) {
     if (id.startsWith('anthropic:') && profile.token) {
       return profile.token
@@ -44,8 +55,7 @@ function getAnthropicToken(): string {
   }
 
   throw new Error(
-    'OpenClaw auth-profiles.json에 Anthropic 토큰이 없습니다. ' +
-    'OpenClaw Gateway에서 Anthropic 인증을 설정해주세요.',
+    'OpenClaw auth-profiles.json에 Anthropic 토큰이 없습니다.',
   )
 }
 
