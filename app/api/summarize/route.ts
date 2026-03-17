@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
-import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
+import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/fc-rag/anthropic-client"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -118,26 +118,26 @@ export async function POST(request: Request) {
       isPrecedent,
     })
 
-    // 1) OpenClaw 브릿지 우선 시도
-    if (process.env.OPENCLAW_ENABLED === 'true' && await isOpenClawHealthy()) {
-      try {
-        let capturedAnswer = ''
-        const send = (data: unknown) => {
-          const evt = data as Record<string, unknown>
-          if (evt.type === 'answer') {
-            const d = evt.data as Record<string, unknown>
-            capturedAnswer = String(d?.answer || '')
-          }
-        }
-        const ok = await fetchFromOpenClaw(prompt, send)
-        if (ok && capturedAnswer) {
-          await recordAITokens(clientIP, capturedAnswer.length)
-          debugLogger.success("AI summary complete (OpenClaw)", { length: capturedAnswer.length })
-          return NextResponse.json({ summary: capturedAnswer.trim() })
-        }
-      } catch (err) {
-        debugLogger.warning("OpenClaw summarize failed, falling back to Gemini", err)
+    // 1) Claude 우선 시도
+    try {
+      const client = getAnthropicClient()
+      const response = await client.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+      })
+      const claudeText = response.content
+        .filter(b => b.type === 'text')
+        .map(b => (b as { type: 'text'; text: string }).text)
+        .join('')
+      if (claudeText) {
+        await recordAITokens(clientIP, claudeText.length)
+        debugLogger.success("AI summary complete (Claude)", { length: claudeText.length })
+        return NextResponse.json({ summary: claudeText.trim() })
       }
+    } catch (err) {
+      debugLogger.warning("Claude summarize failed, falling back to Gemini", err)
     }
 
     // 2) Gemini 폴백

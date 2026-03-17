@@ -462,7 +462,7 @@ const TOOLS: ToolDef[] = [
   },
 ]
 
-// ─── Gemini FunctionDeclaration 변환 ───
+// ─── Gemini FunctionDeclaration 변환 (Gemini fallback용) ───
 
 let _cachedDeclarations: FunctionDeclaration[] | null = null
 
@@ -505,6 +505,49 @@ export function getToolDeclarations(): FunctionDeclaration[] {
   })
 
   return _cachedDeclarations
+}
+
+// ─── Anthropic Tool 변환 (Claude primary용) ───
+
+interface AnthropicTool {
+  name: string
+  description: string
+  input_schema: {
+    type: 'object'
+    properties: Record<string, unknown>
+    required?: string[]
+  }
+}
+
+let _cachedAnthropicTools: AnthropicTool[] | null = null
+
+/**
+ * 도구 스키마를 Anthropic Tool 배열로 변환
+ * 결과는 캐시되어 재사용
+ */
+export function getAnthropicToolDefinitions(): AnthropicTool[] {
+  if (_cachedAnthropicTools) return _cachedAnthropicTools
+
+  _cachedAnthropicTools = TOOLS.map(tool => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jsonSchema = zodToJsonSchema(tool.schema as any, { target: 'openApi3' })
+
+    const properties = { ...((jsonSchema as any).properties || {}) }
+    delete properties.apiKey
+    const required: string[] = ((jsonSchema as any).required || []).filter((k: string) => k !== 'apiKey')
+
+    return {
+      name: tool.name,
+      description: tool.description,
+      input_schema: {
+        type: 'object' as const,
+        properties,
+        ...(required.length ? { required } : {}),
+      },
+    }
+  })
+
+  return _cachedAnthropicTools
 }
 
 // ─── 도구 실행 ───

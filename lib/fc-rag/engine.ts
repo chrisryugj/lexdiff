@@ -5,22 +5,25 @@
  * 법제처 API 실시간 데이터 기반 답변 생성.
  *
  * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — OpenClaw Bridge 경유 (route.ts에서 분기)
- * Fallback: Gemini Flash — Bridge 불능 시 이 엔진이 직접 Gemini 호출
+ * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
+ * Fallback: Gemini Flash — Claude 불능 시 이 엔진이 직접 Gemini 호출
  *
  * 도구 어댑터(tool-adapter), Tier 시스템(tool-tiers), 프롬프트(prompts)는
  * 양쪽 LLM이 공유하는 인프라.
  *
- * SSE 스트리밍 지원: executeRAGStream()으로 도구 호출 과정을 실시간 전송
+ * SSE 스트리밍 지원: executeClaudeRAGStream() / executeGeminiRAGStream()
  */
 
 import { GoogleGenAI, type Part } from '@google/genai'
-import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
+import { getToolDeclarations, getAnthropicToolDefinitions, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery } from './tool-tiers'
 import { KNOWN_MST, cacheMSTEntries, detectFastPath, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
 import { buildCitations, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
+import { evaluateResponseQuality } from './quality-evaluator'
+import { getAnthropicClient, CLAUDE_MODEL } from './anthropic-client'
+import type Anthropic from '@anthropic-ai/sdk'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -102,18 +105,422 @@ export { KNOWN_MST } from './fast-path'
 
 // ─── 메인 엔진 (SSE 스트림) ───
 
-/** executeRAGStream 옵션 */
+/** RAG 스트림 옵션 */
 interface RAGStreamOptions {
   apiKey?: string
   signal?: AbortSignal
   conversationId?: string
 }
 
+// ─── Fast Path 공통 (Claude/Gemini 공유) ───
+
 /**
- * FC-RAG 스트리밍 실행 (SSE용 AsyncGenerator)
- * 도구 호출 과정을 실시간으로 yield
+ * Fast Path 처리. 단순 패턴은 LLM 없이 직접 도구 호출.
+ * 처리됐으면 true, 아니면 false 반환.
  */
-export async function* executeRAGStream(
+async function* handleFastPath(
+  query: string,
+  queryType: LegalQueryType,
+  signal?: AbortSignal,
+): AsyncGenerator<FCRAGStreamEvent, boolean> {
+  const fastPath = detectFastPath(query)
+  if (fastPath.type === 'none') return false
+
+  // ── 패턴 A: 판례/해석례/행정규칙 검색 ──
+  if (fastPath.type === 'precedent_search' || fastPath.type === 'interpretation_search' || fastPath.type === 'admin_rule_search') {
+    const toolName = fastPath.toolName!
+    const displayName = TOOL_DISPLAY_NAMES[toolName] || toolName
+    yield { type: 'tool_call', name: toolName, displayName, query: fastPath.searchQuery }
+    yield { type: 'status', message: '검색 중...', progress: 40 }
+    const searchResult = await executeTool(toolName, { query: fastPath.searchQuery }, signal)
+    yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult) }
+    if (!searchResult.isError) {
+      yield { type: 'status', message: '완료', progress: 100 }
+      yield {
+        type: 'answer',
+        data: {
+          answer: searchResult.result,
+          citations: buildCitations([searchResult]),
+          confidenceLevel: 'medium',
+          complexity: 'simple',
+          queryType,
+        },
+      }
+      return true
+    }
+  }
+
+  // ── 패턴 B: 별표 조회 ──
+  if (fastPath.type === 'annex_resolve') {
+    let mst = fastPath.mst
+    if (!mst) {
+      yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
+      const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
+      if (!searchResult.isError) {
+        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
+        const entries = parseLawEntries(searchResult.result)
+        cacheMSTEntries(entries)
+        mst = findBestMST(entries, query) || undefined
+      }
+    }
+    if (mst) {
+      yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: fastPath.searchQuery }
+      yield { type: 'status', message: '별표를 조회하고 있습니다...', progress: 50 }
+      const annexResult = await executeTool('get_annexes', { lawName: fastPath.searchQuery }, signal)
+      yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: !annexResult.isError, summary: summarizeToolResult('get_annexes', annexResult) }
+      if (!annexResult.isError) {
+        yield { type: 'status', message: '완료', progress: 100 }
+        yield {
+          type: 'answer',
+          data: {
+            answer: annexResult.result,
+            citations: buildCitations([annexResult]),
+            confidenceLevel: 'high',
+            complexity: 'simple',
+            queryType,
+          },
+        }
+        return true
+      }
+    }
+  }
+
+  // ── 패턴 C: 법명+조문번호 ──
+  if (fastPath.type === 'article_hit' || fastPath.type === 'article_resolve') {
+    let mst = fastPath.mst
+    const articles = fastPath.articles!
+
+    if (fastPath.type === 'article_resolve') {
+      yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
+      yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
+      const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
+      if (searchResult.isError) {
+        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
+      } else {
+        yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
+        const entries = parseLawEntries(searchResult.result)
+        cacheMSTEntries(entries)
+        mst = findBestMST(entries, query) || undefined
+      }
+    }
+
+    if (mst) {
+      yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
+      yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
+      const articlesResult = await executeTool('get_batch_articles', { mst, articles }, signal)
+      yield {
+        type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
+        success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
+      }
+
+      if (!articlesResult.isError) {
+        yield { type: 'status', message: '완료', progress: 100 }
+        yield {
+          type: 'answer',
+          data: {
+            answer: articlesResult.result,
+            citations: buildCitations([articlesResult]),
+            confidenceLevel: 'high',
+            complexity: 'simple',
+            queryType,
+          },
+        }
+        return true
+      }
+    }
+  }
+
+  // fast path 실패 → full pipeline으로 진행
+  return false
+}
+
+// ─── Claude Primary 엔진 ───
+
+/**
+ * Claude FC-RAG 스트리밍 실행 (Primary)
+ * Anthropic SDK + OpenClaw OAuth 토큰으로 Claude Sonnet 4.6 호출
+ */
+export async function* executeClaudeRAGStream(
+  query: string,
+  options?: RAGStreamOptions,
+): AsyncGenerator<FCRAGStreamEvent> {
+  const { signal } = options || {}
+  const warnings: string[] = []
+  const complexity = inferComplexity(query)
+  const queryType = inferQueryType(query)
+  const maxToolTurns = getMaxToolTurns(complexity)
+  const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
+
+  yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
+
+  // ── Fast Path ──
+  const fastPathGen = handleFastPath(query, queryType, signal)
+  let fastPathNext = await fastPathGen.next()
+  while (!fastPathNext.done) {
+    yield fastPathNext.value
+    fastPathNext = await fastPathGen.next()
+  }
+  if (fastPathNext.value === true) return
+
+  // ── Full Pipeline: Claude 멀티턴 ──
+  const client = getAnthropicClient()
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false /* isGemini */)
+  const selectedTools = new Set(selectToolsForQuery(query))
+  const allToolDefs = getAnthropicToolDefinitions()
+  const toolDefs = allToolDefs.filter(d => selectedTools.has(d.name))
+
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: query },
+  ]
+
+  let allToolResults: ToolCallResult[] = []
+  const MAX_TOOL_RESULTS = 30
+  let turnCount = 0
+  let latestSearchEntries: LawEntry[] = []
+  const failureCount = new Map<string, number>()
+  let totalInputTokens = 0
+  let totalOutputTokens = 0
+
+  const progressRange = 80
+  const progressPerTurn = progressRange / (maxToolTurns + 1)
+
+  /** Claude 타임아웃 (ms) */
+  const CLAUDE_TIMEOUT: Record<QueryComplexity, number> = {
+    simple: 45_000,
+    moderate: 90_000,
+    complex: 150_000,
+  }
+
+  while (turnCount <= maxToolTurns) {
+    try {
+      const isLastTurn = turnCount === maxToolTurns
+      const currentProgress = Math.min(8 + (turnCount * progressPerTurn), 85)
+      yield { type: 'status', message: 'AI가 분석하고 있습니다...', progress: currentProgress }
+
+      // 실패 2회 이상인 도구 제외
+      const activeTools = toolDefs.filter(d => (failureCount.get(d.name) || 0) < 2)
+
+      if (signal?.aborted) {
+        yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
+        return
+      }
+
+      const response = await withTimeout(
+        client.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: MAX_TOKENS[complexity],
+          system: systemPrompt,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tools: activeTools as any,
+          messages,
+          temperature: 0,
+        }),
+        CLAUDE_TIMEOUT[complexity],
+        'Claude API',
+      )
+
+      // 토큰 사용량
+      totalInputTokens += response.usage.input_tokens
+      totalOutputTokens += response.usage.output_tokens
+      yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
+
+      const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      const toolUseBlocks = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+
+      // 텍스트 답변 (도구 호출 없음) → 완료
+      if (toolUseBlocks.length === 0 || response.stop_reason === 'end_turn') {
+        const answer = textBlocks.map(b => b.text).join('')
+        if (answer) {
+          // Quality Gate 평가
+          const quality = evaluateResponseQuality(allToolResults, answer)
+          if (quality.warnings.length > 0) warnings.push(...quality.warnings)
+
+          yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+          yield {
+            type: 'answer',
+            data: {
+              answer,
+              citations: buildCitations(allToolResults, answer),
+              confidenceLevel: quality.level === 'fail' ? 'low' : calcConfidence(allToolResults),
+              complexity,
+              queryType,
+              warnings: warnings.length > 0 ? warnings : undefined,
+            },
+          }
+          return
+        }
+      }
+
+      // 마지막 턴: 도구 호출 무시, 텍스트 답변 강제
+      if (isLastTurn) {
+        const answer = textBlocks.map(b => b.text).join('')
+        if (answer) {
+          yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+          yield {
+            type: 'answer',
+            data: {
+              answer,
+              citations: buildCitations(allToolResults, answer),
+              confidenceLevel: calcConfidence(allToolResults),
+              complexity,
+              queryType,
+              warnings: warnings.length > 0 ? warnings : undefined,
+            },
+          }
+          return
+        }
+        // 텍스트 없으면 답변 강제 요청
+        if (signal?.aborted) return
+        yield { type: 'status', message: '답변 생성을 요청하고 있습니다...', progress: 88 }
+        messages.push({ role: 'assistant', content: response.content })
+        messages.push({
+          role: 'user',
+          content: '수집된 정보를 바탕으로 한국어로 답변해주세요. 추가 도구 호출 없이 바로 답변하세요.',
+        })
+        const retry = await withTimeout(
+          client.messages.create({
+            model: CLAUDE_MODEL,
+            max_tokens: MAX_TOKENS[complexity],
+            system: systemPrompt,
+            messages,
+            temperature: 0,
+          }),
+          CLAUDE_TIMEOUT[complexity],
+          'Claude API (마지막 턴)',
+        )
+        totalInputTokens += retry.usage.input_tokens
+        totalOutputTokens += retry.usage.output_tokens
+        yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
+        const retryText = retry.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+        yield {
+          type: 'answer',
+          data: {
+            answer: retryText || '답변 생성에 실패했습니다.',
+            citations: buildCitations(allToolResults, retryText),
+            confidenceLevel: calcConfidence(allToolResults),
+            complexity,
+            queryType,
+            warnings: warnings.length > 0 ? warnings : undefined,
+          },
+        }
+        return
+      }
+
+      // ── Tool Use 실행 ──
+      const calls = toolUseBlocks.map(b => ({
+        name: b.name,
+        args: (b.input || {}) as Record<string, unknown>,
+        id: b.id,
+      }))
+
+      // MST 보정
+      const fallbackEvents: FCRAGStreamEvent[] = []
+      await correctToolArgs(calls, latestSearchEntries, query, (entries, searchResult) => {
+        fallbackEvents.push({
+          type: 'tool_call', name: 'search_law',
+          displayName: '법령 검색 (MST 자동 확인)',
+          query: entries[0]?.name,
+        })
+        fallbackEvents.push({
+          type: 'tool_result', name: 'search_law',
+          displayName: '법령 검색 (MST 자동 확인)',
+          success: true,
+          summary: summarizeToolResult('search_law', searchResult),
+        })
+        allToolResults.push(searchResult)
+      })
+      for (const evt of fallbackEvents) yield evt
+
+      // 도구 호출 이벤트
+      for (const call of calls) {
+        yield {
+          type: 'tool_call',
+          name: call.name,
+          displayName: TOOL_DISPLAY_NAMES[call.name] || call.name,
+          query: getToolCallQuery(call.name, call.args),
+        }
+      }
+
+      const results = await executeToolsParallel(calls, signal)
+
+      // search_ai_law 결과 재정렬
+      for (const r of results) {
+        if (r.name === 'search_ai_law' && !r.isError) {
+          r.result = rerankAiSearchResult(r.result, query)
+        }
+      }
+
+      allToolResults.push(...results)
+      while (allToolResults.length > MAX_TOOL_RESULTS) {
+        const errIdx = allToolResults.findIndex(r => r.isError)
+        allToolResults.splice(errIdx >= 0 ? errIdx : 0, 1)
+      }
+
+      // 도구 결과 이벤트
+      for (const r of results) {
+        yield {
+          type: 'tool_result',
+          name: r.name,
+          displayName: TOOL_DISPLAY_NAMES[r.name] || r.name,
+          success: !r.isError,
+          summary: summarizeToolResult(r.name, r),
+        }
+        if (r.isError) failureCount.set(r.name, (failureCount.get(r.name) || 0) + 1)
+        else failureCount.delete(r.name)
+      }
+
+      // search_law 결과 추적
+      for (const r of results) {
+        if (r.name === 'search_law' && !r.isError) {
+          latestSearchEntries = parseLawEntries(r.result)
+          cacheMSTEntries(latestSearchEntries)
+        }
+      }
+
+      // ── 히스토리 추가 (Anthropic 형식) ──
+      messages.push({ role: 'assistant', content: response.content })
+      messages.push({
+        role: 'user',
+        content: calls.map((call, i) => ({
+          type: 'tool_result' as const,
+          tool_use_id: call.id,
+          content: results[i].result,
+        })),
+      })
+
+      turnCount++
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      warnings.push(`Claude API 오류: ${message}`)
+      yield { type: 'error', message }
+      break
+    }
+  }
+
+  // 루프 종료 (에러/예외)
+  if (turnCount > maxToolTurns) {
+    warnings.push('도구 호출 횟수 제한에 도달했습니다.')
+  }
+  yield {
+    type: 'answer',
+    data: {
+      answer: '죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+      citations: buildCitations(allToolResults),
+      confidenceLevel: 'low',
+      complexity,
+      queryType,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    },
+  }
+}
+
+// ─── Gemini Fallback 엔진 ───
+
+/**
+ * Gemini FC-RAG 스트리밍 실행 (Fallback)
+ * Claude 불능 시 Gemini Flash로 대체
+ */
+export async function* executeGeminiRAGStream(
   query: string,
   options?: RAGStreamOptions
 ): AsyncGenerator<FCRAGStreamEvent> {
@@ -126,115 +533,14 @@ export async function* executeRAGStream(
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
-  // ── Fast Path: 단순 패턴은 LLM 없이 직접 도구 호출 ──
-  const fastPath = detectFastPath(query)
-  if (fastPath.type !== 'none') {
-    // ── 패턴 A: 판례/해석례/행정규칙 검색 (직접 도구 호출) ──
-    if (fastPath.type === 'precedent_search' || fastPath.type === 'interpretation_search' || fastPath.type === 'admin_rule_search') {
-      const toolName = fastPath.toolName!
-      const displayName = TOOL_DISPLAY_NAMES[toolName] || toolName
-      yield { type: 'tool_call', name: toolName, displayName, query: fastPath.searchQuery }
-      yield { type: 'status', message: '검색 중...', progress: 40 }
-      const searchResult = await executeTool(toolName, { query: fastPath.searchQuery }, signal)
-      yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult) }
-      if (!searchResult.isError) {
-        yield { type: 'status', message: '완료', progress: 100 }
-        yield {
-          type: 'answer',
-          data: {
-            answer: searchResult.result,
-            citations: buildCitations([searchResult]),
-            confidenceLevel: 'medium',
-            complexity: 'simple',
-            queryType,
-          },
-        }
-        return
-      }
-      // 실패 시 full pipeline으로 폴백
-    }
-
-    // ── 패턴 B: 별표 조회 ──
-    if (fastPath.type === 'annex_resolve') {
-      let mst = fastPath.mst
-      if (!mst) {
-        yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
-        const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
-        if (!searchResult.isError) {
-          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
-          const entries = parseLawEntries(searchResult.result)
-          cacheMSTEntries(entries)
-          mst = findBestMST(entries, query) || undefined
-        }
-      }
-      if (mst) {
-        yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: fastPath.searchQuery }
-        yield { type: 'status', message: '별표를 조회하고 있습니다...', progress: 50 }
-        const annexResult = await executeTool('get_annexes', { lawName: fastPath.searchQuery }, signal)
-        yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: !annexResult.isError, summary: summarizeToolResult('get_annexes', annexResult) }
-        if (!annexResult.isError) {
-          yield { type: 'status', message: '완료', progress: 100 }
-          yield {
-            type: 'answer',
-            data: {
-              answer: annexResult.result,
-              citations: buildCitations([annexResult]),
-              confidenceLevel: 'high',
-              complexity: 'simple',
-              queryType,
-            },
-          }
-          return
-        }
-      }
-    }
-
-    // ── 패턴 C: 법명+조문번호 (기존 로직) ──
-    if (fastPath.type === 'article_hit' || fastPath.type === 'article_resolve') {
-      let mst = fastPath.mst
-      const articles = fastPath.articles!
-
-      if (fastPath.type === 'article_resolve') {
-        yield { type: 'tool_call', name: 'search_law', displayName: '법령 검색', query: fastPath.lawName }
-        yield { type: 'status', message: `${fastPath.lawName} MST 확인 중...`, progress: 20 }
-        const searchResult = await executeTool('search_law', { query: fastPath.lawName }, signal)
-        if (searchResult.isError) {
-          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: false, summary: '검색 실패' }
-        } else {
-          yield { type: 'tool_result', name: 'search_law', displayName: '법령 검색', success: true, summary: summarizeToolResult('search_law', searchResult) }
-          const entries = parseLawEntries(searchResult.result)
-          cacheMSTEntries(entries)
-          mst = findBestMST(entries, query) || undefined
-        }
-      }
-
-      if (mst) {
-        yield { type: 'tool_call', name: 'get_batch_articles', displayName: '조문 일괄 조회', query: articles.join(', ') }
-        yield { type: 'status', message: '조문을 가져오고 있습니다...', progress: 50 }
-        const articlesResult = await executeTool('get_batch_articles', { mst, articles }, signal)
-        yield {
-          type: 'tool_result', name: 'get_batch_articles', displayName: '조문 일괄 조회',
-          success: !articlesResult.isError, summary: summarizeToolResult('get_batch_articles', articlesResult),
-        }
-
-        if (!articlesResult.isError) {
-          yield { type: 'status', message: '완료', progress: 100 }
-          yield {
-            type: 'answer',
-            data: {
-              answer: articlesResult.result,
-              citations: buildCitations([articlesResult]),
-              confidenceLevel: 'high',
-              complexity: 'simple',
-              queryType,
-            },
-          }
-          return
-        }
-      }
-    }
-    // fast path 실패 시 아래 full pipeline으로 자연스럽게 진행
+  // ── Fast Path ──
+  const fastPathGen = handleFastPath(query, queryType, signal)
+  let fastPathNext = await fastPathGen.next()
+  while (!fastPathNext.done) {
+    yield fastPathNext.value
+    fastPathNext = await fastPathGen.next()
   }
+  if (fastPathNext.value === true) return
 
   // ── Full Pipeline: Gemini 멀티턴 ──
   const effectiveKey = geminiApiKey || process.env.GEMINI_API_KEY
@@ -607,17 +913,29 @@ export async function* executeRAGStream(
   }
 }
 
-// ─── 동기 래퍼 (하위 호환) ───
+// ─── 하위 호환 래퍼 ───
+
+/** @deprecated route.ts에서 직접 executeClaudeRAGStream/executeGeminiRAGStream 사용 */
+export const executeRAGStream = executeGeminiRAGStream
 
 /**
  * FC-RAG 실행 (비스트리밍 버전)
- * executeRAGStream의 래퍼 - 최종 결과만 반환
+ * Claude 우선, 실패 시 Gemini fallback
  */
 export async function executeRAG(
   query: string,
   geminiApiKey?: string
 ): Promise<FCRAGResult> {
-  for await (const event of executeRAGStream(query, { apiKey: geminiApiKey })) {
+  // Claude 우선
+  try {
+    for await (const event of executeClaudeRAGStream(query)) {
+      if (event.type === 'answer') return event.data
+      if (event.type === 'error') throw new Error(event.message)
+    }
+  } catch {
+    // Claude 실패 → Gemini fallback
+  }
+  for await (const event of executeGeminiRAGStream(query, { apiKey: geminiApiKey })) {
     if (event.type === 'answer') return event.data
     if (event.type === 'error') throw new Error(event.message)
   }

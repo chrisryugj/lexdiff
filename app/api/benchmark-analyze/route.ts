@@ -9,12 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { isOpenClawHealthy } from '@/lib/openclaw-client'
-
-const OPENCLAW_URL = process.env.OPENCLAW_URL || ''
-const OPENCLAW_TOKEN = process.env.OPENCLAW_API_TOKEN || ''
-const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID || ''
-const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET || ''
+import { getAnthropicClient, CLAUDE_MODEL } from '@/lib/fc-rag/anthropic-client'
 
 // ── 조례 본문 조회 ──
 
@@ -88,34 +83,22 @@ function parseAnalysisResponse(text: string): { comparisonTable: string; highlig
   }
 }
 
-// ── OpenClaw 호출 (JSON, 비스트리밍) ──
+// ── Claude 호출 ──
 
-async function callOpenClaw(prompt: string): Promise<string | null> {
-  if (!OPENCLAW_URL) return null
-
+async function callClaude(prompt: string): Promise<string | null> {
   try {
-    const healthy = await isOpenClawHealthy()
-    if (!healthy) return null
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENCLAW_TOKEN}`,
-    }
-    if (CF_ACCESS_CLIENT_ID) {
-      headers['CF-Access-Client-Id'] = CF_ACCESS_CLIENT_ID
-      headers['CF-Access-Client-Secret'] = CF_ACCESS_CLIENT_SECRET
-    }
-
-    const res = await fetch(`${OPENCLAW_URL}/api/legal-query`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query: prompt }),
-      signal: AbortSignal.timeout(120_000),
+    const client = getAnthropicClient()
+    const response = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 8192,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
     })
-
-    if (!res.ok) return null
-    const data = await res.json()
-    return data?.answer || null
+    const text = response.content
+      .filter(b => b.type === 'text')
+      .map(b => (b as { type: 'text'; text: string }).text)
+      .join('')
+    return text || null
   } catch {
     return null
   }
@@ -176,15 +159,13 @@ export async function POST(request: NextRequest) {
   const prompt = buildPrompt(keyword, validTexts, focus)
 
   try {
-    // 1) OpenClaw 우선 시도
-    const openClawAnswer = await callOpenClaw(prompt)
-    if (openClawAnswer) {
-      console.log('[benchmark-analyze] OpenClaw 응답 사용')
-      return NextResponse.json(parseAnalysisResponse(openClawAnswer))
+    // 1) Claude 우선 시도
+    const claudeAnswer = await callClaude(prompt)
+    if (claudeAnswer) {
+      return NextResponse.json(parseAnalysisResponse(claudeAnswer))
     }
 
     // 2) Gemini 폴백
-    console.log('[benchmark-analyze] Gemini 폴백')
     const geminiAnswer = await callGemini(prompt)
     return NextResponse.json(parseAnalysisResponse(geminiAnswer))
   } catch (err: any) {

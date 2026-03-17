@@ -1,11 +1,14 @@
 /**
  * FC-RAG API endpoint with SSE streaming.
+ *
+ * ── LLM 구성 ──
+ * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
+ * Fallback: Gemini Flash — Claude 불능 시
  */
 
 import { NextRequest } from "next/server"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
-import { executeRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
-import { fetchFromOpenClaw, isOpenClawHealthy, getOpenClawStatus } from "@/lib/openclaw-client"
+import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import {
   getUsageHeaders,
   getUsageWarningMessage,
@@ -111,38 +114,70 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        let openClawHandled = false
+        let handled = false
+        let source: 'claude' | 'gemini' = 'gemini'
 
-        if (process.env.OPENCLAW_ENABLED === "true") {
-          const healthy = await isOpenClawHealthy()
-          if (healthy) {
-            traceLogger.addEvent(traceId, 'bridge_attempt', { healthy: true })
-            send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
-            openClawHandled = await fetchFromOpenClaw(query, send, {
-              conversationId,
-              abortSignal: request.signal,
-            })
-            if (openClawHandled) {
-              traceLogger.completeTrace(traceId, 'openclaw')
-            } else {
-              traceLogger.addEvent(traceId, 'bridge_failed', { fallback: 'gemini' })
+        // ── Claude Primary ──
+        try {
+          traceLogger.addEvent(traceId, 'claude_start', {})
+          send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+
+          let lastAnswerCitations: FCRAGCitation[] = []
+
+          for await (const event of executeClaudeRAGStream(query, {
+            signal: request.signal,
+            conversationId,
+          })) {
+            if (event.type === "answer") {
+              lastAnswerCitations = event.data.citations || []
+
+              if (!userApiKey) {
+                const usageStats = await recordAITokens(clientIP, event.data.answer.length)
+                const warningMessage = getUsageWarningMessage(usageStats)
+
+                if (warningMessage) {
+                  const warnings = [...(event.data.warnings || []), warningMessage]
+                  send({ ...event, data: { ...event.data, warnings } })
+                  continue
+                }
+              }
             }
-          } else {
-            const status = getOpenClawStatus()
-            const reason = status.circuitOpen ? '서킷 브레이커 오픈' : '헬스체크 실패'
-            traceLogger.addEvent(traceId, 'bridge_skip', { reason, ...status })
+
+            send(event)
           }
+
+          // Citation 검증
+          if (lastAnswerCitations.length > 0) {
+            try {
+              const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
+              if (verifiable.length > 0) {
+                send({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
+                const verified = await verifyAllCitations(verifiable)
+                send({ type: "citation_verification", citations: [...verified, ...skipped] })
+              }
+            } catch (error) {
+              console.error("[FC-RAG] Citation verification failed:", error)
+            }
+          }
+
+          handled = true
+          source = 'claude'
+          traceLogger.completeTrace(traceId, 'openclaw')
+        } catch (claudeError) {
+          traceLogger.addEvent(traceId, 'claude_failed', {
+            message: claudeError instanceof Error ? claudeError.message : 'unknown',
+            fallback: 'gemini',
+          })
         }
 
-        if (!openClawHandled) {
-          if (process.env.OPENCLAW_ENABLED === "true") {
-            send({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
-          }
+        // ── Gemini Fallback ──
+        if (!handled) {
+          send({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
           traceLogger.addEvent(traceId, 'gemini_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []
 
-          for await (const event of executeRAGStream(query, {
+          for await (const event of executeGeminiRAGStream(query, {
             apiKey: userApiKey,
             signal: request.signal,
             conversationId,
@@ -178,9 +213,11 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          send({ type: 'source', source: 'gemini' })
+          source = 'gemini'
           traceLogger.completeTrace(traceId, 'gemini')
         }
+
+        send({ type: 'source', source })
       } catch (error) {
         traceLogger.addEvent(traceId, 'error', { message: error instanceof Error ? error.message : 'unknown' })
         send({

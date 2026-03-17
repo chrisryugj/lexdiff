@@ -1,12 +1,16 @@
 /**
- * AI 영향도 분류기 - OpenClaw 우선, Gemini 폴백
+ * AI 영향도 분류기 - Claude 우선, Gemini 폴백
  *
  * 법령 변경사항의 영향도(critical/review/info)를 AI로 분류하고
  * 종합 요약을 생성한다.
+ *
+ * ── LLM 구성 ──
+ * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
+ * Fallback: Gemini Flash Lite — Claude 불능 시
  */
 
 import { GoogleGenAI } from '@google/genai'
-import { fetchFromOpenClaw, isOpenClawHealthy } from '@/lib/openclaw-client'
+import { getAnthropicClient, CLAUDE_MODEL } from '@/lib/fc-rag/anthropic-client'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import {
   buildClassificationQuery,
@@ -25,48 +29,48 @@ export async function classifyImpact(
 
   const query = buildClassificationQuery(changes)
 
-  // 1) OpenClaw 시도
-  const openClawResult = await classifyViaOpenClaw(query, options?.signal)
-  if (openClawResult) return openClawResult
+  // 1) Claude 시도
+  const claudeResult = await classifyViaClaude(query)
+  if (claudeResult) return claudeResult
 
   // 2) Gemini 폴백
   return classifyWithGemini(query, options?.apiKey)
 }
 
 /**
- * AI 엔진이 OpenClaw인지 Gemini인지 판별
+ * AI 엔진이 Claude인지 Gemini인지 판별
  * (SSE에서 ai_source 이벤트 전송용)
  */
 export async function getAISource(): Promise<'openclaw' | 'gemini'> {
-  if (process.env.OPENCLAW_ENABLED === 'true' && await isOpenClawHealthy()) {
+  try {
+    getAnthropicClient()
     return 'openclaw'
+  } catch {
+    return 'gemini'
   }
-  return 'gemini'
 }
 
-// ── OpenClaw 경로 ──
+// ── Claude 경로 ──
 
-async function classifyViaOpenClaw(
+async function classifyViaClaude(
   query: string,
-  signal?: AbortSignal,
 ): Promise<ClassificationResult[] | null> {
-  if (process.env.OPENCLAW_ENABLED !== 'true') return null
-  if (!await isOpenClawHealthy()) return null
-
   try {
-    let capturedAnswer = ''
-    const send = (data: unknown) => {
-      const evt = data as Record<string, unknown>
-      if (evt.type === 'answer') {
-        const d = evt.data as Record<string, unknown>
-        capturedAnswer = String(d?.answer || '')
-      }
-    }
+    const client = getAnthropicClient()
+    const response = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      system: buildClassificationSystemPrompt(),
+      messages: [{ role: 'user', content: query }],
+      temperature: 0.1,
+    })
 
-    const ok = await fetchFromOpenClaw(query, send, { abortSignal: signal })
-    if (!ok || !capturedAnswer) return null
+    const text = response.content
+      .filter(b => b.type === 'text')
+      .map(b => (b as { type: 'text'; text: string }).text)
+      .join('')
 
-    return parseClassificationJSON(capturedAnswer)
+    return parseClassificationJSON(text)
   } catch {
     return null
   }
@@ -112,35 +116,33 @@ export async function generateImpactSummary(
 
   const query = buildSummaryQuery(items, dateRange)
 
-  // 1) OpenClaw 시도
-  const openClawResult = await summarizeViaOpenClaw(query, options?.signal)
-  if (openClawResult) return openClawResult
+  // 1) Claude 시도
+  const claudeResult = await summarizeViaClaude(query)
+  if (claudeResult) return claudeResult
 
   // 2) Gemini 폴백
   return summarizeWithGemini(query, options?.apiKey)
 }
 
-async function summarizeViaOpenClaw(
+async function summarizeViaClaude(
   query: string,
-  signal?: AbortSignal,
 ): Promise<string | null> {
-  if (process.env.OPENCLAW_ENABLED !== 'true') return null
-  if (!await isOpenClawHealthy()) return null
-
   try {
-    let capturedAnswer = ''
-    const send = (data: unknown) => {
-      const evt = data as Record<string, unknown>
-      if (evt.type === 'answer') {
-        const d = evt.data as Record<string, unknown>
-        capturedAnswer = String(d?.answer || '')
-      }
-    }
+    const client = getAnthropicClient()
+    const response = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      system: buildSummarySystemPrompt(),
+      messages: [{ role: 'user', content: query }],
+      temperature: 0.3,
+    })
 
-    const ok = await fetchFromOpenClaw(query, send, { abortSignal: signal })
-    if (!ok || !capturedAnswer) return null
+    const text = response.content
+      .filter(b => b.type === 'text')
+      .map(b => (b as { type: 'text'; text: string }).text)
+      .join('')
 
-    return capturedAnswer.trim()
+    return text.trim() || null
   } catch {
     return null
   }
