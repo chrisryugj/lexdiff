@@ -19,6 +19,10 @@ const ReferenceModal = dynamic(
   () => import('@/components/reference-modal').then(m => m.ReferenceModal),
   { ssr: false }
 )
+const AnnexModal = dynamic(
+  () => import('@/components/annex-modal').then(m => m.AnnexModal),
+  { ssr: false }
+)
 
 interface ImpactTrackerViewProps {
   initialRequest?: ImpactTrackerRequest | null
@@ -81,6 +85,9 @@ export function ImpactTrackerView({
     openExternalLawArticleModal,
     handleRefModalBack,
     handleViewFullLaw,
+    annexModal,
+    openAnnexModal,
+    closeAnnexModal,
   } = useLawViewerModals(emptyMeta, undefined)
 
   // 히스토리 복원 시 자동 분석 시작
@@ -394,6 +401,17 @@ export function ImpactTrackerView({
         hasHistory={refModalHistory.length > 0}
         onBack={handleRefModalBack}
         onViewFullLaw={handleViewFullLaw}
+      />
+      <AnnexModal
+        isOpen={annexModal.open}
+        onClose={closeAnnexModal}
+        annexNumber={annexModal.annexNumber}
+        lawName={annexModal.lawName}
+        lawId={annexModal.lawId}
+        onLawClick={(lawName, article) => {
+          closeAnnexModal()
+          if (article) openExternalLawArticleModal(lawName, article)
+        }}
       />
     </div>
   )
