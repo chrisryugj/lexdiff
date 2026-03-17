@@ -125,6 +125,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.21(postcss@8.5.6)
+      cfb:
+        specifier: ^1.2.2
+        version: 1.2.2
       cheerio:
         specifier: latest
         version: 1.1.2

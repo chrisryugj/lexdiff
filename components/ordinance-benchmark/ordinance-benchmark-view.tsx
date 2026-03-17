@@ -15,6 +15,7 @@ import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
 import type { BenchmarkOrdinanceResult } from "@/lib/ordinance-benchmark/types"
 import { REGIONS } from "@/lib/ordinance-benchmark/municipality-codes"
 import { ReferenceModal } from "@/components/reference-modal"
+import { AnnexModal } from "@/components/annex-modal"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { extractArticleText } from "@/lib/law-xml-parser"
@@ -67,6 +68,9 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   const [modalTitle, setModalTitle] = useState('')
   const [modalHtml, setModalHtml] = useState<string | undefined>()
   const [modalLoading, setModalLoading] = useState(false)
+
+  // 별표 모달
+  const [annexState, setAnnexState] = useState({ open: false, annexNumber: '', lawName: '', lawId: '' })
 
   // 헤더 스크롤
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
@@ -574,6 +578,13 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
 
       <ReferenceModal isOpen={modalOpen} onClose={() => setModalOpen(false)}
         title={modalTitle} html={modalHtml} loading={modalLoading} />
+      <AnnexModal
+        isOpen={annexState.open}
+        onClose={() => setAnnexState(s => ({ ...s, open: false }))}
+        annexNumber={annexState.annexNumber}
+        lawName={annexState.lawName}
+        lawId={annexState.lawId}
+      />
       <LawStatsFooter />
     </div>
   )

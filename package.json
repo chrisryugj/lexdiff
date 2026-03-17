@@ -56,6 +56,7 @@
     "@xmldom/xmldom": "^0.8.11",
     "ai": "5.0.82",
     "autoprefixer": "^10.4.20",
+    "cfb": "^1.2.2",
     "cheerio": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

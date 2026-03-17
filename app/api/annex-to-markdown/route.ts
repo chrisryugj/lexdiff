@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
-import { isHwpxFile, isOldHwpFile, parseHwpxToMarkdown } from "@/lib/hwpx-parser"
+import { parseAnnexFile, isHwpxFile, isOldHwpFile, isPdfFile } from "@/lib/annex-parser"
 import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
 import { validateExternalUrl } from "@/lib/url-validator"
 
@@ -55,32 +55,36 @@ export async function POST(request: Request) {
     }
 
     const fileBuffer = await fileResponse.arrayBuffer()
-    const isHwpx = isHwpxFile(fileBuffer)
-    const isOldHwp = isOldHwpFile(fileBuffer)
 
-    if (isOldHwp) {
-      return NextResponse.json(
-        {
-          error: "구형 HWP 파일은 다운로드 후 별도 뷰어로 열어 주세요.",
-          fileType: "old-hwp",
-        },
-        { status: 400 }
-      )
-    }
+    // 통합 파서: HWPX + 구형 HWP 모두 지원
+    if (isHwpxFile(fileBuffer) || isOldHwpFile(fileBuffer)) {
+      const result = await parseAnnexFile(fileBuffer)
 
-    if (isHwpx) {
-      const parseResult = await parseHwpxToMarkdown(fileBuffer)
-      if (!parseResult.success || !parseResult.markdown) {
-        throw new Error(parseResult.error || "HWPX 파싱 실패")
+      if (result.success && result.markdown) {
+        debugLogger.success(`Annex parsed (${result.fileType})`, {
+          annexNumber,
+          markdownLength: result.markdown.length,
+        })
+        return NextResponse.json({
+          markdown: result.markdown,
+          source: `${result.fileType}-parser`,
+        })
       }
 
-      return NextResponse.json({
-        markdown: parseResult.markdown,
-        source: "hwpx-parser",
-        meta: parseResult.meta,
-      })
+      // 파싱 실패 시 구형 HWP는 에러, HWPX는 Gemini 폴백
+      if (isOldHwpFile(fileBuffer)) {
+        debugLogger.warning("HWP5 파싱 실패, 다운로드 안내", { error: result.error })
+        return NextResponse.json({
+          error: result.error || "구형 HWP 파일 파싱에 실패했습니다.",
+          fileType: "old-hwp",
+        }, { status: 400 })
+      }
+
+      debugLogger.warning("HWPX 파싱 실패, Gemini 폴백", { error: result.error })
+      // HWPX 실패 시 아래 Gemini Vision으로 폴백
     }
 
+    // PDF 또는 파싱 실패 → Gemini Vision AI 변환
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       debugLogger.error("GEMINI_API_KEY is missing")
