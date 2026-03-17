@@ -22,7 +22,7 @@ import { detectDomain } from './DomainDetector'
 import { detectQueryType, analyzeLegalQuestion } from './QueryAnalyzer'
 
 // Patterns
-import { isOrdinanceQuery } from '../../patterns/OrdinancePattern'
+import { isOrdinanceQuery, containsLocalGovName, LAW_ENFORCEMENT_PATTERN } from '../../patterns/OrdinancePattern'
 
 /**
  * 통합 검색 쿼리 분류 함수 (메인)
@@ -52,8 +52,11 @@ export function classifySearchQuery(query: string): UnifiedQueryClassification {
   const rulingPattern = detectRulingPattern(trimmedQuery)
   const interpretationPattern = detectInterpretationPattern(trimmedQuery)
 
-  // 3. 조례 판별
-  const isOrdinance = isOrdinanceQuery(trimmedQuery)
+  // 3. 조례 판별 (명시적 키워드 or 지역명 포함 + 법령 키워드 없음)
+  const isOrdinance = isOrdinanceQuery(trimmedQuery) ||
+    (!LAW_ENFORCEMENT_PATTERN.test(trimmedQuery) &&
+     !/(법|법률|시행령|규정)/.test(trimmedQuery) &&
+     containsLocalGovName(trimmedQuery))
 
   // 4. 기본 쿼리 타입 감지
   const basicDetection = detectQueryType(trimmedQuery)

@@ -67,11 +67,11 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  const runAnalysis = useCallback(async () => {
+  const runAnalysis = useCallback(async (skipCache = false) => {
     if (!meta.mst && !meta.lawId) return
 
     // 캐시 체크
-    const cached = meta.mst ? getCachedAnalysis(meta.mst) : null
+    const cached = !skipCache && meta.mst ? getCachedAnalysis(meta.mst) : null
     if (cached) {
       setAnalysis(cached)
       setExtractedCount(cached.totalClauses)
@@ -247,7 +247,7 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
             <div className="text-center space-y-3">
               <Icon name="alert-circle" size={40} className="mx-auto text-red-500" />
               <p className="text-sm text-muted-foreground">{error}</p>
-              <Button variant="outline" size="sm" onClick={runAnalysis}>
+              <Button variant="outline" size="sm" onClick={() => runAnalysis()}>
                 <Icon name="refresh" size={14} className="mr-1" />
                 다시 시도
               </Button>
@@ -306,6 +306,15 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
                     onClick={() => setShowOnlyGaps(false)}
                   >
                     전체
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
+                    onClick={() => runAnalysis(true)}
+                    title="캐시 무시 재분석"
+                  >
+                    <Icon name="refresh-cw" size={12} />
                   </Button>
                   <Button
                     variant="outline"

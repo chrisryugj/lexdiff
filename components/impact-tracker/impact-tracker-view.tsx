@@ -117,12 +117,23 @@ export function ImpactTrackerView({
   }, [])
 
 
+  const lastRequestRef = useRef<ImpactTrackerRequest | null>(null)
+
   const handleSubmit = useCallback((request: ImpactTrackerRequest) => {
+    lastRequestRef.current = request
     setHasStarted(true)
     setSeverityFilter('all')
     setLawFilter('all')
     startAnalysis(request)
   }, [startAnalysis])
+
+  const handleForceRefresh = useCallback(() => {
+    const req = lastRequestRef.current || initialRequest
+    if (!req) return
+    setSeverityFilter('all')
+    setLawFilter('all')
+    startAnalysis(req, true)
+  }, [startAnalysis, initialRequest])
 
   const handleNewAnalysis = useCallback(() => {
     clearResults()
@@ -182,9 +193,20 @@ export function ImpactTrackerView({
             {/* Actions */}
             <div className="flex items-center gap-2 lg:gap-4">
               {hasStarted && !isAnalyzing && (
-                <Button variant="outline" size="sm" onClick={handleNewAnalysis} className="h-8 text-xs border-gray-200 dark:border-gray-700">
-                  새 분석
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleForceRefresh}
+                    className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
+                    title="캐시 무시 새로고침"
+                  >
+                    <Icon name="refresh-cw" size={14} />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleNewAnalysis} className="h-8 text-xs border-gray-200 dark:border-gray-700">
+                    새 분석
+                  </Button>
+                </>
               )}
               <ThemeToggle />
               <Button variant="ghost" size="sm" onClick={onBack} title="뒤로가기" className="hover:bg-gray-200 dark:hover:bg-gray-800">

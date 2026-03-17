@@ -160,9 +160,9 @@ export function useImpactTracker() {
   const collectedItemsRef = useRef<ImpactItem[]>([])
   const collectedSummaryRef = useRef<ImpactSummary | null>(null)
 
-  const startAnalysis = useCallback((request: ImpactTrackerRequest) => {
+  const startAnalysis = useCallback((request: ImpactTrackerRequest, skipCache = false) => {
     // 캐시 체크
-    const cached = getCachedResult(request)
+    const cached = !skipCache ? getCachedResult(request) : null
     if (cached) {
       setIsAnalyzing(false)
       setProgress(100)

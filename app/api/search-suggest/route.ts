@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { expandQuery } from '@/lib/query-expansion'
+import { containsLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
@@ -273,8 +274,8 @@ export async function GET(request: NextRequest) {
       searchQuery = articleMatch[1].trim()  // 법령명만 추출
     }
 
-    // 조례 키워드 감지 (scope=all이면 항상 조례 검색)
-    const isOrdinanceQuery = scope === 'all' || /조례|규칙|자치법규|시|군|구/.test(query)
+    // 조례 감지: scope=all이면 항상, 아니면 OrdinancePattern 공용 로직 사용
+    const isOrdinanceQuery = scope === 'all' || /조례|규칙|자치법규/.test(query) || containsLocalGovName(query)
 
     // 동의어 확장: 원본 + 상위 2개 동의어 병렬 호출 (응답 시간 제약)
     const expansion = expandQuery(searchQuery)

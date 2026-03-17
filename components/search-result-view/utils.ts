@@ -116,8 +116,15 @@ export function hasOrdinanceKeyword(query: string): boolean {
   return /조례|조레|자치법규/.test(query) || (/규칙/.test(query) && !/시행규칙/.test(query))
 }
 
+import { containsLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
+export { containsLocalGovName }
+
 export function isOrdinanceQuery(query: string): boolean {
-  return hasOrdinanceKeyword(query) && !hasLawKeyword(query)
+  // 명시적 조례 키워드
+  if (hasOrdinanceKeyword(query) && !hasLawKeyword(query)) return true
+  // 지역명 포함 + 법령 키워드 없음 → 조례 가능성
+  if (containsLocalGovName(query) && !hasLawKeyword(query)) return true
+  return false
 }
 
 // ============================================================

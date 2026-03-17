@@ -39,6 +39,38 @@ export const ORDINANCE_PATTERNS: RegExp[] = [
 // 시행령/시행규칙 패턴 (법령으로 분류되어야 함)
 export const LAW_ENFORCEMENT_PATTERN = /시행령|시행규칙/
 
+// 모든 지자체명 (광역시 구/군 + 경기도 주요 시/군)
+const ALL_LOCAL_GOV_NAMES = [
+  ...SEOUL_DISTRICTS,
+  // 광역시 구/군
+  '중구', '동구', '서구', '남구', '북구', '수영구', '해운대구', '사하구', '금정구', '연제구',
+  '수성구', '달서구', '달성군', '부평구', '남동구', '연수구', '계양구', '미추홀구',
+  '광산구', '유성구', '대덕구', '울주군',
+  // 경기도 주요 시/군
+  '수원시', '성남시', '고양시', '용인시', '부천시', '안산시', '안양시', '남양주시',
+  '화성시', '평택시', '의정부시', '시흥시', '파주시', '광명시', '김포시', '군포시',
+  '광주시', '이천시', '양주시', '오산시', '구리시', '안성시', '포천시', '의왕시',
+  '하남시', '여주시', '양평군', '동두천시', '과천시', '가평군', '연천군',
+]
+
+/**
+ * 쿼리에 지자체명이 포함되어 있는지 판별 (통합 감지 로직)
+ *
+ * 홈 검색바 (classifySearchQuery) 와 영향분석 (search-suggest) 양쪽에서
+ * 동일한 기준으로 조례 가능성을 판별하기 위한 공용 함수.
+ *
+ * "광진구 복무" → true, "복무규정" → false
+ */
+export function containsLocalGovName(query: string): boolean {
+  for (const city of [...METRO_CITIES, ...PROVINCES]) {
+    if (query.includes(city)) return true
+  }
+  for (const name of ALL_LOCAL_GOV_NAMES) {
+    if (query.includes(name)) return true
+  }
+  return false
+}
+
 /**
  * 조례 쿼리인지 판별
  */
