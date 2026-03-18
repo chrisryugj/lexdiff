@@ -219,6 +219,13 @@ export function useAiSearch(deps: HandlerDeps) {
         } catch { /* ignore */ }
       }
 
+      // 안전장치: 스트림 종료 시 answer 미수신 → 에러 상태 표시
+      if (!answerReceivedRef.current) {
+        debugLogger.error('SSE 스트림 종료 - answer 이벤트 미수신')
+        actions.setAiAnswerContent('죄송합니다. AI 엔진 응답을 받지 못했습니다. 다시 시도해 주세요.')
+        actions.setAiConfidenceLevel('low')
+      }
+
       // 안전장치: 스트림 종료 시 isSearching 무조건 해제
       // (state.isSearching은 stale closure 문제로 현재 값이 아닐 수 있음)
       actions.setIsSearching(false)
@@ -236,7 +243,9 @@ export function useAiSearch(deps: HandlerDeps) {
       debugLogger.error('FC-RAG SSE 오류', error)
       actions.setIsSearching(false)
       actions.updateProgress('complete', 0)
-      actions.setIsAiMode(false)
+      // isAiMode 유지하고 에러 메시지 표시 (isAiMode=false로 하면 빈 lawData 상태의 깨진 UI 노출)
+      actions.setAiAnswerContent('죄송합니다. AI 검색 중 오류가 발생했습니다. 다시 시도해 주세요.')
+      actions.setAiConfidenceLevel('low')
       toast({
         title: "AI 검색 실패",
         description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",

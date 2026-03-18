@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
           traceLogger.addEvent(traceId, 'gemini_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []
+          let geminiAnswerSent = false
 
           for await (const event of executeGeminiRAGStream(query, {
             apiKey: userApiKey,
@@ -200,6 +201,7 @@ export async function POST(request: NextRequest) {
             conversationId,
           })) {
             if (event.type === "answer") {
+              geminiAnswerSent = true
               lastAnswerCitations = event.data.citations || []
 
               if (!userApiKey) {
@@ -215,6 +217,21 @@ export async function POST(request: NextRequest) {
             }
 
             send(event)
+          }
+
+          // 안전장치: Claude도 Gemini도 answer를 보내지 못한 경우 에러 답변 전송
+          if (!geminiAnswerSent) {
+            send({
+              type: "answer",
+              data: {
+                answer: "죄송합니다. AI 엔진에 일시적 문제가 발생하여 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                citations: [],
+                confidenceLevel: "low",
+                complexity: "simple",
+                queryType: "application",
+                warnings: ["Claude 및 Gemini 엔진 모두 응답 실패"],
+              },
+            })
           }
 
           if (lastAnswerCitations.length > 0) {
