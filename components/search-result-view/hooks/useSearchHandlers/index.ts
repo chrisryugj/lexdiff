@@ -109,6 +109,9 @@ export function useSearchHandlers({
 
           if (isPureLawName) {
             queryDetection = { type: 'structured', confidence: 1.0, reason: '순수 법령명' }
+          } else if (hasOrdinance && /휴가|수당|근무|복무|급여|연차|보수|징계|임용|승진|전보|파견|겸직/.test(fullQuery)) {
+            // 조례 + 주제 키워드 → 기본 조례 검색(키워드 매칭)으로는 내용 검색 불가 → AI 검색 필요
+            queryDetection = { type: 'natural', confidence: 0.9, reason: '조례 + 주제 키워드 (AI 검색 필요)' }
           } else {
             queryDetection = { type: 'structured', confidence: 0.6, reason: '법령 키워드 포함되나 조문 불분명' }
           }
