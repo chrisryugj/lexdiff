@@ -22,7 +22,7 @@ import { KNOWN_MST, cacheMSTEntries, detectFastPath, parseLawEntries, findBestMS
 import { buildCitations, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { evaluateResponseQuality } from './quality-evaluator'
-import { callGateway, type GatewayMessage } from './anthropic-client'
+import { callAnthropic, type DirectMessage } from './anthropic-client'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -261,74 +261,101 @@ export async function* executeClaudeRAGStream(
   }
   if (fastPathNext.value === true) return
 
-  // ── Full Pipeline: OpenClaw Gateway → Claude Sonnet 4.6 ──
-  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false /* isGemini */)
+  // ── Full Pipeline: Anthropic SDK 직접 호출 + tool_use 멀티턴 ──
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
 
-  yield { type: 'status', message: 'AI가 분석하고 있습니다...', progress: 15 }
+  yield { type: 'status', message: 'AI가 법령을 검색하고 있습니다...', progress: 15 }
 
   if (signal?.aborted) {
     yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
     return
   }
 
-  /** Gateway 타임아웃 (ms) — 에이전트가 MCP 도구까지 실행하므로 넉넉하게 */
-  const GATEWAY_TIMEOUT: Record<QueryComplexity, number> = {
-    simple: 60_000,
-    moderate: 120_000,
-    complex: 180_000,
-  }
+  const maxToolTurnsClaude = getMaxToolTurns(complexity)
+  const anthropicTools = getAnthropicToolDefinitions()
+  const allToolResults: ToolCallResult[] = []
+  let totalInput = 0
+  let totalOutput = 0
 
   try {
-    const messages: GatewayMessage[] = [
-      { role: 'system', content: systemPrompt },
+    const messages: DirectMessage[] = [
       { role: 'user', content: query },
     ]
 
-    const response = await withTimeout(
-      callGateway(messages, {
+    for (let turn = 0; turn < maxToolTurnsClaude; turn++) {
+      if (signal?.aborted) break
+
+      const response = await callAnthropic(systemPrompt, messages, {
         maxTokens: MAX_TOKENS[complexity],
         temperature: 0,
+        tools: anthropicTools,
         signal,
-      }),
-      GATEWAY_TIMEOUT[complexity],
-      'OpenClaw Gateway',
-    )
+      })
 
-    const answer = response.choices?.[0]?.message?.content || ''
+      totalInput += response.usage.inputTokens
+      totalOutput += response.usage.outputTokens
 
-    if (!answer || answer.length < 10) {
-      throw new Error('Gateway 응답이 비어있습니다.')
-    }
+      // 텍스트 블록 추출
+      const textBlocks = response.content.filter(b => b.type === 'text')
+      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
 
-    // Quality Gate 평가
-    const quality = evaluateResponseQuality([], answer)
-    if (quality.warnings.length > 0) warnings.push(...quality.warnings)
+      // tool_use가 없으면 최종 답변
+      if (toolUseBlocks.length === 0 || response.stopReason === 'end_turn') {
+        const answer = textBlocks.map(b => 'text' in b ? b.text : '').join('\n').trim()
 
-    // 토큰 사용량 (Gateway가 제공하면)
-    if (response.usage) {
-      yield {
-        type: 'token_usage',
-        inputTokens: response.usage.prompt_tokens,
-        outputTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens,
+        if (!answer || answer.length < 10) {
+          throw new Error('Claude 응답이 비어있습니다.')
+        }
+
+        const quality = evaluateResponseQuality(allToolResults, answer)
+        if (quality.warnings.length > 0) warnings.push(...quality.warnings)
+
+        yield { type: 'token_usage', inputTokens: totalInput, outputTokens: totalOutput, totalTokens: totalInput + totalOutput }
+        yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+        yield {
+          type: 'answer',
+          data: {
+            answer,
+            citations: buildCitations(allToolResults, answer),
+            confidenceLevel: quality.level === 'fail' ? 'low' : quality.level === 'pass' ? 'high' : 'medium',
+            complexity,
+            queryType,
+            warnings: warnings.length > 0 ? warnings : undefined,
+          },
+        }
+        return
       }
+
+      // tool_use 처리: 도구 실행 후 결과를 assistant → user 메시지로 추가
+      messages.push({ role: 'assistant', content: response.content as any })
+
+      const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = []
+
+      for (const block of toolUseBlocks) {
+        if (block.type !== 'tool_use') continue
+        const displayName = TOOL_DISPLAY_NAMES[block.name] || block.name
+        yield { type: 'tool_call', name: block.name, displayName, query: getToolCallQuery(block.name, block.input as Record<string, unknown>) }
+
+        try {
+          const result = await executeTool(block.name, block.input as Record<string, unknown>, signal)
+          allToolResults.push(result)
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: summarizeToolResult(block.name, result) })
+          yield { type: 'tool_result', name: block.name, displayName, success: !result.isError, summary: result.result.substring(0, 200) }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `오류: ${errMsg}` })
+          yield { type: 'tool_result', name: block.name, displayName, success: false, summary: errMsg }
+        }
+      }
+
+      messages.push({ role: 'user', content: toolResults as any })
     }
 
-    yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
-    yield {
-      type: 'answer',
-      data: {
-        answer,
-        citations: buildCitations([], answer),
-        confidenceLevel: quality.level === 'fail' ? 'low' : quality.level === 'pass' ? 'high' : 'medium',
-        complexity,
-        queryType,
-        warnings: warnings.length > 0 ? warnings : undefined,
-      },
-    }
+    // 턴 초과 — 마지막 응답을 그대로 사용
+    throw new Error('도구 호출 턴 초과')
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    warnings.push(`OpenClaw 오류: ${message}`)
+    warnings.push(`Claude 오류: ${message}`)
     yield { type: 'error', message }
     yield {
       type: 'answer',

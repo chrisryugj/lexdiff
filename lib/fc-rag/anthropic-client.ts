@@ -1,18 +1,98 @@
 /**
- * OpenClaw Gateway를 OpenAI-compatible LLM 엔드포인트로 사용.
+ * Anthropic SDK 직접 호출 클라이언트
  *
- * Gateway가 내부적으로 Anthropic OAuth 처리 + Claude Sonnet 4.6 호출.
- * 이 모듈은 Gateway의 /v1/chat/completions를 호출하는 얇은 래퍼.
- *
- * 환경변수:
- * - OPENCLAW_GATEWAY_URL (기본: http://127.0.0.1:18789)
- * - OPENCLAW_GATEWAY_TOKEN (필수)
+ * Gateway 없이 Anthropic API를 직접 호출.
+ * auth-profiles.json에서 OAuth 토큰 동적 읽기.
+ * tool_use 멀티턴은 engine.ts에서 처리.
  */
 
-export const CLAUDE_MODEL = 'anthropic/claude-sonnet-4-6'
+import Anthropic from '@anthropic-ai/sdk'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
-const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789'
-const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '27034d1e40c21276201d2e06eeae276841c90cb94e3fecdc'
+export const CLAUDE_MODEL = 'claude-sonnet-4-6-20250514'
+
+const AUTH_PROFILES_PATH = join(
+  process.env.HOME || process.env.USERPROFILE || '',
+  '.openclaw/agents/lexdiff-law/agent/auth-profiles.json',
+)
+
+let cachedClient: Anthropic | null = null
+let cachedToken = ''
+
+function getAnthropicToken(): string {
+  try {
+    const raw = readFileSync(AUTH_PROFILES_PATH, 'utf8')
+    const data = JSON.parse(raw)
+    const lastGoodKey = data.lastGood?.anthropic
+    if (lastGoodKey && data.profiles?.[lastGoodKey]?.token) {
+      return data.profiles[lastGoodKey].token
+    }
+    // fallback: 아무 anthropic 프로필 찾기
+    for (const [, profile] of Object.entries(data.profiles || {})) {
+      const p = profile as Record<string, unknown>
+      if (p.provider === 'anthropic' && p.token) return p.token as string
+    }
+  } catch { /* ignore */ }
+  return process.env.ANTHROPIC_API_KEY || ''
+}
+
+function getClient(): Anthropic {
+  const token = getAnthropicToken()
+  if (!cachedClient || token !== cachedToken) {
+    cachedToken = token
+    cachedClient = new Anthropic({ apiKey: token })
+  }
+  return cachedClient
+}
+
+export interface DirectMessage {
+  role: 'user' | 'assistant'
+  content: string | Anthropic.MessageParam['content']
+}
+
+export interface DirectResponse {
+  content: Anthropic.ContentBlock[]
+  stopReason: string | null
+  usage: { inputTokens: number; outputTokens: number }
+}
+
+/**
+ * Anthropic Messages API 직접 호출
+ */
+export async function callAnthropic(
+  systemPrompt: string,
+  messages: DirectMessage[],
+  options?: {
+    maxTokens?: number
+    temperature?: number
+    tools?: Anthropic.Tool[]
+    signal?: AbortSignal
+  },
+): Promise<DirectResponse> {
+  const { maxTokens = 4096, temperature = 0, tools, signal } = options || {}
+  const client = getClient()
+
+  const response = await client.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: maxTokens,
+    temperature,
+    system: systemPrompt,
+    messages: messages as Anthropic.MessageParam[],
+    ...(tools && tools.length > 0 ? { tools } : {}),
+  }, signal ? { signal } : undefined)
+
+  return {
+    content: response.content,
+    stopReason: response.stop_reason,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    },
+  }
+}
+
+// ── 호환 래퍼: 기존 callGateway 인터페이스 유지 (summarize, benchmark 등) ──
 
 export interface GatewayMessage {
   role: 'system' | 'user' | 'assistant'
@@ -21,131 +101,35 @@ export interface GatewayMessage {
 
 export interface GatewayResponse {
   id: string
-  choices: Array<{
-    index: number
-    message: { role: string; content: string }
-    finish_reason: string
-  }>
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
+  choices: Array<{ index: number; message: { role: string; content: string }; finish_reason: string }>
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
 }
 
-/**
- * Gateway /v1/chat/completions 호출 (non-streaming)
- */
 export async function callGateway(
   messages: GatewayMessage[],
   options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal },
 ): Promise<GatewayResponse> {
   const { maxTokens = 4096, temperature = 0, signal } = options || {}
 
-  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GATEWAY_TOKEN}`,
-      'Content-Type': 'application/json',
+  const systemMsg = messages.find(m => m.role === 'system')?.content || ''
+  const chatMessages: DirectMessage[] = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
+  const response = await callAnthropic(systemMsg, chatMessages, { maxTokens, temperature, signal })
+
+  const text = response.content
+    .filter(b => b.type === 'text')
+    .map(b => 'text' in b ? b.text : '')
+    .join('')
+
+  return {
+    id: `direct-${Date.now()}`,
+    choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: response.stopReason || 'stop' }],
+    usage: {
+      prompt_tokens: response.usage.inputTokens,
+      completion_tokens: response.usage.outputTokens,
+      total_tokens: response.usage.inputTokens + response.usage.outputTokens,
     },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-      agent_id: 'lexdiff-law',
-    }),
-    signal,
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Gateway 오류 (${res.status}): ${text.slice(0, 200)}`)
-  }
-
-  return res.json()
-}
-
-/**
- * Gateway /v1/chat/completions 스트리밍 호출
- * SSE 청크를 AsyncGenerator로 yield
- */
-export async function* streamGateway(
-  messages: GatewayMessage[],
-  options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal },
-): AsyncGenerator<string> {
-  const { maxTokens = 4096, temperature = 0, signal } = options || {}
-
-  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GATEWAY_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-      stream: true,
-      agent_id: 'lexdiff-law',
-    }),
-    signal,
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Gateway 스트리밍 오류 (${res.status}): ${text.slice(0, 200)}`)
-  }
-
-  const reader = res.body?.getReader()
-  if (!reader) throw new Error('Gateway 응답에 body가 없습니다.')
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data: ')) continue
-        const data = trimmed.slice(6)
-        if (data === '[DONE]') return
-
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) yield content
-        } catch {
-          // 파싱 불가능한 청크 무시
-        }
-      }
-    }
-
-    // 잔여 버퍼 처리
-    if (buffer.trim()) {
-      for (const line of buffer.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data: ')) continue
-        const data = trimmed.slice(6)
-        if (data === '[DONE]') return
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) yield content
-        } catch {
-          // ignore
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock()
   }
 }
