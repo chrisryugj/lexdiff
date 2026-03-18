@@ -403,6 +403,17 @@ export async function* executeGeminiRAGStream(
   const effectiveKey = geminiApiKey || process.env.GEMINI_API_KEY
   if (!effectiveKey) {
     yield { type: 'error', message: 'Gemini API 키가 설정되지 않았습니다.' }
+    yield {
+      type: 'answer',
+      data: {
+        answer: '죄송합니다. AI 엔진이 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+        citations: [],
+        confidenceLevel: 'low' as const,
+        complexity,
+        queryType,
+        warnings: ['Gemini API 키 미설정'],
+      },
+    }
     return
   }
 
