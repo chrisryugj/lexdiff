@@ -171,7 +171,7 @@ export async function* executeImpactAnalysis(
       yield {
         type: 'status',
         message: `AI 분류 중... (${Math.min(i + BATCH_SIZE, classificationInputs.length)}/${classificationInputs.length})`,
-        progress: 65 + ((i + BATCH_SIZE) / classificationInputs.length) * 20,
+        progress: Math.min(85, 65 + (Math.min(i + BATCH_SIZE, classificationInputs.length) / classificationInputs.length) * 20),
         step: 'classifying',
       }
     }
