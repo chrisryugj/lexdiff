@@ -252,12 +252,12 @@ export function ImpactTrackerView({
                 <>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">영향 분석 진행 중</span>
-                    <span className="text-sm font-bold text-brand-navy tabular-nums">{Math.round(progress)}%</span>
+                    <span className="text-sm font-bold text-brand-navy tabular-nums">{Math.min(100, Math.round(progress))}%</span>
                   </div>
                   <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4">
                     <div
                       className="bg-gradient-to-r from-brand-navy to-brand-gold h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${Math.min(100, progress)}%` }}
                     />
                   </div>
                 </>

@@ -18,7 +18,7 @@ export const TIER_1: Record<string, readonly string[]> = {
   competition: ['search_ftc_decisions', 'get_ftc_decision_text'],
   constitutional: ['search_constitutional_decisions', 'get_constitutional_decision_text'],
   admin: ['search_admin_appeals', 'get_admin_appeal_text', 'search_admin_rule', 'get_admin_rule'],
-  public_servant: ['search_admin_rule', 'get_admin_rule', 'get_annexes'],
+  public_servant: ['search_admin_rule', 'get_admin_rule', 'get_annexes', 'search_ordinance', 'get_ordinance'],
   housing: ['search_ordinance', 'get_ordinance', 'chain_ordinance_compare', 'chain_action_basis', 'chain_procedure_detail'],
   environment: ['search_ordinance', 'search_admin_rule', 'chain_law_system', 'chain_action_basis', 'chain_amendment_track'],
   construction: ['search_admin_rule', 'get_three_tier', 'chain_ordinance_compare', 'chain_action_basis', 'chain_procedure_detail'],
@@ -55,6 +55,18 @@ export type LegalDomain = 'tax' | 'customs' | 'labor' | 'privacy' | 'competition
 
 export function detectDomain(query: string): LegalDomain {
   const src = query.toLowerCase()
+
+  // 조례/자치법규 키워드가 있으면 다른 도메인보다 우선
+  // (e.g., "광진구 복무조례 휴가" → 조례 검색이 핵심이지 행정규칙이 아님)
+  const hasOrdinance = /조례|자치법규/.test(src)
+  const hasRegion = /[가-힣]+[시도군구]/.test(src)
+  if (hasOrdinance || (hasRegion && /복무|근무|휴가|수당/.test(src) && !/법\s|법률/.test(src))) {
+    // 지역+복무/휴가 조합은 조례 질의 (복무조례, 근무조례 등)
+    // 단, "지방공무원법" 같이 명시적으로 법률을 지칭하면 제외
+    if (hasOrdinance) return 'civil_service'
+    if (hasRegion) return 'civil_service'
+  }
+
   if (/관세|수입|수출|통관|hs코드|원산지|fta|보세/.test(src)) return 'customs'
   if (/근로|임금|해고|퇴직금|최저임금|산재|산업재해|고용보험|연차|수당|휴가/.test(src)) return 'labor'
   if (/개인정보|정보주체|개인정보처리자/.test(src)) return 'privacy'
@@ -132,7 +144,7 @@ export function selectToolsForQuery(query: string): string[] {
     chain_procedure_detail: ['get_three_tier', 'get_annexes', 'search_ai_law'],
     chain_law_system: ['get_three_tier', 'get_annexes'],
     chain_amendment_track: ['compare_old_new', 'get_article_history'],
-    chain_ordinance_compare: ['search_ordinance', 'get_three_tier'],
+    chain_ordinance_compare: ['get_three_tier'],  // search_ordinance는 제거하지 않음 (단독 조례 검색 필요)
   }
 
   for (const [chain, covered] of Object.entries(chainCovers)) {

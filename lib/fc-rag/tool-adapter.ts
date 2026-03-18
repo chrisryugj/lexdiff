@@ -603,11 +603,14 @@ export async function executeTool(
       isError: response.isError || false,
     }
 
-    // 성공 시 캐시 저장
+    // 성공 시 캐시 저장 (빈 검색 결과는 캐시하지 않음 — 일시적 API 오류일 수 있음)
     const ttl = CACHE_TTL[name]
     if (ttl && !result.isError) {
-      apiCache.set(cacheKey, { result, expiry: Date.now() + ttl })
-      evictOldest()
+      const isEmptySearch = name.startsWith('search_') && isEmptySearchResult(result.result)
+      if (!isEmptySearch) {
+        apiCache.set(cacheKey, { result, expiry: Date.now() + ttl })
+        evictOldest()
+      }
     }
 
     return result
@@ -740,4 +743,17 @@ function compressAiSearchResult(text: string): string {
   const total = blocks.length
   const suffix = total > kept ? `\n\n(총 ${total}건 중 상위 ${kept}건 표시)` : ''
   return header + compressed.join('\n\n') + suffix
+}
+
+/**
+ * 검색 결과가 실질적으로 비어있는지 판별
+ * API가 에러 없이 "결과 없음"을 반환하는 경우를 캐시에서 제외하기 위함
+ */
+function isEmptySearchResult(text: string): boolean {
+  if (!text || text.trim().length === 0) return true
+  // "검색 결과가 없습니다" 등의 메시지
+  if (/검색 결과가 없|결과 없음|0건|데이터가 없|찾을 수 없/.test(text)) return true
+  // 검색 결과 헤더는 있지만 실제 항목이 없는 경우 (총 0건)
+  if (/총 0건/.test(text)) return true
+  return false
 }
