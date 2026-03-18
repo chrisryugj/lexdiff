@@ -39,6 +39,9 @@ function getAnthropicToken(): string {
 
 function getClient(): Anthropic {
   const token = getAnthropicToken()
+  if (!token) {
+    throw new Error('Anthropic API 키가 설정되지 않았습니다. (auth-profiles.json 또는 ANTHROPIC_API_KEY 환경변수 필요)')
+  }
   if (!cachedClient || token !== cachedToken) {
     cachedToken = token
     cachedClient = new Anthropic({ apiKey: token })
