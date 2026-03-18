@@ -2,13 +2,14 @@
  * FC-RAG API endpoint with SSE streaming.
  *
  * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
- * Fallback: Gemini Flash — Claude 불능 시
+ * Primary : OpenClaw Bridge (미니PC Claude CLI via Cloudflare Tunnel)
+ * Fallback: Gemini Flash — Bridge 불능 시
  */
 
 import { NextRequest } from "next/server"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
-import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
+import { executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
+import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
 import {
   getUsageHeaders,
   getUsageWarningMessage,
@@ -117,50 +118,46 @@ export async function POST(request: NextRequest) {
         let handled = false
         let source: 'claude' | 'gemini' = 'gemini'
 
-        // ── Claude Primary ──
+        // ── OpenClaw Bridge Primary (미니PC Claude CLI via Cloudflare Tunnel) ──
         try {
-          traceLogger.addEvent(traceId, 'claude_start', {})
-          send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+          const bridgeHealthy = await isOpenClawHealthy()
+          if (!bridgeHealthy) {
+            throw new Error('OpenClaw Bridge unavailable')
+          }
+
+          traceLogger.addEvent(traceId, 'openclaw_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []
-          let claudeHadError = false
 
-          for await (const event of executeClaudeRAGStream(query, {
-            signal: request.signal,
-            conversationId,
-          })) {
-            // Claude 내부 에러 감지 → Gemini 폴백 트리거
-            if (event.type === "error") {
-              claudeHadError = true
-              traceLogger.addEvent(traceId, 'claude_internal_error', { message: event.message })
-              continue
-            }
+          // fetchFromOpenClaw이 send()를 직접 호출하므로, 래핑하여 citations 캡처 + usage 추적
+          const wrappedSend = (data: unknown) => {
+            const event = data as Record<string, unknown>
 
-            // 에러 후 나온 fallback answer는 무시 (Gemini가 처리)
-            if (claudeHadError && event.type === "answer") {
-              continue
-            }
+            if (event?.type === 'answer') {
+              const answerData = event.data as Record<string, unknown> | undefined
+              lastAnswerCitations = (answerData?.citations || []) as FCRAGCitation[]
 
-            if (event.type === "answer") {
-              lastAnswerCitations = event.data.citations || []
-
-              if (!userApiKey) {
-                const usageStats = await recordAITokens(clientIP, event.data.answer.length)
-                const warningMessage = getUsageWarningMessage(usageStats)
-
-                if (warningMessage) {
-                  const warnings = [...(event.data.warnings || []), warningMessage]
-                  send({ ...event, data: { ...event.data, warnings } })
-                  continue
-                }
+              if (!userApiKey && answerData?.answer) {
+                // usage tracking은 비동기이지만 SSE 전송을 막지 않도록 fire-and-forget
+                recordAITokens(clientIP, String(answerData.answer).length).then(usageStats => {
+                  const warningMessage = getUsageWarningMessage(usageStats)
+                  if (warningMessage) {
+                    send({ type: "status", message: warningMessage, progress: 99 })
+                  }
+                }).catch(() => {})
               }
             }
 
-            send(event)
+            send(data)
           }
 
-          if (claudeHadError) {
-            throw new Error('Claude internal error, falling back to Gemini')
+          const success = await fetchFromOpenClaw(query, wrappedSend, {
+            abortSignal: request.signal,
+            conversationId,
+          })
+
+          if (!success) {
+            throw new Error('OpenClaw Bridge returned failure')
           }
 
           // Citation 검증
@@ -180,9 +177,9 @@ export async function POST(request: NextRequest) {
           handled = true
           source = 'claude'
           traceLogger.completeTrace(traceId, 'openclaw')
-        } catch (claudeError) {
-          traceLogger.addEvent(traceId, 'claude_failed', {
-            message: claudeError instanceof Error ? claudeError.message : 'unknown',
+        } catch (bridgeError) {
+          traceLogger.addEvent(traceId, 'openclaw_failed', {
+            message: bridgeError instanceof Error ? bridgeError.message : 'unknown',
             fallback: 'gemini',
           })
         }

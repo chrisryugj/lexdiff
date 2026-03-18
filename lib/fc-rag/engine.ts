@@ -5,24 +5,22 @@
  * 법제처 API 실시간 데이터 기반 답변 생성.
  *
  * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
- * Fallback: Gemini Flash — Claude 불능 시 이 엔진이 직접 Gemini 호출
+ * Primary : OpenClaw Bridge (미니PC Claude CLI via Cloudflare Tunnel) — route.ts에서 처리
+ * Fallback: Gemini Flash — Bridge 불능 시 이 엔진이 직접 Gemini 호출
  *
  * 도구 어댑터(tool-adapter), Tier 시스템(tool-tiers), 프롬프트(prompts)는
- * 양쪽 LLM이 공유하는 인프라.
+ * Gemini 엔진이 사용하는 인프라.
  *
- * SSE 스트리밍 지원: executeClaudeRAGStream() / executeGeminiRAGStream()
+ * SSE 스트리밍 지원: executeGeminiRAGStream()
  */
 
 import { GoogleGenAI, type Part } from '@google/genai'
-import { getToolDeclarations, getAnthropicToolDefinitions, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
+import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery } from './tool-tiers'
 import { KNOWN_MST, cacheMSTEntries, detectFastPath, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
 import { buildCitations, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
-import { evaluateResponseQuality } from './quality-evaluator'
-import { callAnthropic, type DirectMessage } from './anthropic-client'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -231,144 +229,6 @@ async function* handleFastPath(
 
   // fast path 실패 → full pipeline으로 진행
   return false
-}
-
-// ─── Claude Primary 엔진 (OpenClaw Gateway 경유) ───
-
-/**
- * Claude FC-RAG 스트리밍 실행 (Primary)
- * OpenClaw Gateway /v1/chat/completions 호출.
- * Gateway 에이전트가 korean-law MCP 도구를 내부적으로 처리.
- */
-export async function* executeClaudeRAGStream(
-  query: string,
-  options?: RAGStreamOptions,
-): AsyncGenerator<FCRAGStreamEvent> {
-  const { signal } = options || {}
-  const warnings: string[] = []
-  const complexity = inferComplexity(query)
-  const queryType = inferQueryType(query)
-  const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
-
-  yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
-
-  // ── Fast Path: LLM 없이 직접 도구 호출 ──
-  const fastPathGen = handleFastPath(query, queryType, signal)
-  let fastPathNext = await fastPathGen.next()
-  while (!fastPathNext.done) {
-    yield fastPathNext.value
-    fastPathNext = await fastPathGen.next()
-  }
-  if (fastPathNext.value === true) return
-
-  // ── Full Pipeline: Anthropic SDK 직접 호출 + tool_use 멀티턴 ──
-  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
-
-  yield { type: 'status', message: 'AI가 법령을 검색하고 있습니다...', progress: 15 }
-
-  if (signal?.aborted) {
-    yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
-    return
-  }
-
-  const maxToolTurnsClaude = getMaxToolTurns(complexity)
-  const anthropicTools = getAnthropicToolDefinitions()
-  const allToolResults: ToolCallResult[] = []
-  let totalInput = 0
-  let totalOutput = 0
-
-  try {
-    const messages: DirectMessage[] = [
-      { role: 'user', content: query },
-    ]
-
-    for (let turn = 0; turn < maxToolTurnsClaude; turn++) {
-      if (signal?.aborted) break
-
-      const response = await callAnthropic(systemPrompt, messages, {
-        maxTokens: MAX_TOKENS[complexity],
-        temperature: 0,
-        tools: anthropicTools,
-        signal,
-      })
-
-      totalInput += response.usage.inputTokens
-      totalOutput += response.usage.outputTokens
-
-      // 텍스트 블록 추출
-      const textBlocks = response.content.filter(b => b.type === 'text')
-      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
-
-      // tool_use가 없으면 최종 답변
-      if (toolUseBlocks.length === 0 || response.stopReason === 'end_turn') {
-        const answer = textBlocks.map(b => 'text' in b ? b.text : '').join('\n').trim()
-
-        if (!answer || answer.length < 10) {
-          throw new Error('Claude 응답이 비어있습니다.')
-        }
-
-        const quality = evaluateResponseQuality(allToolResults, answer)
-        if (quality.warnings.length > 0) warnings.push(...quality.warnings)
-
-        yield { type: 'token_usage', inputTokens: totalInput, outputTokens: totalOutput, totalTokens: totalInput + totalOutput }
-        yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
-        yield {
-          type: 'answer',
-          data: {
-            answer,
-            citations: buildCitations(allToolResults, answer),
-            confidenceLevel: quality.level === 'fail' ? 'low' : quality.level === 'pass' ? 'high' : 'medium',
-            complexity,
-            queryType,
-            warnings: warnings.length > 0 ? warnings : undefined,
-          },
-        }
-        return
-      }
-
-      // tool_use 처리: 도구 실행 후 결과를 assistant → user 메시지로 추가
-      messages.push({ role: 'assistant', content: response.content as any })
-
-      const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = []
-
-      for (const block of toolUseBlocks) {
-        if (block.type !== 'tool_use') continue
-        const displayName = TOOL_DISPLAY_NAMES[block.name] || block.name
-        yield { type: 'tool_call', name: block.name, displayName, query: getToolCallQuery(block.name, block.input as Record<string, unknown>) }
-
-        try {
-          const result = await executeTool(block.name, block.input as Record<string, unknown>, signal)
-          allToolResults.push(result)
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: summarizeToolResult(block.name, result) })
-          yield { type: 'tool_result', name: block.name, displayName, success: !result.isError, summary: result.result.substring(0, 200) }
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `오류: ${errMsg}` })
-          yield { type: 'tool_result', name: block.name, displayName, success: false, summary: errMsg }
-        }
-      }
-
-      messages.push({ role: 'user', content: toolResults as any })
-    }
-
-    // 턴 초과 — 마지막 응답을 그대로 사용
-    throw new Error('도구 호출 턴 초과')
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    warnings.push(`Claude 오류: ${message}`)
-    yield { type: 'error', message }
-    yield {
-      type: 'answer',
-      data: {
-        answer: '죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
-        citations: [],
-        confidenceLevel: 'low',
-        complexity,
-        queryType,
-        warnings,
-      },
-    }
-  }
 }
 
 // ─── Gemini Fallback 엔진 ───
@@ -783,26 +643,16 @@ export async function* executeGeminiRAGStream(
 
 // ─── 하위 호환 래퍼 ───
 
-/** @deprecated route.ts에서 직접 executeClaudeRAGStream/executeGeminiRAGStream 사용 */
+/** @deprecated route.ts에서 직접 fetchFromOpenClaw/executeGeminiRAGStream 사용 */
 export const executeRAGStream = executeGeminiRAGStream
 
 /**
- * FC-RAG 실행 (비스트리밍 버전)
- * Claude 우선, 실패 시 Gemini fallback
+ * FC-RAG 실행 (비스트리밍 버전, Gemini only)
  */
 export async function executeRAG(
   query: string,
   geminiApiKey?: string
 ): Promise<FCRAGResult> {
-  // Claude 우선
-  try {
-    for await (const event of executeClaudeRAGStream(query)) {
-      if (event.type === 'answer') return event.data
-      if (event.type === 'error') throw new Error(event.message)
-    }
-  } catch {
-    // Claude 실패 → Gemini fallback
-  }
   for await (const event of executeGeminiRAGStream(query, { apiKey: geminiApiKey })) {
     if (event.type === 'answer') return event.data
     if (event.type === 'error') throw new Error(event.message)

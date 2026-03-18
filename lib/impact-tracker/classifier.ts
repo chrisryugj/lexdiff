@@ -1,16 +1,11 @@
 /**
- * AI 영향도 분류기 - Claude(Gateway) 우선, Gemini 폴백
+ * AI 영향도 분류기 - Gemini Flash Lite
  *
  * 법령 변경사항의 영향도(critical/review/info)를 AI로 분류하고
  * 종합 요약을 생성한다.
- *
- * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — OpenClaw Gateway /v1/chat/completions
- * Fallback: Gemini Flash Lite — Gateway 불능 시
  */
 
 import { GoogleGenAI } from '@google/genai'
-import { callGateway } from '@/lib/fc-rag/anthropic-client'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import {
   buildClassificationQuery,
@@ -28,12 +23,6 @@ export async function classifyImpact(
   if (changes.length === 0) return []
 
   const query = buildClassificationQuery(changes)
-
-  // 1) Claude(Gateway) 시도
-  const claudeResult = await classifyViaClaude(query)
-  if (claudeResult) return claudeResult
-
-  // 2) Gemini 폴백
   return classifyWithGemini(query, options?.apiKey)
 }
 
@@ -41,25 +30,7 @@ export async function classifyImpact(
  * AI 엔진 판별 (SSE ai_source 이벤트용)
  */
 export async function getAISource(): Promise<'openclaw' | 'gemini'> {
-  return 'openclaw'
-}
-
-// ── Claude 경로 (Gateway) ──
-
-async function classifyViaClaude(
-  query: string,
-): Promise<ClassificationResult[] | null> {
-  try {
-    const response = await callGateway([
-      { role: 'system', content: buildClassificationSystemPrompt() },
-      { role: 'user', content: query },
-    ], { temperature: 0.1 })
-
-    const text = response.choices?.[0]?.message?.content || ''
-    return parseClassificationJSON(text)
-  } catch {
-    return null
-  }
+  return 'gemini'
 }
 
 // ── Gemini 경로 ──
@@ -99,28 +70,7 @@ export async function generateImpactSummary(
 
   const query = buildSummaryQuery(items, dateRange)
 
-  // 1) Claude(Gateway) 시도
-  const claudeResult = await summarizeViaClaude(query)
-  if (claudeResult) return claudeResult
-
-  // 2) Gemini 폴백
   return summarizeWithGemini(query, options?.apiKey)
-}
-
-async function summarizeViaClaude(
-  query: string,
-): Promise<string | null> {
-  try {
-    const response = await callGateway([
-      { role: 'system', content: buildSummarySystemPrompt() },
-      { role: 'user', content: query },
-    ], { temperature: 0.3 })
-
-    const text = response.choices?.[0]?.message?.content || ''
-    return text.trim() || null
-  } catch {
-    return null
-  }
 }
 
 async function summarizeWithGemini(

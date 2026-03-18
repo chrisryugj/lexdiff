@@ -6,14 +6,13 @@
 ## 🔴 LLM 구성 (중요)
 | 역할 | LLM | 경로 |
 |------|-----|------|
-| **Primary** | **Sonnet 4.6 (Claude)** | route.ts → engine.ts `executeClaudeRAGStream()` → Anthropic SDK |
-| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (Claude 불능 시) |
+| **Primary** | **OpenClaw Bridge (미니PC Claude CLI)** | route.ts → `openclaw-client.ts` `fetchFromOpenClaw()` → Cloudflare Tunnel → 미니PC |
+| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (Bridge 불능 시) |
 
-- **인증**: OpenClaw `auth-profiles.json`에서 Anthropic OAuth 토큰 동적 읽기 (`lib/fc-rag/anthropic-client.ts`)
-- tool-adapter, tool-tiers, prompts, fast-path는 **양쪽 LLM이 공유**하는 인프라
-- 도구 description·프롬프트 최적화는 **Claude 기준 우선** 설계
-- engine.ts의 GoogleGenAI 호출은 **폴백 전용**
-- Bridge/Nanobot 의존성 제거됨 (2026-03-18)
+- **Vercel에서 Anthropic API 직접 호출 안 함** — 미니PC의 Claude CLI가 처리
+- **인증**: Cloudflare Access (`CF_ACCESS_CLIENT_ID/SECRET`) + `OPENCLAW_API_TOKEN`
+- tool-adapter, tool-tiers, prompts, fast-path는 **Gemini 폴백 엔진**이 사용하는 인프라
+- summarize, benchmark-analyze, classifier는 **Gemini only** (간단 작업)
 
 ## Commands
 ```bash

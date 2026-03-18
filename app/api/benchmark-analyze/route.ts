@@ -9,7 +9,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { callGateway } from '@/lib/fc-rag/anthropic-client'
 
 // ── 조례 본문 조회 ──
 
@@ -83,20 +82,7 @@ function parseAnalysisResponse(text: string): { comparisonTable: string; highlig
   }
 }
 
-// ── Claude 호출 ──
-
-async function callClaude(prompt: string): Promise<string | null> {
-  try {
-    const response = await callGateway([
-      { role: 'user', content: prompt },
-    ], { maxTokens: 8192, temperature: 0 })
-    return response.choices?.[0]?.message?.content || null
-  } catch {
-    return null
-  }
-}
-
-// ── Gemini 폴백 ──
+// ── Gemini ──
 
 async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY
@@ -151,13 +137,6 @@ export async function POST(request: NextRequest) {
   const prompt = buildPrompt(keyword, validTexts, focus)
 
   try {
-    // 1) Claude 우선 시도
-    const claudeAnswer = await callClaude(prompt)
-    if (claudeAnswer) {
-      return NextResponse.json(parseAnalysisResponse(claudeAnswer))
-    }
-
-    // 2) Gemini 폴백
     const geminiAnswer = await callGemini(prompt)
     return NextResponse.json(parseAnalysisResponse(geminiAnswer))
   } catch (err: any) {

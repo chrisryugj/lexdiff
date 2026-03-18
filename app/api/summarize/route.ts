@@ -2,7 +2,6 @@ import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
-import { callGateway } from "@/lib/fc-rag/anthropic-client"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -118,22 +117,6 @@ export async function POST(request: Request) {
       isPrecedent,
     })
 
-    // 1) Claude(Gateway) 우선 시도
-    try {
-      const response = await callGateway([
-        { role: 'user', content: prompt },
-      ], { maxTokens: 4096, temperature: 0 })
-      const claudeText = response.choices?.[0]?.message?.content || ''
-      if (claudeText) {
-        await recordAITokens(clientIP, claudeText.length)
-        debugLogger.success("AI summary complete (Claude)", { length: claudeText.length })
-        return NextResponse.json({ summary: claudeText.trim() })
-      }
-    } catch (err) {
-      debugLogger.warning("Claude summarize failed, falling back to Gemini", err)
-    }
-
-    // 2) Gemini 폴백
     const ai = new GoogleGenAI({ apiKey })
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
