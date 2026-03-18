@@ -123,11 +123,24 @@ export async function POST(request: NextRequest) {
           send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
 
           let lastAnswerCitations: FCRAGCitation[] = []
+          let claudeHadError = false
 
           for await (const event of executeClaudeRAGStream(query, {
             signal: request.signal,
             conversationId,
           })) {
+            // Claude 내부 에러 감지 → Gemini 폴백 트리거
+            if (event.type === "error") {
+              claudeHadError = true
+              traceLogger.addEvent(traceId, 'claude_internal_error', { message: event.message })
+              continue
+            }
+
+            // 에러 후 나온 fallback answer는 무시 (Gemini가 처리)
+            if (claudeHadError && event.type === "answer") {
+              continue
+            }
+
             if (event.type === "answer") {
               lastAnswerCitations = event.data.citations || []
 
@@ -144,6 +157,10 @@ export async function POST(request: NextRequest) {
             }
 
             send(event)
+          }
+
+          if (claudeHadError) {
+            throw new Error('Claude internal error, falling back to Gemini')
           }
 
           // Citation 검증
