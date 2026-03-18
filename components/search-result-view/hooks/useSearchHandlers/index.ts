@@ -124,7 +124,7 @@ export function useSearchHandlers({
     // 모드 선택 다이얼로그
     // ✅ 수정: classification이 'ai'이거나 queryDetection이 'natural'이면 다이얼로그 안 띄움
     const effectiveConfidence = classification ? classification.confidence : queryDetection.confidence
-    const isAiClassified = classification?.searchType === 'ai' || queryDetection.type === 'natural'
+    const isAiClassified = classification?.searchType === 'ai' || (query as any).searchType === 'ai' || queryDetection.type === 'natural'
 
     if (!forcedMode && !isAiClassified && effectiveConfidence < 0.7) {
       debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', {
