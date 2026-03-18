@@ -436,7 +436,14 @@ export function useAiSearch(deps: HandlerDeps) {
       } catch (e) { debugLogger.error('캐시 저장 실패', e) }
 
       try {
-        await cacheResponse(query, processedContent, data.citations, data.confidenceLevel, data.queryType)
+        // 실질적으로 빈 답변이나 실패 답변은 캐싱하지 않음 (다음 시도 시 재검색)
+        const isEmptyAnswer = !processedContent || processedContent.length < 50 ||
+          /검색 결과.*없|찾을 수 없|조회.*실패|확인.*어렵/.test(processedContent)
+        if (!isEmptyAnswer) {
+          await cacheResponse(query, processedContent, data.citations, data.confidenceLevel, data.queryType)
+        } else {
+          debugLogger.warning('빈/실패 AI 답변 - RAG 캐시 저장 스킵', { contentLength: processedContent?.length })
+        }
       } catch (e) { debugLogger.error('RAG 캐시 저장 실패', e) }
     }
 
