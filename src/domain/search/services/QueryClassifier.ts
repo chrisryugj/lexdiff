@@ -118,8 +118,10 @@ export function classifySearchQuery(query: string): UnifiedQueryClassification {
   // 우선순위 6: AI 질문 (자연어 검색)
   else if (basicDetection.type === 'natural' && basicDetection.confidence >= 0.75) {
     searchType = 'ai'
-    // confidence 조화평균 사용
-    confidence = calculateHarmonicMean(basicDetection.confidence, legalQuestion.confidence)
+    // confidence: detectQueryType가 natural로 확실히 판단하면 최소 0.7 보장
+    // (legalQuestion fallback 0.5가 조화평균으로 전체를 끌어내리는 문제 방지)
+    const harmonicMean = calculateHarmonicMean(basicDetection.confidence, legalQuestion.confidence)
+    confidence = Math.max(harmonicMean, Math.min(basicDetection.confidence, 0.75))
     reason = basicDetection.reason
     matchedPatterns.push('ai')
   }

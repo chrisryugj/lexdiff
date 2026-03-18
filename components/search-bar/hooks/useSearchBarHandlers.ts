@@ -59,6 +59,7 @@ export function useSearchBarHandlers({
           jo: undefined,
           searchType: 'ai',
           classification,
+          forcedMode: 'ai',
           rawQuery: searchQuery,
         })
         actions.setShowDropdown(false)

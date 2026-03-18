@@ -62,10 +62,12 @@ export function useSearchHandlers({
     forcedMode?: 'law' | 'ai',
     skipCache?: boolean
   ) => {
+    // query 객체에 forcedMode가 있으면 사용 (search-result-view에서 직접 호출 시)
+    const effectiveForcedMode = forcedMode || (query as any).forcedMode as 'law' | 'ai' | undefined
     const fullQuery = buildFullQuery(query.lawName, query.article)
     actions.setSearchQuery(fullQuery)
     actions.setUserQuery((query as any).rawQuery || fullQuery)
-    debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode })
+    debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode: effectiveForcedMode })
 
     // 통합검색: classification이 있으면 재감지 스킵
     const classification = (query as any).classification
@@ -91,9 +93,9 @@ export function useSearchHandlers({
     let queryDetection = detectQueryType(fullQuery)
 
     // 강제 모드 처리
-    if (forcedMode === 'ai') {
+    if (effectiveForcedMode === 'ai') {
       queryDetection = { type: 'natural', confidence: 1.0, reason: '사용자 강제 선택 (AI)' }
-    } else if (forcedMode === 'law') {
+    } else if (effectiveForcedMode === 'law') {
       queryDetection = { type: 'structured', confidence: 1.0, reason: '사용자 강제 선택 (법령)' }
     } else {
       if (queryDetection.type !== 'natural' && (hasLaw || hasOrdinance)) {
@@ -124,9 +126,9 @@ export function useSearchHandlers({
     // 모드 선택 다이얼로그
     // ✅ 수정: classification이 'ai'이거나 queryDetection이 'natural'이면 다이얼로그 안 띄움
     const effectiveConfidence = classification ? classification.confidence : queryDetection.confidence
-    const isAiClassified = classification?.searchType === 'ai' || queryDetection.type === 'natural'
+    const isAiClassified = classification?.searchType === 'ai' || (query as any).searchType === 'ai' || queryDetection.type === 'natural'
 
-    if (!forcedMode && !isAiClassified && effectiveConfidence < 0.7) {
+    if (!effectiveForcedMode && !isAiClassified && effectiveConfidence < 0.7) {
       debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', {
         effectiveConfidence,
         hasClassification: !!classification,
@@ -140,11 +142,11 @@ export function useSearchHandlers({
     }
 
     // ✅ 수정: classification.searchType도 고려 (기존에는 queryDetection만 체크)
-    const isAiSearch = forcedMode === 'ai' || (!forcedMode && isAiClassified)
+    const isAiSearch = effectiveForcedMode === 'ai' || (!effectiveForcedMode && isAiClassified)
 
     debugLogger.info('🔍 최종 검색 모드 결정', {
       isAiSearch,
-      forcedMode,
+      effectiveForcedMode,
       isAiClassified,
       classificationSearchType: classification?.searchType,
       queryDetectionType: queryDetection.type
