@@ -74,6 +74,8 @@ export function useAiSearch(deps: HandlerDeps) {
     try {
       if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
         toast({ title: 'AI 기능을 사용하려면 비밀번호 인증이 필요합니다.', variant: 'destructive' })
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 0)
         return
       }
     } catch { /* private browsing */ }
@@ -174,7 +176,11 @@ export function useAiSearch(deps: HandlerDeps) {
         signal: mergedSignal
       })
 
-      if (mergedSignal.aborted) return
+      if (mergedSignal.aborted) {
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 0)
+        return
+      }
 
       if (!response.ok) {
         throw new Error(`API 오류: ${response.status}`)
@@ -213,11 +219,10 @@ export function useAiSearch(deps: HandlerDeps) {
         } catch { /* ignore */ }
       }
 
-      // 안전장치: answer 이벤트 없이 스트림 종료된 경우 isSearching 해제
-      if (state.isSearching) {
-        actions.setIsSearching(false)
-        actions.updateProgress('complete', 100)
-      }
+      // 안전장치: 스트림 종료 시 isSearching 무조건 해제
+      // (state.isSearching은 stale closure 문제로 현재 값이 아닐 수 있음)
+      actions.setIsSearching(false)
+      actions.updateProgress('complete', 100)
 
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
