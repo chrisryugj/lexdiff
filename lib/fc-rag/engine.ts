@@ -5,13 +5,13 @@
  * 법제처 API 실시간 데이터 기반 답변 생성.
  *
  * ── LLM 구성 ──
- * Primary : OpenClaw Bridge (미니PC Claude CLI via Cloudflare Tunnel) — route.ts에서 처리
- * Fallback: Gemini Flash — Bridge 불능 시 이 엔진이 직접 Gemini 호출
+ * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
+ * Fallback: Gemini Flash — Claude 불능 시 이 엔진이 직접 Gemini 호출
  *
  * 도구 어댑터(tool-adapter), Tier 시스템(tool-tiers), 프롬프트(prompts)는
- * Gemini 엔진이 사용하는 인프라.
+ * 양쪽 LLM이 공유하는 인프라.
  *
- * SSE 스트리밍 지원: executeGeminiRAGStream()
+ * SSE 스트리밍 지원: executeClaudeRAGStream() / executeGeminiRAGStream()
  */
 
 import { GoogleGenAI, type Part } from '@google/genai'
@@ -19,8 +19,9 @@ import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallRe
 import { buildSystemPrompt, type LegalQueryType } from './prompts'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery } from './tool-tiers'
 import { KNOWN_MST, cacheMSTEntries, detectFastPath, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
-import { buildCitations, calcConfidence } from './citations'
+import { buildCitations, calcConfidence, parseCitationsFromAnswer } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
+import { callAnthropicStream, type DirectMessage } from './anthropic-client'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -229,6 +230,127 @@ async function* handleFastPath(
 
   // fast path 실패 → full pipeline으로 진행
   return false
+}
+
+// ─── Claude Primary 엔진 (OpenClaw Gateway 경유) ───
+
+/**
+ * Claude FC-RAG 스트리밍 실행 (Primary)
+ * OpenClaw Gateway /v1/chat/completions 호출.
+ * Gateway 에이전트가 korean-law MCP 도구를 내부적으로 처리.
+ */
+export async function* executeClaudeRAGStream(
+  query: string,
+  options?: RAGStreamOptions,
+): AsyncGenerator<FCRAGStreamEvent> {
+  const { signal } = options || {}
+  const warnings: string[] = []
+  const complexity = inferComplexity(query)
+  const queryType = inferQueryType(query)
+  const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
+
+  yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
+
+  // ── Fast Path: LLM 없이 직접 도구 호출 ──
+  const fastPathGen = handleFastPath(query, queryType, signal)
+  let fastPathNext = await fastPathGen.next()
+  while (!fastPathNext.done) {
+    yield fastPathNext.value
+    fastPathNext = await fastPathGen.next()
+  }
+  if (fastPathNext.value === true) return
+
+  // ── Full Pipeline: Claude CLI stream-json 모드로 실시간 도구 호출 추적 ──
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
+
+  yield { type: 'status', message: 'AI가 법령을 검색하고 있습니다...', progress: 15 }
+
+  if (signal?.aborted) {
+    yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
+    return
+  }
+
+  try {
+    const messages: DirectMessage[] = [{ role: 'user', content: query }]
+    let toolCount = 0
+
+    for await (const event of callAnthropicStream(systemPrompt, messages, { signal })) {
+      if (signal?.aborted) {
+        yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
+        return
+      }
+
+      if (event.type === 'tool_call') {
+        // Claude CLI 내부 도구 (ToolSearch 등) 필터링 — 법령 도구만 SSE 전달
+        if (!TOOL_DISPLAY_NAMES[event.name]) continue
+        toolCount++
+        const progress = Math.min(15 + toolCount * 10, 85)
+        yield { type: 'status', message: `법령 도구 호출 중 (${toolCount})...`, progress }
+        yield {
+          type: 'tool_call',
+          name: event.name,
+          displayName: TOOL_DISPLAY_NAMES[event.name],
+          query: getToolCallQuery(event.name, event.input),
+        }
+      } else if (event.type === 'tool_result') {
+        // Claude CLI 내부 도구 결과 필터링
+        if (!TOOL_DISPLAY_NAMES[event.name]) continue
+        const summary = summarizeToolResult(event.name, {
+          name: event.name, result: event.content, isError: event.isError,
+        })
+        yield {
+          type: 'tool_result',
+          name: event.name,
+          displayName: TOOL_DISPLAY_NAMES[event.name],
+          success: !event.isError,
+          summary,
+        }
+      } else if (event.type === 'result') {
+        const answer = event.text?.trim()
+        if (!answer || answer.length < 10) {
+          throw new Error('Claude 응답이 비어있습니다.')
+        }
+
+        yield {
+          type: 'token_usage',
+          inputTokens: event.usage.inputTokens,
+          outputTokens: event.usage.outputTokens,
+          totalTokens: event.usage.inputTokens + event.usage.outputTokens,
+        }
+        yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+        yield {
+          type: 'answer',
+          data: {
+            answer,
+            citations: parseCitationsFromAnswer(answer),
+            confidenceLevel: 'high' as const,
+            complexity,
+            queryType,
+            warnings: warnings.length > 0 ? warnings : undefined,
+          },
+        }
+        return
+      }
+    }
+
+    // 스트림 완료 후 result 이벤트가 없었던 경우
+    throw new Error('Claude CLI 스트림에서 결과를 받지 못했습니다.')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    warnings.push(`Claude 오류: ${message}`)
+    yield { type: 'error', message }
+    yield {
+      type: 'answer',
+      data: {
+        answer: '죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+        citations: [],
+        confidenceLevel: 'low',
+        complexity,
+        queryType,
+        warnings,
+      },
+    }
+  }
 }
 
 // ─── Gemini Fallback 엔진 ───
@@ -643,16 +765,26 @@ export async function* executeGeminiRAGStream(
 
 // ─── 하위 호환 래퍼 ───
 
-/** @deprecated route.ts에서 직접 fetchFromOpenClaw/executeGeminiRAGStream 사용 */
+/** @deprecated route.ts에서 직접 executeClaudeRAGStream/executeGeminiRAGStream 사용 */
 export const executeRAGStream = executeGeminiRAGStream
 
 /**
- * FC-RAG 실행 (비스트리밍 버전, Gemini only)
+ * FC-RAG 실행 (비스트리밍 버전)
+ * Claude 우선, 실패 시 Gemini fallback
  */
 export async function executeRAG(
   query: string,
   geminiApiKey?: string
 ): Promise<FCRAGResult> {
+  // Claude 우선
+  try {
+    for await (const event of executeClaudeRAGStream(query)) {
+      if (event.type === 'answer') return event.data
+      if (event.type === 'error') throw new Error(event.message)
+    }
+  } catch {
+    // Claude 실패 → Gemini fallback
+  }
   for await (const event of executeGeminiRAGStream(query, { apiKey: geminiApiKey })) {
     if (event.type === 'answer') return event.data
     if (event.type === 'error') throw new Error(event.message)
@@ -666,8 +798,8 @@ function inferComplexity(query: string): QueryComplexity {
   const lawMatches = query.match(/「([^」]+)」/g) || []
   const articleMatches = query.match(/제\d+조(?:의\d+)?/g) || []
 
-  const complexPatterns = /(?:하고|와\s*함께|에\s*대한\s*판례|판례도|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
-  const moderatePatterns = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조)/
+  const complexPatterns = /(?:하고|와\s*함께|판례|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
+  const moderatePatterns = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조|절차|방법)/
 
   if (lawMatches.length > 1 || articleMatches.length > 2 || query.length > 100 || complexPatterns.test(query)) {
     return 'complex'

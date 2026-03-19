@@ -6,13 +6,13 @@
 ## 🔴 LLM 구성 (중요)
 | 역할 | LLM | 경로 |
 |------|-----|------|
-| **Primary** | **OpenClaw Bridge (미니PC Claude CLI)** | route.ts → `openclaw-client.ts` `fetchFromOpenClaw()` → Cloudflare Tunnel → 미니PC |
-| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (Bridge 불능 시) |
+| **Primary** | **Sonnet 4.6 (Claude CLI)** | route.ts → engine.ts `executeClaudeRAGStream()` → `anthropic-client.ts` `callAnthropicStream()` → claude.exe subprocess (stream-json) |
+| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (Claude 불능 시) |
 
-- **Vercel에서 Anthropic API 직접 호출 안 함** — 미니PC의 Claude CLI가 처리
-- **인증**: Cloudflare Access (`CF_ACCESS_CLIENT_ID/SECRET`) + `OPENCLAW_API_TOKEN`
-- tool-adapter, tool-tiers, prompts, fast-path는 **Gemini 폴백 엔진**이 사용하는 인프라
-- summarize, benchmark-analyze, classifier는 **Gemini only** (간단 작업)
+- **Claude CLI subprocess 직접 호출** — OAuth 인증은 CLI가 자동 처리, korean-law MCP 도구 네이티브 사용
+- **stream-json 모드**: 중간 tool_call/tool_result 이벤트를 실시간 SSE로 전달 → UI 진행상황 표시
+- tool-adapter, tool-tiers, prompts, fast-path는 **양쪽 LLM이 공유**하는 인프라 (시스템 프롬프트에 도메인/queryType별 지침 포함)
+- `inferComplexity` + `inferQueryType` + `detectDomain` → `buildSystemPrompt`로 전처리 파이프라인 구성
 
 ## Commands
 ```bash

@@ -234,3 +234,32 @@ export function calcConfidence(toolResults: ToolCallResult[]): 'high' | 'medium'
   if (successful.length >= 1) return 'medium'
   return 'low'
 }
+
+/**
+ * 답변 텍스트에서 「법령명」 제N조 패턴으로 citation 추출.
+ * Claude CLI가 도구를 직접 호출하므로 tool result 없이 텍스트 기반으로 파싱.
+ */
+export function parseCitationsFromAnswer(answer: string): FCRAGCitation[] {
+  const citations: FCRAGCitation[] = []
+  const seen = new Set<string>()
+
+  // 「법령명」 제N조 패턴
+  const lawArticlePattern = /「([^」]+)」\s*제(\d+)조(?:의(\d+))?/g
+  for (const m of answer.matchAll(lawArticlePattern)) {
+    const lawName = m[1]
+    const articleNum = m[3] ? `제${m[2]}조의${m[3]}` : `제${m[2]}조`
+    const key = `${lawName}:${articleNum}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      const idx = m.index ?? 0
+      citations.push({
+        lawName,
+        articleNumber: articleNum,
+        chunkText: answer.slice(Math.max(0, idx), Math.min(answer.length, idx + 300)),
+        source: 'claude-cli',
+      })
+    }
+  }
+
+  return citations
+}
