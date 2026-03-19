@@ -171,6 +171,7 @@ export async function* callAnthropicStream(
 
   const args = [
     '--print',
+    '--verbose',
     '--model', CLAUDE_MODEL,
     '--output-format', 'stream-json',
     '--include-partial-messages',
