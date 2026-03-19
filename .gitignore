@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+
+# query logs
+/logs
 package-lock.json
 
 # next.js

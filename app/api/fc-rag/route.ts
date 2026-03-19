@@ -2,13 +2,18 @@
  * FC-RAG API endpoint with SSE streaming.
  *
  * ── LLM 구성 ──
- * Primary : Sonnet 4.6 (Claude) — Anthropic SDK + OpenClaw OAuth 토큰
+ * Primary : Claude CLI (미니PC subprocess 또는 Bridge 프록시)
  * Fallback: Gemini Flash — Claude 불능 시
+ *
+ * ── 환경 분기 ──
+ * 미니PC (로컬): executeClaudeRAGStream → claude.exe subprocess 직접
+ * Vercel (배포): fetchFromOpenClaw → CF Worker → Tunnel → Bridge → Gateway → Claude CLI
  */
 
 import { NextRequest } from "next/server"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
+import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
 import {
   getUsageHeaders,
   getUsageWarningMessage,
@@ -17,6 +22,7 @@ import {
   recordAIUsage,
 } from "@/lib/usage-tracker"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
+import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
 
 function convertForVerification(fcCitations: FCRAGCitation[]): {
   verifiable: Citation[]
@@ -113,64 +119,117 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
       }
 
+      // ── 질의 로그 수집기 ──
+      const logStartMs = Date.now()
+      const logTools: string[] = []
+      let logAnswerLen = 0
+      let logCitationCount = 0
+      let logVerifiedCount = 0
+      let logComplexity = ''
+      let logQueryType = ''
+      let logError: string | null = null
+
+      const sendAndLog = (data: unknown) => {
+        const evt = data as Record<string, unknown>
+        if (evt.type === 'tool_call' && evt.name) logTools.push(evt.name as string)
+        if (evt.type === 'answer') {
+          const d = evt.data as Record<string, unknown> | undefined
+          logAnswerLen = String(d?.answer || '').length
+          logCitationCount = (d?.citations as unknown[] || []).length
+          logComplexity = String(d?.complexity || '')
+          logQueryType = String(d?.queryType || '')
+        }
+        if (evt.type === 'citation_verification') {
+          logVerifiedCount = ((evt.citations as unknown[]) || []).filter((c: any) => c?.verified).length
+        }
+        if (evt.type === 'error') logError = String(evt.message || 'unknown')
+        send(data)
+      }
+
       try {
         let handled = false
         let source: 'claude' | 'gemini' = 'gemini'
 
-        // ── Claude Primary ──
+        // ── Claude Primary (환경별 분기) ──
+        // 미니PC: CLI subprocess 직접 / Vercel: Bridge 프록시 (CF Worker → Tunnel → 미니PC)
         try {
           traceLogger.addEvent(traceId, 'claude_start', {})
-          send({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+          sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
 
           let lastAnswerCitations: FCRAGCitation[] = []
-          let claudeHadError = false
 
-          for await (const event of executeClaudeRAGStream(query, {
-            signal: request.signal,
-            conversationId,
-          })) {
-            // Claude 내부 에러 감지 → Gemini 폴백 트리거
-            if (event.type === "error") {
-              claudeHadError = true
-              traceLogger.addEvent(traceId, 'claude_internal_error', { message: event.message })
-              continue
-            }
+          if (process.env.VERCEL) {
+            // ── Vercel: Bridge 프록시 경유 ──
+            const bridgeHealthy = await isOpenClawHealthy()
+            if (!bridgeHealthy) throw new Error('Bridge unavailable')
 
-            // 에러 후 나온 fallback answer는 무시 (Gemini가 처리)
-            if (claudeHadError && event.type === "answer") {
-              continue
-            }
+            traceLogger.addEvent(traceId, 'bridge_start', {})
 
-            if (event.type === "answer") {
-              lastAnswerCitations = event.data.citations || []
-
-              if (!userApiKey) {
-                const usageStats = await recordAITokens(clientIP, event.data.answer.length)
-                const warningMessage = getUsageWarningMessage(usageStats)
-
-                if (warningMessage) {
-                  const warnings = [...(event.data.warnings || []), warningMessage]
-                  send({ ...event, data: { ...event.data, warnings } })
-                  continue
+            const wrappedSend = (data: unknown) => {
+              const evt = data as Record<string, unknown>
+              if (evt?.type === 'answer') {
+                const answerData = evt.data as Record<string, unknown> | undefined
+                lastAnswerCitations = (answerData?.citations || []) as FCRAGCitation[]
+                if (!userApiKey && answerData?.answer) {
+                  recordAITokens(clientIP, String(answerData.answer).length).then(usageStats => {
+                    const warningMessage = getUsageWarningMessage(usageStats)
+                    if (warningMessage) {
+                      sendAndLog({ type: "status", message: warningMessage, progress: 99 })
+                    }
+                  }).catch(() => {})
                 }
               }
+              sendAndLog(data)
             }
 
-            send(event)
+            const success = await fetchFromOpenClaw(query, wrappedSend, {
+              abortSignal: request.signal,
+              conversationId,
+            })
+
+            if (!success) throw new Error('Bridge returned failure')
+          } else {
+            // ── 미니PC: CLI subprocess 직접 ──
+            let claudeHadError = false
+
+            for await (const event of executeClaudeRAGStream(query, {
+              signal: request.signal,
+              conversationId,
+            })) {
+              if (event.type === "error") {
+                claudeHadError = true
+                traceLogger.addEvent(traceId, 'claude_internal_error', { message: event.message })
+                continue
+              }
+              if (claudeHadError && event.type === "answer") continue
+
+              if (event.type === "answer") {
+                lastAnswerCitations = event.data.citations || []
+                if (!userApiKey) {
+                  const usageStats = await recordAITokens(clientIP, event.data.answer.length)
+                  const warningMessage = getUsageWarningMessage(usageStats)
+                  if (warningMessage) {
+                    const warnings = [...(event.data.warnings || []), warningMessage]
+                    sendAndLog({ ...event, data: { ...event.data, warnings } })
+                    continue
+                  }
+                }
+              }
+
+              sendAndLog(event)
+            }
+
+            if (claudeHadError) throw new Error('Claude internal error, falling back to Gemini')
           }
 
-          if (claudeHadError) {
-            throw new Error('Claude internal error, falling back to Gemini')
-          }
-
-          // Citation 검증
+          // Citation 검증 (양쪽 경로 공통)
           if (lastAnswerCitations.length > 0) {
             try {
               const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
               if (verifiable.length > 0) {
-                send({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
+                sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
                 const verified = await verifyAllCitations(verifiable)
-                send({ type: "citation_verification", citations: [...verified, ...skipped] })
+                sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {
               console.error("[FC-RAG] Citation verification failed:", error)
@@ -189,7 +248,7 @@ export async function POST(request: NextRequest) {
 
         // ── Gemini Fallback ──
         if (!handled) {
-          send({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
+          sendAndLog({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
           traceLogger.addEvent(traceId, 'gemini_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []
@@ -210,18 +269,18 @@ export async function POST(request: NextRequest) {
 
                 if (warningMessage) {
                   const warnings = [...(event.data.warnings || []), warningMessage]
-                  send({ ...event, data: { ...event.data, warnings } })
+                  sendAndLog({ ...event, data: { ...event.data, warnings } })
                   continue
                 }
               }
             }
 
-            send(event)
+            sendAndLog(event)
           }
 
           // 안전장치: Claude+Gemini 모두 answer를 보내지 못한 경우
           if (!geminiAnswerSent) {
-            send({
+            sendAndLog({
               type: "answer",
               data: {
                 answer: "죄송합니다. AI 엔진에 일시적 문제가 발생하여 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -238,9 +297,9 @@ export async function POST(request: NextRequest) {
             try {
               const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
               if (verifiable.length > 0) {
-                send({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
+                sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
                 const verified = await verifyAllCitations(verifiable)
-                send({ type: "citation_verification", citations: [...verified, ...skipped] })
+                sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {
               console.error("[FC-RAG] Citation verification failed:", error)
@@ -251,12 +310,46 @@ export async function POST(request: NextRequest) {
           traceLogger.completeTrace(traceId, 'gemini')
         }
 
-        send({ type: 'source', source })
+        sendAndLog({ type: 'source', source })
+
+        // ── 질의 로그 기록 ──
+        appendQueryLog({
+          ts: new Date().toISOString(),
+          traceId,
+          query,
+          source,
+          env: process.env.VERCEL ? 'vercel' : 'local',
+          complexity: logComplexity,
+          queryType: logQueryType,
+          durationMs: Date.now() - logStartMs,
+          tools: logTools,
+          answerLength: logAnswerLen,
+          citationCount: logCitationCount,
+          verifiedCount: logVerifiedCount,
+          error: logError,
+        })
       } catch (error) {
-        traceLogger.addEvent(traceId, 'error', { message: error instanceof Error ? error.message : 'unknown' })
-        send({
+        logError = error instanceof Error ? error.message : 'unknown'
+        traceLogger.addEvent(traceId, 'error', { message: logError })
+        sendAndLog({
           type: "error",
           message: "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
+        })
+        // 에러 시에도 로그 기록
+        appendQueryLog({
+          ts: new Date().toISOString(),
+          traceId,
+          query,
+          source: 'gemini',
+          env: process.env.VERCEL ? 'vercel' : 'local',
+          complexity: logComplexity,
+          queryType: logQueryType,
+          durationMs: Date.now() - logStartMs,
+          tools: logTools,
+          answerLength: 0,
+          citationCount: 0,
+          verifiedCount: 0,
+          error: logError,
         })
       } finally {
         controller.close()
