@@ -10,6 +10,7 @@
 
 import { parseHwpxDocument } from "./hwpx-parser"
 import { parseHwp5Document } from "./hwp5-parser"
+import { parsePdfDocument } from "./pdf-parser"
 
 // ─── 매직바이트 감지 ─────────────────────────────────
 
@@ -34,6 +35,10 @@ export interface AnnexParseResult {
   success: boolean
   markdown?: string
   fileType: "hwpx" | "hwp" | "pdf" | "unknown"
+  /** 이미지 기반 PDF 여부 (텍스트 추출 불가) */
+  isImageBased?: boolean
+  /** PDF 페이지 수 */
+  pageCount?: number
   error?: string
 }
 
@@ -47,7 +52,7 @@ export async function parseAnnexFile(buffer: ArrayBuffer): Promise<AnnexParseRes
     return parseHwp(buffer)
   }
   if (isPdfFile(buffer)) {
-    return { success: false, fileType: "pdf", error: "PDF 파일은 Gemini Vision으로 변환합니다." }
+    return parsePdf(buffer)
   }
   return { success: false, fileType: "unknown", error: "지원하지 않는 파일 형식입니다." }
 }
@@ -71,5 +76,38 @@ async function parseHwp(buffer: ArrayBuffer): Promise<AnnexParseResult> {
     return { success: true, fileType: "hwp", markdown }
   } catch (err) {
     return { success: false, fileType: "hwp", error: err instanceof Error ? err.message : "HWP 파싱 실패" }
+  }
+}
+
+// ─── PDF 파서 ────────────────────────────────────────
+
+async function parsePdf(buffer: ArrayBuffer): Promise<AnnexParseResult> {
+  try {
+    const result = await parsePdfDocument(buffer)
+    if (result.isImageBased) {
+      return {
+        success: false,
+        fileType: "pdf",
+        isImageBased: true,
+        pageCount: result.pageCount,
+        error: result.error,
+      }
+    }
+    if (!result.success || !result.markdown) {
+      return {
+        success: false,
+        fileType: "pdf",
+        pageCount: result.pageCount,
+        error: result.error || "PDF 텍스트 추출 실패",
+      }
+    }
+    return {
+      success: true,
+      fileType: "pdf",
+      markdown: result.markdown,
+      pageCount: result.pageCount,
+    }
+  } catch (err) {
+    return { success: false, fileType: "pdf", error: err instanceof Error ? err.message : "PDF 파싱 실패" }
   }
 }

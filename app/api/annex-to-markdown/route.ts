@@ -56,35 +56,42 @@ export async function POST(request: Request) {
 
     const fileBuffer = await fileResponse.arrayBuffer()
 
-    // 통합 파서: HWPX + 구형 HWP 모두 지원
-    if (isHwpxFile(fileBuffer) || isOldHwpFile(fileBuffer)) {
-      const result = await parseAnnexFile(fileBuffer)
+    // 통합 파서: HWPX + 구형 HWP + PDF 모두 지원
+    const result = await parseAnnexFile(fileBuffer)
 
-      if (result.success && result.markdown) {
-        debugLogger.success(`Annex parsed (${result.fileType})`, {
-          annexNumber,
-          markdownLength: result.markdown.length,
-        })
-        return NextResponse.json({
-          markdown: result.markdown,
-          source: `${result.fileType}-parser`,
-        })
-      }
-
-      // 파싱 실패 시 구형 HWP는 에러, HWPX는 Gemini 폴백
-      if (isOldHwpFile(fileBuffer)) {
-        debugLogger.warning("HWP5 파싱 실패, 다운로드 안내", { error: result.error })
-        return NextResponse.json({
-          error: result.error || "구형 HWP 파일 파싱에 실패했습니다.",
-          fileType: "old-hwp",
-        }, { status: 400 })
-      }
-
-      debugLogger.warning("HWPX 파싱 실패, Gemini 폴백", { error: result.error })
-      // HWPX 실패 시 아래 Gemini Vision으로 폴백
+    if (result.success && result.markdown) {
+      debugLogger.success(`Annex parsed (${result.fileType})`, {
+        annexNumber,
+        markdownLength: result.markdown.length,
+        pageCount: result.pageCount,
+      })
+      return NextResponse.json({
+        markdown: result.markdown,
+        source: `${result.fileType}-parser`,
+      })
     }
 
-    // PDF 또는 파싱 실패 → Gemini Vision AI 변환
+    // 파싱 실패 시 분기
+    if (isOldHwpFile(fileBuffer)) {
+      debugLogger.warning("HWP5 파싱 실패, 다운로드 안내", { error: result.error })
+      return NextResponse.json({
+        error: result.error || "구형 HWP 파일 파싱에 실패했습니다.",
+        fileType: "old-hwp",
+      }, { status: 400 })
+    }
+
+    if (isPdfFile(fileBuffer) && result.isImageBased) {
+      debugLogger.info("이미지 기반 PDF, Gemini Vision 폴백", { pageCount: result.pageCount })
+      // 이미지 기반 PDF → Gemini Vision으로 폴백
+    } else if (isPdfFile(fileBuffer) && result.success === false) {
+      debugLogger.warning("PDF 파싱 실패, Gemini Vision 폴백", { error: result.error })
+      // PDF 파싱 실패 → Gemini Vision으로 폴백
+    } else if (isHwpxFile(fileBuffer)) {
+      debugLogger.warning("HWPX 파싱 실패, Gemini Vision 폴백", { error: result.error })
+      // HWPX 실패 → Gemini Vision으로 폴백
+    }
+
+    // 파싱 실패 → Gemini Vision AI 변환 (PDF 이미지 기반 또는 파서 실패)
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       debugLogger.error("GEMINI_API_KEY is missing")

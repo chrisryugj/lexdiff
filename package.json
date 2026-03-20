@@ -77,6 +77,7 @@
     "motion": "^12.23.26",
     "next": "^16.0.7",
     "next-themes": "latest",
+    "pdfjs-dist": "^5.5.207",
     "radix-ui": "^1.4.3",
     "react": "19.2.0",
     "react-day-picker": "latest",
