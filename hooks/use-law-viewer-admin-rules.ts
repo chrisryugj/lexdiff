@@ -102,14 +102,25 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
       // Don't change tierViewMode - stay in tab view
 
 
-      const contentResponse = await fetch(`/api/admrul?${contentParams.toString()}`, { cache: 'no-store' })
-      if (!contentResponse.ok) {
-        const errorText = await contentResponse.text()
-        console.error('[행정규칙] API 오류:', contentResponse.status, errorText)
+      // 법제처 API 일시 오류 대비 재시도 (최대 2회)
+      let contentResponse: Response | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        contentResponse = await fetch(`/api/admrul?${contentParams.toString()}`, { cache: 'no-store' })
+        if (contentResponse.ok) break
         if (contentResponse.status === 429) {
           throw new Error('법제처 API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.')
         }
+        if (contentResponse.status >= 500 && attempt < 2) {
+          console.warn(`[행정규칙] ${contentResponse.status} 오류, ${attempt + 1}/3 재시도...`)
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          continue
+        }
+        const errorText = await contentResponse.text()
+        console.error('[행정규칙] API 오류:', contentResponse.status, errorText)
         throw new Error(`행정규칙 조회 실패: ${contentResponse.status}`)
+      }
+      if (!contentResponse || !contentResponse.ok) {
+        throw new Error('행정규칙 조회 실패: 재시도 초과')
       }
 
       const contentXml = await contentResponse.text()

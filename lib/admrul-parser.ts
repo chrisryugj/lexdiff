@@ -360,22 +360,42 @@ export function filterAdminRulesByTitle(
 /**
  * admrul-search 결과와 hierarchy 규칙을 교차 참조 (Tier 2)
  * - search는 모든 법령의 규칙을 반환하므로, hierarchy에 있는 것만 필터
+ * - 검색 결과가 너무 많으면 (hierarchy의 50% 초과) 검색이 과도하게 넓은 것이므로,
+ *   이름에 조문번호가 포함된 것만 필터 (body-only 매칭은 신뢰할 수 없음)
  */
 export function crossReferenceSearchWithHierarchy(
   searchResults: AdminRuleListItem[],
-  hierarchyRules: Array<{ id: string; name: string; serialNumber?: string }>
+  hierarchyRules: Array<{ id: string; name: string; serialNumber?: string }>,
+  articleNumber?: string
 ): Array<{ id: string; name: string; serialNumber?: string; matchType: "content" }> {
   const searchSerialNumbers = new Set(
     searchResults.map(r => r.serialNumber).filter((s): s is string => !!s)
   )
   const searchNames = new Set(searchResults.map(r => r.name))
 
-  return hierarchyRules
-    .filter(rule => {
-      if (rule.serialNumber && searchSerialNumbers.has(rule.serialNumber)) return true
-      return searchNames.has(rule.name)
-    })
-    .map(rule => ({ id: rule.id, name: rule.name, serialNumber: rule.serialNumber, matchType: "content" as const }))
+  // 1차: hierarchy와 search 결과 교차
+  const crossMatched = hierarchyRules.filter(rule => {
+    if (rule.serialNumber && searchSerialNumbers.has(rule.serialNumber)) return true
+    return searchNames.has(rule.name)
+  })
+
+  // 2차: 검색 결과가 hierarchy의 50% 이상이면 검색이 너무 넓은 것
+  // → 이름에 조문번호가 포함된 결과만 유지 (false positive 방지)
+  const tooManyResults = hierarchyRules.length > 0 &&
+    crossMatched.length > Math.max(5, hierarchyRules.length * 0.5)
+
+  if (tooManyResults && articleNumber) {
+    const filtered = crossMatched.filter(rule =>
+      rule.name.includes(articleNumber)
+    )
+    return filtered.map(rule => ({
+      id: rule.id, name: rule.name, serialNumber: rule.serialNumber, matchType: "content" as const
+    }))
+  }
+
+  return crossMatched.map(rule => ({
+    id: rule.id, name: rule.name, serialNumber: rule.serialNumber, matchType: "content" as const
+  }))
 }
 
 /**

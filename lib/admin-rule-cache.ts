@@ -10,7 +10,7 @@
 import type { AdminRuleMatch } from "./use-admin-rules"
 
 const DB_NAME = "LexDiffCache"
-const DB_VERSION = 11 // Two-Tier matching: purpose 필드 제거, hierarchy만 캐시
+const DB_VERSION = 12 // Tier 2 검색 필터링 개선 — 기존 과다 매칭 캐시 무효화
 const PURPOSE_STORE = "lawAdminRulesPurposeCache" // 법령별 hierarchy 규칙 목록 캐시
 const MATCH_INDEX_STORE = "articleMatchIndexCache" // 조문별 매칭 인덱스
 const CONTENT_STORE = "adminRulesContentCache"

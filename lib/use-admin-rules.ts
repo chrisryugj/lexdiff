@@ -276,7 +276,9 @@ export function useAdminRules(
         }
 
         // admrul-search API 호출
-        const searchQuery = `「${lawName}」 ${articleNumber}`
+        // 따옴표로 구문 검색 — "「관세법」 제38조" → 정확히 이 문구를 포함하는 결과만 반환
+        // 따옴표 없으면 law.go.kr이 "관세법" OR "제38조"로 넓게 매칭 (337개→11개)
+        const searchQuery = `"「${lawName}」 ${articleNumber}"`
         const params = new URLSearchParams({
           query: searchQuery,
           search: "2",     // 본문 검색
@@ -299,7 +301,7 @@ export function useAdminRules(
         if (cancelled) return
 
         const searchResults = parseAdminRuleList(xml)
-        const contentMatches = crossReferenceSearchWithHierarchy(searchResults, hierarchyRules)
+        const contentMatches = crossReferenceSearchWithHierarchy(searchResults, hierarchyRules, articleNumber)
 
         // Tier 1과 중복 제거
         const titleMatchIds = new Set(titleMatches.map(r => r.serialNumber || r.id))
