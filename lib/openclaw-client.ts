@@ -159,14 +159,7 @@ function processSSEEvent(
 
       case 'done': {
         state.gotDone = true
-        // Bridge가 보낸 toolsUsed → tool_call/tool_result 쌍으로 변환하여 프론트엔드 로그에 반영
-        const toolsUsed = parsed.toolsUsed as Array<{ name: string; displayName?: string; success: boolean; summary?: string }> | undefined
-        if (toolsUsed && toolsUsed.length > 0) {
-          for (const tool of toolsUsed) {
-            send({ type: 'tool_call', name: tool.name, displayName: tool.displayName || tool.name, query: '' })
-            send({ type: 'tool_result', name: tool.name, displayName: tool.displayName || tool.name, success: tool.success, summary: tool.summary || '' })
-          }
-        }
+        // 실시간 SSE에서 tool_call/tool_result를 이미 전달했으므로 done.toolsUsed 재전송 생략
         // 소스 정보 전달
         send({ type: 'source', source: 'openclaw' })
         send({
