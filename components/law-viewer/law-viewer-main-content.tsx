@@ -116,6 +116,10 @@ interface LawViewerMainContentProps {
   onToggleFavorite?: (jo: string) => void
   isFavorite: (jo: string) => boolean
   formatSimpleJo: (jo: string, forceOrdinance?: boolean) => string
+
+  // AI 추천 질의
+  onAiQuery?: (query: string, preEvidence?: string) => void
+  onLawAction?: (action: string) => void
 }
 
 export function LawViewerMainContent({
@@ -143,6 +147,8 @@ export function LawViewerMainContent({
   onToggleFavorite,
   isFavorite,
   formatSimpleJo,
+  onAiQuery,
+  onLawAction,
 }: LawViewerMainContentProps) {
   const { fontSize, setFontSize, increaseFontSize, decreaseFontSize, resetFontSize } = fontProps
 
@@ -310,6 +316,8 @@ export function LawViewerMainContent({
                   resetFontSize={resetFontSize}
                   handleContentClick={handleContentClick}
                   formatSimpleJo={formatSimpleJo}
+                  onAiQuery={onAiQuery}
+                  onLawAction={onLawAction}
                   showPrecedents={true}
                   precedentViewMode="side"
                   precedents={precedentProps.precedents}
@@ -393,6 +401,8 @@ export function LawViewerMainContent({
             resetFontSize={resetFontSize}
             handleContentClick={handleContentClick}
             formatSimpleJo={formatSimpleJo}
+            onAiQuery={onAiQuery}
+            onLawAction={onLawAction}
             showPrecedents={precedentProps.showPrecedents}
             precedentViewMode={precedentProps.viewMode}
             precedents={precedentProps.precedents}

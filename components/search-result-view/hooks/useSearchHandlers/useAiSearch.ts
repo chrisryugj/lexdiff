@@ -69,7 +69,8 @@ export function useAiSearch(deps: HandlerDeps) {
     fullQuery: string,
     signal?: AbortSignal,
     skipCache?: boolean,
-    conversationId?: string | null
+    conversationId?: string | null,
+    preEvidence?: string,
   ) => {
     // AI 비밀번호 게이트 확인
     try {
@@ -205,6 +206,7 @@ export function useAiSearch(deps: HandlerDeps) {
         body: JSON.stringify({
           query: fullQuery,
           conversationId: actualConvId,
+          ...(preEvidence ? { preEvidence } : {}),
         }),
         signal: mergedSignal
       })

@@ -108,6 +108,8 @@ interface RAGStreamOptions {
   apiKey?: string
   signal?: AbortSignal
   conversationId?: string
+  /** 프론트에서 이미 가진 조문 데이터 — 있으면 도구 호출 없이 즉답 */
+  preEvidence?: string
 }
 
 // ─── Fast Path 공통 (Claude/Gemini 공유) ───
@@ -243,7 +245,7 @@ export async function* executeClaudeRAGStream(
   query: string,
   options?: RAGStreamOptions,
 ): AsyncGenerator<FCRAGStreamEvent> {
-  const { signal } = options || {}
+  const { signal, preEvidence } = options || {}
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
@@ -251,14 +253,17 @@ export async function* executeClaudeRAGStream(
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
-  // ── Fast Path: LLM 없이 직접 도구 호출 ──
-  const fastPathGen = handleFastPath(query, queryType, signal)
-  let fastPathNext = await fastPathGen.next()
-  while (!fastPathNext.done) {
-    yield fastPathNext.value
-    fastPathNext = await fastPathGen.next()
+  // ── preEvidence 있으면 fast-path 스킵 (이미 조문 데이터 있음) ──
+  if (!preEvidence) {
+    // ── Fast Path: LLM 없이 직접 도구 호출 ──
+    const fastPathGen = handleFastPath(query, queryType, signal)
+    let fastPathNext = await fastPathGen.next()
+    while (!fastPathNext.done) {
+      yield fastPathNext.value
+      fastPathNext = await fastPathGen.next()
+    }
+    if (fastPathNext.value === true) return
   }
-  if (fastPathNext.value === true) return
 
   // ── Full Pipeline: Claude CLI stream-json 모드로 실시간 도구 호출 추적 ──
   const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
@@ -271,7 +276,11 @@ export async function* executeClaudeRAGStream(
   }
 
   try {
-    const messages: DirectMessage[] = [{ role: 'user', content: query }]
+    // preEvidence가 있으면 조문 데이터를 user message에 주입 → 도구 호출 0회 즉답
+    const userContent = preEvidence
+      ? `⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: MCP 도구를 일절 호출하지 말 것. 아래 조문 데이터만으로 즉시 답변.\n\n[사전 수집된 법령 조문]\n${preEvidence}\n\n${query}`
+      : query
+    const messages: DirectMessage[] = [{ role: 'user', content: userContent }]
     let toolCount = 0
 
     for await (const event of callAnthropicStream(systemPrompt, messages, { signal })) {
@@ -812,14 +821,24 @@ function inferComplexity(query: string): QueryComplexity {
 
 /** @internal 테스트용 export */
 export function inferQueryType(query: string): LegalQueryType {
+  // ── 복합 의도 사전 감지 (순차 매칭 전 오버라이드) ──
+  // "형사처벌과 행정처분 차이" → 비교 질문이지 벌칙 질문이 아님
+  if (/(?:차이|비교|vs|대비|장단점|구분|구별)/.test(query) && /(?:처벌|벌금|과태료|제재|형사|행정처분)/.test(query)) return 'comparison'
+  // "과태료 얼마", "벌금 금액", "과태료 한도" → 금액 질문이지 불이익 질문이 아님
+  if (/(?:과태료|벌금|범칙금|과징금).{0,8}(?:얼마|금액|한도|상한|세율|별표|기준액)/.test(query)) return 'scope'
+  if (/(?:얼마|금액|한도|상한|세율|별표|기준액).{0,8}(?:과태료|벌금|범칙금|과징금)/.test(query)) return 'scope'
+  // "수당 얼마", "사례금 상한" → scope
+  if (/(?:수당|사례금|강의료|보상비|급여).{0,8}(?:얼마|금액|한도|상한|기준액|별표)/.test(query)) return 'scope'
+  if (/(?:얼마|금액|한도|상한|기준액|별표).{0,8}(?:수당|사례금|강의료|보상비|급여)/.test(query)) return 'scope'
+
   // 좁은 패턴(consequence, exemption) 우선, 넓은 범용 패턴(알려줘/설명) 마지막
   const patterns: [RegExp, LegalQueryType][] = [
     [/(?:면제|감면|특례|예외|비과세|영세율|감경)/,                     'exemption'],
-    [/(?:벌칙|과태료|처벌|위반|제재|벌금|징역|형사)/,                  'consequence'],
-    [/(?:절차|방법|신청|신고|등록|제출|처리|납부|환급|경정청구|어떻게)/, 'procedure'],
-    [/(?:비교|차이|구별|구분|다른\s*점|vs|대비)/,                     'comparison'],
+    [/(?:벌칙|과태료|처벌|위반|제재|벌금|징역|형사|영업정지|허가취소|과징금|불이익)/, 'consequence'],
+    [/(?:절차|방법|신청|신고|등록|제출|처리|납부|환급|경정청구|어떻게|순서|과정|단계)/, 'procedure'],
+    [/(?:비교|차이|구별|구분|다른\s*점|vs|대비|장단점)/,               'comparison'],
     [/(?:요건|조건|자격|충족|해당.*경우|갖추|필요.*서류|하려면)/,        'requirement'],
-    [/(?:범위|적용.*범위|해당.*대상|포함|제외.*범위|얼마|세율|금액|기한|산정|계산)/, 'scope'],
+    [/(?:범위|적용.*범위|해당.*대상|포함|제외.*범위|얼마|세율|금액|기한|산정|계산|수당|사례금|강의료|한도|상한|기준액)/, 'scope'],
     [/(?:정의|뜻|의미|개념|무엇|이란\??$)/,                           'definition'],
     [/(?:적용|해당|판단|가능|여부|할\s*수)/,                          'application'],
     [/(?:알려|궁금|설명|내용|전반|개요|현황|주요|핵심|요약|정리)/,       'definition'],

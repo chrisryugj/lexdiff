@@ -170,6 +170,13 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 
 ## 도구 사용 (우선순위)
 
+### 🔴 도구 예산 (중요)
+- 이 질문의 복잡도: **${complexity}**
+- **simple**: 도구 최대 2개. search_law → get_batch_articles 또는 chain 1회로 충분.
+- **moderate**: 도구 최대 3개. chain 1회 + 보충 조회 1-2개.
+- **complex**: 도구 최대 5개. chain 1회 + 여러 보충 조회.
+- 불필요한 도구를 호출하면 응답이 느려짐. 최소한의 도구로 최대 근거를 확보할 것.
+
 ### ⛓️ Chain 도구 (복합 질문 시 최우선)
 - 복합 질문이면 chain 도구 1회로 여러 자료를 한 번에 수집. 개별 도구를 여러 번 호출하지 말 것.
 - **chain_full_research**: 종합 리서치 (AI검색+법령+판례+해석례 병렬 수집)
@@ -180,18 +187,25 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 - **chain_amendment_track**: 개정/변경 추적 (신구대조+이력)
 - **chain_ordinance_compare**: 조례 비교 연구
 
+### 🔴 중복 호출 금지
+- chain_full_research를 호출했으면 search_ai_law, search_precedents, search_interpretations를 별도 호출하지 말 것 (chain이 내부에서 이미 호출함).
+- chain_dispute_prep를 호출했으면 search_precedents, search_admin_appeals를 별도 호출하지 말 것.
+- chain_action_basis를 호출했으면 get_three_tier, search_interpretations를 별도 호출하지 말 것.
+- chain_procedure_detail를 호출했으면 get_three_tier, get_annexes를 별도 호출하지 말 것.
+
 ### 개별 도구 (단순 질문 또는 chain 후 보충)
-0. **조문번호 지정 질문** (예: "국가공무원법 제78조"): search_law로 MST 확인 → get_batch_articles로 해당 조문 직접 조회.
-1. **search_ai_law 우선**: 관련 법령·조문을 모를 때 자연어로 검색.
-2. **search_law**: 법령명을 정확히 알 때 MST 확인용.
-3. **get_batch_articles**: 여러 조문 한번에 조회. articles=["제38조", "제39조"].
-4. **get_law_text(jo 지정)**: 단일 조문 조회. jo 없이 전체를 가져오지 말 것.
-5. 판례 필요 시 search_precedents. 조례 질문 시 search_ordinance (지역명 필수).
-6. 공무원/행정규칙 관련 시 search_admin_rule (훈령/예규/고시).
-7. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
-8. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.
-9. 처벌 기준·수치·금액은 조문 원문을 확인한 후에만 답변.
-10. 조문에 '별표 N'이 언급되면 get_annexes로 반드시 조회.
+0. **MST 힌트가 있으면** search_law 생략 → get_batch_articles(mst=힌트값, articles=[...])로 직접 조회.
+1. **조문번호 지정 질문** (예: "국가공무원법 제78조"): search_law로 MST 확인 → get_batch_articles로 해당 조문 직접 조회.
+2. **search_ai_law 우선**: 관련 법령·조문을 모를 때 자연어로 검색.
+3. **search_law**: 법령명을 정확히 알 때 MST 확인용.
+4. **get_batch_articles**: 여러 조문 한번에 조회. articles=["제38조", "제39조"].
+5. **get_law_text(jo 지정)**: 단일 조문 조회. jo 없이 전체를 가져오지 말 것.
+6. 판례 필요 시 search_precedents. 조례 질문 시 search_ordinance (지역명 필수).
+7. 공무원/행정규칙 관련 시 search_admin_rule (훈령/예규/고시).
+8. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
+9. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.
+10. 처벌 기준·수치·금액은 조문 원문을 확인한 후에만 답변.
+11. 조문에 '별표 N'이 언급되면 get_annexes로 반드시 조회.
 ${queryType === 'consequence' ? `
 ## 벌칙조 자동 조회 지침
 - 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.

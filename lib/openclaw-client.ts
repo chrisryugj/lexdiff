@@ -227,6 +227,7 @@ interface OpenClawRequest {
   query: string
   userId?: string
   conversationId?: string
+  preEvidence?: string
 }
 
 /**
@@ -257,7 +258,7 @@ interface OpenClawResponse {
 export async function fetchFromOpenClaw(
   query: string,
   send: (data: unknown) => void,
-  options?: { abortSignal?: AbortSignal; userId?: string; conversationId?: string },
+  options?: { abortSignal?: AbortSignal; userId?: string; conversationId?: string; preEvidence?: string },
 ): Promise<boolean> {
   try {
     send({ type: 'status', message: '법률 AI 분석 중...', progress: 10 })
@@ -274,6 +275,7 @@ export async function fetchFromOpenClaw(
         query,
         userId: options?.userId,
         conversationId: options?.conversationId,
+        preEvidence: options?.preEvidence,
       } satisfies OpenClawRequest),
       signal: signals,
     })

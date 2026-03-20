@@ -78,11 +78,13 @@ export async function POST(request: NextRequest) {
 
   let query: string
   let conversationId: string | undefined
+  let preEvidence: string | undefined
 
   try {
     const body = await request.json()
     query = body.query
     conversationId = body.conversationId || undefined
+    preEvidence = typeof body.preEvidence === 'string' ? body.preEvidence.slice(0, 5000) : undefined
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 })
   }
@@ -185,6 +187,7 @@ export async function POST(request: NextRequest) {
             const success = await fetchFromOpenClaw(query, wrappedSend, {
               abortSignal: request.signal,
               conversationId,
+              preEvidence,
             })
 
             if (!success) throw new Error('Bridge returned failure')
@@ -195,6 +198,7 @@ export async function POST(request: NextRequest) {
             for await (const event of executeClaudeRAGStream(query, {
               signal: request.signal,
               conversationId,
+              preEvidence,
             })) {
               if (event.type === "error") {
                 claudeHadError = true

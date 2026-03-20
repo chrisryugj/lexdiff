@@ -662,6 +662,7 @@ function SearchResultViewComponent({
                       onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
                       onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
                       onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
+                      onAiQuery={handlers.handleAiQuery}
                     />
                   </div>
                 )}
@@ -725,6 +726,7 @@ function SearchResultViewComponent({
                   onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
                   onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
                   onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
+                  onAiQuery={handlers.handleAiQuery}
                 />
               </div>
             </div>

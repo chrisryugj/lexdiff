@@ -80,6 +80,9 @@ interface LawViewerProps {
   onImpactTracker?: (lawName: string) => void
   onOrdinanceSync?: (lawName: string) => void
   onOrdinanceBenchmark?: (lawName: string) => void
+
+  // AI 추천 질의 (조문 화면에서 AI 검색 시작)
+  onAiQuery?: (query: string, preEvidence?: string) => void
 }
 
 function LawViewerComponent({
@@ -116,6 +119,7 @@ function LawViewerComponent({
   onImpactTracker,
   onOrdinanceSync,
   onOrdinanceBenchmark,
+  onAiQuery,
 }: LawViewerProps) {
   const isFullView = isOrdinance || viewMode === "full" || isPrecedent  // 판례는 항상 전체 뷰
   const { toast } = useToast()
@@ -709,6 +713,27 @@ function LawViewerComponent({
 
   const { handleContentClick } = useContentClickHandlers(contentClickContext, contentClickActions)
 
+  // AI 추천 질의 — 법령 액션 핸들러 (시행령/별표/판례 등)
+  const handleLawAction = useMemo(() => (action: string) => {
+    switch (action) {
+      case 'three_tier':
+        if (tierViewMode === '1-tier') {
+          if (!threeTierDelegation && !threeTierCitation) fetchThreeTierData()
+          setTierViewMode('2-tier')
+        }
+        break
+      case 'annexes':
+        if (meta?.lawTitle) openAnnexModal({ lawName: meta.lawTitle, lawId: meta.lawId })
+        break
+      case 'precedents':
+        setShowPrecedents(true)
+        break
+      case 'history':
+        // 조문 이력은 이미 LawViewerSingleArticle에서 표시
+        break
+    }
+  }, [tierViewMode, threeTierDelegation, threeTierCitation, fetchThreeTierData, setTierViewMode, meta, openAnnexModal, setShowPrecedents])
+
   // Props 그룹화 (LawViewerMainContent용)
   const fontProps = useMemo(() => ({
     fontSize,
@@ -924,6 +949,8 @@ function LawViewerComponent({
               onToggleFavorite={onToggleFavorite}
               isFavorite={isFavorite}
               formatSimpleJo={formatSimpleJo}
+              onAiQuery={onAiQuery}
+              onLawAction={handleLawAction}
             />
           </Card >
           <ReferenceModal

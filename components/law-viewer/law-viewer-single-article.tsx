@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 import { RevisionHistory } from "@/components/revision-history"
 import { PrecedentSection } from "@/components/precedent-section"
+import { ArticleSuggestions } from "@/components/law-viewer/article-suggestions"
 import type { LawArticle, LawMeta } from "@/lib/law-types"
 
 interface LawViewerSingleArticleProps {
@@ -29,6 +30,10 @@ interface LawViewerSingleArticleProps {
   resetFontSize: () => void
   handleContentClick: React.MouseEventHandler<HTMLDivElement>
   formatSimpleJo: (jo: string, forceOrdinance?: boolean) => string
+
+  // AI 추천 질의
+  onAiQuery?: (query: string, preEvidence?: string) => void
+  onLawAction?: (action: string) => void
 
   // 판례 관련 (optional)
   showPrecedents?: boolean
@@ -59,6 +64,8 @@ export function LawViewerSingleArticle({
   resetFontSize,
   handleContentClick,
   formatSimpleJo,
+  onAiQuery,
+  onLawAction,
   showPrecedents = false,
   precedentViewMode = "bottom",
   precedents = [],
@@ -144,6 +151,18 @@ export function LawViewerSingleArticle({
         onClick={handleContentClick}
         dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
       />
+
+      {/* AI 추천 질의 */}
+      {onAiQuery && (
+        <ArticleSuggestions
+          articleText={activeArticle.content || activeArticleHtml}
+          lawName={meta.lawTitle}
+          articleNo={formatSimpleJo(activeArticle.jo, isOrdinance)}
+          onAiQuery={onAiQuery}
+          onLawAction={onLawAction || (() => {})}
+          preEvidence={`「${meta.lawTitle}」 ${formatSimpleJo(activeArticle.jo, isOrdinance)}${activeArticle.title ? ` (${activeArticle.title})` : ''}\n\n${activeArticle.content}`}
+        />
+      )}
 
       {/* 조문 이력 */}
       {!isOrdinance && revisionHistory.length > 0 && (

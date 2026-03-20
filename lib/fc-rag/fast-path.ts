@@ -65,7 +65,7 @@ for (const [name, mst] of PRELOAD_LAWS) {
 
 export interface LawEntry { name: string; mst: string }
 
-export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'annex_resolve' | 'none'
+export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'annex_resolve' | 'term_search' | 'law_system' | 'none'
 
 interface FastPathDetection {
   type: FastPathType
@@ -135,7 +135,19 @@ export function detectFastPath(query: string): FastPathDetection {
     return { type: 'annex_resolve', lawName, searchQuery: `${lawName} 별표${annexMatch[2] || ''}` }
   }
 
-  // ── 패턴 5: 법명+조문번호 (기존 로직) ──
+  // ── 패턴 5: 용어 정의 ("XX란?", "XX 뜻") ──
+  const termMatch = query.match(/^(.{2,20})(?:이란|란|의\s*(?:뜻|의미|개념|정의))[\s?]*$/)
+  if (termMatch && !/법|령|조례|규칙/.test(termMatch[1])) {
+    return { type: 'term_search', searchQuery: termMatch[1].trim(), toolName: 'search_legal_terms' }
+  }
+
+  // ── 패턴 6: 법체계 ("XX법 시행령", "XX법 시행규칙") ──
+  const lawSystemMatch = query.match(/^(.+?법)\s*(?:시행령|시행규칙|하위법령|법체계)[\s?]*$/)
+  if (lawSystemMatch && !/비교|개정|판례/.test(query)) {
+    return { type: 'law_system', lawName: lawSystemMatch[1].trim(), searchQuery: lawSystemMatch[1].trim(), toolName: 'chain_law_system' }
+  }
+
+  // ── 패턴 7: 법명+조문번호 ──
   // 복잡한 키워드가 있으면 full pipeline으로
   if (/(?:비교|판례|해석례|개정|위임|시행령|시행규칙|신구|대조|이력|조례|자치법규|처벌|벌칙|과태료|면제|감면|특례|예외)/.test(query)) {
     return { type: 'none' }
@@ -147,16 +159,29 @@ export function detectFastPath(query: string): FastPathDetection {
   const lawName = lawNameMatch[1].trim()
 
   // 조문번호 추출
-  const articleMatches = Array.from(query.matchAll(/제(\d+)조(?:의(\d+))?/g))
+  const articleMatches = Array.from(query.matchAll(/제?\s*(\d+)\s*조(?:의\s*(\d+))?/g))
   if (articleMatches.length === 0) return { type: 'none' }
-  const articles = articleMatches.map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
+
+  const mainArticles = articleMatches.map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
+
+  // ── 조문 자동 확장 (Bridge 역이식) ──
+  const articles = new Set(mainArticles)
+  for (const m of articleMatches) {
+    if (!m[2]) {
+      articles.add(`제${m[1]}조의2`)
+      articles.add(`제${m[1]}조의3`)
+    }
+  }
+  articles.add('제2조') // 정의 조문
+
+  const expandedArticles = Array.from(articles)
 
   // KNOWN_MST 조회
   const mst = KNOWN_MST.get(lawName)
   if (mst) {
-    return { type: 'article_hit', lawName, articles, mst }
+    return { type: 'article_hit', lawName, articles: expandedArticles, mst }
   }
-  return { type: 'article_resolve', lawName, articles }
+  return { type: 'article_resolve', lawName, articles: expandedArticles }
 }
 
 // ─── search_law 결과 파싱 유틸 ───

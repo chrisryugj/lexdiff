@@ -218,6 +218,12 @@ export function useSearchHandlers({
     handleAiFollowUp: handleFollowUp,
     handleNewConversation,
 
+    // 조문 화면에서 AI 질의 시작 (추천 질의 칩 / 직접 입력)
+    // preEvidence: 이미 가진 조문 데이터 → FC-RAG에 전달 → 도구 호출 0회 즉답
+    handleAiQuery: useCallback((query: string, preEvidence?: string) => {
+      handleAiSearch(query, undefined, true, null, preEvidence)
+    }, [handleAiSearch]),
+
     // 새로고침 핸들러
     handleAiRefresh: basicHandlers.handleAiRefresh,
     handleRefresh: unifiedHandlers.handleRefresh,
