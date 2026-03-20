@@ -75,6 +75,17 @@ export default function Home() {
   // AI 비밀번호 게이트
   const { showGate, requireAuth, handleSubmit: handleGateSubmit, handleClose: handleGateClose } = useAiGate()
 
+  // AI 게이트 이벤트 수신 (useAiSearch에서 게이트 미인증 시 발송)
+  useEffect(() => {
+    const handler = () => {
+      requireAuth(() => {
+        // 인증 완료 후 사용자가 직접 재검색하도록 (자동 재검색은 복잡도 대비 효용 낮음)
+      })
+    }
+    window.addEventListener('lexdiff:ai-gate-required', handler)
+    return () => window.removeEventListener('lexdiff:ai-gate-required', handler)
+  }, [requireAuth])
+
   // 초기화: History API + IndexedDB 설정
   useEffect(() => {
     // 만료된 검색 결과 삭제

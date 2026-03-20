@@ -74,9 +74,27 @@ export function useAiSearch(deps: HandlerDeps) {
     // AI 비밀번호 게이트 확인
     try {
       if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
-        toast({ title: 'AI 기능을 사용하려면 비밀번호 인증이 필요합니다.', variant: 'destructive' })
+        // AI 모드로 전환하여 인증 안내 표시 (에러 화면 대신)
+        actions.setIsSearching(true)
+        actions.setIsAiMode(true)
+        actions.setSearchMode('rag')
+        const aiLawData: LawDataState = {
+          meta: {
+            lawId: 'ai-answer', lawTitle: 'AI 답변',
+            promulgationDate: new Date().toISOString().split('T')[0],
+            lawType: 'AI', isOrdinance: false, fetchedAt: new Date().toISOString()
+          },
+          articles: [], selectedJo: undefined, isOrdinance: false
+        }
+        actions.setLawData(aiLawData)
+        actions.setMobileView("content")
+        actions.setAiAnswerContent('AI 검색을 사용하려면 비밀번호 인증이 필요합니다. 아래 인증 후 다시 시도해 주세요.')
+        actions.setAiConfidenceLevel('low')
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
+
+        // 게이트 다이얼로그 트리거 (page.tsx의 useAiGate가 수신)
+        window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required'))
         return
       }
     } catch { /* private browsing */ }
