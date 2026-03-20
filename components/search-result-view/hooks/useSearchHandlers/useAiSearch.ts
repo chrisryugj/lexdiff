@@ -306,13 +306,8 @@ export function useAiSearch(deps: HandlerDeps) {
           if (!answerReceivedRef.current) {
             actions.updateProgress('streaming', resolvedProgress)
           }
-          actions.addToolCallLog({
-            id: `log-${++logIdCounter}`,
-            type: 'status',
-            displayName: event.message,
-            message: event.message,
-            timestamp: Date.now(),
-          })
+          // status 메시지는 프로그레스 바만 업데이트 — 타임라인에는 추가하지 않음
+          // (tool_call/tool_result가 타임라인에 별도로 표시되므로 중복 제거)
           break
         }
         case 'tool_call': {
