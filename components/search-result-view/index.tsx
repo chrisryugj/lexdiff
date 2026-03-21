@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useEffect, useState, useRef, memo } from "react"
+import { useEffect, useState, useRef, memo, useDeferredValue } from "react"
 import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
@@ -91,6 +91,13 @@ function SearchResultViewComponent({
   const [timeMachineModal, setTimeMachineModal] = useState<{ isOpen: boolean; meta: LawMeta | null }>({
     isOpen: false, meta: null,
   })
+
+  // ============================================================
+  // 스트리밍 핫패스 최적화: 고빈도 업데이트를 낮은 우선순위로 분리
+  // → 나머지 UI(헤더, 검색바, 사이드바)는 즉시 반응 유지
+  // ============================================================
+  const deferredAiContent = useDeferredValue(state.aiAnswerContent)
+  const deferredToolCallLogs = useDeferredValue(state.toolCallLogs)
 
   // ============================================================
   // 핸들러 훅
@@ -512,7 +519,7 @@ function SearchResultViewComponent({
               favorites={state.favorites}
               isOrdinance={false}
               aiAnswerMode={true}
-              aiAnswerContent={state.aiAnswerContent}
+              aiAnswerContent={deferredAiContent}
               relatedArticles={state.aiRelatedLaws}
               onRelatedArticleClick={handlers.handleCitationClick}
               fileSearchFailed={state.fileSearchFailed}
@@ -524,7 +531,7 @@ function SearchResultViewComponent({
               onAiRefresh={handlers.handleAiRefresh}
               isStreaming={state.isSearching}
               searchProgress={state.searchProgress}
-              toolCallLogs={state.toolCallLogs}
+              toolCallLogs={deferredToolCallLogs}
               conversationHistory={state.conversationHistory}
               onFollowUp={handlers.handleAiFollowUp}
               onNewConversation={handlers.handleNewConversation}
@@ -585,79 +592,10 @@ function SearchResultViewComponent({
               </div>
             </div>
           ) : (
-            /* 법령 뷰어 */
+            /* 법령 뷰어 — 단일 인스턴스 (이중 마운트 제거: API 호출/useEffect 2배→1배) */
             <div className="space-y-2 sm:space-y-4">
-              {/* 모바일 뷰 */}
-              <div className="md:hidden">
-                {state.mobileView === "list" ? (
-                  <div className="space-y-2 sm:space-y-4">
-                    <SearchBar onSearch={(query) => {
-                      if (query.classification) {
-                        switch (query.classification.searchType) {
-                          case 'precedent': handlers.handlePrecedentSearch(query); break
-                          case 'interpretation': handlers.handleInterpretationSearch(query); break
-                          case 'ruling': handlers.handleRulingSearch(query); break
-                          case 'multi': handlers.handleMultiSearch(query); break
-                          default: handlers.handleSearch(query)
-                        }
-                      } else {
-                        handlers.handleSearch(query)
-                      }
-                    }} isLoading={state.isSearching} />
-                  </div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-4">
-                    {state.articleNotFound && (
-                      <ArticleNotFoundBanner
-                        requestedJo={state.articleNotFound.requestedJo}
-                        lawTitle={state.articleNotFound.lawTitle}
-                        nearestArticles={state.articleNotFound.nearestArticles}
-                        crossLawSuggestions={state.articleNotFound.crossLawSuggestions}
-                        onSelectArticle={(jo) => {
-                          actions.setLawData(prev => prev ? { ...prev, selectedJo: jo } : null)
-                        }}
-                        onSelectCrossLaw={(lawTitle) => {
-                          handlers.handleSearch({ lawName: lawTitle, article: formatJO(state.articleNotFound!.requestedJo) })
-                        }}
-                        onDismiss={() => actions.setArticleNotFound(null)}
-                      />
-                    )}
-                    <LawViewer
-                      meta={state.lawData.meta}
-                      articles={state.lawData.articles}
-                      selectedJo={state.lawData.selectedJo}
-                      viewMode={state.lawData.viewMode || 'full'}
-                      onCompare={handlers.handleCompare}
-                      onSummarize={handlers.handleSummarize}
-                      onToggleFavorite={handlers.handleToggleFavorite}
-                      favorites={state.favorites}
-                      isOrdinance={state.lawData.isOrdinance ?? false}
-                      aiAnswerMode={state.isAiMode}
-                      aiAnswerContent={state.aiAnswerContent}
-                      relatedArticles={state.aiRelatedLaws}
-                      onRelatedArticleClick={handlers.handleCitationClick}
-                      fileSearchFailed={state.fileSearchFailed}
-                      aiCitations={state.aiCitations}
-                      userQuery={state.userQuery}
-                      aiQueryType={state.aiQueryType}
-                      aiConfidenceLevel={state.aiConfidenceLevel}
-                      aiIsTruncated={state.aiIsTruncated}
-                      onAiRefresh={handlers.handleAiRefresh}
-                      isPrecedent={state.lawData.isPrecedent}
-                      onRefresh={handlers.handleRefresh}
-                      onDelegationGap={(meta) => setDelegationGapModal({ isOpen: true, meta })}
-                      onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
-                      onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
-                      onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
-                      onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
-                      onAiQuery={handlers.handleAiQuery}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* 데스크톱 뷰 */}
-              <div className="hidden md:block space-y-4">
+              {/* 검색바: 데스크톱 항상 / 모바일 list 모드에서만 */}
+              <div className={state.mobileView === "list" ? "" : "hidden md:block"}>
                 <SearchBar onSearch={(query) => {
                   if (query.classification) {
                     switch (query.classification.searchType) {
@@ -671,6 +609,10 @@ function SearchResultViewComponent({
                     handlers.handleSearch(query)
                   }
                 }} isLoading={state.isSearching} />
+              </div>
+
+              {/* 법령 본문: 데스크톱 항상 / 모바일 content 모드에서만 */}
+              <div className={state.mobileView === "content" ? "" : "hidden md:block"}>
                 {state.articleNotFound && (
                   <ArticleNotFoundBanner
                     requestedJo={state.articleNotFound.requestedJo}
@@ -697,7 +639,7 @@ function SearchResultViewComponent({
                   favorites={state.favorites}
                   isOrdinance={state.lawData.isOrdinance ?? false}
                   aiAnswerMode={state.isAiMode}
-                  aiAnswerContent={state.aiAnswerContent}
+                  aiAnswerContent={deferredAiContent}
                   relatedArticles={state.aiRelatedLaws}
                   onRelatedArticleClick={handlers.handleCitationClick}
                   fileSearchFailed={state.fileSearchFailed}

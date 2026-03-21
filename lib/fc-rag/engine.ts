@@ -460,8 +460,9 @@ export async function* executeGeminiRAGStream(
         return
       }
 
-      const response = await withTimeout(
-        ai.models.generateContent({
+      // ── Gemini 스트리밍: 텍스트 답변을 실시간 answer_token으로 전달 ──
+      const stream = await withTimeout(
+        ai.models.generateContentStream({
           model: MODEL,
           contents: messages,
           config: {
@@ -475,22 +476,44 @@ export async function* executeGeminiRAGStream(
         'Gemini API',
       )
 
-      const candidate = response.candidates?.[0]
+      // 스트림에서 파트 누적 + 텍스트 실시간 전달
+      const accParts: GeminiPart[] = []
+      let accFinishReason: string | undefined
+      let accUsage: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined
+      let hasFunctionCall = false
+
+      for await (const chunk of stream) {
+        if (signal?.aborted) break
+        const chunkCandidate = chunk.candidates?.[0]
+        if (chunkCandidate?.finishReason) accFinishReason = chunkCandidate.finishReason
+        const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+        if (chunkUsage) accUsage = chunkUsage
+
+        if (chunkCandidate?.content?.parts) {
+          for (const part of chunkCandidate.content.parts as GeminiPart[]) {
+            accParts.push(part)
+            if (part.functionCall) hasFunctionCall = true
+            // 실시간 텍스트 스트리밍 (도구 호출이 없는 턴에서만)
+            if (part.text && !hasFunctionCall) {
+              yield { type: 'answer_token', data: { text: part.text } }
+            }
+          }
+        }
+      }
 
       // 토큰 사용량 추적
-      const usage = (response as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
-      if (usage) {
-        totalInputTokens += usage.promptTokenCount || 0
-        totalOutputTokens += usage.candidatesTokenCount || 0
+      if (accUsage) {
+        totalInputTokens += accUsage.promptTokenCount || 0
+        totalOutputTokens += accUsage.candidatesTokenCount || 0
         yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
       }
 
-      if (!candidate?.content?.parts) {
+      if (accParts.length === 0) {
         warnings.push('Gemini 응답이 비어있습니다.')
         break
       }
 
-      const parts = candidate.content.parts
+      const parts = accParts
       const functionCalls = parts.filter((p: GeminiPart) => p.functionCall)
 
       // 텍스트 답변 (도구 호출 없음) → 품질 평가 후 완료
@@ -511,7 +534,7 @@ export async function* executeGeminiRAGStream(
             confidenceLevel: confidence,
             complexity,
             queryType,
-            isTruncated: candidate.finishReason === 'MAX_TOKENS',
+            isTruncated: accFinishReason === 'MAX_TOKENS',
             warnings: warnings.length > 0 ? warnings : undefined,
           },
         }
@@ -522,6 +545,7 @@ export async function* executeGeminiRAGStream(
       if (isLastTurn) {
         const textParts = parts.filter((p: GeminiPart) => p.text)
         if (textParts.length > 0) {
+          // 스트리밍에서 이미 answer_token을 전달했으므로 최종 answer만 emit
           const answer = textParts.map((p: GeminiPart) => p.text).join('')
           yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
           yield {
@@ -532,7 +556,7 @@ export async function* executeGeminiRAGStream(
               confidenceLevel: calcConfidence(allToolResults),
               complexity,
               queryType,
-              isTruncated: candidate.finishReason === 'MAX_TOKENS',
+              isTruncated: accFinishReason === 'MAX_TOKENS',
               warnings: warnings.length > 0 ? warnings : undefined,
             },
           }
@@ -545,8 +569,9 @@ export async function* executeGeminiRAGStream(
           role: 'user',
           parts: [{ text: '수집된 정보를 바탕으로 한국어로 답변해주세요. 추가 도구 호출 없이 바로 답변하세요.' }],
         })
-        const retry = await withTimeout(
-          ai.models.generateContent({
+        // 마지막 턴 재시도도 스트리밍으로 실시간 답변 표시
+        const retryStream = await withTimeout(
+          ai.models.generateContentStream({
             model: MODEL,
             contents: messages,
             config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
@@ -554,15 +579,32 @@ export async function* executeGeminiRAGStream(
           GEMINI_TIMEOUT[complexity],
           'Gemini API (마지막 턴)',
         )
-        const retryUsage = (retry as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+        let retryText = ''
+        let retryFinishReason: string | undefined
+        let retryUsage: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined
+
+        for await (const chunk of retryStream) {
+          if (signal?.aborted) break
+          const retryCandidate = chunk.candidates?.[0]
+          if (retryCandidate?.finishReason) retryFinishReason = retryCandidate.finishReason
+          const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+          if (chunkUsage) retryUsage = chunkUsage
+
+          if (retryCandidate?.content?.parts) {
+            for (const part of retryCandidate.content.parts as GeminiPart[]) {
+              if (part.text) {
+                retryText += part.text
+                yield { type: 'answer_token', data: { text: part.text } }
+              }
+            }
+          }
+        }
+
         if (retryUsage) {
           totalInputTokens += retryUsage.promptTokenCount || 0
           totalOutputTokens += retryUsage.candidatesTokenCount || 0
           yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
         }
-        const retryCandidate = retry.candidates?.[0]
-        const retryText = (retryCandidate?.content?.parts || [])
-          .filter((p: GeminiPart) => p.text).map((p: GeminiPart) => p.text).join('')
         yield {
           type: 'answer',
           data: {
@@ -571,7 +613,7 @@ export async function* executeGeminiRAGStream(
             confidenceLevel: calcConfidence(allToolResults),
             complexity,
             queryType,
-            isTruncated: retryCandidate?.finishReason === 'MAX_TOKENS',
+            isTruncated: retryFinishReason === 'MAX_TOKENS',
             warnings: warnings.length > 0 ? warnings : undefined,
           },
         }

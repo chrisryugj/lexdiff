@@ -10,6 +10,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { SearchView } from "@/components/search-view"
 import { SearchResultView } from "@/components/search-result-view"
 import { debugLogger } from "@/lib/debug-logger"
@@ -28,15 +29,35 @@ import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
 import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
-import { ImpactTrackerView } from "@/components/impact-tracker/impact-tracker-view"
-import { OrdinanceBenchmarkView } from "@/components/ordinance-benchmark/ordinance-benchmark-view"
-import { ComparisonModal } from "@/components/comparison-modal"
-import { DelegationGapModal } from "@/components/delegation-gap-modal"
-import { TimeMachineModal } from "@/components/time-machine-modal"
-import { LawSelectionDialog } from "@/components/law-selection-dialog"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useAiGate } from "@/hooks/use-ai-gate"
 import type { LawMeta } from "@/lib/law-types"
+
+// Dynamic imports: 초기 번들에서 제외 (사용자 액션 시에만 로드)
+const ImpactTrackerView = dynamic(
+  () => import("@/components/impact-tracker/impact-tracker-view").then(m => m.ImpactTrackerView),
+  { ssr: false }
+)
+const OrdinanceBenchmarkView = dynamic(
+  () => import("@/components/ordinance-benchmark/ordinance-benchmark-view").then(m => m.OrdinanceBenchmarkView),
+  { ssr: false }
+)
+const ComparisonModal = dynamic(
+  () => import("@/components/comparison-modal").then(m => m.ComparisonModal),
+  { ssr: false }
+)
+const DelegationGapModal = dynamic(
+  () => import("@/components/delegation-gap-modal").then(m => m.DelegationGapModal),
+  { ssr: false }
+)
+const TimeMachineModal = dynamic(
+  () => import("@/components/time-machine-modal").then(m => m.TimeMachineModal),
+  { ssr: false }
+)
+const LawSelectionDialog = dynamic(
+  () => import("@/components/law-selection-dialog").then(m => m.LawSelectionDialog),
+  { ssr: false }
+)
 
 type ViewMode = 'home' | 'search-result' | 'precedent-detail' | 'impact-tracker' | 'ordinance-benchmark'
 
