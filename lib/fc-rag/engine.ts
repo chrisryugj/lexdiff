@@ -403,7 +403,7 @@ export async function* executeClaudeRAGStream(
       : ''
 
     if (hasEvidence && complexity === 'simple') {
-      userContent = `${contextPrefix}⚡ 빠른 답변 모드 — 관련 조문이 사전 수집됨.\n규칙:\n1. 아래 데이터만으로 답변 가능하면 추가 도구 호출 없이 즉시 답변.\n2. 부족하면 추가 도구를 호출하여 보충 후 답변.\n3. **절대 "추가 조회가 필요합니다"만으로 끝내지 말 것** — 반드시 실질적 답변을 포함해야 함.\n\n[사전 수집된 법령 데이터]\n${collectedEvidence}\n\n${query}`
+      userContent = `${contextPrefix}⚡ 빠른 답변 모드 — 관련 조문이 사전 수집됨.\n아래 데이터로 즉시 답변할 것. 추가 도구는 핵심 정보가 완전히 빠진 경우에만 최대 1회.\n"추가 조회 필요"만으로 끝내지 말고 반드시 실질 답변을 포함할 것.\n\n[사전 수집된 법령 데이터]\n${collectedEvidence}\n\n${query}`
       maxTurns = 5
     } else if (hasEvidence) {
       userContent = `${contextPrefix}📋 사전 검색 결과가 아래에 있음. 이를 참고하되, 부족한 부분은 추가 도구를 적극 호출하여 충분하고 상세한 답변을 생성할 것.\n\n[사전 검색 결과]\n${collectedEvidence}\n\n${query}`
