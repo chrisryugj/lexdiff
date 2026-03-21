@@ -1,0 +1,1151 @@
+[
+  {
+    "id": 1,
+    "name": "승진소요연수",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 725,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 32422,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 2,
+    "name": "전보제한",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 685,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 51187,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 3,
+    "name": "직위해제",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 974,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 45316,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 4,
+    "name": "시보임용",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 818,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 60404,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 5,
+    "name": "당직근무",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 709,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 73371,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 6,
+    "name": "교육훈련",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 972,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 76498,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 7,
+    "name": "병가",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 701,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 49948,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 8,
+    "name": "육아시간",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 816,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 134213,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_ai_law",
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 9,
+    "name": "명예퇴직",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1306,
+    "toolCount": 2,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 71153,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 10,
+    "name": "파견근무",
+    "cat": "인사",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1115,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 71900,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 11,
+    "name": "시간외수당",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1043,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 81804,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 12,
+    "name": "가족수당",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 862,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 75157,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "get_annexes",
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 13,
+    "name": "정근수당",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1176,
+    "toolCount": 2,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 77365,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 14,
+    "name": "직급보조비",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1042,
+    "toolCount": 2,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 60853,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 15,
+    "name": "명절휴가비",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 836,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 83358,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 16,
+    "name": "순직유족급여",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1770,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 97192,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 17,
+    "name": "퇴직수당",
+    "cat": "급여",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 747,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 70830,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 18,
+    "name": "행정예고",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1029,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 89717,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 19,
+    "name": "인허가의제",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1197,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 96775,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 20,
+    "name": "행정대집행",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1520,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 84467,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 21,
+    "name": "과태료부과",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1235,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 72556,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 22,
+    "name": "행정심판",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 796,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 65959,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 23,
+    "name": "개인정보파기",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1001,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 75861,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 24,
+    "name": "위원회운영",
+    "cat": "행정",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 818,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 29548,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 25,
+    "name": "이해충돌신고",
+    "cat": "청렴",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1127,
+    "toolCount": 5,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 80145,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles",
+      "get_batch_articles",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 26,
+    "name": "재산등록",
+    "cat": "청렴",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 875,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 36493,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 27,
+    "name": "선물신고",
+    "cat": "청렴",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 878,
+    "toolCount": 2,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 60950,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 28,
+    "name": "퇴직자취업제한",
+    "cat": "청렴",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 699,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 40145,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 29,
+    "name": "공익신고",
+    "cat": "청렴",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1163,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 67784,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 30,
+    "name": "수의계약",
+    "cat": "계약",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1093,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 71073,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 31,
+    "name": "입찰자격심사",
+    "cat": "계약",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 608,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 60299,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 32,
+    "name": "보조금정산",
+    "cat": "계약",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1126,
+    "toolCount": 5,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 99984,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "chain_procedure_detail",
+      "search_law",
+      "get_batch_articles",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 33,
+    "name": "하자보수",
+    "cat": "계약",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 842,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 71307,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 34,
+    "name": "물품관리",
+    "cat": "계약",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1589,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 87423,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 35,
+    "name": "주민참여예산",
+    "cat": "자치",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1183,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 78316,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 36,
+    "name": "주민감사청구",
+    "cat": "자치",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1410,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 85356,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 37,
+    "name": "조례제개정",
+    "cat": "자치",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 931,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 50330,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 38,
+    "name": "행정사무감사",
+    "cat": "자치",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 773,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 69342,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 39,
+    "name": "주민자치회",
+    "cat": "자치",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 972,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 66105,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 40,
+    "name": "체납처분",
+    "cat": "세무",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1253,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 90518,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 41,
+    "name": "지방교부세",
+    "cat": "세무",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1223,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 68931,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 42,
+    "name": "세외수입",
+    "cat": "세무",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1646,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 112022,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "chain_procedure_detail",
+      "search_ai_law",
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 43,
+    "name": "재정건전성",
+    "cat": "세무",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1752,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 84744,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 44,
+    "name": "취득세감면",
+    "cat": "세무",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1113,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 72018,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 45,
+    "name": "건축허가",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1037,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 66889,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "chain_procedure_detail",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 46,
+    "name": "환경영향평가",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1712,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 85570,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 47,
+    "name": "도로점용",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1556,
+    "toolCount": 5,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 88786,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 48,
+    "name": "공유재산대부",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1600,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 85139,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 49,
+    "name": "재난안전",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1066,
+    "toolCount": 2,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 79043,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 50,
+    "name": "소방시설",
+    "cat": "건설",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 845,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 39017,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 51,
+    "name": "파견도급구별",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1167,
+    "toolCount": 6,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 68497,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "get_batch_articles",
+      "search_precedents",
+      "search_ai_law",
+      "search_precedents"
+    ],
+    "errors": []
+  },
+  {
+    "id": 52,
+    "name": "부당징계구제",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1407,
+    "toolCount": 5,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 139779,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "search_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 53,
+    "name": "개인정보유출대응",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 808,
+    "toolCount": 1,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 38702,
+    "source": "claude",
+    "tools": [
+      "search_ai_law"
+    ],
+    "errors": []
+  },
+  {
+    "id": 54,
+    "name": "행정처분취소소송",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 957,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 67196,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 55,
+    "name": "하도급공정거래",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1666,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 80247,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 56,
+    "name": "국가배상청구",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1214,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 66666,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 57,
+    "name": "규제영향분석",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1895,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 74629,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 58,
+    "name": "공무원범죄통보",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 341,
+    "toolCount": 10,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 69532,
+    "source": "gemini",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles",
+      "search_ai_law",
+      "search_ai_law",
+      "get_annexes",
+      "search_ai_law",
+      "get_annexes"
+    ],
+    "errors": []
+  },
+  {
+    "id": 59,
+    "name": "주민소송",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1547,
+    "toolCount": 3,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 102492,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_law",
+      "get_batch_articles"
+    ],
+    "errors": []
+  },
+  {
+    "id": 60,
+    "name": "계약분쟁조정",
+    "cat": "자문",
+    "grade": "A",
+    "confidence": "high",
+    "answerLen": 1442,
+    "toolCount": 4,
+    "hasCitations": true,
+    "domainToolHit": true,
+    "durationMs": 115784,
+    "source": "claude",
+    "tools": [
+      "search_ai_law",
+      "search_ai_law",
+      "get_annexes",
+      "get_annexes"
+    ],
+    "errors": []
+  }
+]
