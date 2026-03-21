@@ -40,9 +40,9 @@ const EVIDENCE_TOOLS = new Set([
 
 // ── 정규식 패턴 ──
 
-const CITATION_PATTERN = /「[^」]+」\s*제\d+조/g
+const CITATION_PATTERN = /(?:「[^」]+」|[\w가-힣]+법)\s*제\d+조/g
 const ARTICLE_REF_PATTERN = /제\d+조/g
-const LAW_NAME_PATTERN = /「[^」]+」/g
+const LAW_NAME_PATTERN = /(?:「[^」]+」|[\w가-힣]+법(?:\s|$))/g
 const ANSWER_FAILURE_PATTERN = /추출[이가은]\s*(?:반복\s*)?실패|직접\s*추출|검색\s*결과\s*없음|조회되지\s*않/
 
 /**
@@ -57,9 +57,12 @@ export function evaluateResponseQuality(
 ): QualityResult {
   const warnings: string[] = []
 
-  // 증거 도구 카운트
+  // 증거 도구 카운트 (chain 도구는 내부에서 3-5개 도구를 실행하므로 가중치 부여)
   const toolsCalled = toolResults.map(t => t.name)
-  const retrievalCount = toolsCalled.filter(t => EVIDENCE_TOOLS.has(t)).length
+  const chainCount = toolsCalled.filter(t => t.startsWith('chain_') && EVIDENCE_TOOLS.has(t)).length
+  const regularCount = toolsCalled.filter(t => !t.startsWith('chain_') && EVIDENCE_TOOLS.has(t)).length
+  const retrievalCount = regularCount + chainCount
+  const weightedToolCount = regularCount + (chainCount * 2)
   const hasSuccessfulResults = toolResults.some(t => !t.isError && t.result.length > 100)
 
   // 인용 카운트
@@ -69,8 +72,8 @@ export function evaluateResponseQuality(
 
   // ── 점수 계산 (100점 만점) ──
 
-  // Tool Score (0-30): 증거 도구당 10점
-  const toolScore = Math.min(retrievalCount * 10, 30)
+  // Tool Score (0-30): 증거 도구당 10점 (chain 도구는 2배 가중)
+  const toolScore = Math.min(weightedToolCount * 10, 30)
 
   // Content Score (0-30): 실제 검색 결과 유무
   let contentScore = 0

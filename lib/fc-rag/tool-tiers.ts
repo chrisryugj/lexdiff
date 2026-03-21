@@ -79,7 +79,7 @@ export function detectDomain(query: string): LegalDomain {
   if (/행정|허가|처분|이의신청|행정심판|행정소송|정보공개|민원|계약|보조금|조달|입찰/.test(src)) return 'admin'
   if (/여권|주민등록|인감|가족관계|출생신고|사망신고|혼인신고|운전면허/.test(src)) return 'civil_service'
   if (/주택|임대차|공동주택|아파트|관리비|층간소음|전세|월세/.test(src)) return 'housing'
-  if (/건설|시공|도급|건설업/.test(src)) return 'construction'
+  if (/건설|시공|도급|건설업|주차장|주차/.test(src)) return 'construction'
   if (/환경|대기|수질|폐기물|오염/.test(src)) return 'environment'
   if (/공정거래|하도급|독점|카르텔|납품단가/.test(src)) return 'competition'
   if (/헌법|기본권|위헌|헌법소원|헌법재판/.test(src)) return 'constitutional'
@@ -95,7 +95,7 @@ export function detectContextNeeds(query: string): string[] {
   const needs: string[] = []
   if (/위임|시행령|시행규칙|3단|체계/.test(query)) needs.push('structural')
   if (/개정|변경|이력|역사|신구|대조|바뀐/.test(query)) needs.push('historical')
-  if (/조례|자치법규|지방/.test(query)) needs.push('ordinance')
+  if (/조례|자치법규|지방/.test(query) || /[가-힣]+[시도군구]\s/.test(query)) needs.push('ordinance')
   if (/별표|서식|부표|급여표|수당표|세율표|가액|금액.?기준|한도|상한|범위표|기준표/.test(query)) needs.push('annex')
   return needs
 }

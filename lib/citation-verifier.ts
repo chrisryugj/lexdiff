@@ -112,13 +112,13 @@ export async function verifyAllCitations(
   for (let i = 0; i < citations.length; i += BATCH_SIZE) {
     const batch = citations.slice(i, i + BATCH_SIZE)
     const batchResults = await Promise.allSettled(batch.map(c => verifyCitation(c)))
-    for (const r of batchResults) {
+    for (let j = 0; j < batchResults.length; j++) {
+      const r = batchResults[j]
       if (r.status === 'fulfilled') {
         results.push(r.value)
       } else {
-        // 개별 검증 실패는 전체를 중단하지 않고 error로 기록
         results.push({
-          ...batch[batchResults.indexOf(r)],
+          ...batch[j],
           verified: false,
           verificationMethod: 'error',
           verificationError: r.reason?.message || 'unknown error',
@@ -146,7 +146,8 @@ async function fetchLawId(lawName: string): Promise<string | null> {
 
     const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${LAW_OC}&type=XML&target=law&query=${encodeURIComponent(lawName)}`
     const response = await fetch(url, {
-      next: { revalidate: 3600 } // 1시간 캐시
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!response.ok) {
@@ -228,7 +229,8 @@ async function checkArticleExists(
     // ✅ lawId는 법령ID이므로 ID 파라미터 사용 (MST 아님!)
     const url = `https://www.law.go.kr/DRF/lawService.do?OC=${LAW_OC}&target=law&type=JSON&ID=${lawId}`
     const response = await fetch(url, {
-      next: { revalidate: 3600 } // 1시간 캐시
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!response.ok) {
