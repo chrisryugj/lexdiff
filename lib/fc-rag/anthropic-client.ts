@@ -9,7 +9,9 @@
 
 import { execFile, spawn } from 'child_process'
 import { createInterface } from 'readline'
+import { readFileSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
 
 export const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
@@ -18,6 +20,24 @@ const CLAUDE_BIN = process.env.CLAUDE_CLI_PATH || 'claude'
 
 // korean-law MCP만 로드하는 전용 설정 (context7, sequential-thinking 등 불필요 서버 차단)
 const MCP_CONFIG_PATH = join(process.cwd(), 'lib/fc-rag/claude-mcp-config.json')
+
+/**
+ * ~/.claude/.credentials.json에서 OAuth accessToken 추출.
+ * --bare 모드에서는 keychain/OAuth 자동인증이 스킵되므로
+ * ANTHROPIC_API_KEY env로 직접 주입 필요.
+ */
+function getOAuthToken(): string {
+  try {
+    const credPath = join(homedir(), '.claude', '.credentials.json')
+    const creds = JSON.parse(readFileSync(credPath, 'utf8'))
+    const token = creds?.claudeAiOauth?.accessToken
+    if (!token) throw new Error('accessToken 없음')
+    return token
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`OAuth 토큰 읽기 실패 (${msg}) — claude setup-token으로 갱신 필요`)
+  }
+}
 
 export interface DirectMessage {
   role: 'user' | 'assistant'
@@ -53,6 +73,7 @@ export async function callAnthropic(
 
   const args = [
     '--print',
+    '--bare',
     '--model', CLAUDE_MODEL,
     '--output-format', 'json',
     '--no-session-persistence',
@@ -62,7 +83,7 @@ export async function callAnthropic(
   ]
 
   const env = { ...process.env }
-  delete env.ANTHROPIC_API_KEY
+  env.ANTHROPIC_API_KEY = getOAuthToken()
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[claude-cli] calling ${CLAUDE_MODEL}, prompt: ${prompt.length} chars, system: ${systemPrompt.length} chars`)
@@ -182,6 +203,7 @@ export async function* callAnthropicStream(
 
   const args = [
     '--print',
+    '--bare',
     '--verbose',
     '--model', CLAUDE_MODEL,
     '--output-format', 'stream-json',
@@ -196,7 +218,7 @@ export async function* callAnthropicStream(
   ]
 
   const env = { ...process.env }
-  delete env.ANTHROPIC_API_KEY
+  env.ANTHROPIC_API_KEY = getOAuthToken()
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[claude-cli] streaming ${CLAUDE_MODEL}, prompt: ${prompt.length} chars`)
