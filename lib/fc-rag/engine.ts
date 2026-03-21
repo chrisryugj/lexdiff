@@ -27,6 +27,39 @@ import { evaluateResponseQuality } from './quality-evaluator'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
+// ── 대화 컨텍스트 스토어 (로컬 dev용, Bridge 경로는 서버사이드 세션 사용) ──
+interface ConversationEntry { query: string; answer: string }
+const conversationStore = new Map<string, ConversationEntry[]>()
+const CONV_MAX_ENTRIES = 5
+const CONV_MAX_AGE_MS = 30 * 60_000 // 30분
+const conversationTimestamps = new Map<string, number>()
+
+function getConversationContext(conversationId?: string): string {
+  if (!conversationId) return ''
+  const entries = conversationStore.get(conversationId)
+  if (!entries?.length) return ''
+  // 최근 3턴만 포함 (토큰 절약)
+  const recent = entries.slice(-3)
+  return recent.map((e, i) => `[이전 질문 ${i + 1}] ${e.query}\n[이전 답변 ${i + 1}] ${e.answer.slice(0, 500)}`).join('\n\n')
+}
+
+function storeConversation(conversationId: string | undefined, query: string, answer: string) {
+  if (!conversationId) return
+  // 만료된 대화 정리
+  const now = Date.now()
+  for (const [id, ts] of conversationTimestamps) {
+    if (now - ts > CONV_MAX_AGE_MS) {
+      conversationStore.delete(id)
+      conversationTimestamps.delete(id)
+    }
+  }
+  const entries = conversationStore.get(conversationId) || []
+  entries.push({ query, answer: answer.slice(0, 2000) })
+  if (entries.length > CONV_MAX_ENTRIES) entries.shift()
+  conversationStore.set(conversationId, entries)
+  conversationTimestamps.set(conversationId, now)
+}
+
 interface GeminiPart {
   text?: string
   functionCall?: { name?: string; args?: Record<string, unknown> }
@@ -260,13 +293,16 @@ export async function* executeClaudeRAGStream(
   query: string,
   options?: RAGStreamOptions,
 ): AsyncGenerator<FCRAGStreamEvent> {
-  const { signal, preEvidence } = options || {}
+  const { signal, preEvidence, conversationId } = options || {}
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
   const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
+
+  // ── 대화 컨텍스트 (follow-up 질의 시 이전 Q&A 참조) ──
+  const prevContext = getConversationContext(conversationId)
 
   // ── preEvidence 있으면 fast-path 스킵 (이미 조문 데이터 있음) ──
   let collectedEvidence = preEvidence
@@ -298,28 +334,42 @@ export async function* executeClaudeRAGStream(
         preResults.push(aiSearch.result)
       }
     } else if (complexity === 'moderate') {
-      // moderate: 도메인별 최적 도구 1-2회 사전 호출
+      // moderate: search_ai_law + queryType별 보충 도구
       yield { type: 'status', message: '도메인별 법령 사전 수집 중...', progress: 12 }
       const aiSearch = await executeTool('search_ai_law', { query }, signal)
       if (!aiSearch.isError && aiSearch.result.length > 200) {
         yield { type: 'tool_call', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], query }
         yield { type: 'tool_result', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], success: true, summary: summarizeToolResult('search_ai_law', aiSearch) }
         preResults.push(aiSearch.result)
-      }
-      // 벌칙 질문이면 법령 검색 → 벌칙 조문 사전 수집
-      if (queryType === 'consequence') {
-        const lawMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+법)/)
-        if (lawMatch) {
-          const searchRes = await executeTool('search_law', { query: lawMatch[1] }, signal)
-          if (!searchRes.isError) {
-            const entries = parseLawEntries(searchRes.result)
-            cacheMSTEntries(entries)
-            const mst = findBestMST(entries, query)
-            if (mst) {
-              // 벌칙 조문 직접 조회
-              const penaltySearch = await executeTool('search_ai_law', { query: `${lawMatch[1]} 벌칙 과태료` }, signal)
-              if (!penaltySearch.isError) preResults.push(penaltySearch.result)
-            }
+
+        // search_ai_law 결과에서 법명 추출 (쿼리가 아닌 실제 조회 결과 기반)
+        const extractedLaw = aiSearch.result.match(/📜\s+(.+?)(?:\n|$)/)?.[1]?.trim()
+          || query.match(/「([^」]+)」/)?.[1]
+          || query.match(/([\w가-힣]+법)/)?.[1]
+
+        // queryType별 보충 수집
+        if (queryType === 'consequence' && extractedLaw) {
+          // 벌칙 질문: 해당 법률의 벌칙편 추가 검색
+          const penaltySearch = await executeTool('search_ai_law', { query: `${extractedLaw} 벌칙 과태료` }, signal)
+          if (!penaltySearch.isError && penaltySearch.result.length > 100) {
+            yield { type: 'tool_call', name: 'search_ai_law', displayName: '벌칙 조문 검색', query: `${extractedLaw} 벌칙` }
+            yield { type: 'tool_result', name: 'search_ai_law', displayName: '벌칙 조문 검색', success: true, summary: summarizeToolResult('search_ai_law', penaltySearch) }
+            preResults.push(penaltySearch.result)
+          }
+        } else if (queryType === 'scope' && extractedLaw) {
+          // 금액/수치 질문: 별표 조회
+          const annexSearch = await executeTool('get_annexes', { lawName: extractedLaw }, signal)
+          if (!annexSearch.isError && annexSearch.result.length > 100) {
+            yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: extractedLaw }
+            yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: true, summary: summarizeToolResult('get_annexes', annexSearch) }
+            preResults.push(annexSearch.result)
+          }
+        } else if (queryType === 'procedure') {
+          // 절차 질문: 위임법령 구조 조회
+          const lawName = extractedLaw || query.replace(/절차|방법|신청|어떻게/g, '').trim().slice(0, 20)
+          const threeSearch = await executeTool('search_ai_law', { query: `${lawName} 절차 신청 서류` }, signal)
+          if (!threeSearch.isError && threeSearch.result.length > 100) {
+            preResults.push(threeSearch.result)
           }
         }
       }
@@ -342,17 +392,29 @@ export async function* executeClaudeRAGStream(
   }
 
   try {
-    // collectedEvidence가 있으면 조문 데이터를 user message에 주입 → 도구 호출 최소화
+    // collectedEvidence가 있으면 조문 데이터를 user message에 주입
     const hasEvidence = !!collectedEvidence
-    const userContent = collectedEvidence
-      ? `⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한의 추가 도구 사용.\n\n[사전 수집된 법령 데이터]\n${collectedEvidence}\n\n${query}`
-      : query
+    let userContent: string
+    let maxTurns: number
+
+    // 대화 컨텍스트 프리픽스
+    const contextPrefix = prevContext
+      ? `[이전 대화 맥락 — 사용자의 후속 질문임]\n${prevContext}\n\n---\n\n`
+      : ''
+
+    if (hasEvidence && complexity === 'simple') {
+      userContent = `${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한의 추가 도구 사용.\n\n[사전 수집된 법령 데이터]\n${collectedEvidence}\n\n${query}`
+      maxTurns = 3
+    } else if (hasEvidence) {
+      userContent = `${contextPrefix}📋 사전 검색 결과가 아래에 있음. 이를 참고하되, 부족한 부분은 추가 도구를 적극 호출하여 충분하고 상세한 답변을 생성할 것.\n\n[사전 검색 결과]\n${collectedEvidence}\n\n${query}`
+      maxTurns = getMaxClaudeTurns(complexity)
+    } else {
+      userContent = `${contextPrefix}${query}`
+      maxTurns = getMaxClaudeTurns(complexity)
+    }
+
     const messages: DirectMessage[] = [{ role: 'user', content: userContent }]
     let toolCount = 0
-    // simple+사전수집 → 최대 3턴(보충 허용), moderate+사전수집 → 5턴, 나머지 → 복잡도 기본값
-    const maxTurns = hasEvidence
-      ? (complexity === 'simple' ? 3 : 5)
-      : getMaxClaudeTurns(complexity)
 
     for await (const event of callAnthropicStream(systemPrompt, messages, { signal, maxTurns })) {
       if (signal?.aborted) {
@@ -401,6 +463,9 @@ export async function* executeClaudeRAGStream(
           totalTokens: event.usage.inputTokens + event.usage.outputTokens,
         }
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
+        // 대화 컨텍스트 저장
+        storeConversation(conversationId, query, answer)
+
         yield {
           type: 'answer',
           data: {
@@ -437,7 +502,7 @@ export async function* executeGeminiRAGStream(
   query: string,
   options?: RAGStreamOptions
 ): AsyncGenerator<FCRAGStreamEvent> {
-  const { apiKey: geminiApiKey, signal, preEvidence } = options || {}
+  const { apiKey: geminiApiKey, signal, preEvidence, conversationId } = options || {}
   const warnings: string[] = []
   const complexity = inferComplexity(query)
   const queryType = inferQueryType(query)
@@ -445,6 +510,9 @@ export async function* executeGeminiRAGStream(
   const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
+
+  // ── 대화 컨텍스트 ──
+  const prevContext = getConversationContext(conversationId)
 
   // ── preEvidence 있으면 fast-path 스킵 ──
   let geminiEvidence = preEvidence
@@ -493,10 +561,11 @@ export async function* executeGeminiRAGStream(
   const selectedTools = new Set(selectToolsForQuery(query))
   const toolDeclarations = getToolDeclarations().filter(d => selectedTools.has(d.name!))
 
-  // geminiEvidence: 이미 수집된 조문으로 즉답 또는 보충만
+  // geminiEvidence + 대화 컨텍스트
+  const contextPrefix = prevContext ? `[이전 대화 맥락]\n${prevContext}\n\n---\n\n` : ''
   const userText = geminiEvidence
-    ? `⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
-    : query
+    ? `${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
+    : `${contextPrefix}${query}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: Array<{ role: 'user' | 'model'; parts: any[] }> = [
