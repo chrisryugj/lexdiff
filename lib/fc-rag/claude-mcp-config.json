@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "korean-law": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:\\Users\\Mong NAS\\.openclaw\\workspace\\korean-law-mcp\\build\\index.js"],
+      "env": {
+        "LAW_OC": "ryuseungin"
+      }
+    }
+  }
+}

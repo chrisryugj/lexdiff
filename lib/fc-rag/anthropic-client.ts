@@ -9,11 +9,15 @@
 
 import { execFile, spawn } from 'child_process'
 import { createInterface } from 'readline'
+import { join } from 'path'
 
 export const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 // 환경변수 우선, 미설정 시 PATH에서 탐색
 const CLAUDE_BIN = process.env.CLAUDE_CLI_PATH || 'claude'
+
+// korean-law MCP만 로드하는 전용 설정 (context7, sequential-thinking 등 불필요 서버 차단)
+const MCP_CONFIG_PATH = join(process.cwd(), 'lib/fc-rag/claude-mcp-config.json')
 
 export interface DirectMessage {
   role: 'user' | 'assistant'
@@ -184,6 +188,9 @@ export async function* callAnthropicStream(
     '--include-partial-messages',
     '--no-session-persistence',
     '--max-turns', String(maxTurns),
+    '--mcp-config', MCP_CONFIG_PATH,
+    '--strict-mcp-config',
+    '--disallowed-tools', 'ToolSearch,Bash,Read,Edit,Write,Glob,Grep',
     '--system-prompt', systemPrompt,
     prompt,
   ]
