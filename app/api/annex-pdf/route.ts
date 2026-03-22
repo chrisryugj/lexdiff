@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 /**
  * 별표 파일 프록시 API
@@ -117,10 +118,6 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    debugLogger.error("별표 파일 프록시 실패", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "파일 다운로드 실패" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "파일 다운로드 실패", "별표 PDF")
   }
 }

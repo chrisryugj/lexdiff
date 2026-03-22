@@ -115,11 +115,31 @@ export interface SearchResultViewProps {
   onOrdinanceBenchmark?: (lawName: string) => void
 }
 
+/** 통합 검색 분류 결과 (unified-query-classifier에서 생성) */
+export interface SearchClassification {
+  searchType: string
+  confidence: number
+  secondaryTypes?: string[]
+  entities?: {
+    lawName?: string
+    caseNumber?: string
+    court?: string
+    ruleType?: string
+    rulingNumber?: string
+  }
+}
+
 export interface SearchQuery {
   lawName: string
   article?: string
   jo?: string
   searchType?: string
+  /** 사전 분류 결과 (통합검색 분류기에서 주입) */
+  classification?: SearchClassification
+  /** 원본 사용자 입력 (파싱 전 쿼리) */
+  rawQuery?: string
+  /** 강제 검색 모드 ('law' | 'ai') */
+  forcedMode?: 'law' | 'ai'
 }
 
 // ============================================================

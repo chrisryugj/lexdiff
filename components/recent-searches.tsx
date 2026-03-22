@@ -82,11 +82,6 @@ export function RecentSearches({
     }
   }
 
-  // Expose addSearch method
-  useEffect(() => {
-    ;(window as any).__addRecentSearch = addSearch
-  }, [searches])
-
   if (searches.length === 0) {
     return null
   }

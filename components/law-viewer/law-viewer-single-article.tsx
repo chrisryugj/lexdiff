@@ -10,6 +10,7 @@ import { PrecedentSection } from "@/components/precedent-section"
 import { ArticleSuggestions } from "@/components/law-viewer/article-suggestions"
 import type { LawArticle, LawMeta, RevisionHistoryItem } from "@/lib/law-types"
 import type { PrecedentSearchResult, PrecedentDetail } from "@/lib/precedent-parser"
+import { sanitizeForRender } from "@/lib/sanitize-html-render"
 
 interface LawViewerSingleArticleProps {
   // 데이터
@@ -150,7 +151,7 @@ export function LawViewerSingleArticle({
           wordBreak: "break-word",
         }}
         onClick={handleContentClick}
-        dangerouslySetInnerHTML={{ __html: activeArticleHtml }}
+        dangerouslySetInnerHTML={{ __html: sanitizeForRender(activeArticleHtml) }}
       />
 
       {/* AI 추천 질의 */}

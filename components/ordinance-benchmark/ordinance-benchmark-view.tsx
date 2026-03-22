@@ -19,12 +19,13 @@ import { AnnexModal } from "@/components/annex-modal"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import { parseOrdinanceXML } from "@/lib/ordin-parser"
 import { extractArticleText } from "@/lib/law-xml-parser"
+import { formatDate as _formatDate } from "@/lib/law-data-utils"
 
 // ── 유틸 ──────────────────────────────────────────────────
 
 function formatDate(raw: string): string {
-  if (!raw || raw.length !== 8) return raw || '-'
-  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+  if (!raw) return '-'
+  return _formatDate(raw, 'dash')
 }
 
 function revisionBadgeClass(type: string): string {
@@ -273,8 +274,8 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
       setAiAnalysis(await res.json())
-    } catch (err: any) {
-      setAiError(err.message || 'AI 분석 실패')
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : String(err))
     } finally {
       setAiLoading(false)
     }

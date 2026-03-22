@@ -141,9 +141,9 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
 
       setAnalysis(analysisResult)
       setStep('done')
-    } catch (err: any) {
-      if (err.name === 'AbortError') return
-      setError(err.message || '분석 중 오류 발생')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
       setStep('error')
     }
   }, [meta])

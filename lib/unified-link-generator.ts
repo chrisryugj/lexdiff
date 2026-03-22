@@ -7,10 +7,7 @@
  * 3. 테스트 가능한 구조
  */
 
-/** HTML 속성값 이스케이프 (XSS 방지) */
-function escapeHtmlAttr(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
+import { escapeHtml } from './law-data-utils'
 
 export interface LinkConfig {
   mode: 'safe' | 'aggressive'  // safe: 「」 있는 것만, aggressive: 모든 패턴
@@ -138,7 +135,7 @@ function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawNam
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('same-law', lawName, joLabel))}">같은 법 ${fullLabel}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('same-law', lawName, joLabel))}">같은 법 ${fullLabel}</a>`
       })
     }
   }
@@ -198,7 +195,7 @@ function collectSameLawMatches(text: string, matches: LinkMatch[], currentLawNam
         lawName: targetLawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(targetLawName)}" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('same-law', targetLawName, joLabel))}">${refType} ${fullLabel}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(targetLawName)}" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('same-law', targetLawName, joLabel))}">${refType} ${fullLabel}</a>`
       })
     }
   }
@@ -225,7 +222,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
       lawName,
       article: joLabel,
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}" data-law-type="${escapeHtmlAttr(lawType)}" aria-label="${escapeHtmlAttr(getAriaLabel('law-article', lawName, joLabel))}">「${lawName}」 ${fullLabel}</a>`
+      html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}" data-law-type="${escapeHtml(lawType)}" aria-label="${escapeHtml(getAriaLabel('law-article', lawName, joLabel))}">「${lawName}」 ${fullLabel}</a>`
     })
   }
 
@@ -248,7 +245,7 @@ function collectQuotedLawMatches(text: string, matches: LinkMatch[]): void {
         type: 'law-quoted',
         lawName,
         displayText: match[0],
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law" data-law="${escapeHtmlAttr(lawName)}" data-law-type="${escapeHtmlAttr(lawType)}" aria-label="${escapeHtmlAttr(getAriaLabel('law-quoted', lawName))}">${match[0]}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law" data-law="${escapeHtml(lawName)}" data-law-type="${escapeHtml(lawType)}" aria-label="${escapeHtml(getAriaLabel('law-quoted', lawName))}">${match[0]}</a>`
       })
     }
   }
@@ -333,7 +330,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         }
       }
 
-      const efYdAttr = efYd ? ` data-efyd="${escapeHtmlAttr(efYd)}"` : ''
+      const efYdAttr = efYd ? ` data-efyd="${escapeHtml(efYd)}"` : ''
 
       // 이 범위 내의 기존 짧은 매칭 제거 (예: "제11조"만 잡힌 경우)
       const newStart = match.index
@@ -352,7 +349,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName: lawName, // "구" 제외한 법령명으로 검색
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}"${efYdAttr} data-old-law="true" aria-label="${escapeHtmlAttr('구 ' + lawName + ' ' + joLabel)}">${fullText}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}"${efYdAttr} data-old-law="true" aria-label="${escapeHtml('구 ' + lawName + ' ' + joLabel)}">${fullText}</a>`
       })
     }
   }
@@ -376,7 +373,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
 
       // ✅ 앞서 정의된 efYd 참조 (이하 같다 패턴)
       const inheritedEfYd = oldLawEfYdMap.get(lawName)
-      const efYdAttr = inheritedEfYd ? ` data-efyd="${escapeHtmlAttr(inheritedEfYd)}"` : ''
+      const efYdAttr = inheritedEfYd ? ` data-efyd="${escapeHtml(inheritedEfYd)}"` : ''
 
       // 이 범위 내의 기존 짧은 매칭 제거 (예: "제11조"만 잡힌 경우)
       const newStart = match.index
@@ -395,7 +392,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName: lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}"${efYdAttr} data-old-law="true" aria-label="${escapeHtmlAttr('구 ' + lawName + ' ' + joLabel)}">${fullText}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}"${efYdAttr} data-old-law="true" aria-label="${escapeHtml('구 ' + lawName + ' ' + joLabel)}">${fullText}</a>`
       })
     }
   }
@@ -433,7 +430,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
       })
     }
   }
@@ -471,7 +468,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
       })
     }
   }
@@ -514,7 +511,7 @@ function collectUnquotedLawMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         article: joLabel,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref" data-ref="law-article" data-law="${escapeHtmlAttr(lawName)}" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
+        html: `<a href="#" class="law-ref" data-ref="law-article" data-law="${escapeHtml(lawName)}" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('law-article', lawName, joLabel))}">${fullText}</a>`
       })
     }
   }
@@ -573,7 +570,7 @@ function collectInternalArticleMatches(text: string, matches: LinkMatch[]): void
       type: 'article',
       article: joLabel,
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" data-ref="article" data-article="${escapeHtmlAttr(joLabel)}" aria-label="${escapeHtmlAttr(getAriaLabel('article', undefined, joLabel))}">${fullLabel}</a>`
+      html: `<a href="#" class="law-ref" data-ref="article" data-article="${escapeHtml(joLabel)}" aria-label="${escapeHtml(getAriaLabel('article', undefined, joLabel))}">${fullLabel}</a>`
     })
   }
 }
@@ -592,7 +589,7 @@ function collectDecreeMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'decree',
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" data-ref="related" data-kind="decree" aria-label="${escapeHtmlAttr(getAriaLabel('decree'))}">${match[0]}</a>`
+      html: `<a href="#" class="law-ref" data-ref="related" data-kind="decree" aria-label="${escapeHtml(getAriaLabel('decree'))}">${match[0]}</a>`
     })
   }
 }
@@ -611,7 +608,7 @@ function collectRuleMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'rule',
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" data-ref="related" data-kind="rule" aria-label="${escapeHtmlAttr(getAriaLabel('rule'))}">${match[0]}</a>`
+      html: `<a href="#" class="law-ref" data-ref="related" data-kind="rule" aria-label="${escapeHtml(getAriaLabel('rule'))}">${match[0]}</a>`
     })
   }
 }
@@ -630,7 +627,7 @@ function collectAdminRuleMatches(text: string, matches: LinkMatch[]): void {
       end: match.index + match[0].length,
       type: 'rule',
       displayText: match[0],
-      html: `<a href="javascript:void(0)" class="law-ref" data-ref="regulation" data-kind="administrative" aria-label="${escapeHtmlAttr(getAriaLabel('regulation'))}">${match[0]}</a>`
+      html: `<a href="#" class="law-ref" data-ref="regulation" data-kind="administrative" aria-label="${escapeHtml(getAriaLabel('regulation'))}">${match[0]}</a>`
     })
   }
 }
@@ -694,7 +691,7 @@ function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
     )
 
     if (!isOverlap) {
-      const dataLawAttr = lawName ? ` data-law="${escapeHtmlAttr(lawName)}"` : ''
+      const dataLawAttr = lawName ? ` data-law="${escapeHtml(lawName)}"` : ''
       matches.push({
         start: match.index,
         end: match.index + match[0].length,
@@ -702,7 +699,7 @@ function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         annexNumber: annexNum,
         displayText: match[0],
-        html: `<a href="javascript:void(0)" class="law-ref annex-ref" data-ref="annex" data-annex="${escapeHtmlAttr(annexNum)}"${dataLawAttr} aria-label="${escapeHtmlAttr(getAriaLabel('annex', lawName, undefined, annexNum))}">${match[0]}</a>`
+        html: `<a href="#" class="law-ref annex-ref" data-ref="annex" data-annex="${escapeHtml(annexNum)}"${dataLawAttr} aria-label="${escapeHtml(getAriaLabel('annex', lawName, undefined, annexNum))}">${match[0]}</a>`
       })
     }
   }
@@ -726,7 +723,7 @@ function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
     )
 
     if (!isOverlap) {
-      const dataLawAttr = lawName ? ` data-law="${escapeHtmlAttr(lawName)}"` : ''
+      const dataLawAttr = lawName ? ` data-law="${escapeHtml(lawName)}"` : ''
       matches.push({
         start: match.index,
         end: match.index + match[0].length,
@@ -734,7 +731,7 @@ function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
         lawName,
         annexNumber: annexNum,
         displayText: match[0],
-        html: `<a href="javascript:void(0)" class="law-ref annex-ref" data-ref="annex" data-annex="${escapeHtmlAttr(annexNum)}"${dataLawAttr} aria-label="${escapeHtmlAttr(getAriaLabel('annex', lawName, undefined, annexNum))}">${match[0]}</a>`
+        html: `<a href="#" class="law-ref annex-ref" data-ref="annex" data-annex="${escapeHtml(annexNum)}"${dataLawAttr} aria-label="${escapeHtml(getAriaLabel('annex', lawName, undefined, annexNum))}">${match[0]}</a>`
       })
     }
   }
@@ -917,7 +914,7 @@ function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
         type: 'precedent',
         caseNumber,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${escapeHtmlAttr(caseNumber)}" data-court="${escapeHtmlAttr(court)}" data-date="${escapeHtmlAttr(`${year}.${month}.${day}`)}" aria-label="${escapeHtmlAttr(getAriaLabel('precedent', undefined, undefined, undefined, caseNumber))}">${fullText}</a>`
+        html: `<a href="#" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${escapeHtml(caseNumber)}" data-court="${escapeHtml(court)}" data-date="${escapeHtml(`${year}.${month}.${day}`)}" aria-label="${escapeHtml(getAriaLabel('precedent', undefined, undefined, undefined, caseNumber))}">${fullText}</a>`
       })
     }
   }
@@ -949,7 +946,7 @@ function collectPrecedentMatches(text: string, matches: LinkMatch[]): void {
         type: 'precedent',
         caseNumber,
         displayText: fullText,
-        html: `<a href="javascript:void(0)" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${escapeHtmlAttr(caseNumber)}" aria-label="${escapeHtmlAttr(getAriaLabel('precedent', undefined, undefined, undefined, caseNumber))}">${fullText}</a>`
+        html: `<a href="#" class="law-ref precedent-ref" data-ref="precedent" data-case-number="${escapeHtml(caseNumber)}" aria-label="${escapeHtml(getAriaLabel('precedent', undefined, undefined, undefined, caseNumber))}">${fullText}</a>`
       })
     }
   }

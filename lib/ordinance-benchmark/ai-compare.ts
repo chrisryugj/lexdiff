@@ -152,9 +152,9 @@ ${ordinanceList}
     setCacheAIAnalysis(keyword, orgCodes, analysis)
 
     return analysis
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
-      comparisonTable: `AI 분석 오류: ${err.message || '알 수 없는 오류'}`,
+      comparisonTable: `AI 분석 오류: ${err instanceof Error ? err.message : String(err)}`,
       highlights: '',
       analyzedAt: new Date().toISOString(),
     }

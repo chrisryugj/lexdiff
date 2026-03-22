@@ -15,13 +15,14 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'Not available' }, { status: 404 })
   }
 
-  // Optional token-based authentication for non-production environments
+  // Token-based authentication required — no token configured = endpoint disabled
   const debugToken = process.env.DEBUG_TRACE_TOKEN
-  if (debugToken) {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || authHeader !== `Bearer ${debugToken}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!debugToken) {
+    return Response.json({ error: 'Not available' }, { status: 404 })
+  }
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader || authHeader !== `Bearer ${debugToken}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { searchParams } = new URL(request.url)

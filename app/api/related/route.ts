@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
+import { escapeHtml } from "@/lib/law-data-utils"
 
 const LAW_SEARCH_API = "https://www.law.go.kr/DRF/lawSearch.do"
 const LAW_SERVICE_API = "https://www.law.go.kr/DRF/lawService.do"
@@ -10,9 +12,6 @@ function stripTags(s: string): string {
   return s.replace(/<[^>]*>/g, "")
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-}
 
 // Extract all articles (조문) from eflaw XML
 function extractArticlesFromXml(xml: string): Array<{ joNum: string; title?: string; text: string }> {
@@ -129,7 +128,6 @@ export async function GET(request: Request) {
     debugLogger.info("related search", { baseLaw, joLabel, kind, candidates: candidates.length })
     return NextResponse.json({ lawName, candidates })
   } catch (error) {
-    debugLogger.error("related search error", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "unknown" }, { status: 500 })
+    return safeErrorResponse(error, "관련 법령 조회 실패")
   }
 }

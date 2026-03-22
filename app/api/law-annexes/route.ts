@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 import type { LawAnnex, AnnexKind } from "@/lib/law-types"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
@@ -356,16 +357,10 @@ export async function GET(request: Request) {
       annexes,
     })
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "알 수 없는 오류"
-
-    // AbortError(타임아웃)는 504, 나머지는 502 (upstream 오류)
     const isTimeout = error instanceof Error && error.name === "AbortError"
     const status = isTimeout ? 504 : 502
+    const userMessage = isTimeout ? "법제처 API 응답 시간 초과" : "별표 목록 조회 실패"
 
-    debugLogger.error("별표 목록 조회 실패", { error: msg, status, query })
-    return NextResponse.json(
-      { error: isTimeout ? "법제처 API 응답 시간 초과" : msg, success: false, totalCount: 0, annexes: [] },
-      { status }
-    )
+    return safeErrorResponse(error, userMessage, "별표 목록", status)
   }
 }

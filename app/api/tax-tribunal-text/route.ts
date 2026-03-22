@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 export interface TaxTribunalDetail {
   name: string           // 사건명
@@ -93,10 +94,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(detail)
 
   } catch (error) {
-    debugLogger.error("[tax-tribunal-text] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "재결례 조회 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "재결례 조회 중 오류 발생")
   }
 }

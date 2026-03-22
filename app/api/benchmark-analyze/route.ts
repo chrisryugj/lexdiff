@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { AI_CONFIG } from '@/lib/ai-config'
+import { safeErrorResponse } from '@/lib/api-error'
 
 // ── 조례 본문 조회 ──
 
@@ -140,10 +141,7 @@ export async function POST(request: NextRequest) {
   try {
     const geminiAnswer = await callGemini(prompt)
     return NextResponse.json(parseAnalysisResponse(geminiAnswer))
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: `AI 분석 실패: ${err.message}` },
-      { status: 500 }
-    )
+  } catch (err: unknown) {
+    return safeErrorResponse(err, "AI 분석 실패")
   }
 }

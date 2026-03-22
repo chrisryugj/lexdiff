@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 import { parsePrecedentSearchXML, type PrecedentSearchResult } from "@/lib/precedent-parser"
 
 export async function GET(request: NextRequest) {
@@ -122,10 +123,6 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    debugLogger.error("[precedent-search] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "판례 검색 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "판례 검색 중 오류 발생")
   }
 }

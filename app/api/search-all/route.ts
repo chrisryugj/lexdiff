@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 interface SearchResult {
   id: string
@@ -219,10 +220,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response)
 
   } catch (error) {
-    debugLogger.error("[search-all] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "통합 검색 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "통합 검색 중 오류 발생")
   }
 }

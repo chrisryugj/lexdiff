@@ -40,8 +40,6 @@ export function getRecentPrecedents(): RecentPrecedent[] {
  */
 export async function addRecentPrecedent(precedent: Omit<RecentPrecedent, 'viewedAt'>): Promise<void> {
   try {
-    console.log('[최근판례] 저장 시도:', precedent)
-
     const current = getRecentPrecedents()
 
     const newPrecedent: RecentPrecedent = {
@@ -56,7 +54,6 @@ export async function addRecentPrecedent(precedent: Omit<RecentPrecedent, 'viewe
     ].slice(0, MAX_RECENT)
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-    console.log('[최근판례] 저장 완료:', updated.length, '개')
   } catch (error) {
     console.error('[최근판례] 저장 실패:', error)
   }

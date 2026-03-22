@@ -4,6 +4,7 @@
 
 import { debugLogger } from './debug-logger'
 import { linkifyRefsAI } from './unified-link-generator'
+import { escapeHtml } from './law-data-utils'
 
 /**
  * 텍스트 앞의 마크다운 불릿/대시 제거
@@ -154,17 +155,6 @@ function removeMarkdownSyntax(text: string): string {
     .replace(/^[\-*]{3,}$/gm, '')         // 구분선
 }
 
-/**
- * HTML 이스케이프
- */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
 
 /**
  * ⚖️ 조문 발췌 마커 추가 (HTML 이스케이프 전에 실행)

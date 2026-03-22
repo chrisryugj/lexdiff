@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 /**
  * 별표 뷰어 URL 조회 API
@@ -91,13 +92,6 @@ export async function GET(request: Request) {
       hanFlSeq,
     })
   } catch (error) {
-    debugLogger.error("[annex-viewer] 뷰어 URL 조회 실패", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "뷰어 URL 조회 실패",
-      },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "뷰어 URL 조회 실패", "별표 뷰어")
   }
 }

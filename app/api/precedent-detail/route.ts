@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 import { parsePrecedentDetailXML } from "@/lib/precedent-parser"
 
 export async function GET(request: NextRequest) {
@@ -60,10 +61,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(precedent)
 
   } catch (error) {
-    debugLogger.error("[precedent-detail] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "판례 조회 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "판례 조회 중 오류 발생")
   }
 }

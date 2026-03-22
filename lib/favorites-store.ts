@@ -56,14 +56,6 @@ export class FavoritesStore {
     const now = new Date()
     const koreaTime = now.toISOString()
 
-    console.log("[즐겨찾기] 추가 시간 기록:", {
-      timestamp: koreaTime,
-      localTime: now.toLocaleString("ko-KR"),
-      lawTitle: favorite.lawTitle,
-      jo: favorite.jo,
-      effectiveDate: favorite.effectiveDate, // 최근 개정일 로그 추가
-    })
-
     const newFavorite: Favorite = {
       ...favorite,
       id: `${Date.now()}-${Math.random()}`,

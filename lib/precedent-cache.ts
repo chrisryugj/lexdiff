@@ -7,6 +7,7 @@
  */
 
 import type { PrecedentSearchResult, PrecedentDetail } from "./precedent-parser"
+import { debugLogger } from "./debug-logger"
 
 const DB_NAME = "LexDiffPrecedentCache"
 const DB_VERSION = 1
@@ -35,7 +36,7 @@ async function openDB(): Promise<IDBDatabase> {
     request.onerror = (event) => {
       const error = (event.target as IDBOpenDBRequest).error
       if (error?.name === "VersionError") {
-        console.warn("[precedent-cache] VersionError, deleting and retrying...")
+        debugLogger.warning("[precedent-cache] VersionError, deleting and retrying...")
         indexedDB.deleteDatabase(DB_NAME)
       }
       reject(error)
@@ -213,7 +214,7 @@ export async function clearExpiredPrecedentCache(): Promise<void> {
       }
     }
 
-    console.log("[precedent-cache] Expired cache cleared")
+    debugLogger.debug("[precedent-cache] Expired cache cleared")
   } catch (error) {
     console.error("[precedent-cache] clearExpired error:", error)
   }

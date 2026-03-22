@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { debugLogger } from "./debug-logger"
 import { parseHierarchyXML } from "./hierarchy-parser"
 import {
   filterAdminRulesByTitle,
@@ -210,10 +211,10 @@ export function useAdminRules(
         }
         fetchingLawNames.delete(lawName)
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         fetchingLawNames.delete(lawName)
         if (!cancelled) {
-          setError(err.message || "행정규칙 조회 중 오류 발생")
+          setError(err instanceof Error ? err.message : String(err))
           setLoadingHierarchy(false)
           setHierarchyLoaded(true) // 에러도 "시도 완료"
         }
@@ -290,7 +291,7 @@ export function useAdminRules(
         if (cancelled) return
 
         if (!response.ok) {
-          console.warn(`[use-admin-rules] Tier 2 search failed: ${response.status}`)
+          debugLogger.warning(`[use-admin-rules] Tier 2 search failed: ${response.status}`)
           // Tier 2 실패는 치명적이지 않음 — Tier 1 결과만 표시
           setTier2Loading(false)
           setDataReady(true)

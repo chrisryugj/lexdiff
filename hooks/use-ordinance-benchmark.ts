@@ -51,9 +51,9 @@ export function useOrdinanceBenchmark() {
       if (!controller.signal.aborted) {
         setSearchResult(result)
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return
-      setError(err.message || '검색 중 오류가 발생했습니다.')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsSearching(false)
     }
@@ -80,9 +80,9 @@ export function useOrdinanceBenchmark() {
       if (!controller.signal.aborted) {
         setSearchResult(result)
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return
-      setError(err.message || '추가 로드 중 오류가 발생했습니다.')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsLoadingMore(false)
       setProgress(null)
@@ -105,9 +105,9 @@ export function useOrdinanceBenchmark() {
     try {
       const result = await searchFirstPage(searchKeyword, { signal: controller.signal })
       if (!controller.signal.aborted) setSearchResult(result)
-    } catch (err: any) {
-      if (err.name === 'AbortError') return
-      setError(err.message || '검색 중 오류가 발생했습니다.')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsSearching(false)
     }

@@ -158,9 +158,11 @@ export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
   }
 }
 
+import { formatDate as _formatDate } from './law-data-utils'
+
+/** @deprecated Use formatDate from law-data-utils directly */
 export function formatDate(dateStr: string): string {
-  if (!dateStr || dateStr.length !== 8) return dateStr
-  return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
+  return _formatDate(dateStr, 'dash')
 }
 
 export function extractArticleRevisions(

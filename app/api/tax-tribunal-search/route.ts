@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 export interface TaxTribunalSearchResult {
   id: string           // 특별행정심판재결례일련번호
@@ -112,10 +113,6 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    debugLogger.error("[tax-tribunal-search] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "조세심판원 검색 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "조세심판원 검색 중 오류 발생")
   }
 }

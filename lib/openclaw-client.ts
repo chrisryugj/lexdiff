@@ -7,6 +7,7 @@
 
 import type { FCRAGResult } from '@/lib/fc-rag/engine'
 import type { LegalQueryType } from '@/lib/fc-rag/prompts'
+import { debugLogger } from './debug-logger'
 
 // ─── 설정 ───
 
@@ -186,7 +187,7 @@ function processSSEEvent(
       }
 
       case 'error':
-        console.error('[openclaw-client] bridge SSE error:', parsed.error)
+        debugLogger.debug('[openclaw-client] bridge SSE error:', parsed.error)
         break
     }
   } catch {

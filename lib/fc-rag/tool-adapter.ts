@@ -13,6 +13,7 @@
 
 import { LawApiClient } from 'korean-law-mcp/lib/api-client'
 import { zodToJsonSchema } from 'zod-to-json-schema'
+import { debugLogger } from '../debug-logger'
 
 // ── Tier 0: Core search & retrieval ──
 import { searchLaw, SearchLawSchema } from 'korean-law-mcp/tools/search'
@@ -103,7 +104,7 @@ import type { FunctionDeclaration } from '@google/genai'
 
 const LAW_OC = process.env.LAW_OC
 if (!LAW_OC) {
-  console.warn('[FC-RAG] LAW_OC 환경 변수가 설정되지 않았습니다.')
+  debugLogger.warning('[FC-RAG] LAW_OC 환경 변수가 설정되지 않았습니다.')
 }
 const apiClient = new LawApiClient({ apiKey: LAW_OC || '' })
 

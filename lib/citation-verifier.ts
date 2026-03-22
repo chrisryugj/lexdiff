@@ -14,6 +14,7 @@
 
 import { DOMParser } from '@xmldom/xmldom'
 import { buildJO, formatJO } from './law-parser'
+import { debugLogger } from './debug-logger'
 
 /**
  * RAG Citation 타입 (file-search-client.ts와 동일)
@@ -87,7 +88,7 @@ export async function verifyCitation(citation: Citation): Promise<VerifiedCitati
         : undefined
     }
   } catch (error) {
-    console.error('[Citation Verifier] Error:', error)
+    debugLogger.warning('[Citation Verifier] Error:', error)
     return {
       ...citation,
       verified: false,
@@ -140,7 +141,7 @@ async function fetchLawId(lawName: string): Promise<string | null> {
     // law-search API 직접 호출 (외부 API)
     const LAW_OC = process.env.LAW_OC
     if (!LAW_OC) {
-      console.error('[Citation Verifier] LAW_OC 환경변수가 설정되지 않았습니다')
+      debugLogger.warning('[Citation Verifier] LAW_OC 환경변수가 설정되지 않았습니다')
       return null
     }
 
@@ -151,7 +152,7 @@ async function fetchLawId(lawName: string): Promise<string | null> {
     })
 
     if (!response.ok) {
-      console.error('[Citation Verifier] law-search API error:', response.status)
+      debugLogger.warning('[Citation Verifier] law-search API error:', response.status)
       return null
     }
 
@@ -193,10 +194,10 @@ async function fetchLawId(lawName: string): Promise<string | null> {
       }
     }
 
-    console.warn(`[Citation Verifier] ⚠️  Law ID not found for "${lawName}"`)
+    debugLogger.warning(`[Citation Verifier] Law ID not found for "${lawName}"`)
     return null
   } catch (error) {
-    console.error('[Citation Verifier] fetchLawId error:', error)
+    debugLogger.warning('[Citation Verifier] fetchLawId error:', error)
     return null
   }
 }
@@ -215,14 +216,14 @@ async function checkArticleExists(
   try {
     // 조문 번호가 없으면 검증 불가
     if (!articleNum || articleNum === '') {
-      console.warn('[Citation Verifier] ⚠️  Empty article number')
+      debugLogger.warning('[Citation Verifier] Empty article number')
       return false
     }
 
     // eflaw API 직접 호출 (외부 API)
     const LAW_OC = process.env.LAW_OC
     if (!LAW_OC) {
-      console.error('[Citation Verifier] LAW_OC 환경변수가 설정되지 않았습니다')
+      debugLogger.warning('[Citation Verifier] LAW_OC 환경변수가 설정되지 않았습니다')
       return false
     }
 
@@ -234,14 +235,14 @@ async function checkArticleExists(
     })
 
     if (!response.ok) {
-      console.error('[Citation Verifier] eflaw API error:', response.status)
+      debugLogger.warning('[Citation Verifier] eflaw API error:', response.status)
       return false
     }
 
     // 대형 법령(민법 등) OOM 방지: 10MB 초과 시 검증 스킵
     const contentLength = Number(response.headers.get('content-length') || '0')
     if (contentLength > 10 * 1024 * 1024) {
-      console.warn(`[Citation Verifier] ⚠️  Response too large (${(contentLength / 1024 / 1024).toFixed(1)}MB), skipping verification for law ID ${lawId}`)
+      debugLogger.warning(`[Citation Verifier] Response too large (${(contentLength / 1024 / 1024).toFixed(1)}MB), skipping verification for law ID ${lawId}`)
       return false
     }
 
@@ -255,7 +256,7 @@ async function checkArticleExists(
     const articleUnits = xmlDoc.getElementsByTagName('조문단위')
 
     if (articleUnits.length === 0) {
-      console.warn('[Citation Verifier] ⚠️  No article units found in XML')
+      debugLogger.warning('[Citation Verifier] No article units found in XML')
       return false
     }
 
@@ -279,14 +280,14 @@ async function checkArticleExists(
     }
 
     if (!found) {
-      console.warn(
-        `[Citation Verifier] ⚠️  Article "${articleNum}" (JO: ${targetJoCode}) not found in law ID ${lawId}`
+      debugLogger.warning(
+        `[Citation Verifier] Article "${articleNum}" (JO: ${targetJoCode}) not found in law ID ${lawId}`
       )
     }
 
     return found
   } catch (error) {
-    console.error('[Citation Verifier] checkArticleExists error:', error)
+    debugLogger.warning('[Citation Verifier] checkArticleExists error:', error)
     return false
   }
 }

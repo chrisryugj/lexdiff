@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -55,8 +56,6 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    debugLogger.error("[개정이력 API] Error:", error)
-    debugLogger.error("법령 변경이력 조회 실패", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
+    return safeErrorResponse(error, "개정이력 조회 실패")
   }
 }

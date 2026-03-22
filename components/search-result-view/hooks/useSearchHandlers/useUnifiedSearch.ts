@@ -139,7 +139,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       debugLogger.info("[unified-search] precedent search", { query })
 
       try {
-        const classification = (query as SearchQuery & { classification?: any }).classification
+        const classification = query.classification
         const caseNumber = classification?.entities?.caseNumber
         const court = classification?.entities?.court
         const searchQuery = caseNumber || query.lawName || query.article || ""
@@ -327,7 +327,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       debugLogger.info("[unified-search] interpretation search", { query })
 
       try {
-        const classification = (query as SearchQuery & { classification?: any }).classification
+        const classification = query.classification
         const ruleType = classification?.entities?.ruleType
         const lawName = classification?.entities?.lawName || query.lawName
         const searchQuery = lawName || query.article || ""
@@ -412,7 +412,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       debugLogger.info("[unified-search] ruling search", { query })
 
       try {
-        const classification = (query as SearchQuery & { classification?: any }).classification
+        const classification = query.classification
         const rulingNumber = classification?.entities?.rulingNumber
         const searchQuery = rulingNumber || query.lawName || ""
 
@@ -493,7 +493,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     async (query: SearchQuery) => {
       debugLogger.info("[unified-search] multi search", { query })
 
-      const classification = (query as SearchQuery & { classification?: any }).classification
+      const classification = query.classification
       const secondaryTypes = Array.from(new Set<string>(classification?.secondaryTypes || []))
 
       if (secondaryTypes.length === 0) {

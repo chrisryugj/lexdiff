@@ -12,6 +12,7 @@ import { createInterface } from 'readline'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
+import { debugLogger } from '../debug-logger'
 
 export const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
@@ -85,9 +86,7 @@ export async function callAnthropic(
   const env = { ...process.env }
   env.ANTHROPIC_API_KEY = getOAuthToken()
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[claude-cli] calling ${CLAUDE_MODEL}, prompt: ${prompt.length} chars, system: ${systemPrompt.length} chars`)
-  }
+  debugLogger.debug(`[claude-cli] calling ${CLAUDE_MODEL}, prompt: ${prompt.length} chars, system: ${systemPrompt.length} chars`)
 
   try {
     const stdout = await new Promise<string>((resolve, reject) => {
@@ -103,7 +102,7 @@ export async function callAnthropic(
           if (err) {
             // 비정상 종료이지만 부분 stdout 존재 — 경고 후 복구 시도
             const code = (err as NodeJS.ErrnoException).code || 'unknown'
-            console.warn(`[claude-cli] non-zero exit (${code}) but got partial stdout (${stdout?.length ?? 0} chars), attempting recovery`)
+            debugLogger.warning(`[claude-cli] non-zero exit (${code}) but got partial stdout (${stdout?.length ?? 0} chars), attempting recovery`)
           }
           resolve(stdout || '')
         }
@@ -152,9 +151,7 @@ export async function callAnthropic(
     }
 
     const usage = (resultEvent.usage || {}) as Record<string, number>
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[claude-cli] success: ${text.length} chars, turns: ${resultEvent.num_turns}`)
-    }
+    debugLogger.debug(`[claude-cli] success: ${text.length} chars, turns: ${resultEvent.num_turns}`)
 
     return {
       content: [{ type: 'text', text }],
@@ -166,7 +163,7 @@ export async function callAnthropic(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[claude-cli] ERROR: ${msg}`)
+    debugLogger.error(`[claude-cli] ERROR: ${msg}`)
     throw new Error(`Claude CLI 호출 실패: ${msg}`)
   }
 }
@@ -220,9 +217,7 @@ export async function* callAnthropicStream(
   const env = { ...process.env }
   env.ANTHROPIC_API_KEY = getOAuthToken()
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[claude-cli] streaming ${CLAUDE_MODEL}, prompt: ${prompt.length} chars`)
-  }
+  debugLogger.debug(`[claude-cli] streaming ${CLAUDE_MODEL}, prompt: ${prompt.length} chars`)
 
   const proc = spawn(CLAUDE_BIN, args, {
     env,
@@ -314,9 +309,7 @@ export async function* callAnthropicStream(
       }
 
       const usage = (event.usage || {}) as Record<string, number>
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[claude-cli] stream done: ${(finalText || resultText).length} chars, turns: ${event.num_turns}`)
-      }
+      debugLogger.debug(`[claude-cli] stream done: ${(finalText || resultText).length} chars, turns: ${event.num_turns}`)
       yield {
         type: 'result',
         text: finalText || resultText,

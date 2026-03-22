@@ -182,7 +182,6 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
             if (!response.ok) return { strategy, ordinances: [] as OrdinResult[], totalCount: 0 }
             const xmlText = await response.text()
             const result = parseOrdinanceSearchXML(xmlText)
-            console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
             return { strategy, ordinances: result.ordinances, totalCount: result.totalCount }
           })
         )
@@ -219,8 +218,6 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
 
             const xmlText = await response.text()
             const result = parseOrdinanceSearchXML(xmlText)
-            console.log(`[ordin-search] ${strategy.description} → ${result.totalCount}건`)
-
             if (result.ordinances.length > 0) {
               let ordinances = result.ordinances
               if (strategy.filterKeywords && strategy.filterKeywords.length > 0) {
@@ -323,11 +320,10 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
               if (!response.ok) return { query: q, results: [] as LawSearchResult[], xml: '' }
               const xmlText = await response.text()
               const results = parseLawSearchXML(xmlText)
-              console.log(`[law-search] "${q}" → ${results.length}건`)
               return { query: q, results, xml: xmlText }
-            } catch (err: any) {
-              if (err.name === 'AbortError') {
-                console.log(`[law-search] "${q}" 타임아웃`)
+            } catch (err: unknown) {
+              if (err instanceof Error && err.name === 'AbortError') {
+                // timeout — no action needed
               }
               return { query: q, results: [] as LawSearchResult[], xml: '' }
             }

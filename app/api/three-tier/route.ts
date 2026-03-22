@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { parseThreeTierDelegation } from "@/lib/three-tier-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -82,16 +83,6 @@ export async function GET(request: Request) {
       },
     )
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류"
-    debugLogger.error("3단비교 데이터 조회 실패", {
-      message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-      lawId,
-      mst,
-    })
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 },
-    )
+    return safeErrorResponse(error, "3단비교 데이터 조회 실패")
   }
 }

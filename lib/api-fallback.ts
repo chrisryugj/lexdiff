@@ -11,6 +11,7 @@
  */
 
 import { performanceMonitor } from './performance-monitor'
+import { debugLogger } from './debug-logger'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Circuit Breaker 설정
@@ -69,7 +70,7 @@ function updateCircuitState(apiName: string, success: boolean, config = DEFAULT_
         state.state = 'CLOSED'
         state.failures = 0
         state.halfOpenSuccesses = 0
-        console.log(`✅ [Circuit Breaker] ${apiName}: HALF_OPEN → CLOSED (복구됨)`)
+        debugLogger.info(`[Circuit Breaker] ${apiName}: HALF_OPEN → CLOSED (복구됨)`)
       }
     } else {
       state.failures = 0
@@ -80,7 +81,7 @@ function updateCircuitState(apiName: string, success: boolean, config = DEFAULT_
 
     if (state.failures >= config.failureThreshold) {
       state.state = 'OPEN'
-      console.warn(`🔴 [Circuit Breaker] ${apiName}: CLOSED → OPEN (${state.failures}회 연속 실패)`)
+      debugLogger.warning(`[Circuit Breaker] ${apiName}: CLOSED → OPEN (${state.failures}회 연속 실패)`)
     }
   }
 }
@@ -100,7 +101,7 @@ export function isCircuitOpen(apiName: string, config = DEFAULT_CONFIG): boolean
     if (Date.now() - state.lastFailureTime >= config.resetTimeoutMs) {
       state.state = 'HALF_OPEN'
       state.halfOpenSuccesses = 0
-      console.log(`🟡 [Circuit Breaker] ${apiName}: OPEN → HALF_OPEN (재시도 허용)`)
+      debugLogger.info(`[Circuit Breaker] ${apiName}: OPEN → HALF_OPEN (재시도 허용)`)
       return false
     }
     return true
@@ -212,7 +213,7 @@ export async function withRetry<T>(
 
   // Circuit Breaker 확인
   if (isCircuitOpen(apiName)) {
-    console.warn(`🔴 [Fallback] ${apiName}: Circuit Open - 요청 차단됨`)
+    debugLogger.warning(`[Fallback] ${apiName}: Circuit Open - 요청 차단됨`)
     return {
       data: null,
       isFallback: true,
@@ -226,7 +227,7 @@ export async function withRetry<T>(
     try {
       if (attempt > 0) {
         const delay = calculateDelay(attempt - 1, retryConfig)
-        console.log(`🔄 [Retry] ${apiName}: 재시도 ${attempt}/${retryConfig.maxRetries} (${delay}ms 대기)`)
+        debugLogger.debug(`[Retry] ${apiName}: 재시도 ${attempt}/${retryConfig.maxRetries} (${delay}ms 대기)`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
 
@@ -357,5 +358,5 @@ export function resetCircuitBreaker(apiName: string): void {
   state.state = 'CLOSED'
   state.failures = 0
   state.halfOpenSuccesses = 0
-  console.log(`✅ [Circuit Breaker] ${apiName}: 수동 리셋 완료`)
+  debugLogger.info(`[Circuit Breaker] ${apiName}: 수동 리셋 완료`)
 }

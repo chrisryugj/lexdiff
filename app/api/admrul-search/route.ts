@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 /**
  * GET /api/admrul-search
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const nw = searchParams.get("nw") || "1" // 1=현행, 2=연혁
 
     // Build API URL
-    const apiUrl = new URL("http://www.law.go.kr/DRF/lawSearch.do")
+    const apiUrl = new URL("https://www.law.go.kr/DRF/lawSearch.do")
     apiUrl.searchParams.set("OC", LAW_OC)
     apiUrl.searchParams.set("target", "admrul")
     apiUrl.searchParams.set("type", "XML")
@@ -81,10 +82,6 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    debugLogger.error("[admrul-search] Error:", error)
-    return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "행정규칙 검색 실패")
   }
 }

@@ -102,7 +102,6 @@ export const Icon = forwardRef<SVGSVGElement, IconProps>(
     const IconComponent = ICON_REGISTRY[name]
 
     if (!IconComponent) {
-      console.warn(`[Icon] Unknown icon name: "${name}"`)
       return null
     }
 

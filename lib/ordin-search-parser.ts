@@ -22,7 +22,7 @@ export function parseOrdinanceSearchXML(xmlText: string): { totalCount: number; 
     // Check for parsing errors
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.log("XML parsing error:", parserError.textContent)
+      debugLogger.debug("XML parsing error:", parserError.textContent)
       throw new Error("XML 파싱 오류")
     }
 
@@ -31,7 +31,7 @@ export function parseOrdinanceSearchXML(xmlText: string): { totalCount: number; 
     const totalCount = parseInt(totalCnt, 10) || 0
 
     const ordinances = xmlDoc.querySelectorAll("law")
-    console.log("Found ordinances:", ordinances.length, "totalCount:", totalCount)
+    debugLogger.debug(`Found ordinances: ${ordinances.length}, totalCount: ${totalCount}`)
 
     const results: OrdinanceSearchResult[] = []
 
@@ -65,7 +65,7 @@ export function parseOrdinanceSearchXML(xmlText: string): { totalCount: number; 
 
     return { totalCount, ordinances: results }
   } catch (error) {
-    console.log("Ordinance search parsing error:", error)
+    debugLogger.debug("Ordinance search parsing error:", error)
     debugLogger.error("자치법규 검색 결과 파싱 실패", error)
     return { totalCount: 0, ordinances: [] }
   }

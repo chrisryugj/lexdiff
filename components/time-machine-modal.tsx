@@ -186,9 +186,9 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       if (meta.mst) {
         setCache(meta.mst, searchDate, { pastText: pText, currentText: cText, versionMatch: match })
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return
-      setError(err.message || '조회 중 오류가 발생했습니다.')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsLoading(false)
     }

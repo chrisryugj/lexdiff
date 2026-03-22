@@ -3,6 +3,8 @@
  * Converts basic markdown to structured markdown for File Search
  */
 
+import { debugLogger } from './debug-logger'
+
 /**
  * Convert basic markdown to structured markdown
  *
@@ -75,7 +77,7 @@ export function convertToStructuredMarkdown(markdown: string): string {
 
   const output = [header, '', ...articleBlocks, '\n---\n'].join('\n')
 
-  console.log(`[Markdown Converter] ✅ Converted ${articleCount} articles to structured format`)
+  debugLogger.debug(`[Markdown Converter] Converted ${articleCount} articles to structured format`)
 
   return output
 }

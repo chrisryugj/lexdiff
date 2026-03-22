@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
+import { sanitizeForRender } from "@/lib/sanitize-html-render"
 
 interface PrecedentMeta {
   court?: string
@@ -119,7 +120,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
   // HTML은 그대로 사용 (CSS로 간격 처리)
   const processedHtml = useMemo(() => {
     if (!html) return "연결된 본문을 불러올 수 없습니다."
-    return html
+    return sanitizeForRender(html)
   }, [html])
 
   // 제목 파싱 (매 렌더링마다 regex 방지)

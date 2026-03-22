@@ -25,7 +25,7 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
   // 검색 핸들러
   // ============================================================
   const handleSearch = useCallback((query: SearchQuery) => {
-    const passedForcedMode = (query as any).forcedMode as 'law' | 'ai' | undefined
+    const passedForcedMode = query.forcedMode
     handleSearchInternal(query, undefined, passedForcedMode)
   }, [handleSearchInternal])
 

@@ -64,14 +64,14 @@ export function useSearchHandlers({
     skipCache?: boolean
   ) => {
     // query 객체에 forcedMode가 있으면 사용 (search-result-view에서 직접 호출 시)
-    const effectiveForcedMode = forcedMode || (query as any).forcedMode as 'law' | 'ai' | undefined
+    const effectiveForcedMode = forcedMode || query.forcedMode
     const fullQuery = buildFullQuery(query.lawName, query.article)
     actions.setSearchQuery(fullQuery)
-    actions.setUserQuery((query as any).rawQuery || fullQuery)
+    actions.setUserQuery(query.rawQuery || fullQuery)
     debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode: effectiveForcedMode })
 
     // 통합검색: classification이 있으면 재감지 스킵
-    const classification = (query as any).classification
+    const classification = query.classification
     if (classification) {
       debugLogger.info('✅ 통합검색: 사전 분류 결과 사용', {
         searchType: classification.searchType,
@@ -88,7 +88,7 @@ export function useSearchHandlers({
         debugLogger.info('✅ 사전 분류 고신뢰 → 재감지 스킵', { searchType: classification.searchType })
         const isAiSearch = effectiveForcedMode === 'ai'
         if (isAiSearch) {
-          const aiQuery = (query as any).rawQuery || fullQuery
+          const aiQuery = query.rawQuery || fullQuery
           await handleAiSearch(aiQuery, signal, skipCache)
         } else {
           await handleBasicSearch(query, fullQuery, skipCache)
@@ -142,7 +142,7 @@ export function useSearchHandlers({
     // 모드 선택 다이얼로그
     // ✅ 수정: classification이 'ai'이거나 queryDetection이 'natural'이면 다이얼로그 안 띄움
     const effectiveConfidence = classification ? classification.confidence : queryDetection.confidence
-    const isAiClassified = classification?.searchType === 'ai' || (query as any).searchType === 'ai' || queryDetection.type === 'natural'
+    const isAiClassified = classification?.searchType === 'ai' || query.searchType === 'ai' || queryDetection.type === 'natural'
 
     if (!effectiveForcedMode && !isAiClassified && effectiveConfidence < 0.7) {
       debugLogger.info('🤔 검색 의도 불분명 - 다이얼로그 표시', {
@@ -171,7 +171,7 @@ export function useSearchHandlers({
     // AI 검색 vs 기본 검색 분기
     if (isAiSearch) {
       // AI 검색에는 원본 쿼리 전달 (파싱으로 자연어 부분 잘리지 않도록)
-      const aiQuery = (query as any).rawQuery || fullQuery
+      const aiQuery = query.rawQuery || fullQuery
       await handleAiSearch(aiQuery, signal, skipCache)
     } else {
       await handleBasicSearch(query, fullQuery, skipCache)

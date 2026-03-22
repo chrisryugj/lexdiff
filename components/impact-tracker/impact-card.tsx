@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
 import { SEVERITY_CONFIG, type ImpactItem } from '@/lib/impact-tracker/types'
+import { formatDate } from '@/lib/law-data-utils'
 
 interface ImpactCardProps {
   item: ImpactItem
@@ -28,13 +29,6 @@ const SEVERITY_ACCENT = {
   },
 }
 
-/** 날짜 포맷 정규화: 20241231 → 2024-12-31 */
-function formatDate(raw: string): string {
-  if (/^\d{8}$/.test(raw)) {
-    return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
-  }
-  return raw
-}
 
 export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
   const config = SEVERITY_CONFIG[item.severity]
@@ -55,7 +49,7 @@ export function ImpactCard({ item, onCompare, onViewLaw }: ImpactCardProps) {
               {item.change.revisionType}
             </span>
             <span className="text-[11px] sm:text-[12px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded border border-gray-100 dark:border-gray-700 tabular-nums">
-              {formatDate(item.change.revisionDate)}
+              {formatDate(item.change.revisionDate, 'dash')}
             </span>
           </div>
         </div>

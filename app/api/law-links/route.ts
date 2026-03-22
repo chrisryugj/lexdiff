@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { load, type CheerioAPI, type Cheerio } from "cheerio"
 import type { Element } from "domhandler"
 import iconv from "iconv-lite"
+import { validateExternalUrl } from "@/lib/url-validator"
 
 function absUrl(href: string): string {
   try {
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
       }
       targetUrl = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(joLabel)}`
     }
-    if (!targetUrl.startsWith('https://www.law.go.kr')) {
+    if (!validateExternalUrl(targetUrl)) {
       return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
     }
 

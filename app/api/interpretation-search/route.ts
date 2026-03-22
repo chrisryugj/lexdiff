@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 
 export interface InterpretationSearchResult {
   id: string           // 법령해석례일련번호
@@ -109,10 +110,6 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    debugLogger.error("[interpretation-search] Error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "해석례 검색 중 오류 발생" },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "해석례 검색 중 오류 발생")
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 import { normalizeLawSearchText, resolveLawAlias } from "@/lib/search-normalizer"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
@@ -229,8 +230,6 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    debugLogger.error("Law search error:", error)
-    debugLogger.error("법령 검색 실패", error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
+    return safeErrorResponse(error, "법령 검색 실패")
   }
 }

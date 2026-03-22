@@ -127,8 +127,6 @@ export function useRelatedPrecedentCases({
           p.name === currentCaseName &&
           p.caseNumber !== currentCaseNumber
         )
-        console.log('[관련심급] 검색:', currentCaseName, '→', related.length, '건')
-
         // 선고일자 순 정렬 (오래된 것 먼저 = 1심부터)
         related.sort((a, b) => {
           const dateA = a.date?.replace(/[.\-]/g, '') || ''

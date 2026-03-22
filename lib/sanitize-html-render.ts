@@ -31,14 +31,13 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   '*': ['class'],
 }
 
-const ALLOWED_SCHEMES = ['http', 'https', 'javascript'] // javascript:void(0) for law-ref links
+const ALLOWED_SCHEMES = ['http', 'https']
 
 const sanitizeOptions: Parameters<typeof sanitizeHtml>[1] = {
   allowedTags: ALLOWED_TAGS,
   allowedAttributes: ALLOWED_ATTRIBUTES,
   allowedSchemes: ALLOWED_SCHEMES,
   allowedSchemesByTag: { a: ALLOWED_SCHEMES },
-  // javascript:void(0) 허용 (법령 링크 클릭 핸들러용)
   allowProtocolRelative: false,
 }
 

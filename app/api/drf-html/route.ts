@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { safeErrorResponse } from "@/lib/api-error"
 import { load, type CheerioAPI, type Cheerio } from "cheerio"
 import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
@@ -299,7 +300,6 @@ export async function GET(req: Request) {
     debugLogger.debug("[drf-html] content-type:", { ctype, len: bodyHtml.length, sanitized: safe.length })
     return NextResponse.json({ html: safe })
   } catch (e) {
-    debugLogger.error("[drf-html] error", e)
-    return NextResponse.json({ error: e instanceof Error ? e.message : "unknown" }, { status: 500 })
+    return safeErrorResponse(e, "법령 HTML 조회 실패", "drf-html")
   }
 }
