@@ -65,10 +65,17 @@ export const paginationSchema = z.object({
 })
 
 /**
- * RAG 요청 스키마
+ * RAG 요청 스키마 (fc-rag POST body)
  */
 export const ragRequestSchema = z.object({
-  query: searchQuerySchema,
+  query: z.string()
+    .min(1, 'Query is required')
+    .max(2000, 'Query too long (max 2000 chars)')
+    .transform(val => val.trim())
+    .transform(val => val.replace(/<[^>]*>/g, ''))
+    .transform(val => val.replace(/javascript:|data:|vbscript:/gi, '')),
+  conversationId: z.string().max(200).optional(),
+  preEvidence: z.string().max(5000).optional(),
   metadataFilter: z.string().optional(),
 })
 
@@ -89,6 +96,29 @@ export const comparisonRequestSchema = z.object({
   lawName: lawNameSchema,
   effectiveDate1: dateSchema.optional(),
   effectiveDate2: dateSchema.optional(),
+})
+
+/**
+ * 현행법령(eflaw) 조회 요청 스키마
+ * - lawId 또는 mst 중 하나 필수
+ */
+export const eflawRequestSchema = z.object({
+  lawId: z.string().max(100).optional(),
+  mst: z.string().max(20).optional(),
+  efYd: z.string().regex(/^\d{8}$/, '날짜는 YYYYMMDD 형식이어야 합니다').optional(),
+  jo: z.string().max(20).optional(),
+}).refine(data => data.lawId || data.mst, {
+  message: 'lawId 또는 mst가 필요합니다',
+})
+
+/**
+ * 법령 HTML 조회 요청 스키마
+ */
+export const lawHtmlRequestSchema = z.object({
+  url: z.string().max(2000).optional(),
+  lawName: z.string().max(200).optional(),
+  joLabel: z.string().max(100).optional(),
+  debug: z.enum(['0', '1']).optional(),
 })
 
 /**

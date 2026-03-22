@@ -6,6 +6,7 @@ import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 import { buildJO } from "@/lib/law-parser"
+import { LAW_GO_KR, toLawAbsoluteUrl } from "@/lib/law-constants"
 
 function ensureOc(url: string, oc: string): string {
   try {
@@ -21,17 +22,13 @@ function ensureOc(url: string, oc: string): string {
 
 function absUrl(href: string): string {
   try {
-    if (!href) return ""
-    if (href.startsWith("http")) return href
-    if (href.startsWith("//")) return `https:${href}`
-    if (href.startsWith("/")) return `https://www.law.go.kr${href}`
-    return `https://www.law.go.kr/${href.replace(/^\./, "")}`
+    return toLawAbsoluteUrl(href) || href
   } catch {
     return href
   }
 }
 
-const DRF_BASE = "https://www.law.go.kr/DRF/lawService.do"
+const DRF_BASE = LAW_GO_KR.DRF_LAW_SERVICE
 const OC = process.env.LAW_OC || ""
 
 function buildParams(params: Record<string, string | undefined>) {
@@ -177,7 +174,7 @@ function rewriteAnchors(
       // Try to extract viewer-relative URL from the handler, e.g. '/법령/국세징수법/제12조' or '/LSW/lsInfoP.do?...'
       const pathMatch = src.match(/['"](\/[^'"\s]+\.(?:do|jsp)(?:\?[^'"\s]*)?)['"]/i) || src.match(/['"](\/법령\/[^"]+)['"]/)
       if (pathMatch && pathMatch[1]) {
-        const abs = `https://www.law.go.kr${pathMatch[1]}`
+        const abs = `${LAW_GO_KR.BASE}${pathMatch[1]}`
         a.attr("href", abs).addClass("law-html-link").attr("data-href", abs)
         a.attr("target", "_blank").attr("rel", "noopener noreferrer")
         return

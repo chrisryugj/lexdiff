@@ -69,8 +69,8 @@ export function useRelatedPrecedentCases({
   }, [isPrecedent, actualArticles])
 
   // 의존성 안정화를 위한 값 추출
-  const currentCaseNumber = (meta as any).caseNumber as string | undefined
-  const currentCaseName = (meta as any).lawTitle as string | undefined
+  const currentCaseNumber = meta.caseNumber
+  const currentCaseName = meta.lawTitle
 
   // 관련 심급 검색 AbortController
   const relatedCasesAbortRef = useRef<AbortController | null>(null)

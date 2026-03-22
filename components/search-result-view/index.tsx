@@ -343,7 +343,7 @@ function SearchResultViewComponent({
           actions.updateProgress('searching', 20)
 
           // ✅ 통합검색 분기
-          const classification = (cached.query as any).classification
+          const classification = cached.query.classification
           if (classification && ['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
             // 판례/해석례/재결례는 handleSearchInternal 스킵하고 전용 핸들러 사용
             debugLogger.info('📡 캐시 복원: 전용 핸들러 실행', { searchType: classification.searchType })

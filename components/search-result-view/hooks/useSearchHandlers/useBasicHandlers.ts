@@ -240,7 +240,7 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
           jo: state.lawData.meta.lawTitle,
           oldContent: '',
           newContent: allContent,
-          effectiveDate: (state.lawData.meta as any).promulgationDate,
+          effectiveDate: state.lawData.meta.promulgationDate,
           isPrecedent: true,
         })
       } catch (error) {

@@ -40,6 +40,7 @@ export interface ParsedLaw {
 }
 
 import { extractContentFromHangArray, formatDate } from "./law-data-utils"
+import { LAW_GO_KR } from "./law-constants"
 
 /**
  * Detect law type from name
@@ -83,9 +84,9 @@ export function parseLawFromAPI(jsonData: any): ParsedLaw {
   // URL 생성: MST가 없으면 법령ID로 대체
   let url = ""
   if (mst) {
-    url = `https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=${mst}`
+    url = `${LAW_GO_KR.LSW_INFO}?lsiSeq=${mst}`
   } else if (lawId && lawId !== "unknown") {
-    url = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+    url = `${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}`
   }
 
   const metadata: ParsedLawMetadata = {
@@ -291,7 +292,7 @@ function generateMarkdown(metadata: ParsedLawMetadata, articles: ParsedLawArticl
  * Fetch law data from law.go.kr API
  */
 export async function fetchLawFromAPI(lawId: string, apiKey: string): Promise<any> {
-  const url = `https://www.law.go.kr/DRF/lawService.do?target=eflaw&OC=${apiKey}&type=JSON&ID=${lawId}`
+  const url = `${LAW_GO_KR.DRF_LAW_SERVICE}?target=eflaw&OC=${apiKey}&type=JSON&ID=${lawId}`
 
   const response = await fetch(url)
 
@@ -314,7 +315,7 @@ export async function fetchLawFromAPI(lawId: string, apiKey: string): Promise<an
  * Search law by name and return candidates
  */
 export async function searchLawByName(lawName: string, apiKey: string): Promise<any[]> {
-  const url = `https://www.law.go.kr/DRF/lawSearch.do?target=law&OC=${apiKey}&type=JSON&query=${encodeURIComponent(lawName)}`
+  const url = `${LAW_GO_KR.DRF_LAW_SEARCH}?target=law&OC=${apiKey}&type=JSON&query=${encodeURIComponent(lawName)}`
 
   const response = await fetch(url)
 

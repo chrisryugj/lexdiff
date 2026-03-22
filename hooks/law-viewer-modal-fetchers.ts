@@ -4,6 +4,7 @@ import { extractArticleText } from '@/lib/law-xml-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import { parseOrdinanceSearchXML } from '@/lib/ordin-search-parser'
 import { parseOrdinanceXML } from '@/lib/ordin-parser'
+import { LAW_GO_KR } from '@/lib/law-constants'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Types
@@ -163,8 +164,8 @@ function convertUnitToLawArticle(unit: RawUnit): LawArticle {
 
 /** 법제처 링크 폴백 HTML 생성 */
 function lawGoKrFallback(lawName: string, articleLabel: string, message: string, isOrdinance = false): string {
-  const path = isOrdinance ? '자치법규' : '법령'
-  const url = `https://www.law.go.kr/${path}/${encodeURIComponent(lawName)}${articleLabel ? `/${encodeURIComponent(articleLabel)}` : ''}`
+  const base = isOrdinance ? LAW_GO_KR.ORDINANCE_VIEW : LAW_GO_KR.LAW_VIEW
+  const url = `${base}/${encodeURIComponent(lawName)}${articleLabel ? `/${encodeURIComponent(articleLabel)}` : ''}`
   return `<div class="space-y-3"><p>${message}</p><div class="pt-3 border-t"><a href="${url}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${lawName} ${articleLabel} 보기 →</a></div></div>`
 }
 
@@ -364,7 +365,7 @@ export async function fetchOldLawArticle(
   if (!targetUnit) {
     return {
       title: `구 ${cleanedLawName} ${articleLabel || ''}`.trim(),
-      html: `<div class="space-y-3">${historyNotice}<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p></div>`,
+      html: `<div class="space-y-3">${historyNotice}<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p></div>`,
       lawName: cleanedLawName, articleNumber: articleLabel,
     }
   }
@@ -429,7 +430,7 @@ export async function fetchCurrentLawArticle(
   if (!targetUnit) {
     return {
       title: `${cleanedLawName} ${articleLabel || ''}`.trim(),
-      html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
+      html: `<p>해당 조문을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></p>`,
       lawName: cleanedLawName, articleNumber: articleLabel,
     }
   }

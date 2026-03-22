@@ -5,6 +5,8 @@ import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
 import iconv from "iconv-lite"
 import { validateExternalUrl } from "@/lib/url-validator"
+import { validate, lawHtmlRequestSchema, createErrorResponse } from "@/lib/api-validation"
+import { LAW_GO_KR, toLawAbsoluteUrl } from "@/lib/law-constants"
 
 /**
  * 개정 태그 키워드를 4가지 타입으로 분류
@@ -18,11 +20,7 @@ function getRevisionType(keyword: string): 'new' | 'edit' | 'delete' | 'etc' {
 
 function absUrl(href: string): string {
   try {
-    if (!href) return ""
-    if (/^https?:/i.test(href)) return href
-    if (href.startsWith("//")) return `https:${href}`
-    if (href.startsWith("/")) return `https://www.law.go.kr${href}`
-    return `https://www.law.go.kr/${href.replace(/^\./, "")}`
+    return toLawAbsoluteUrl(href) || href
   } catch {
     return href
   }
@@ -96,7 +94,7 @@ function rewriteAnchorsKeepHref(fragmentHtml: string): string {
     const onclick = (a.attr("onclick") || "").toString()
     if (/^javascript\s*:\s*;?$/i.test(href) || /#AJAX/i.test(href)) {
       const mPath = onclick.match(/['"](\/[^'"\s]+\.(?:do|jsp)(?:\?[^'"\s]*)?)['"]/i) || onclick.match(/['"](\/법령\/[^"]+)['"]/)
-      if (mPath && mPath[1]) href = `https://www.law.go.kr${mPath[1]}`
+      if (mPath && mPath[1]) href = `${LAW_GO_KR.BASE}${mPath[1]}`
     }
     const abs = absUrl(href)
     if (abs) {
@@ -111,26 +109,35 @@ function rewriteAnchorsKeepHref(fragmentHtml: string): string {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const urlParam = searchParams.get("url") || ""
-  const lawName = searchParams.get("lawName") || ""
-  const joLabel = searchParams.get("joLabel") || ""
-  const debug = searchParams.get("debug") === "1"
+
+  const rawParams = {
+    url: searchParams.get("url") || undefined,
+    lawName: searchParams.get("lawName") || undefined,
+    joLabel: searchParams.get("joLabel") || undefined,
+    debug: searchParams.get("debug") || undefined,
+  }
+
+  const validation = validate(lawHtmlRequestSchema, rawParams)
+  if (!validation.success) {
+    return createErrorResponse(validation.error, 400)
+  }
+
+  const urlParam = validation.data.url || ""
+  const lawName = validation.data.lawName || ""
+  const joLabel = validation.data.joLabel || ""
+  const debug = validation.data.debug === "1"
 
   try {
     let targetUrl = urlParam
     if (!targetUrl) {
       if (!lawName || !joLabel) {
-        return NextResponse.json({ error: "lawName 또는 url이 필요합니다." }, { status: 400 })
+        return createErrorResponse("lawName 또는 url이 필요합니다.", 400)
       }
-      targetUrl = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(joLabel)}`
+      targetUrl = `${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}/${encodeURIComponent(joLabel)}`
     }
 
     // 상대 경로는 law.go.kr 기준으로 절대 URL 변환
-    if (targetUrl.startsWith('/')) {
-      targetUrl = `https://www.law.go.kr${targetUrl}`
-    } else if (targetUrl.startsWith('//')) {
-      targetUrl = `https:${targetUrl}`
-    }
+    targetUrl = toLawAbsoluteUrl(targetUrl)
 
     // If the incoming URL is a DRF endpoint, ensure OC is present
     try {

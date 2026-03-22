@@ -101,7 +101,7 @@ function removeParentheses(nodes: React.ReactNode[]): React.ReactNode[] {
       return React.cloneElement(node, {
         ...props,
         children: newChildren
-      } as any)
+      } as React.Attributes & { children?: React.ReactNode })
     }
     return node
   })
@@ -121,7 +121,7 @@ function removePartialQuoteText(nodes: React.ReactNode[]): React.ReactNode[] {
       return React.cloneElement(node, {
         ...props,
         children: newChildren
-      } as any)
+      } as React.Attributes & { children?: React.ReactNode })
     }
     return node
   })
@@ -155,7 +155,7 @@ function replaceOmittedWithBadge(nodes: React.ReactNode[]): React.ReactNode[] {
       return React.cloneElement(node, {
         ...props,
         children: newChildren
-      } as any)
+      } as React.Attributes & { children?: React.ReactNode })
     }
     return node
   })

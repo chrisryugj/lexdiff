@@ -231,7 +231,8 @@ async function fetchAnnexesFromApi(
 
   switch (lawType) {
     case 'ordinance': {
-      const rows: OrdinanceAnnexRow[] = ensureArray((searchResult as any).ordinbyl)
+      const licResult = rawData.licBylSearch
+      const rows: OrdinanceAnnexRow[] = ensureArray(licResult?.ordinbyl)
       return rows.map((row) => ({
         annexId: row.별표일련번호 || "",
         annexNumber: row.별표번호 || "",
@@ -248,7 +249,8 @@ async function fetchAnnexesFromApi(
     }
 
     case 'admin': {
-      const rows: AdminRuleAnnexRow[] = ensureArray((searchResult as any).admbyl)
+      const admResult = rawData.admRulBylSearch
+      const rows: AdminRuleAnnexRow[] = ensureArray(admResult?.admbyl)
       return rows.map((row) => ({
         annexId: row.별표일련번호 || "",
         annexNumber: row.별표번호 || "",
@@ -264,7 +266,8 @@ async function fetchAnnexesFromApi(
     }
 
     default: {
-      const rows: LawApiAnnexRow[] = ensureArray((searchResult as any).licbyl)
+      const licResult = rawData.licBylSearch
+      const rows: LawApiAnnexRow[] = ensureArray(licResult?.licbyl)
       return rows.map((row) => ({
         annexId: row.별표일련번호 || "",
         annexNumber: row.별표번호 || "",

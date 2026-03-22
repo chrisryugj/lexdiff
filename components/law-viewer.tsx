@@ -34,56 +34,54 @@ import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerHeader, LawViewerMainContent, LawViewerProvider, type LawViewerContextValue } from "@/components/law-viewer/index"
 
-interface LawViewerProps {
+// ── Props 그루핑 ──
+
+interface LawViewerCoreProps {
   meta?: LawMeta
   articles?: LawArticle[]
   selectedJo?: string
-  onCompare?: (jo: string) => void
-  onSummarize?: (jo: string) => void
-  onToggleFavorite?: (jo: string) => void
   favorites: Set<string>
   isOrdinance: boolean
   viewMode: "single" | "full"
+  isPrecedent?: boolean
+  onRefresh?: () => void
+  onCompare?: (jo: string) => void
+  onSummarize?: (jo: string) => void
+  onToggleFavorite?: (jo: string) => void
+  onAiQuery?: (query: string, preEvidence?: string) => void
+}
 
-  // AI 답변 모드 (Real-time Legal AI)
+interface LawViewerAIProps {
   aiAnswerMode?: boolean
   aiAnswerContent?: string
   relatedArticles?: ParsedRelatedLaw[]
   onRelatedArticleClick?: (lawName: string, jo: string, article: string) => void
-  fileSearchFailed?: boolean  // 검색 실패 여부
-  aiCitations?: VerifiedCitation[]  // ✅ 검증된 인용 목록
-  userQuery?: string   // 사용자 질의
-  aiConfidenceLevel?: 'high' | 'medium' | 'low'  // AI 신뢰도
-  aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'  // ✅ 8가지 법률 질문 유형
-  aiIsTruncated?: boolean  // ✅ Phase 7: 답변 잘림 여부
-  onAiRefresh?: () => void  // ✅ AI 답변 강제 새로고침 (캐시 무시)
-
+  fileSearchFailed?: boolean
+  aiCitations?: VerifiedCitation[]
+  userQuery?: string
+  aiConfidenceLevel?: 'high' | 'medium' | 'low'
+  aiQueryType?: 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'
+  aiIsTruncated?: boolean
+  onAiRefresh?: () => void
   // SSE 스트리밍
   isStreaming?: boolean
   searchProgress?: number
   toolCallLogs?: import("@/components/search-result-view/types").ToolCallLogEntry[]
-
   // 연속 대화
   conversationHistory?: import("@/components/search-result-view/types").ConversationEntry[]
   onFollowUp?: (query: string) => void
   onNewConversation?: () => void
+}
 
-  // ✅ 판례 모드
-  isPrecedent?: boolean  // 판례 뷰 여부
-
-  // ✅ 강제 새로고침 (법령/판례 뷰용)
-  onRefresh?: () => void
-
-  // 📊 분석 도구 콜백
+interface LawViewerAnalysisProps {
   onDelegationGap?: (meta: LawMeta) => void
   onTimeMachine?: (meta: LawMeta) => void
   onImpactTracker?: (lawName: string) => void
   onOrdinanceSync?: (lawName: string) => void
   onOrdinanceBenchmark?: (lawName: string) => void
-
-  // AI 추천 질의 (조문 화면에서 AI 검색 시작)
-  onAiQuery?: (query: string, preEvidence?: string) => void
 }
+
+type LawViewerProps = LawViewerCoreProps & LawViewerAIProps & LawViewerAnalysisProps
 
 function LawViewerComponent({
   meta = { lawTitle: '', fetchedAt: new Date().toISOString() },
@@ -183,7 +181,7 @@ function LawViewerComponent({
           jo,
           title,  // ✅ 조문 제목 (보완 포함)
           display: `${citation.lawName} ${citation.articleNum}`,
-          source: 'citation' as any,  // ✅ Citations 전용 source (기존 'excerpt' | 'related'과 별개)
+          source: 'citation',  // ✅ Citations 전용 source (기존 'excerpt' | 'related'과 별개)
           fullText: citation.text
         }
       })
@@ -596,7 +594,7 @@ function LawViewerComponent({
     // 판례 모드: 사건번호로 검색 링크 생성
     if (isPrecedent) {
       // meta.caseNumber가 있으면 사건번호로 검색, 없으면 사건명으로 검색
-      const caseNumber = (meta as any).caseNumber
+      const caseNumber = meta.caseNumber
       const searchQuery = caseNumber || lawTitle
       const url = `https://www.law.go.kr/precSc.do?menuId=7&subMenuId=47&tabMenuId=213&query=${encodeURIComponent(searchQuery)}`
       window.open(url, "_blank", "noopener,noreferrer")

@@ -347,56 +347,24 @@ const [highlightedText, setHighlightedText] = useState<string>()
 
 ---
 
-### 4. **AIAnswerView** (280줄)
+### 4. **AI 답변 뷰** (3파일로 분리 완료, 2026-03 3차 코드리뷰)
 
-**책임**: AI 답변 및 관련 법령 표시
+**현재 구조** (1170줄 → 3파일):
+| 파일 | 줄 수 | 역할 |
+|------|-------|------|
+| `components/law-viewer-ai-answer.tsx` | 749 | AIAnswerContent 메인 컴포넌트 |
+| `components/ai-answer-sidebar.tsx` | 272 | AIAnswerSidebar (관련 법령 사이드바) |
+| `components/ai-step-timeline.tsx` | 133 | AiStepTimeline (도구 호출 진행상황) |
 
-**Props** (7개):
+**Props**: LawViewerProps가 3개 서브인터페이스로 분리됨
 ```typescript
-interface AIAnswerViewProps {
-  aiAnswer: AIAnswerData  // ← 7개 props를 1개 interface로 통합
-  fontSize: number
-  onCitationClick: (citation: Citation) => void
-  onRelatedLawClick: (lawName: string, article: string) => void
-  comparisonLaw?: ComparisonLawData  // ← Optional
-}
-
-interface AIAnswerData {
-  content: string
-  citations: Citation[]
-  relatedArticles: ParsedRelatedLaw[]
-  userQuery: string
-  failed: boolean
-}
-
-interface ComparisonLawData {
-  meta: LawMeta
-  articles: LawArticle[]
-  selectedJo: string
-  isLoading: boolean
-}
+interface LawViewerCoreProps { meta, articles, selectedJo, viewMode, ... }
+interface LawViewerAIProps { aiAnswerMode, aiAnswerContent, relatedArticles, ... }
+interface LawViewerAnalysisProps { comparisonLawMeta, comparisonLawArticles, ... }
+type LawViewerProps = LawViewerCoreProps & LawViewerAIProps & LawViewerAnalysisProps
 ```
 
-**State** (3개):
-```typescript
-const [activeTab, setActiveTab] = useState<"answer" | "citations">()
-const [expandedCitations, setExpandedCitations] = useState<Set<number>>()
-const [comparisonMode, setComparisonMode] = useState<boolean>()
-```
-
-**레이아웃**:
-```tsx
-{comparisonLaw ? (
-  <div className="grid grid-cols-2 gap-4">
-    <AIAnswerPanel content={aiAnswer.content} />
-    <ComparisonLawPanel law={comparisonLaw} />
-  </div>
-) : (
-  <AIAnswerPanel content={aiAnswer.content} citations={aiAnswer.citations} />
-)}
-```
-
-**파일 위치**: `components/law-viewer/AIAnswerView.tsx`
+**파일 위치**: `components/law-viewer-ai-answer.tsx`, `components/ai-answer-sidebar.tsx`, `components/ai-step-timeline.tsx`
 
 ---
 
@@ -881,5 +849,6 @@ describe('useArticleNavigation', () => {
 ---
 
 **작성자**: BMAD Architect Agent
+**최종 업데이트**: 2026-03-22 (3차 코드리뷰 AI 답변 컴포넌트 분리 반영)
 **검토 요청**: LexDiff 개발팀
 **다음 문서**: `docs/scrum-stories-law-viewer.md` (Scrum Master 작성 예정)

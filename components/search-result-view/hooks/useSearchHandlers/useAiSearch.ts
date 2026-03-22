@@ -12,6 +12,8 @@ import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from 
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
 
+type AiQueryType = 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'
+
 let logIdCounter = 0
 
 export function useAiSearch(deps: HandlerDeps) {
@@ -142,7 +144,7 @@ export function useAiSearch(deps: HandlerDeps) {
       actions.setAiAnswerContent(cached.response)
       actions.setAiRelatedLaws(relatedLaws)
       actions.setAiCitations(cached.citations || [])
-      actions.setAiQueryType((cached.queryType || 'application') as any)
+      actions.setAiQueryType((cached.queryType || 'application') as AiQueryType)
       actions.setFileSearchFailed(false)
       const aiLawData: LawDataState = {
         meta: {
@@ -387,7 +389,7 @@ export function useAiSearch(deps: HandlerDeps) {
           actions.setAiAnswerContent(processedContent)
           actions.setAiRelatedLaws(relatedLaws)
           actions.setAiCitations(data.citations || [])
-          actions.setAiQueryType((data.queryType || 'application') as any)
+          actions.setAiQueryType((data.queryType || 'application') as AiQueryType)
           actions.setAiConfidenceLevel(data.confidenceLevel || 'high')
           actions.setAiIsTruncated(data.isTruncated || false)
           actions.updateProgress('complete', 100)

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
+import { validate, eflawRequestSchema, createErrorResponse } from "@/lib/api-validation"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -23,19 +24,25 @@ function normalizeDateFormat(dateStr: string | null): string {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const lawId = searchParams.get("lawId")
-  const mst = searchParams.get("mst")
-  const efYd = searchParams.get("efYd")
-  const jo = searchParams.get("jo")
 
   if (!OC) {
     debugLogger.error("LAW_OC 환경변수가 설정되지 않았습니다")
     return NextResponse.json({ error: "API 키가 설정되지 않았습니다" }, { status: 500 })
   }
 
-  if (!lawId && !mst) {
-    return NextResponse.json({ error: "lawId 또는 mst가 필요합니다" }, { status: 400 })
+  const rawParams = {
+    lawId: searchParams.get("lawId") || undefined,
+    mst: searchParams.get("mst") || undefined,
+    efYd: searchParams.get("efYd") || undefined,
+    jo: searchParams.get("jo") || undefined,
   }
+
+  const validation = validate(eflawRequestSchema, rawParams)
+  if (!validation.success) {
+    return createErrorResponse(validation.error, 400)
+  }
+
+  const { lawId, mst, efYd, jo } = validation.data
 
   try {
     const params = new URLSearchParams({

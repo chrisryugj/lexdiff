@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { formatJO } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
+import { LAW_GO_KR } from '@/lib/law-constants'
 import {
   fetchOrdinanceArticle,
   fetchOldLawArticle,
@@ -113,7 +114,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           setRefModal({
             open: true,
             title: `${cleanedLawName} ${articleLabel}`,
-            html: `<div class="space-y-3"><p>자치법규 조회 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/자치법규/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 보기 →</a></div></div>`,
+            html: `<div class="space-y-3"><p>자치법규 조회 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.ORDINANCE_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 보기 →</a></div></div>`,
             lawName: cleanedLawName,
             articleNumber: articleLabel,
           })
@@ -128,7 +129,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: cleanedLawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
         })
         return
       }
@@ -161,7 +162,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: `${cleanedLawName} ${articleLabel}`,
-          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
+          html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
         })
       }
     } catch (err) {
@@ -169,7 +170,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       setRefModal({
         open: true,
         title: `${cleanedLawName} ${articleLabel}`,
-        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
+        html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
       })
     }
   }
@@ -183,7 +184,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: `${meta.lawTitle} ${kindLabel}`,
-          html: `<p>관련 법령 정보를 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+          html: `<p>관련 법령 정보를 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.BASE}/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
         return
       }
@@ -202,7 +203,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: `${meta.lawTitle} ${kindLabel}`,
-          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
         return
       }
@@ -213,7 +214,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: `${meta.lawTitle} ${kindLabel}`,
-          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+          html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
         return
       }
@@ -231,13 +232,13 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       setRefModal({
         open: true,
         title: relatedLaw.lawName,
-        html: `<div class="space-y-3"><p>해당 ${kindLabel}을 찾았습니다.</p><p class="text-sm"><strong>${relatedLaw.lawName}</strong></p><div class="flex gap-2 mt-4"><a href="https://www.law.go.kr/법령/${encodeURIComponent(relatedLaw.lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 전문 보기</a></div></div>`,
+        html: `<div class="space-y-3"><p>해당 ${kindLabel}을 찾았습니다.</p><p class="text-sm"><strong>${relatedLaw.lawName}</strong></p><div class="flex gap-2 mt-4"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(relatedLaw.lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 전문 보기</a></div></div>`,
       })
     } catch {
       setRefModal({
         open: true,
         title: `${meta.lawTitle} ${kindLabel}`,
-        html: `<p>${kindLabel} 조회 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
+        html: `<p>${kindLabel} 조회 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.BASE}/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
       })
     }
   }
@@ -254,7 +255,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
           forceWhiteTheme: true,
         })
         return
@@ -277,7 +278,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         setRefModal({
           open: true,
           title: lawName,
-          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+          html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
           forceWhiteTheme: true,
         })
         return
@@ -313,14 +314,14 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         }
       }
 
-      html += `<div class="pt-2 border-t"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기 →</a></div></div>`
+      html += `<div class="pt-2 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기 →</a></div></div>`
 
       setRefModal({ open: true, title: `${lawName} 체계도`, html, forceWhiteTheme: true })
     } catch {
       setRefModal({
         open: true,
         title: lawName,
-        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="https://www.law.go.kr/법령/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
+        html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
         forceWhiteTheme: true,
       })
     }

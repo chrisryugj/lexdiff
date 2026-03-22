@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
 import { normalizeLawSearchText, resolveLawAlias } from "@/lib/search-normalizer"
+import { validate, searchQuerySchema, createErrorResponse } from "@/lib/api-validation"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
@@ -62,10 +63,15 @@ export async function GET(request: Request) {
   const rawQuery = searchParams.get("query")
 
   if (!rawQuery) {
-    return NextResponse.json({ error: "검색어가 필요합니다" }, { status: 400 })
+    return createErrorResponse("검색어가 필요합니다", 400)
   }
 
-  const normalizedQuery = normalizeLawSearchText(rawQuery)
+  const queryValidation = validate(searchQuerySchema, rawQuery)
+  if (!queryValidation.success) {
+    return createErrorResponse(queryValidation.error, 400)
+  }
+
+  const normalizedQuery = normalizeLawSearchText(queryValidation.data)
   const aliasResolution = resolveLawAlias(normalizedQuery)
   const query = aliasResolution.canonical
 

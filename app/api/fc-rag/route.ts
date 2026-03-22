@@ -25,6 +25,7 @@ import {
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
 import { getClientIP } from "@/lib/get-client-ip"
+import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
 
 function convertForVerification(fcCitations: FCRAGCitation[]): {
   verifiable: Citation[]
@@ -65,26 +66,19 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "API key format is invalid." }, { status: 400 })
   }
 
-  let query: string
-  let conversationId: string | undefined
-  let preEvidence: string | undefined
-
+  let body: unknown
   try {
-    const body = await request.json()
-    query = body.query
-    conversationId = body.conversationId || undefined
-    preEvidence = typeof body.preEvidence === 'string' ? body.preEvidence.slice(0, 5000) : undefined
+    body = await request.json()
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
+    return createErrorResponse("Invalid JSON body", 400)
   }
 
-  if (!query || typeof query !== "string") {
-    return Response.json({ error: "Query is required" }, { status: 400 })
+  const validation = validate(ragRequestSchema, body)
+  if (!validation.success) {
+    return createErrorResponse(validation.error, 400)
   }
 
-  if (query.length > 2000) {
-    return Response.json({ error: "Query too long (max 2000 chars)" }, { status: 400 })
-  }
+  const { query, conversationId, preEvidence } = validation.data
 
   let usageHeaders: Record<string, string> | undefined
   if (!userApiKey) {

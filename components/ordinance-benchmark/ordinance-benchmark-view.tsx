@@ -240,7 +240,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         const html = parsed.articles.map(a => {
           const titlePart = a.title ? ` (${a.title})` : ''
           const header = `<div class="font-semibold text-primary mb-1">${a.joNum}${titlePart}</div>`
-          const content = extractArticleText(a as any, true, cleanedName)
+          const content = extractArticleText(a, true, cleanedName)
           return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed">${content}</div></div>`
         }).join('')
         setModalHtml(`<div class="space-y-2">${html}</div>`)

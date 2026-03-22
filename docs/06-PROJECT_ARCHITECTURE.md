@@ -423,6 +423,16 @@ lib/
 │   ├── file-search-client.ts (581줄) - Gemini File Search
 │   └── embedding.ts (424줄) - Voyage AI
 │
+├── 🟠 링크 생성 (2026-03 3차 리뷰에서 분리)
+│   ├── unified-link-generator.ts (207줄) — 메인 generateLinks + re-exports
+│   ├── link-pattern-matchers.ts (641줄) — 9개 패턴 수집 함수
+│   └── link-specialized.ts (365줄) — linkifyRefsB/AI/Markdown
+│
+├── 🟠 질의 확장 (2026-03 3차 리뷰에서 분리)
+│   ├── query-expansion.ts (364줄) — 핵심 확장 로직 + re-exports
+│   ├── query-expansion-data.ts (655줄) — 동의어/용어 인덱스 데이터
+│   └── ordinance-search-strategy.ts (156줄) — 조례 검색 전략
+│
 ├── 🔴 Database (2개)
 │   ├── db.ts (Turso DB - 비활성화)
 │   └── db-local.ts (SQLite local)
@@ -433,7 +443,23 @@ lib/
 │   ├── rag-session-store.ts (245줄)
 │   └── search-result-store.ts (265줄) - IndexedDB
 │
-├── 🟤 RAG (3개)
+├── 🟤 FC-RAG (`lib/fc-rag/`, 2026-03 3차 리뷰에서 분리)
+│   ├── engine.ts (64줄) — re-export 허브 + executeRAG
+│   ├── engine-shared.ts (326줄) — 타입, 설정, 대화 컨텍스트, Fast Path, 질의 분류
+│   ├── claude-engine.ts (218줄) — Claude Primary 엔진
+│   ├── gemini-engine.ts (547줄) — Gemini Fallback 엔진
+│   ├── tool-adapter.ts (173줄) — 선언 변환 + 실행
+│   ├── tool-registry.ts (216줄) — 57개 도구 정의 + API 클라이언트
+│   ├── tool-cache.ts (205줄) — 캐시 인프라 + 결과 압축
+│   ├── anthropic-client.ts — Claude CLI subprocess (stream-json)
+│   ├── fast-path.ts — 단순 패턴 LLM 바이패스
+│   ├── prompts.ts — 시스템 프롬프트
+│   ├── tool-tiers.ts — 도메인 감지 + 도구 선택
+│   ├── quality-evaluator.ts — 응답 품질 평가
+│   ├── citations.ts — 인용 처리
+│   └── result-utils.ts — 결과 유틸리티
+│
+├── 🟤 RAG (레거시, 3개)
 │   ├── rag-content-filter.ts (240줄)
 │   ├── rag-data-collector.ts (287줄)
 │   └── rag-session-store.ts (245줄)
@@ -909,5 +935,5 @@ function FullArticleList({ articles }: { articles: LawArticle[] }) {
 ---
 
 **작성자**: BMAD Architect Agent
-**문서 버전**: 1.0
-**최종 업데이트**: 2025-11-19
+**문서 버전**: 1.1 (3차 코드리뷰 반영)
+**최종 업데이트**: 2026-03-22

@@ -21,6 +21,18 @@ export interface SearchResultCache {
     lawName: string
     article?: string
     jo?: string
+    classification?: {
+      searchType: string
+      confidence: number
+      secondaryTypes?: string[]
+      entities?: {
+        lawName?: string
+        caseNumber?: string
+        court?: string
+        ruleType?: string
+        rulingNumber?: string
+      }
+    }
   }
   lawData?: {
     meta: {

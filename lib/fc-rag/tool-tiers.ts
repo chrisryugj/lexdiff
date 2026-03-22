@@ -145,7 +145,7 @@ export function selectToolsForQuery(query: string): string[] {
     if (tools.has(chain)) {
       for (const basic of covered) {
         // TIER_0 도구는 초기 선택 시점에서는 제거하지 않음 (런타임 중복 방지는 engine.ts에서 처리)
-        if (!TIER_0.includes(basic as any)) {
+        if (!(TIER_0 as readonly string[]).includes(basic)) {
           tools.delete(basic)
         }
       }

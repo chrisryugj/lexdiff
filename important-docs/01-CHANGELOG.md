@@ -4,6 +4,33 @@
 
 ---
 
+## 2026-03-22: 3차 코드리뷰 — 대형 파일 5개 → 17개 모듈 분리
+
+### 모듈 분리 (5 → 17 파일)
+
+| 원본 | 줄 수 | 분리 결과 |
+|------|-------|-----------|
+| `engine.ts` | 1095 | `engine.ts` (64, re-export), `engine-shared.ts` (326, 타입/설정/분류), `claude-engine.ts` (218, Claude Primary), `gemini-engine.ts` (547, Gemini Fallback) |
+| `tool-adapter.ts` | 1003 | `tool-adapter.ts` (173, 선언+실행), `tool-registry.ts` (216, 57개 도구 정의), `tool-cache.ts` (205, 캐시+압축) |
+| `law-viewer-ai-answer.tsx` | 1170 | `law-viewer-ai-answer.tsx` (749, AIAnswerContent), `ai-answer-sidebar.tsx` (272, AIAnswerSidebar), `ai-step-timeline.tsx` (133, AiStepTimeline) |
+| `unified-link-generator.ts` | 1158 | `unified-link-generator.ts` (207, 메인+re-exports), `link-pattern-matchers.ts` (641, 9개 패턴), `link-specialized.ts` (365, linkifyRefs) |
+| `query-expansion.ts` | 1134 | `query-expansion.ts` (364, 핵심 로직), `query-expansion-data.ts` (655, 동의어/인덱스), `ordinance-search-strategy.ts` (156, 조례 전략) |
+
+### 타입 안전성 강화
+
+- `as any` 26회 → 9회 제거
+- `lib/law-constants.ts` 신규 — law.go.kr URL 상수 중앙화
+- `lib/api-validation.ts` — Zod 스키마 3개 추가 (eflawRequest, lawHtmlRequest, ragRequest 확장)
+- `components/law-viewer.tsx` — LawViewerProps → 3개 서브인터페이스 (Core/AI/Analysis) 분리
+- Zod 스키마 4개 API 라우트 적용 (fc-rag, law-search, eflaw, law-html)
+
+### 영향
+
+- 1,200줄 초과 파일 0개 (기준 준수)
+- 모든 re-export 허브가 기존 import 경로 유지 → 외부 호출 코드 변경 없음
+
+---
+
 ## 2025-12-20: 법률 데이터 API 시스템 + 12월 종합 개선
 
 ### korean-law-mcp 기능 도입 (9개 API)
