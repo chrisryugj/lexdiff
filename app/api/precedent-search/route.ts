@@ -6,7 +6,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
-import { parsePrecedentSearchXML, type PrecedentSearchResult } from "@/lib/precedent-parser"
+import { parsePrecedentSearchXML } from "@/lib/precedent-parser"
+import { extractRelationsFromPrecedents } from "@/lib/relation-graph/extractors/precedent-extractor"
+import { storeRelationsAsync } from "@/lib/relation-graph/relation-db"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -16,6 +18,10 @@ export async function GET(request: NextRequest) {
   const display = searchParams.get("display") || "20"
   const page = searchParams.get("page") || "1"
   const sort = searchParams.get("sort")
+  // 관계 그래프 적재용 (옵셔널)
+  const lawId = searchParams.get("lawId")
+  const lawTitle = searchParams.get("lawTitle")
+  const article = searchParams.get("article")
 
   if (!query && !caseNumber) {
     return NextResponse.json(
@@ -112,6 +118,12 @@ export async function GET(request: NextRequest) {
 
     // ✅ 연도 필터링 제거 - 서버 사이드로 이동 (API query에 연도 포함)
     // 이제 API가 직접 연도로 필터링하므로 클라이언트 필터링 불필요
+
+    // 관계 그래프 적재 (fire-and-forget)
+    if (lawId && lawTitle && article && precedents.length > 0) {
+      const relations = extractRelationsFromPrecedents(lawId, lawTitle, article, precedents)
+      storeRelationsAsync(relations)
+    }
 
     return NextResponse.json({
       totalCount,

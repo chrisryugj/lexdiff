@@ -50,6 +50,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-visually-hidden": "^1.2.4",
+    "@supabase/supabase-js": "^2.99.3",
     "@tanstack/react-virtual": "^3.13.12",
     "@vercel/analytics": "^1.5.0",
     "@xmldom/xmldom": "^0.8.11",

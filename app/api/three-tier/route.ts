@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { parseThreeTierDelegation } from "@/lib/three-tier-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
+import { extractRelationsFromThreeTier } from "@/lib/relation-graph/extractors/three-tier-extractor"
+import { storeRelationsAsync } from "@/lib/relation-graph/relation-db"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawService.do"
 const OC = process.env.LAW_OC || ""
@@ -69,6 +71,15 @@ export async function GET(request: Request) {
     debugLogger.success("3단비교 데이터 파싱 완료", {
       delegationArticles: delegationData.articles.length,
     })
+
+    // 관계 그래프 적재 (fire-and-forget, 응답 속도 영향 없음)
+    const sourceLawId = mst || delegationData.meta.lawId || lawId || ""
+    if (sourceLawId) {
+      const relations = extractRelationsFromThreeTier(
+        sourceLawId, delegationData.meta.lawName, delegationData,
+      )
+      storeRelationsAsync(relations)
+    }
 
     return NextResponse.json(
       {

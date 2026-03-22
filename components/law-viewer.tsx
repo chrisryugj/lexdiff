@@ -33,6 +33,7 @@ import { useRelatedPrecedentCases } from "@/hooks/use-related-precedent-cases"
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerHeader, LawViewerMainContent, LawViewerProvider, type LawViewerContextValue } from "@/components/law-viewer/index"
+import { ImpactAnalysisPanel } from "@/components/law-viewer/impact-analysis-panel"
 
 // ── Props 그루핑 ──
 
@@ -139,6 +140,7 @@ function LawViewerComponent({
   const contentRef = useRef<HTMLDivElement>(null)
   const [revisionHistory, setRevisionHistory] = useState<any[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [showImpactAnalysis, setShowImpactAnalysis] = useState(false)
 
   // Swipe tutorial and hints
   const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
@@ -752,7 +754,7 @@ function LawViewerComponent({
     onRefresh,
     onDelegationGap,
     onTimeMachine,
-    onImpactTracker,
+    onImpactTracker: () => setShowImpactAnalysis(prev => !prev),
     onOrdinanceSync,
     onOrdinanceBenchmark,
     openLawCenter,
@@ -760,7 +762,7 @@ function LawViewerComponent({
   }), [
     meta, isPrecedent, isOrdinance, aiAnswerMode, viewMode,
     fontSize, favorites, onToggleFavorite, onCompare, onSummarize, onRefresh,
-    onDelegationGap, onTimeMachine, onImpactTracker, onOrdinanceSync, onOrdinanceBenchmark,
+    onDelegationGap, onTimeMachine, onOrdinanceSync, onOrdinanceBenchmark,
     openLawCenter, formatSimpleJo,
   ])
 
@@ -911,6 +913,16 @@ function LawViewerComponent({
             <LawViewerOrdinanceActions
               actualArticles={actualArticles}
             />
+
+            {/* 영향 분석 패널 */}
+            {showImpactAnalysis && (
+              <ImpactAnalysisPanel
+                lawId={meta?.mst || meta?.lawId}
+                jo={activeArticle?.jo}
+                lawTitle={meta?.lawTitle}
+                onClose={() => setShowImpactAnalysis(false)}
+              />
+            )}
 
             <LawViewerMainContent
               contentRef={contentRef}
