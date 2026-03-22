@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
   traceLogger.startTrace(traceId, query)
 
   const encoder = new TextEncoder()
+  const abortController = new AbortController()
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -152,6 +153,9 @@ export async function POST(request: NextRequest) {
         send(data)
       }
 
+      // request.signal + cancel() 양쪽 모두 반응하는 합성 signal
+        const combinedSignal = AbortSignal.any([request.signal, abortController.signal])
+
       try {
         let handled = false
         let source: 'claude' | 'gemini' = 'gemini'
@@ -189,7 +193,7 @@ export async function POST(request: NextRequest) {
             }
 
             const success = await fetchFromOpenClaw(query, wrappedSend, {
-              abortSignal: request.signal,
+              abortSignal: combinedSignal,
               conversationId,
               preEvidence,
             })
@@ -210,7 +214,7 @@ export async function POST(request: NextRequest) {
               let errorMessage = ''
 
               for await (const event of executeClaudeRAGStream(query, {
-                signal: request.signal,
+                signal: combinedSignal,
                 conversationId,
                 preEvidence,
               })) {
@@ -284,7 +288,7 @@ export async function POST(request: NextRequest) {
 
           for await (const event of executeGeminiRAGStream(query, {
             apiKey: userApiKey,
-            signal: request.signal,
+            signal: combinedSignal,
             conversationId,
             preEvidence,
           })) {
@@ -386,6 +390,9 @@ export async function POST(request: NextRequest) {
       } finally {
         controller.close()
       }
+    },
+    cancel() {
+      abortController.abort()
     },
   })
 

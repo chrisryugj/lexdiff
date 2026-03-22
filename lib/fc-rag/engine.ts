@@ -32,6 +32,7 @@ interface ConversationEntry { query: string; answer: string }
 const conversationStore = new Map<string, ConversationEntry[]>()
 const CONV_MAX_ENTRIES = 5
 const CONV_MAX_AGE_MS = 30 * 60_000 // 30분
+const CONV_MAX_SIZE = 500 // Map 크기 상한 (메모리 보호)
 const conversationTimestamps = new Map<string, number>()
 
 function getConversationContext(conversationId?: string): string {
@@ -52,6 +53,17 @@ function storeConversation(conversationId: string | undefined, query: string, an
       conversationStore.delete(id)
       conversationTimestamps.delete(id)
     }
+  }
+  // 크기 상한 초과 시 가장 오래된 엔트리 LRU 삭제
+  while (conversationStore.size >= CONV_MAX_SIZE) {
+    let oldestId: string | null = null
+    let oldestTs = Infinity
+    for (const [id, ts] of conversationTimestamps) {
+      if (ts < oldestTs) { oldestTs = ts; oldestId = id }
+    }
+    if (!oldestId) break
+    conversationStore.delete(oldestId)
+    conversationTimestamps.delete(oldestId)
   }
   const entries = conversationStore.get(conversationId) || []
   entries.push({ query, answer: answer.slice(0, 2000) })

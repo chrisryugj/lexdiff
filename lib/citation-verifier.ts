@@ -226,8 +226,8 @@ async function checkArticleExists(
       return false
     }
 
-    // ✅ lawId는 법령ID이므로 ID 파라미터 사용 (MST 아님!)
-    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${LAW_OC}&target=law&type=JSON&ID=${lawId}`
+    // ✅ XML 경량 파싱으로 전환 — 대형 법령(민법 등) JSON 전체 로드 시 OOM 위험 방지
+    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${LAW_OC}&target=law&type=XML&ID=${lawId}`
     const response = await fetch(url, {
       next: { revalidate: 3600 },
       signal: AbortSignal.timeout(10_000),
@@ -238,46 +238,45 @@ async function checkArticleExists(
       return false
     }
 
-    const data = await response.json()
-
-    // API 응답 구조 확인
-    const lawData = data?.법령 || data
-
-    if (!lawData || !lawData.조문) {
-      console.warn('[Citation Verifier] ⚠️  No articles found in eflaw response')
+    // 대형 법령(민법 등) OOM 방지: 10MB 초과 시 검증 스킵
+    const contentLength = Number(response.headers.get('content-length') || '0')
+    if (contentLength > 10 * 1024 * 1024) {
+      console.warn(`[Citation Verifier] ⚠️  Response too large (${(contentLength / 1024 / 1024).toFixed(1)}MB), skipping verification for law ID ${lawId}`)
       return false
     }
 
-    // ✅ 올바른 구조: lawData.조문.조문단위[] (law-json-parser.ts와 동일)
-    const articleUnits = lawData.조문?.조문단위 || []
+    const xmlText = await response.text()
+
+    // XML 파싱 (DOMParser는 이미 import됨)
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
+
+    // 조문단위 태그에서 조문번호만 추출 (본문 내용은 무시)
+    const articleUnits = xmlDoc.getElementsByTagName('조문단위')
 
     if (articleUnits.length === 0) {
-      console.warn('[Citation Verifier] ⚠️  No article units found')
+      console.warn('[Citation Verifier] ⚠️  No article units found in XML')
       return false
     }
 
-    // 조문 번호를 JO Code로 변환 (예: "제38조" → "003800")
     const targetJoCode = buildJO(articleNum)
 
-    // 조문 목록에서 일치하는 조문 찾기
-    const found = articleUnits.some((unit: any) => {
-      // 조문이 아닌 경우 스킵 (예: 편, 장, 절 등)
-      if (unit.조문여부 !== '조문') return false
+    let found = false
+    for (let i = 0; i < articleUnits.length; i++) {
+      const unit = articleUnits[i]
 
-      // 조문번호 + 조문가지번호를 JO Code로 변환 (4+2 형식)
-      // 예: 조문번호 "61", 가지번호 "0" → "006100"
-      // 예: 조문번호 "38", 가지번호 "2" → "003802"
-      const mainNum = Number(unit.조문번호 || '0')
-      const branchNum = Number(unit.조문가지번호 || '0')
+      const yeobu = unit.getElementsByTagName('조문여부')[0]?.textContent?.trim()
+      if (yeobu !== '조문') continue
+
+      const mainNum = Number(unit.getElementsByTagName('조문번호')[0]?.textContent?.trim() || '0')
+      const branchNum = Number(unit.getElementsByTagName('조문가지번호')[0]?.textContent?.trim() || '0')
       const articleJoCode = mainNum.toString().padStart(4, '0') + branchNum.toString().padStart(2, '0')
 
-      // JO Code 비교
       if (articleJoCode === targetJoCode) {
-        return true
+        found = true
+        break
       }
-
-      return false
-    })
+    }
 
     if (!found) {
       console.warn(
