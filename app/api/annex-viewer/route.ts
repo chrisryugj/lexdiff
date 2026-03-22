@@ -32,6 +32,12 @@ export async function GET(request: Request) {
   if (!/^\d+$/.test(bylSeq)) {
     return NextResponse.json({ error: "유효하지 않은 bylSeq입니다" }, { status: 400 })
   }
+  if (!/^\d+$/.test(bylNo)) {
+    return NextResponse.json({ error: "유효하지 않은 bylNo입니다" }, { status: 400 })
+  }
+  if (!/^\d+$/.test(lsiSeq)) {
+    return NextResponse.json({ error: "유효하지 않은 lsiSeq입니다" }, { status: 400 })
+  }
 
   try {
     debugLogger.info("[annex-viewer] 뷰어 URL 조회 시작", { bylSeq, bylNo, lsiSeq })

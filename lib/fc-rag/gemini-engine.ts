@@ -285,6 +285,26 @@ export async function* executeGeminiRAGStream(
 
   let allToolResults: ToolCallResult[] = []
   const MAX_TOOL_RESULTS = 30
+
+  /** 메모리 캡 유지: 에러 → 최단 → 최오래된 순서로 퇴거 (index 0 보호) */
+  const enforceToolResultsCap = () => {
+    while (allToolResults.length > MAX_TOOL_RESULTS) {
+      const errIdx = allToolResults.findIndex(r => r.isError)
+      if (errIdx >= 0) {
+        allToolResults.splice(errIdx, 1)
+      } else {
+        let minIdx = 1
+        let minLen = allToolResults[1]?.result.length ?? Infinity
+        for (let i = 2; i < allToolResults.length; i++) {
+          if (allToolResults[i].result.length < minLen) {
+            minLen = allToolResults[i].result.length
+            minIdx = i
+          }
+        }
+        allToolResults.splice(minIdx, 1)
+      }
+    }
+  }
   let turnCount = 0
   let latestSearchEntries: LawEntry[] = []
   const failureCount = new Map<string, number>()
@@ -446,23 +466,7 @@ export async function* executeGeminiRAGStream(
 
       allToolResults.push(...results)
 
-      // 메모리 누수 방지 (에러 → 최단 → 최오래된 순서로 퇴거, 첫 결과(pre-evidence) 보호)
-      while (allToolResults.length > MAX_TOOL_RESULTS) {
-        const errIdx = allToolResults.findIndex(r => r.isError)
-        if (errIdx >= 0) {
-          allToolResults.splice(errIdx, 1)
-        } else {
-          let minIdx = 1 // index 0 (첫 결과) 보호
-          let minLen = allToolResults[1]?.result.length ?? Infinity
-          for (let i = 2; i < allToolResults.length; i++) {
-            if (allToolResults[i].result.length < minLen) {
-              minLen = allToolResults[i].result.length
-              minIdx = i
-            }
-          }
-          allToolResults.splice(minIdx, 1)
-        }
-      }
+      enforceToolResultsCap()
 
       // 도구 결과 이벤트
       for (const r of results) {
@@ -521,23 +525,7 @@ export async function* executeGeminiRAGStream(
           results.push(autoResult)
         }
 
-        // Auto-chain 결과 추가 후에도 MAX_TOOL_RESULTS 가드 적용
-        while (allToolResults.length > MAX_TOOL_RESULTS) {
-          const errIdx = allToolResults.findIndex(r => r.isError)
-          if (errIdx >= 0) {
-            allToolResults.splice(errIdx, 1)
-          } else {
-            let minIdx = 1 // index 0 (첫 결과) 보호
-            let minLen = allToolResults[1]?.result.length ?? Infinity
-            for (let i = 2; i < allToolResults.length; i++) {
-              if (allToolResults[i].result.length < minLen) {
-                minLen = allToolResults[i].result.length
-                minIdx = i
-              }
-            }
-            allToolResults.splice(minIdx, 1)
-          }
-        }
+        enforceToolResultsCap()
       }
 
       // 에러 경고

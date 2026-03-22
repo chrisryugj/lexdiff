@@ -6,6 +6,7 @@
 
 import type { LawMeta, LawArticle, Favorite } from "@/lib/law-types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
+import type { ParsedRelatedLaw } from "@/lib/law-parser"
 import type { IconName } from "@/lib/icons"
 
 // ============================================================
@@ -233,7 +234,7 @@ export type CitationClickHandler = (lawName: string, jo: string, article: string
 export interface AiModeState {
   isAiMode: boolean
   aiAnswerContent: string
-  aiRelatedLaws: any[]
+  aiRelatedLaws: ParsedRelatedLaw[]
   aiCitations: VerifiedCitation[]
   userQuery: string
   fileSearchFailed: boolean

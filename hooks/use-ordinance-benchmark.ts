@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   searchFirstPage,
   loadRemainingPages,
@@ -31,6 +31,11 @@ export function useOrdinanceBenchmark() {
   })
 
   const abortRef = useRef<AbortController | null>(null)
+
+  // Unmount 시 in-flight 요청 취소
+  useEffect(() => {
+    return () => { abortRef.current?.abort() }
+  }, [])
 
   // ── 검색 (1페이지만) ──
   const search = useCallback(async (searchKeyword: string) => {

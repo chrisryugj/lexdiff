@@ -22,6 +22,8 @@ import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import type { LawMeta } from "@/lib/law-types"
+import type { PrecedentSearchResult } from "@/lib/precedent-parser"
+import type { ParsedRelatedLaw } from "@/lib/law-parser"
 
 // Dynamic imports for modals
 const ComparisonModal = dynamic(
@@ -55,7 +57,7 @@ import { useSearchHandlers } from "./hooks/useSearchHandlers"
 import { LawSearchResultList, OrdinanceSearchResultList, InterpretationResultList, RulingResultList } from "./SearchResultList"
 import { PrecedentResultList } from "./PrecedentResultList"
 import { SearchChoiceDialog, NoResultDialog } from "./SearchDialogs"
-import type { SearchResultViewProps } from "./types"
+import type { SearchResultViewProps, InterpretationSearchResult, RulingSearchResult } from "./types"
 
 // Re-export types
 export type { SearchResultViewProps } from "./types"
@@ -144,155 +146,113 @@ function SearchResultViewComponent({
 
         actions.setSearchQuery(cached.query.lawName || '')
 
-        // ✅ 판례 상세 복원 (새로고침 시)
+        // 캐시 복원 공통 헬퍼 (setIsCacheHit → progress → data restore → cleanup)
+        const restoreFromCache = (label: string, restoreData: () => void, delayMs = 300) => {
+          debugLogger.success(`✅ ${label} 캐시 HIT`)
+          actions.setIsCacheHit(true)
+          actions.setIsSearching(true)
+          actions.updateProgress('parsing', 95)
+          restoreData()
+          actions.updateProgress('complete', 100)
+          setTimeout(() => {
+            actions.setIsCacheHit(false)
+            actions.setIsSearching(false)
+          }, delayMs)
+        }
+
+        // 판례 상세 복원 (새로고침 시)
         if (initialPrecedentId && cached.precedentDetail && cached.precedentDetail.id === initialPrecedentId) {
-          debugLogger.success('✅ 판례 상세 캐시 HIT - API 호출 없음')
-
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          actions.setLawData(cached.precedentDetail.lawData)
-          actions.setPrecedentResults(null)
-          actions.setMobileView("content")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
+          const detail = cached.precedentDetail
+          restoreFromCache('판례 상세', () => {
+            actions.setLawData(detail.lawData)
+            actions.setPrecedentResults(null)
+            actions.setMobileView("content")
+          })
           return
         }
 
-        // ✅ 판례 검색 결과 복원 (뒤로가기 시)
+        // 판례 검색 결과 복원
         if (cached.precedentResults && cached.precedentResults.length > 0 && !initialPrecedentId) {
-          debugLogger.success('✅ 판례 검색 결과 캐시 HIT')
-
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          actions.setPrecedentResults(cached.precedentResults)
-          actions.setLawData(null)  // 판례 상세 초기화
-          actions.setMobileView("list")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
+          const results = cached.precedentResults
+          restoreFromCache('판례 검색 결과', () => {
+            actions.setPrecedentResults(results as unknown as PrecedentSearchResult[])
+            actions.setLawData(null)
+            actions.setMobileView("list")
+          })
           return
         }
 
-        // ✅ 조례 검색 결과 복원 (뒤로가기 시)
-        // hasOrdinanceDetail이 false/undefined면 목록으로 복원
+        // 해석례 검색 결과 복원
         if (cached.interpretationResults && cached.interpretationResults.length > 0 && !initialPrecedentId) {
-          debugLogger.success('??해석례 검색결과 캐시 HIT')
-
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          actions.setInterpretationResults(cached.interpretationResults)
-          actions.setLawData(null)
-          actions.setMobileView("list")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
+          const results = cached.interpretationResults
+          restoreFromCache('해석례 검색결과', () => {
+            actions.setInterpretationResults(results as InterpretationSearchResult[])
+            actions.setLawData(null)
+            actions.setMobileView("list")
+          })
           return
         }
 
+        // 재결례 검색 결과 복원
         if (cached.rulingResults && cached.rulingResults.length > 0 && !initialPrecedentId) {
-          debugLogger.success('??재결례 검색결과 캐시 HIT')
-
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          actions.setRulingResults(cached.rulingResults)
-          actions.setLawData(null)
-          actions.setMobileView("list")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
+          const results = cached.rulingResults
+          restoreFromCache('재결례 검색결과', () => {
+            actions.setRulingResults(results as RulingSearchResult[])
+            actions.setLawData(null)
+            actions.setMobileView("list")
+          })
           return
         }
 
+        // 조례 검색 결과 복원
         const historyState = window.history.state
         if (cached.ordinanceSelectionState && !historyState?.hasOrdinanceDetail) {
-          debugLogger.success('✅ 조례 검색 결과 캐시 HIT')
-
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          // IndexedDB 스키마 → React state 변환
-          const ordinanceResults = cached.ordinanceSelectionState.results.map(o => ({
-            ordinSeq: o.자치법규ID,
-            ordinName: o.자치법규명,
-            ordinId: o.자치법규ID,
-            promulgationDate: o.공포일자,
-          }))
-
-          actions.setOrdinanceSelectionState({
-            results: ordinanceResults,
-            totalCount: ordinanceResults.length,
-            query: { lawName: cached.ordinanceSelectionState.query }
+          const ordState = cached.ordinanceSelectionState
+          restoreFromCache('조례 검색 결과', () => {
+            const ordinanceResults = ordState.results.map(o => ({
+              ordinSeq: o.자치법규ID,
+              ordinName: o.자치법규명,
+              ordinId: o.자치법규ID,
+              promulgationDate: o.공포일자,
+            }))
+            actions.setOrdinanceSelectionState({
+              results: ordinanceResults,
+              totalCount: ordinanceResults.length,
+              query: { lawName: ordState.query }
+            })
+            actions.setLawData(null)
+            actions.setMobileView("list")
           })
-          actions.setLawData(null)  // 조례 상세 초기화
-          actions.setMobileView("list")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
           return
         }
 
         // AI 모드 캐시 복원
         if (cached.aiMode) {
-          debugLogger.success('✅ AI 답변 캐시 HIT - API 호출 없음')
+          const ai = cached.aiMode
+          restoreFromCache('AI 답변', () => {
+            actions.setIsAiMode(true)
+            actions.setAiAnswerContent(ai.aiAnswerContent)
+            actions.setAiRelatedLaws(ai.aiRelatedLaws as ParsedRelatedLaw[])
+            actions.setAiCitations((ai.aiCitations || []) as VerifiedCitation[])
+            actions.setUserQuery(ai.userQuery || cached.query.lawName)
+            actions.setFileSearchFailed(ai.fileSearchFailed || false)
+            actions.setAiQueryType(ai.aiQueryType || 'application')
 
-          actions.setIsCacheHit(true)
-          actions.setIsSearching(true)
-          actions.updateProgress('parsing', 95)
-
-          actions.setIsAiMode(true)
-          actions.setAiAnswerContent(cached.aiMode.aiAnswerContent)
-          actions.setAiRelatedLaws(cached.aiMode.aiRelatedLaws)
-          actions.setAiCitations((cached.aiMode.aiCitations || []) as VerifiedCitation[])
-          actions.setUserQuery(cached.aiMode.userQuery || cached.query.lawName)
-          actions.setFileSearchFailed(cached.aiMode.fileSearchFailed || false)
-          actions.setAiQueryType(cached.aiMode.aiQueryType || 'application')  // ✅ aiQueryType 복원
-
-          const aiLawData = {
-            meta: {
-              lawId: 'ai-answer',
-              lawTitle: 'AI 답변',
-              promulgationDate: new Date().toISOString().split('T')[0],
-              lawType: 'AI',
-              isOrdinance: false,
-              fetchedAt: new Date().toISOString()
-            },
-            articles: [],
-            selectedJo: undefined,
-            isOrdinance: false
-          }
-          actions.setLawData(aiLawData)
-          actions.setMobileView("content")
-
-          actions.updateProgress('complete', 100)
-          setTimeout(() => {
-            actions.setIsCacheHit(false)
-            actions.setIsSearching(false)
-          }, 300)
+            actions.setLawData({
+              meta: {
+                lawId: 'ai-answer',
+                lawTitle: 'AI 답변',
+                promulgationDate: new Date().toISOString().split('T')[0],
+                lawType: 'AI',
+                isOrdinance: false,
+                fetchedAt: new Date().toISOString()
+              },
+              articles: [],
+              selectedJo: undefined,
+              isOrdinance: false
+            })
+            actions.setMobileView("content")
+          })
           return
         }
 
@@ -399,7 +359,7 @@ function SearchResultViewComponent({
 
         if (cached?.precedentResults && cached.precedentResults.length > 0) {
           debugLogger.success('✅ 판례 검색 결과 복원')
-          actions.setPrecedentResults(cached.precedentResults)
+          actions.setPrecedentResults(cached.precedentResults as unknown as PrecedentSearchResult[])
           actions.setLawData(null)
           actions.setMobileView("list")
         }

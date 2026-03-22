@@ -28,10 +28,11 @@ import { useLawViewerModals } from "@/hooks/use-law-viewer-modals"
 import { useLawViewerThreeTier } from "@/hooks/use-law-viewer-three-tier"
 import { useContentClickHandlers } from "@/hooks/use-content-click-handlers"
 import type { ContentClickContext, ContentClickActions } from "@/lib/content-click-handlers"
-import { useSwipe } from "@/hooks/use-swipe"
+import { useLawViewerNavigation } from "@/hooks/use-law-viewer-navigation"
 import { useRelatedPrecedentCases } from "@/hooks/use-related-precedent-cases"
 import { debugLogger } from '@/lib/debug-logger'
 import type { VerifiedCitation } from '@/lib/citation-verifier'
+import { mergeCitationsWithRelated } from '@/lib/merge-citations'
 import { LawViewerActionButtons, LawViewerRelatedCases, LawViewerOrdinanceActions, LawViewerSidebar, LawViewerHeader, LawViewerMainContent, LawViewerProvider, type LawViewerContextValue } from "@/components/law-viewer/index"
 import { ImpactAnalysisPanel } from "@/components/law-viewer/impact-analysis-panel"
 
@@ -147,64 +148,17 @@ function LawViewerComponent({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [showImpactAnalysis, setShowImpactAnalysis] = useState(false)
 
-  // Swipe tutorial and hints
-  const [swipeHint, setSwipeHint] = useState<{ direction: "left" | "right" } | null>(null)
-
-
-
   // ✅ AI 답변 법령 링크 클릭 핸들러
   const handleLawLinkClick = (lawName: string, article?: string) => {
     debugLogger.info('🔗 [AI답변] 법령 링크 클릭', { lawName, article })
     openExternalLawArticleModal(lawName, article || '')
   }
 
-  // ✅ Citations를 ParsedRelatedLaw 형식으로 변환 및 병합
-  const mergedRelatedArticles = useMemo(() => {
-    if (!aiCitations || aiCitations.length === 0) {
-      return relatedArticles
-    }
-
-    // Citations를 ParsedRelatedLaw로 변환
-    const citationsAsRelatedLaws: ParsedRelatedLaw[] = aiCitations
-      .filter(c => c.lawName && c.articleNum)
-      .map(citation => {
-        const articleNum = citation.articleNum.replace(/^제/, '').replace(/조$/, '')
-        const jo = buildJO(articleNum)
-
-        // ✅ 조문 제목 보완: citation에 제목이 없으면 relatedArticles에서 찾기
-        let title = citation.articleTitle
-        if (!title && relatedArticles.length > 0) {
-          const matching = relatedArticles.find(
-            r => r.lawName === citation.lawName && r.article === citation.articleNum && r.title
-          )
-          if (matching) {
-            title = matching.title
-          }
-        }
-
-        return {
-          lawName: citation.lawName,
-          article: citation.articleNum,
-          jo,
-          title,  // ✅ 조문 제목 (보완 포함)
-          display: `${citation.lawName} ${citation.articleNum}`,
-          source: 'citation',  // ✅ Citations 전용 source (기존 'excerpt' | 'related'과 별개)
-          fullText: citation.text
-        }
-      })
-
-    // relatedArticles와 병합 (중복 허용 - 사이드바에서 source별로 그룹화하여 아이콘 표시)
-    // 같은 법령이 본문(excerpt/related)과 AI 인용(citation) 둘 다 있으면 둘 다 유지
-    const merged = [...relatedArticles, ...citationsAsRelatedLaws]
-
-    debugLogger.info('Citations 병합 완료', {
-      citations: aiCitations.length,
-      relatedArticles: relatedArticles.length,
-      merged: merged.length
-    })
-
-    return merged
-  }, [aiCitations, relatedArticles])
+  // Citations를 ParsedRelatedLaw로 변환 후 relatedArticles와 병합
+  const mergedRelatedArticles = useMemo(
+    () => mergeCitationsWithRelated(aiCitations, relatedArticles),
+    [aiCitations, relatedArticles],
+  )
 
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
@@ -516,71 +470,13 @@ function LawViewerComponent({
     }
   }
 
-  // Swipe navigation handlers (mobile only)
-  const handleSwipeLeft = () => {
-    // Swipe left = next article
-    const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
-    if (currentIndex < actualArticles.length - 1) {
-      const nextArticle = actualArticles[currentIndex + 1]
-      setSwipeHint({ direction: "left" }) // Show hint
-      handleArticleClick(nextArticle.jo)
-    }
-  }
-
-  const handleSwipeRight = () => {
-    // Swipe right = previous article
-    const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
-    if (currentIndex > 0) {
-      const prevArticle = actualArticles[currentIndex - 1]
-      setSwipeHint({ direction: "right" }) // Show hint
-      handleArticleClick(prevArticle.jo)
-    }
-  }
-
-  // Apply swipe gestures to content area (mobile only)
-  const swipeRef = useSwipe<HTMLDivElement>({
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
-  }, {
-    threshold: 80, // Require 80px swipe distance
-    timeThreshold: 400, // Within 400ms
+  // Keyboard/Swipe navigation (refModal, handleArticleClick 선언 이후)
+  const { swipeRef, swipeHint, dismissSwipeHint } = useLawViewerNavigation({
+    activeJo,
+    actualArticles,
+    isModalOpen: refModal.open,
+    onNavigate: handleArticleClick,
   })
-
-  // 키보드 화살표 네비게이션 (조문 간 이동)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 입력 필드에 포커스 있으면 무시
-      const activeEl = document.activeElement
-      if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA') {
-        return
-      }
-
-      // 모달이 열려 있으면 무시
-      if (refModal.open) {
-        return
-      }
-
-      const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
-      if (currentIndex === -1) return
-
-      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        // 이전 조문
-        if (currentIndex > 0) {
-          e.preventDefault()
-          handleArticleClick(actualArticles[currentIndex - 1].jo)
-        }
-      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        // 다음 조문
-        if (currentIndex < actualArticles.length - 1) {
-          e.preventDefault()
-          handleArticleClick(actualArticles[currentIndex + 1].jo)
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeJo, actualArticles, refModal.open])
 
   const increaseFontSize = useCallback(() => setFontSize((prev) => Math.min(prev + 2, 28)), [])
   const decreaseFontSize = useCallback(() => setFontSize((prev) => Math.max(prev - 2, 10)), [])
@@ -960,7 +856,7 @@ function LawViewerComponent({
           swipeHint && (
             <SwipeHint
               direction={swipeHint.direction}
-              onDismiss={() => setSwipeHint(null)}
+              onDismiss={dismissSwipeHint}
             />
           )
         }

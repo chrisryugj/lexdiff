@@ -18,14 +18,21 @@ export async function GET() {
     return NextResponse.json({ available: false, message: "Supabase 연결 실패" })
   }
 
-  const [nodeResult, edgeResult] = await Promise.all([
-    client.from('law_node').select('*', { count: 'exact', head: true }),
-    client.from('law_edge').select('*', { count: 'exact', head: true }),
-  ])
+  try {
+    const [nodeResult, edgeResult] = await Promise.all([
+      client.from('law_node').select('*', { count: 'exact', head: true }),
+      client.from('law_edge').select('*', { count: 'exact', head: true }),
+    ])
 
-  return NextResponse.json({
-    available: true,
-    nodes: nodeResult.count ?? 0,
-    edges: edgeResult.count ?? 0,
-  })
+    return NextResponse.json({
+      available: true,
+      nodes: nodeResult.count ?? 0,
+      edges: edgeResult.count ?? 0,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { available: false, message: error instanceof Error ? error.message : "DB 조회 실패" },
+      { status: 500 },
+    )
+  }
 }

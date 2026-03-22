@@ -4,7 +4,7 @@
  * 검색 결과 화면 상태 관리 훅
  */
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { favoritesStore } from "@/lib/favorites-store"
 import type {
   SearchMode,
@@ -25,8 +25,12 @@ import type {
   RagAnswer,
   ToolCallLogEntry,
   ConversationEntry,
+  InterpretationSearchResult,
+  RulingSearchResult,
 } from "../types"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
+import type { ParsedRelatedLaw } from "@/lib/law-parser"
+import type { PrecedentSearchResult } from "@/lib/precedent-parser"
 
 export interface UseSearchStateProps {
   initialSearchMode?: 'basic' | 'rag'
@@ -69,7 +73,7 @@ export interface SearchState {
   // AI 모드 상태
   isAiMode: boolean
   aiAnswerContent: string
-  aiRelatedLaws: any[]
+  aiRelatedLaws: ParsedRelatedLaw[]
   aiCitations: VerifiedCitation[]
   userQuery: string
   fileSearchFailed: boolean
@@ -92,14 +96,14 @@ export interface SearchState {
   conversationHistory: ConversationEntry[]
 
   // 판례/해석례/재결례 상태
-  precedentResults: any[] | null
+  precedentResults: PrecedentSearchResult[] | null
   precedentTotalCount: number
   precedentPage: number
   precedentPageSize: number
   precedentYearFilter?: string
   precedentCourtFilter?: string
-  interpretationResults: any[] | null
-  rulingResults: any[] | null
+  interpretationResults: InterpretationSearchResult[] | null
+  rulingResults: RulingSearchResult[] | null
 
   // 조례 페이지네이션 상태
   ordinancePage: number
@@ -140,7 +144,7 @@ export interface SearchStateActions {
   // AI 모드 상태 업데이트
   setIsAiMode: (value: boolean) => void
   setAiAnswerContent: (content: string) => void
-  setAiRelatedLaws: (laws: any[]) => void
+  setAiRelatedLaws: (laws: ParsedRelatedLaw[]) => void
   setAiCitations: (citations: VerifiedCitation[]) => void
   setUserQuery: (query: string) => void
   setFileSearchFailed: (value: boolean) => void
@@ -165,14 +169,14 @@ export interface SearchStateActions {
   clearConversation: () => void
 
   // 판례/해석례/재결례 상태 업데이트
-  setPrecedentResults: (results: any[] | null) => void
+  setPrecedentResults: (results: PrecedentSearchResult[] | null) => void
   setPrecedentTotalCount: (count: number) => void
   setPrecedentPage: (page: number) => void
   setPrecedentPageSize: (size: number) => void
   setPrecedentYearFilter: (year: string | undefined) => void
   setPrecedentCourtFilter: (court: string | undefined) => void
-  setInterpretationResults: (results: any[] | null) => void
-  setRulingResults: (results: any[] | null) => void
+  setInterpretationResults: (results: InterpretationSearchResult[] | null) => void
+  setRulingResults: (results: RulingSearchResult[] | null) => void
 
   // 조례 페이지네이션 상태 업데이트
   setOrdinancePage: (page: number) => void
@@ -233,7 +237,7 @@ export function useSearchState({
   // ============================================================
   const [isAiMode, setIsAiMode] = useState(false)
   const [aiAnswerContent, setAiAnswerContent] = useState<string>('')
-  const [aiRelatedLaws, setAiRelatedLaws] = useState<any[]>([])
+  const [aiRelatedLaws, setAiRelatedLaws] = useState<ParsedRelatedLaw[]>([])
   const [aiCitations, setAiCitations] = useState<VerifiedCitation[]>([])
   const [userQuery, setUserQuery] = useState<string>('')
   const [fileSearchFailed, setFileSearchFailed] = useState(false)
@@ -260,14 +264,14 @@ export function useSearchState({
   // ============================================================
   // 판례/해석례/재결례 상태
   // ============================================================
-  const [precedentResults, setPrecedentResults] = useState<any[] | null>(null)
+  const [precedentResults, setPrecedentResults] = useState<PrecedentSearchResult[] | null>(null)
   const [precedentTotalCount, setPrecedentTotalCount] = useState(0)
   const [precedentPage, setPrecedentPage] = useState(1)
   const [precedentPageSize, setPrecedentPageSize] = useState(20)
   const [precedentYearFilter, setPrecedentYearFilter] = useState<string | undefined>()
   const [precedentCourtFilter, setPrecedentCourtFilter] = useState<string | undefined>()
-  const [interpretationResults, setInterpretationResults] = useState<any[] | null>(null)
-  const [rulingResults, setRulingResults] = useState<any[] | null>(null)
+  const [interpretationResults, setInterpretationResults] = useState<InterpretationSearchResult[] | null>(null)
+  const [rulingResults, setRulingResults] = useState<RulingSearchResult[] | null>(null)
 
   // ============================================================
   // 조례 페이지네이션 상태
@@ -440,7 +444,8 @@ export function useSearchState({
     ordinanceTotalCount,
   }
 
-  const actions: SearchStateActions = {
+  // actions 객체 메모이제이션 (모든 setter는 useState/useCallback으로 안정 참조)
+  const actions: SearchStateActions = useMemo(() => ({
     setIsSearching,
     setSearchMode,
     updateProgress,
@@ -494,7 +499,8 @@ export function useSearchState({
     setOrdinanceTotalCount,
     resetSearchState,
     resetToHome,
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [updateProgress, addToolCallLog, clearToolCallLogs, addConversationEntry, clearConversation, resetSearchState, resetToHome])
 
   return [state, actions]
 }

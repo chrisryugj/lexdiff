@@ -58,8 +58,8 @@ function parseXML(xml: string): {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("query")
-  const display = searchParams.get("display") || "20"
-  const page = searchParams.get("page") || "1"
+  const display = String(Math.min(Math.max(parseInt(searchParams.get("display") || "20", 10) || 20, 1), 100))
+  const page = String(Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1))
   const explYd = searchParams.get("explYd")
   const sort = searchParams.get("sort")
 

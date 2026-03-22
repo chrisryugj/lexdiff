@@ -7,7 +7,7 @@
 
 import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
-import { extractRelatedLaws } from "@/lib/law-parser"
+import { extractRelatedLaws, type ParsedRelatedLaw } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from "@/lib/rag-response-cache"
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
@@ -480,7 +480,7 @@ export function useAiSearch(deps: HandlerDeps) {
       query: string,
       processedContent: string,
       data: any,
-      relatedLaws: any[],
+      relatedLaws: ParsedRelatedLaw[],
       searchFailed: boolean
     ) {
       try {

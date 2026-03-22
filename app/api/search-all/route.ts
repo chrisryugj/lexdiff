@@ -186,7 +186,7 @@ async function searchOrdinances(query: string, apiKey: string, maxResults: numbe
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("query")
-  const maxResults = parseInt(searchParams.get("maxResults") || "10", 10)
+  const maxResults = Math.min(Math.max(parseInt(searchParams.get("maxResults") || "10", 10) || 10, 1), 100)
 
   if (!query) {
     return NextResponse.json(
