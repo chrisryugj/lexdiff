@@ -206,18 +206,34 @@ export async function fetchOrdinanceArticle(
 ): Promise<ModalResult> {
   debugLogger.info('[citation] 자치법규 본문 조회 시작', { lawName: cleanedLawName, articleLabel })
 
+  // 재시도 헬퍼 (law.go.kr API 간헐 실패 대응)
+  const fetchWithRetry = async (url: string, maxRetries = 2): Promise<Response> => {
+    for (let i = 0; i <= maxRetries; i++) {
+      const res = await fetch(url)
+      if (res.ok) return res
+      if (i < maxRetries) {
+        debugLogger.info('[citation] 자치법규 API 재시도', { url, attempt: i + 1, status: res.status })
+        await new Promise(r => setTimeout(r, 500 * (i + 1)))
+      } else {
+        throw new Error(`자치법규 API 실패 (${res.status}) — ${url.split('?')[0]}`)
+      }
+    }
+    throw new Error('unreachable')
+  }
+
   // 1. 검색
   const searchQuery = cleanedLawName.replace(/[·•‧]/g, ' ').replace(/\s+/g, ' ').trim()
-  const ordinSearchRes = await fetch(`/api/ordin-search?query=${encodeURIComponent(searchQuery)}`)
-  if (!ordinSearchRes.ok) throw new Error('자치법규 검색 실패')
+  const ordinSearchRes = await fetchWithRetry(`/api/ordin-search?query=${encodeURIComponent(searchQuery)}`)
 
   const ordinSearchXml = await ordinSearchRes.text()
   const { ordinances: ordinSearchResults } = parseOrdinanceSearchXML(ordinSearchXml)
 
   const normalizeForCompare = (s: string) => s.replace(/[·•‧\s]/g, "")
   const normalizedSearchName = normalizeForCompare(cleanedLawName)
-  const exactMatch = ordinSearchResults.find(r => normalizeForCompare(r.ordinName) === normalizedSearchName)
-  const ordinResult = exactMatch || ordinSearchResults[0]
+  // ordinId 또는 ordinSeq가 있는 결과만 사용 가능
+  const usableResults = ordinSearchResults.filter(r => r.ordinId || r.ordinSeq)
+  const exactMatch = usableResults.find(r => normalizeForCompare(r.ordinName) === normalizedSearchName)
+  const ordinResult = exactMatch || usableResults[0]
   const ordinId = ordinResult?.ordinId
   const ordinSeq = ordinResult?.ordinSeq
 
@@ -234,7 +250,7 @@ export async function fetchOrdinanceArticle(
   if (ordinId) ordinParams.append("ordinId", ordinId)
   else if (ordinSeq) ordinParams.append("ordinSeq", ordinSeq)
 
-  const ordinRes = await fetch(`/api/ordin?${ordinParams.toString()}`)
+  const ordinRes = await fetchWithRetry(`/api/ordin?${ordinParams.toString()}`)
   if (!ordinRes.ok) throw new Error('자치법규 본문 조회 실패')
 
   const ordinXml = await ordinRes.text()
