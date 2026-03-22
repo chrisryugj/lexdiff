@@ -53,8 +53,8 @@ function parseArticleComponents(input: string): ArticleComponents {
   const branchNumber = match[2] ? Number.parseInt(match[2], 10) : 0
 
   if (Number.isNaN(articleNumber) || Number.isNaN(branchNumber)) {
-    debugLogger.error("조문 숫자 변환 실패", { input, match })
-    throw new Error(`조문 번호를 해석할 수 없습니다: ${input}`)
+    debugLogger.debug("조문 숫자 변환 실패 (비조문 입력)", { input, match })
+    return { articleNumber: 0, branchNumber: 0 }
   }
 
   return { articleNumber, branchNumber }
