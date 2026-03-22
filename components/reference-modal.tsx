@@ -149,37 +149,35 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     return () => clearTimeout(timer)
   }, [isOpen])
 
-  // Attach event listener to the content div
+  // Attach event listener to the content div after render
   useEffect(() => {
     if (!isOpen || loading) return
 
-    let handleClick: ((e: MouseEvent) => void) | null = null
-    let contentEl: HTMLDivElement | null = null
+    const contentEl = contentRef.current
+    if (!contentEl) return
 
-    const timer = setTimeout(() => {
-      contentEl = contentRef.current
-      if (!contentEl) return
-
-      handleClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement
-        if (target && target.tagName === "A") {
-          e.preventDefault()
-          e.stopPropagation()
-          if (onContentClickRef.current) {
-            const reactEvent = e as unknown as React.MouseEvent<HTMLDivElement>
-            onContentClickRef.current(reactEvent)
-          }
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target && target.tagName === "A") {
+        e.preventDefault()
+        e.stopPropagation()
+        if (onContentClickRef.current) {
+          // Synthesize the nativeEvent property React handlers expect
+          const syntheticLike = Object.assign(e, {
+            nativeEvent: e,
+            isDefaultPrevented: () => e.defaultPrevented,
+            isPropagationStopped: () => false,
+            persist: () => {},
+          }) as unknown as React.MouseEvent<HTMLDivElement>
+          onContentClickRef.current(syntheticLike)
         }
       }
+    }
 
-      contentEl.addEventListener("click", handleClick, true)
-    }, 100)
+    contentEl.addEventListener("click", handleClick, true)
 
     return () => {
-      clearTimeout(timer)
-      if (contentEl && handleClick) {
-        contentEl.removeEventListener("click", handleClick, true)
-      }
+      contentEl.removeEventListener("click", handleClick, true)
     }
   }, [isOpen, loading, html])
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { checkDistributedRateLimit } from "@/lib/server/traffic-control"
+import { getClientIP } from "@/lib/get-client-ip"
 
 const RATE_LIMITS = {
   default: { requests: Number(process.env.API_RATE_LIMIT_PER_MINUTE ?? 100), windowMs: 60 * 1000 },
@@ -8,19 +9,6 @@ const RATE_LIMITS = {
 }
 
 const AI_ENDPOINTS = ["/api/fc-rag", "/api/summarize", "/api/annex-to-markdown"]
-
-function getClientIP(request: NextRequest): string {
-  const vercelIP = request.headers.get("x-vercel-forwarded-for")
-  if (vercelIP) return vercelIP.split(",")[0].trim()
-
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) return forwarded.split(",")[0].trim()
-
-  const realIP = request.headers.get("x-real-ip")
-  if (realIP) return realIP
-
-  return "127.0.0.1"
-}
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl

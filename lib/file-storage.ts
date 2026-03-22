@@ -5,6 +5,7 @@
 
 import fs from 'fs/promises'
 import path from 'path'
+import { debugLogger } from './debug-logger'
 import { ParsedLawMetadata } from './law-parser-server'
 import { convertToStructuredMarkdown, isStructuredMarkdown } from './markdown-converter'
 
@@ -60,7 +61,7 @@ export async function saveParsedLaw(
   // ✅ Convert to structured markdown if not already
   let finalMarkdown = markdown
   if (!isStructuredMarkdown(markdown)) {
-    console.log(`[File Storage] 🔄 Converting to structured markdown: ${metadata.lawName}`)
+    debugLogger.debug(`[File Storage] Converting to structured markdown: ${metadata.lawName}`)
     finalMarkdown = convertToStructuredMarkdown(markdown)
   }
 
@@ -69,7 +70,7 @@ export async function saveParsedLaw(
 
   const fileSize = Buffer.byteLength(finalMarkdown, 'utf-8')
 
-  console.log(`[File Storage] ✅ Saved: ${metadata.lawName} (${fileSize} bytes)`)
+  debugLogger.debug(`[File Storage] Saved: ${metadata.lawName} (${fileSize} bytes)`)
 
   // ⚠️ meta.json 생성 제거됨 (메타데이터는 MD 파일 내에 포함)
   return {
@@ -117,7 +118,7 @@ async function extractMetadataFromMarkdown(markdownPath: string, lawName: string
       fetchedAt: new Date().toISOString()
     }
   } catch (error) {
-    console.error(`[File Storage] Error extracting metadata from ${lawName}:`, error)
+    debugLogger.error(`[File Storage] Error extracting metadata from ${lawName}:`, error)
     return {
       lawName,
       lawId: 'unknown',
@@ -156,7 +157,7 @@ export async function listParsedLaws(): Promise<SavedLawFile[]> {
           metadata = JSON.parse(metaContent)
         } catch {
           // No metadata file - extract from markdown and create one
-          console.log(`[File Storage] 📝 Generating metadata for: ${lawNameFromFile}`)
+          debugLogger.debug(`[File Storage] Generating metadata for: ${lawNameFromFile}`)
           metadata = await extractMetadataFromMarkdown(markdownPath, lawNameFromFile)
 
           // Save generated metadata
@@ -179,7 +180,7 @@ export async function listParsedLaws(): Promise<SavedLawFile[]> {
           metadataPath
         })
       } catch (error) {
-        console.error(`[File Storage] Error reading ${lawNameFromFile}:`, error)
+        debugLogger.error(`[File Storage] Error reading ${lawNameFromFile}:`, error)
       }
     }
 
@@ -190,7 +191,7 @@ export async function listParsedLaws(): Promise<SavedLawFile[]> {
 
     return laws
   } catch (error) {
-    console.error('[File Storage] Error listing parsed laws:', error)
+    debugLogger.error('[File Storage] Error listing parsed laws:', error)
     return []
   }
 }
@@ -219,7 +220,7 @@ export async function readParsedLaw(lawNameOrId: string): Promise<{ markdown: st
 
     return { markdown, metadata }
   } catch (error) {
-    console.error(`[File Storage] Error reading ${lawNameOrId}:`, error)
+    debugLogger.error(`[File Storage] Error reading ${lawNameOrId}:`, error)
     return null
   }
 }
@@ -243,10 +244,10 @@ export async function deleteParsedLaw(lawNameOrId: string): Promise<boolean> {
       // Metadata file might not exist, ignore
     }
 
-    console.log(`[File Storage] ✅ Deleted: ${lawNameOrId}`)
+    debugLogger.debug(`[File Storage] Deleted: ${lawNameOrId}`)
     return true
   } catch (error) {
-    console.error(`[File Storage] Error deleting ${lawNameOrId}:`, error)
+    debugLogger.error(`[File Storage] Error deleting ${lawNameOrId}:`, error)
     return false
   }
 }
@@ -266,6 +267,6 @@ export async function logUpload(lawId: string, lawName: string, status: 'success
   try {
     await fs.appendFile(logPath, logEntry, 'utf-8')
   } catch (error) {
-    console.error('[File Storage] Error writing log:', error)
+    debugLogger.error('[File Storage] Error writing log:', error)
   }
 }

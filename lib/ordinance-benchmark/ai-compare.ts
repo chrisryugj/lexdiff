@@ -6,8 +6,9 @@
 
 import { GoogleGenAI } from '@google/genai'
 import type { BenchmarkOrdinanceResult } from './types'
+import { AI_CONFIG } from '@/lib/ai-config'
 
-const MODEL = 'gemini-2.5-flash'
+const MODEL = AI_CONFIG.gemini.standard
 
 /** AI 비교 분석 결과 */
 export interface BenchmarkAIAnalysis {

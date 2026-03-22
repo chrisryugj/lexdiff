@@ -11,6 +11,7 @@
  */
 
 import { NextRequest } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import { fetchFromOpenClaw, isOpenClawHealthy } from "@/lib/openclaw-client"
@@ -23,6 +24,7 @@ import {
 } from "@/lib/usage-tracker"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
+import { getClientIP } from "@/lib/get-client-ip"
 
 function convertForVerification(fcCitations: FCRAGCitation[]): {
   verifiable: Citation[]
@@ -53,19 +55,6 @@ function convertForVerification(fcCitations: FCRAGCitation[]): {
   }
 
   return { verifiable, skipped }
-}
-
-function getClientIP(request: NextRequest): string {
-  const vercelIP = request.headers.get("x-vercel-forwarded-for")
-  if (vercelIP) return vercelIP.split(",")[0].trim()
-
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) return forwarded.split(",")[0].trim()
-
-  const realIP = request.headers.get("x-real-ip")
-  if (realIP) return realIP
-
-  return "127.0.0.1"
 }
 
 export async function POST(request: NextRequest) {
@@ -264,7 +253,7 @@ export async function POST(request: NextRequest) {
                 sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {
-              console.error("[FC-RAG] Citation verification failed:", error)
+              debugLogger.error("[FC-RAG] Citation verification failed:", error)
             }
           }
 
@@ -335,7 +324,7 @@ export async function POST(request: NextRequest) {
                 sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {
-              console.error("[FC-RAG] Citation verification failed:", error)
+              debugLogger.error("[FC-RAG] Citation verification failed:", error)
             }
           }
 

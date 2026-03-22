@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 import { parsePrecedentSearchXML, type PrecedentSearchResult } from "@/lib/precedent-parser"
 
 export async function GET(request: NextRequest) {
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
 
     const { totalCount, precedents } = parsePrecedentSearchXML(xmlText)
 
-    console.log(`[precedent-search] API 응답: totalCount=${totalCount}, precedents.length=${precedents.length}, display=${display}, extractedYear=${extractedYear}, extractedCourt=${extractedCourt}`)
+    debugLogger.debug(`[precedent-search] API 응답: totalCount=${totalCount}, precedents.length=${precedents.length}, display=${display}, extractedYear=${extractedYear}, extractedCourt=${extractedCourt}`)
 
     // ✅ 연도 필터링 제거 - 서버 사이드로 이동 (API query에 연도 포함)
     // 이제 API가 직접 연도로 필터링하므로 클라이언트 필터링 불필요
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error("[precedent-search] Error:", error)
+    debugLogger.error("[precedent-search] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "판례 검색 중 오류 발생" },
       { status: 500 }

@@ -2,6 +2,7 @@
 import { debugLogger } from "./debug-logger"
 import { buildJO } from "./law-parser"
 import { linkifyRefsB } from "./unified-link-generator"
+import { escapeHtml } from "./law-data-utils"
 
 type BoxTableReplacement = { token: string; html: string }
 
@@ -744,14 +745,6 @@ export function formatDelegationContent(content: string, currentLawName?: string
   return text
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-}
 
 /**
  * 개정 태그 키워드를 4가지 타입으로 분류

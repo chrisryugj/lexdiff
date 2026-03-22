@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { AI_CONFIG } from '@/lib/ai-config'
 
 // ── 조례 본문 조회 ──
 
@@ -91,7 +92,7 @@ async function callGemini(prompt: string): Promise<string> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: AI_CONFIG.gemini.standard,
     contents: prompt,
   })
   return response.text || ''

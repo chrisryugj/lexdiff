@@ -6,86 +6,10 @@
  */
 
 import { debugLogger } from "@/lib/debug-logger"
+import { convertArticleNumberToCode, extractContentFromHangArray } from "@/lib/law-data-utils"
 import type { LawData, LawMeta, LawArticle } from "@/lib/law-types"
 
-/**
- * 조문 번호를 6자리 코드로 변환
- */
-export function convertArticleNumberToCode(
-  articleNum: string | number,
-  branchNum?: string | number,
-): { code: string; display: string } {
-  const mainNum = typeof articleNum === "string" ? Number.parseInt(articleNum) : articleNum
-  const branch = branchNum ? (typeof branchNum === "string" ? Number.parseInt(branchNum) : branchNum) : 0
-
-  if (isNaN(mainNum)) {
-    return { code: "000000", display: "제0조" }
-  }
-
-  const code = mainNum.toString().padStart(4, "0") + branch.toString().padStart(2, "0")
-  const display = branch > 0 ? "제" + mainNum + "조의" + branch : "제" + mainNum + "조"
-
-  return { code, display }
-}
-
-/**
- * 항 배열에서 내용 추출
- */
-export function extractContentFromHangArray(hangArray: any[]): string {
-  let content = ""
-
-  if (!Array.isArray(hangArray)) {
-    return content
-  }
-
-  for (const hang of hangArray) {
-    // Extract 항내용 (paragraph content)
-    if (hang.항내용) {
-      let hangContent = hang.항내용
-
-      // Handle array format (some 항내용 are arrays of strings)
-      if (Array.isArray(hangContent)) {
-        hangContent = hangContent.join("\n")
-      }
-
-      content += "\n" + hangContent
-    }
-
-    // Extract 호 (items) if present
-    if (hang.호 && Array.isArray(hang.호)) {
-      for (const ho of hang.호) {
-        if (ho.호내용) {
-          let hoContent = ho.호내용
-
-          // Handle array format
-          if (Array.isArray(hoContent)) {
-            hoContent = hoContent.join("\n")
-          }
-
-          content += "\n" + hoContent
-        }
-
-        // Extract 목 (sub-items) if present
-        if (ho.목 && Array.isArray(ho.목)) {
-          for (const mok of ho.목) {
-            if (mok.목내용) {
-              let mokContent = mok.목내용
-
-              // Handle array format
-              if (Array.isArray(mokContent)) {
-                mokContent = mokContent.join("\n")
-              }
-
-              content += "\n  " + mokContent
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return content
-}
+export { convertArticleNumberToCode, extractContentFromHangArray }
 
 /**
  * JSON 데이터를 LawData로 파싱
@@ -133,10 +57,6 @@ export function parseLawJSON(jsonData: any): LawData {
       const code = result.code
       const display = result.display
 
-      // Debug: Log article parsing for "조의" articles
-      if (branchNum && Number.parseInt(branchNum) > 0) {
-      }
-
       let content = ""
 
       if (unit.항 && Array.isArray(unit.항)) {
@@ -178,7 +98,7 @@ export function parseLawJSON(jsonData: any): LawData {
 
     // Debug: Show JO code range
     if (articles.length > 0) {
-      console.log(`   JO 코드 범위: ${articles[0]?.jo} (${articles[0]?.joNum}) ~ ${articles[articles.length - 1]?.jo} (${articles[articles.length - 1]?.joNum})`)
+      debugLogger.debug(`   JO 코드 범위: ${articles[0]?.jo} (${articles[0]?.joNum}) ~ ${articles[articles.length - 1]?.jo} (${articles[articles.length - 1]?.joNum})`)
 
       // Show all "조의" articles
       const branchArticles = articles.filter(a => {
@@ -186,7 +106,7 @@ export function parseLawJSON(jsonData: any): LawData {
         return branchNum > 0
       })
       if (branchArticles.length > 0) {
-        console.log(`   조의 조문 ${branchArticles.length}개:`, branchArticles.map(a => `${a.jo}(${a.joNum})`).join(', '))
+        debugLogger.debug(`   조의 조문 ${branchArticles.length}개: ${branchArticles.map(a => `${a.jo}(${a.joNum})`).join(', ')}`)
       }
     }
 

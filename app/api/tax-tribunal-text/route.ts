@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 export interface TaxTribunalDetail {
   name: string           // 사건명
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(detail)
 
   } catch (error) {
-    console.error("[tax-tribunal-text] Error:", error)
+    debugLogger.error("[tax-tribunal-text] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "재결례 조회 중 오류 발생" },
       { status: 500 }

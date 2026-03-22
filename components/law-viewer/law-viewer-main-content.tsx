@@ -9,7 +9,9 @@ import { PrecedentDetailPanel } from "@/components/precedent-section"
 import { AIAnswerContent } from "@/components/law-viewer-ai-answer"
 import { AISearchErrorBoundary } from "@/components/error-boundary"
 import { LawViewerSingleArticle } from "./law-viewer-single-article"
-import type { LawMeta, LawArticle } from "@/lib/law-types"
+import type { LawMeta, LawArticle, DelegationItem, RevisionHistoryItem, ThreeTierData } from "@/lib/law-types"
+import type { AdminRuleMatch } from "@/lib/use-admin-rules"
+import type { PrecedentSearchResult, PrecedentDetail } from "@/lib/precedent-parser"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import type { ToolCallLogEntry, ConversationEntry } from "@/components/search-result-view/types"
 
@@ -35,7 +37,7 @@ interface AIAnswerProps {
 type DelegationTabType = "law" | "decree" | "rule" | "admin"
 
 interface DelegationProps {
-  validDelegations: any[]
+  validDelegations: DelegationItem[]
   isLoading: boolean
   activeTab: DelegationTabType
   setActiveTab: React.Dispatch<React.SetStateAction<DelegationTabType>>
@@ -46,13 +48,13 @@ interface DelegationProps {
   loadingAdminRules: boolean
   loadedAdminRulesCount: number
   hasEverLoaded: boolean
-  adminRules: any[]
+  adminRules: AdminRuleMatch[]
   adminRulesProgress: { current: number; total: number } | null
   adminRuleViewMode: "list" | "detail"
   setAdminRuleViewMode: React.Dispatch<React.SetStateAction<"list" | "detail">>
   adminRuleHtml: string | null
   adminRuleTitle: string | null
-  handleViewAdminRuleFullContent: (rule: any) => Promise<void>
+  handleViewAdminRuleFullContent: (rule: AdminRuleMatch) => Promise<void>
 }
 
 interface PrecedentProps {
@@ -60,13 +62,13 @@ interface PrecedentProps {
   viewMode: "bottom" | "side"
   panelSize: number
   setPanelSize: (size: number) => void
-  precedents: any[]
+  precedents: PrecedentSearchResult[]
   totalCount: number
   loading: boolean
   error: string | null
-  selectedPrecedent: any
+  selectedPrecedent: PrecedentDetail | null
   loadingDetail: boolean
-  handleViewDetail: (precedent: any) => void
+  handleViewDetail: (precedent: PrecedentSearchResult) => void
   expandPanel: () => void
   collapsePanel: () => void
 }
@@ -103,7 +105,7 @@ interface LawViewerMainContentProps {
   meta: LawMeta
 
   // Revision
-  revisionHistory: any[]
+  revisionHistory: RevisionHistoryItem[]
 
   // Grouped props
   fontProps: FontProps

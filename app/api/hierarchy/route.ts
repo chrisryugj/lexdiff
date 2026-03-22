@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 const LAW_API_KEY = process.env.LAW_OC
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
       })
 
       const searchUrl = `https://www.law.go.kr/DRF/lawSearch.do?${searchParams.toString()}`
-      console.log("[hierarchy API] Searching for law:", searchUrl)
+      debugLogger.debug("[hierarchy API] Searching for law:", searchUrl)
 
       const searchResponse = await fetch(searchUrl, {
         headers: {
@@ -43,13 +44,13 @@ export async function GET(request: NextRequest) {
 
         if (mstMatch && mstMatch[1]) {
           finalMst = mstMatch[1].trim()
-          console.log("[hierarchy API] Found MST:", finalMst)
+          debugLogger.debug("[hierarchy API] Found MST:", finalMst)
         } else {
-          console.error("[hierarchy API] MST not found in search results")
+          debugLogger.error("[hierarchy API] MST not found in search results")
           return new Response("Law not found", { status: 404 })
         }
       } else {
-        console.error("[hierarchy API] Search failed:", searchResponse.status)
+        debugLogger.error("[hierarchy API] Search failed:", searchResponse.status)
         return new Response("Failed to search for law", { status: searchResponse.status })
       }
     }
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     const url = `https://www.law.go.kr/DRF/lawService.do?${params.toString()}`
-    console.log("[hierarchy API] Fetching hierarchy:", url)
+    debugLogger.debug("[hierarchy API] Fetching hierarchy:", url)
 
     const response = await fetch(url, {
       headers: {
@@ -83,14 +84,14 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      console.error("[hierarchy API] Failed:", response.status, response.statusText)
+      debugLogger.error("[hierarchy API] Failed:", { status: response.status, statusText: response.statusText })
       return new Response(`Failed to fetch hierarchy: ${response.statusText}`, {
         status: response.status,
       })
     }
 
     const xmlText = await response.text()
-    console.log("[hierarchy API] Success, length:", xmlText.length)
+    debugLogger.debug("[hierarchy API] Success, length:", xmlText.length)
 
     return new Response(xmlText, {
       headers: {
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("[hierarchy API] Error:", error)
+    debugLogger.error("[hierarchy API] Error:", error)
     return new Response("Internal server error", { status: 500 })
   }
 }

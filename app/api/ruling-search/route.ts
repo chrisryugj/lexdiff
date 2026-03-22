@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 interface RulingSearchResult {
   id: string
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
       display: parseInt(display, 10),
     })
   } catch (error) {
-    console.error("[ruling-search] Error:", error)
+    debugLogger.error("[ruling-search] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "재결례 검색 중 오류 발생" },
       { status: 500 }

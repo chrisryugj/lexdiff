@@ -24,6 +24,7 @@ import { buildCitations, calcConfidence, parseCitationsFromAnswer } from './cita
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { callAnthropicStream, type DirectMessage } from './anthropic-client'
 import { evaluateResponseQuality } from './quality-evaluator'
+import { AI_CONFIG } from '@/lib/ai-config'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -114,7 +115,7 @@ export type FCRAGStreamEvent =
 
 // ─── 설정 ───
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
+const MODEL = AI_CONFIG.gemini.primary
 
 const MAX_TOKENS: Record<QueryComplexity, number> = {
   simple: 3072,

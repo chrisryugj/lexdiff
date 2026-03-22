@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 import { load, type CheerioAPI, type Cheerio } from "cheerio"
 import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
@@ -248,7 +249,7 @@ export async function GET(req: Request) {
     }
     const sp = buildParams({ target: "eflaw", type: "HTML", OC, ID: lawId || undefined, MST: mstParam || undefined, JO: joParam, efYd: efYd || undefined })
     const url = `${DRF_BASE}?${sp.toString()}`
-    console.log("[drf-html] fetch:", url)
+    debugLogger.debug("[drf-html] fetch:", url)
     const res = await fetch(url, { next: { revalidate: 1800 } })
     const ctype = res.headers.get("content-type") || ""
     const buf = Buffer.from(await res.arrayBuffer())
@@ -263,7 +264,7 @@ export async function GET(req: Request) {
     if (iframeSrc) {
       try {
         const abs = ensureOc(new URL(iframeSrc, DRF_BASE).toString(), OC)
-        console.log("[drf-html] following frame:", abs)
+        debugLogger.debug("[drf-html] following frame:", abs)
         const fr = await fetch(abs, { next: { revalidate: 1800 } })
         const fctype = fr.headers.get("content-type") || ""
         const fbuf = Buffer.from(await fr.arrayBuffer())
@@ -276,9 +277,9 @@ export async function GET(req: Request) {
         rewriteAnchors(_$, { lawId })
         const region = extractArticleRegionAfterAmend(_$, joParam)
         bodyHtml = region.html() || _$("body").html() || _$.root().html() || fhtml
-        console.log("[drf-html] frame content-type:", fctype, "len:", bodyHtml.length)
+        debugLogger.debug("[drf-html] frame content-type:", { fctype, len: bodyHtml.length })
       } catch (frameErr) {
-        console.log("[drf-html] frame fetch failed", frameErr)
+        debugLogger.debug("[drf-html] frame fetch failed", frameErr)
       }
     } else {
       // Rewrite first, then extract region
@@ -295,10 +296,10 @@ export async function GET(req: Request) {
       .replace(/\[(?:개정|전문개정|전부개정|신설|삭제)[^\]]*\]/g, '<span class="rev-mark">$&</span>')
       .replace(/<\s*(?:개정|전문개정|전부개정|신설|삭제)[^>]*>/g, (m) => `<span class="rev-mark">${m.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`)
     const safe = sanitizeKeepAnchors(collapsed)
-    console.log("[drf-html] content-type:", ctype, "len:", bodyHtml.length, "sanitized:", safe.length)
+    debugLogger.debug("[drf-html] content-type:", { ctype, len: bodyHtml.length, sanitized: safe.length })
     return NextResponse.json({ html: safe })
   } catch (e) {
-    console.error("[drf-html] error", e)
+    debugLogger.error("[drf-html] error", e)
     return NextResponse.json({ error: e instanceof Error ? e.message : "unknown" }, { status: 500 })
   }
 }

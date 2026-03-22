@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useEffect, useState, useRef, memo, useDeferredValue } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback, memo, useDeferredValue } from "react"
 import dynamic from "next/dynamic"
 import { FloatingCompactHeader } from "@/components/floating-compact-header"
 import { CommandSearchModal } from "@/components/command-search-modal"
@@ -410,6 +410,63 @@ function SearchResultViewComponent({
   }, [initialPrecedentId, searchId, state.lawData?.isPrecedent, actions])
 
   // ============================================================
+  // 공유 헬퍼: 검색 타입별 분기
+  // ============================================================
+  const handleSearchDispatch = useCallback((query: Parameters<typeof handlers.handleSearch>[0] & { classification?: { searchType?: string } }) => {
+    if (query.classification) {
+      switch (query.classification.searchType) {
+        case 'precedent': handlers.handlePrecedentSearch(query); break
+        case 'interpretation': handlers.handleInterpretationSearch(query); break
+        case 'ruling': handlers.handleRulingSearch(query); break
+        case 'ai': handlers.handleSearch(query); break
+        case 'multi': handlers.handleMultiSearch(query); break
+        default: handlers.handleSearch(query)
+      }
+    } else {
+      handlers.handleSearch(query)
+    }
+  }, [handlers])
+
+  // ============================================================
+  // 공유 LawViewer props (모바일/데스크톱 중복 제거)
+  // ============================================================
+  const lawViewerProps = useMemo(() => state.lawData ? {
+    meta: state.lawData.meta,
+    articles: state.lawData.articles,
+    selectedJo: state.lawData.selectedJo,
+    viewMode: (state.lawData.viewMode || 'full') as 'full' | 'single',
+    onCompare: handlers.handleCompare,
+    onSummarize: handlers.handleSummarize,
+    onToggleFavorite: handlers.handleToggleFavorite,
+    favorites: state.favorites,
+    isOrdinance: state.lawData.isOrdinance ?? false,
+    aiAnswerMode: state.isAiMode,
+    aiAnswerContent: state.aiAnswerContent,
+    relatedArticles: state.aiRelatedLaws,
+    onRelatedArticleClick: handlers.handleCitationClick,
+    fileSearchFailed: state.fileSearchFailed,
+    aiCitations: state.aiCitations,
+    userQuery: state.userQuery,
+    aiQueryType: state.aiQueryType,
+    aiConfidenceLevel: state.aiConfidenceLevel,
+    aiIsTruncated: state.aiIsTruncated,
+    onAiRefresh: handlers.handleAiRefresh,
+    isPrecedent: state.lawData.isPrecedent,
+    onRefresh: handlers.handleRefresh,
+    onDelegationGap: (meta: LawMeta) => setDelegationGapModal({ isOpen: true, meta }),
+    onTimeMachine: (meta: LawMeta) => setTimeMachineModal({ isOpen: true, meta }),
+    onImpactTracker: (lawName: string) => onImpactTracker?.(lawName, 'impact'),
+    onOrdinanceSync: (lawName: string) => onImpactTracker?.(lawName, 'ordinance-sync'),
+    onOrdinanceBenchmark: (lawName: string) => onOrdinanceBenchmark?.(lawName),
+    onAiQuery: handlers.handleAiQuery,
+  } : null, [
+    state.lawData, state.favorites, state.isAiMode, state.aiAnswerContent,
+    state.aiRelatedLaws, state.fileSearchFailed, state.aiCitations,
+    state.userQuery, state.aiQueryType, state.aiConfidenceLevel, state.aiIsTruncated,
+    handlers, onImpactTracker, onOrdinanceBenchmark,
+  ])
+
+  // ============================================================
   // 렌더링
   // ============================================================
   return (
@@ -418,32 +475,7 @@ function SearchResultViewComponent({
       <CommandSearchModal
         isOpen={state.showSearchModal}
         onClose={() => actions.setShowSearchModal(false)}
-        onSearch={(query) => {
-          // ✅ 통합검색: searchType에 따라 분기
-          if (query.classification) {
-            switch (query.classification.searchType) {
-              case 'precedent':
-                handlers.handlePrecedentSearch(query)
-                break
-              case 'interpretation':
-                handlers.handleInterpretationSearch(query)
-                break
-              case 'ruling':
-                handlers.handleRulingSearch(query)
-                break
-              case 'ai':
-                handlers.handleSearch(query)
-                break
-              case 'multi':
-                handlers.handleMultiSearch(query)
-                break
-              default:
-                handlers.handleSearch(query)
-            }
-          } else {
-            handlers.handleSearch(query)
-          }
-        }}
+        onSearch={handleSearchDispatch}
         isAiMode={state.isAiMode}
       />
 
@@ -594,25 +626,37 @@ function SearchResultViewComponent({
           ) : (
             /* 법령 뷰어 — 단일 인스턴스 (이중 마운트 제거: API 호출/useEffect 2배→1배) */
             <div className="space-y-2 sm:space-y-4">
-              {/* 검색바: 데스크톱 항상 / 모바일 list 모드에서만 */}
-              <div className={state.mobileView === "list" ? "" : "hidden md:block"}>
-                <SearchBar onSearch={(query) => {
-                  if (query.classification) {
-                    switch (query.classification.searchType) {
-                      case 'precedent': handlers.handlePrecedentSearch(query); break
-                      case 'interpretation': handlers.handleInterpretationSearch(query); break
-                      case 'ruling': handlers.handleRulingSearch(query); break
-                      case 'multi': handlers.handleMultiSearch(query); break
-                      default: handlers.handleSearch(query)
-                    }
-                  } else {
-                    handlers.handleSearch(query)
-                  }
-                }} isLoading={state.isSearching} />
+              {/* 모바일 뷰 */}
+              <div className="md:hidden">
+                {state.mobileView === "list" ? (
+                  <div className="space-y-2 sm:space-y-4">
+                    <SearchBar onSearch={handleSearchDispatch} isLoading={state.isSearching} />
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-4">
+                    {state.articleNotFound && (
+                      <ArticleNotFoundBanner
+                        requestedJo={state.articleNotFound.requestedJo}
+                        lawTitle={state.articleNotFound.lawTitle}
+                        nearestArticles={state.articleNotFound.nearestArticles}
+                        crossLawSuggestions={state.articleNotFound.crossLawSuggestions}
+                        onSelectArticle={(jo) => {
+                          actions.setLawData(prev => prev ? { ...prev, selectedJo: jo } : null)
+                        }}
+                        onSelectCrossLaw={(lawTitle) => {
+                          handlers.handleSearch({ lawName: lawTitle, article: formatJO(state.articleNotFound!.requestedJo) })
+                        }}
+                        onDismiss={() => actions.setArticleNotFound(null)}
+                      />
+                    )}
+                    {lawViewerProps && <LawViewer {...lawViewerProps} />}
+                  </div>
+                )}
               </div>
 
-              {/* 법령 본문: 데스크톱 항상 / 모바일 content 모드에서만 */}
-              <div className={state.mobileView === "content" ? "" : "hidden md:block"}>
+              {/* 데스크톱 뷰 */}
+              <div className="hidden md:block space-y-4">
+                <SearchBar onSearch={handleSearchDispatch} isLoading={state.isSearching} />
                 {state.articleNotFound && (
                   <ArticleNotFoundBanner
                     requestedJo={state.articleNotFound.requestedJo}
@@ -628,36 +672,7 @@ function SearchResultViewComponent({
                     onDismiss={() => actions.setArticleNotFound(null)}
                   />
                 )}
-                <LawViewer
-                  meta={state.lawData.meta}
-                  articles={state.lawData.articles}
-                  selectedJo={state.lawData.selectedJo}
-                  viewMode={state.lawData.viewMode || 'full'}
-                  onCompare={handlers.handleCompare}
-                  onSummarize={handlers.handleSummarize}
-                  onToggleFavorite={handlers.handleToggleFavorite}
-                  favorites={state.favorites}
-                  isOrdinance={state.lawData.isOrdinance ?? false}
-                  aiAnswerMode={state.isAiMode}
-                  aiAnswerContent={deferredAiContent}
-                  relatedArticles={state.aiRelatedLaws}
-                  onRelatedArticleClick={handlers.handleCitationClick}
-                  fileSearchFailed={state.fileSearchFailed}
-                  aiCitations={state.aiCitations}
-                  userQuery={state.userQuery}
-                  aiQueryType={state.aiQueryType}
-                  aiConfidenceLevel={state.aiConfidenceLevel}
-                  aiIsTruncated={state.aiIsTruncated}
-                  onAiRefresh={handlers.handleAiRefresh}
-                  isPrecedent={state.lawData.isPrecedent}
-                  onRefresh={handlers.handleRefresh}
-                  onDelegationGap={(meta) => setDelegationGapModal({ isOpen: true, meta })}
-                  onTimeMachine={(meta) => setTimeMachineModal({ isOpen: true, meta })}
-                  onImpactTracker={(lawName) => onImpactTracker?.(lawName, 'impact')}
-                  onOrdinanceSync={(lawName) => onImpactTracker?.(lawName, 'ordinance-sync')}
-                  onOrdinanceBenchmark={(lawName) => onOrdinanceBenchmark?.(lawName)}
-                  onAiQuery={handlers.handleAiQuery}
-                />
+                {lawViewerProps && <LawViewer {...lawViewerProps} />}
               </div>
             </div>
           )}

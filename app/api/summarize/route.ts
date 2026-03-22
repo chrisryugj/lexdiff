@@ -2,19 +2,11 @@ import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
+import { getClientIP } from "@/lib/get-client-ip"
+import { AI_CONFIG } from "@/lib/ai-config"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
-}
-
-function getClientIP(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) return forwarded.split(",")[0].trim()
-
-  const realIP = request.headers.get("x-real-ip")
-  if (realIP) return realIP
-
-  return "127.0.0.1"
 }
 
 function buildPrompt(params: {
@@ -119,7 +111,7 @@ export async function POST(request: Request) {
 
     const ai = new GoogleGenAI({ apiKey })
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
+      model: AI_CONFIG.gemini.lite,
       contents: prompt,
     })
 

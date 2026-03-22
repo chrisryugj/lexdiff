@@ -8,6 +8,7 @@
  */
 
 import type { AdminRuleMatch } from "./use-admin-rules"
+import { debugLogger } from "./debug-logger"
 
 const DB_NAME = "LexDiffCache"
 const DB_VERSION = 12 // Tier 2 검색 필터링 개선 — 기존 과다 매칭 캐시 무효화
@@ -57,7 +58,7 @@ async function openDB(): Promise<IDBDatabase> {
 
       // VersionError 발생 시 DB 삭제 후 재시도
       if (error?.name === 'VersionError') {
-        console.warn('[admin-rule-cache] VersionError detected, deleting database and retrying...')
+        debugLogger.warning('[admin-rule-cache] VersionError detected, deleting database and retrying...')
         indexedDB.deleteDatabase(DB_NAME)
       }
 
@@ -145,7 +146,7 @@ async function cleanExpiredCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.warn("[admin-rule-cache] Failed to clean expired cache:", error)
+    debugLogger.warning("[admin-rule-cache] Failed to clean expired cache:", error)
   }
 }
 
@@ -187,8 +188,8 @@ export async function getLawAdminRulesPurposeCacheOptimistic(
         reject(request.error)
       }
     })
-  } catch (error: any) {
-    console.error("[admin-rule-cache] Error reading optimistic cache:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admin-rule-cache] Error reading optimistic cache:", error)
     return null
   }
 }
@@ -231,14 +232,14 @@ export async function getLawAdminRulesPurposeCache(
         reject(request.error)
       }
     })
-  } catch (error: any) {
-    console.error("[admin-rule-cache] Error reading purpose cache:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admin-rule-cache] Error reading purpose cache:", error)
 
-    if (error?.name === 'NotFoundError') {
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+        debugLogger.error('[admin-rule-cache] Failed to delete database:', deleteError)
       }
     }
 
@@ -274,7 +275,7 @@ export async function getLawAdminRulesPurposeCacheEntry(
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error reading purpose cache entry:", error)
+    debugLogger.error("[admin-rule-cache] Error reading purpose cache entry:", error)
     return null
   }
 }
@@ -315,7 +316,7 @@ export async function setLawAdminRulesPurposeCache(
       }
     })
   } catch (error) {
-    console.error("[admin-rule-cache] Error saving purpose cache:", error)
+    debugLogger.error("[admin-rule-cache] Error saving purpose cache:", error)
   }
 }
 
@@ -362,14 +363,14 @@ export async function getArticleMatchIndex(
         reject(request.error)
       }
     })
-  } catch (error: any) {
-    console.error("[admin-rule-cache] Error reading match index:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admin-rule-cache] Error reading match index:", error)
 
-    if (error?.name === 'NotFoundError') {
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+        debugLogger.error('[admin-rule-cache] Failed to delete database:', deleteError)
       }
     }
 
@@ -415,7 +416,7 @@ export async function setArticleMatchIndex(
       }
     })
   } catch (error) {
-    console.warn('[admin-rule-cache] cache operation failed:', error)
+    debugLogger.warning('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -454,14 +455,14 @@ export async function getAdminRuleContentCache(
         reject(request.error)
       }
     })
-  } catch (error: any) {
-    console.error("[admin-rule-cache] Error reading content cache:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admin-rule-cache] Error reading content cache:", error)
 
-    if (error?.name === 'NotFoundError') {
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error('[admin-rule-cache] Failed to delete database:', deleteError)
+        debugLogger.error('[admin-rule-cache] Failed to delete database:', deleteError)
       }
     }
 
@@ -506,7 +507,7 @@ export async function setAdminRuleContentCache(
       }
     })
   } catch (error) {
-    console.warn('[admin-rule-cache] cache operation failed:', error)
+    debugLogger.warning('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -534,7 +535,7 @@ export async function clearAdminRuleContentCache(ruleId: string): Promise<void> 
       }
     })
   } catch (error) {
-    console.warn('[admin-rule-cache] cache operation failed:', error)
+    debugLogger.warning('[admin-rule-cache] cache operation failed:', error)
   }
 }
 
@@ -556,7 +557,7 @@ export async function clearAllAdminRuleCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.warn('[admin-rule-cache] cache operation failed:', error)
+    debugLogger.warning('[admin-rule-cache] cache operation failed:', error)
   }
 }
 

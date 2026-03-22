@@ -7,6 +7,7 @@
 
 import { GoogleGenAI } from '@google/genai'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
+import { AI_CONFIG } from '@/lib/ai-config'
 import {
   buildClassificationQuery,
   buildClassificationSystemPrompt,
@@ -45,7 +46,7 @@ async function classifyWithGemini(
   try {
     const ai = new GoogleGenAI({ apiKey: key })
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: AI_CONFIG.gemini.lite,
       contents: query,
       config: {
         systemInstruction: buildClassificationSystemPrompt(),
@@ -83,7 +84,7 @@ async function summarizeWithGemini(
   try {
     const ai = new GoogleGenAI({ apiKey: key })
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: AI_CONFIG.gemini.lite,
       contents: query,
       config: {
         systemInstruction: buildSummarySystemPrompt(),

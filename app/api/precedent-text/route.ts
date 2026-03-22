@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 import { parsePrecedentDetailJSON, type PrecedentDetail } from "@/lib/precedent-parser"
 
 export async function GET(request: NextRequest) {
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(detail)
 
   } catch (error) {
-    console.error("[precedent-text] Error:", error)
+    debugLogger.error("[precedent-text] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "판례 조회 중 오류 발생" },
       { status: 500 }

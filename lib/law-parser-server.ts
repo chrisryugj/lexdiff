@@ -39,161 +39,7 @@ export interface ParsedLaw {
   markdown: string
 }
 
-/**
- * Extract content from 항 array (paragraph array)
- * This is the CORRECT parsing logic copied from law-xml-parser.tsx
- *
- * CRITICAL: This function handles the law.go.kr API's hierarchical structure:
- * - 항 (paragraphs)
- * - 호 (items within paragraphs)
- * - 목 (sub-items within items)
- *
- * EDGE CASES HANDLED:
- * - 항내용 없고 호만 있는 경우 (도로법 시행령 제55조)
- * - 항만 있고 항내용/호가 없는 경우
- * - 호만 있는 경우
- */
-function extractContentFromHangArray(hangArray: any[]): string {
-  let content = ""
-
-  if (!Array.isArray(hangArray)) {
-    return content
-  }
-
-  // 먼저 항내용이 있는지 확인
-  const hasHangContent = hangArray.some(hang => {
-    const hangContent = hang.항내용
-    if (!hangContent) return false
-
-    // 배열인 경우
-    if (Array.isArray(hangContent)) {
-      return hangContent.some(c => c && typeof c === 'string' && c.trim())
-    }
-    // 문자열인 경우
-    if (typeof hangContent === 'string') {
-      return hangContent.trim().length > 0
-    }
-    // 객체인 경우 (예: { content: '...' })
-    if (typeof hangContent === 'object' && hangContent.content) {
-      return hangContent.content.trim().length > 0
-    }
-    return false
-  })
-
-  // 모든 호 수집
-  const allItems = hangArray.flatMap(hang => {
-    if (hang.호 && Array.isArray(hang.호)) {
-      return hang.호
-    }
-    return []
-  })
-
-  if (hasHangContent) {
-    // 항내용이 있는 경우: 기존 로직
-    for (const hang of hangArray) {
-      // Extract 항내용 (paragraph content)
-      if (hang.항내용) {
-        let hangContent = hang.항내용
-
-        // Handle array format (some 항내용 are arrays of strings or objects)
-        if (Array.isArray(hangContent)) {
-          hangContent = hangContent
-            .map(c => typeof c === 'string' ? c : (c?.content || ''))
-            .join("\n")
-        }
-        // Handle object format (e.g., { content: '...' })
-        else if (typeof hangContent === 'object' && hangContent.content) {
-          hangContent = hangContent.content
-        }
-
-        if (typeof hangContent === 'string') {
-          content += "\n" + hangContent
-        }
-      }
-
-      // Extract 호 (items) if present
-      if (hang.호 && Array.isArray(hang.호)) {
-        for (const ho of hang.호) {
-          if (ho.호내용) {
-            let hoContent = ho.호내용
-
-            // Handle array format
-            if (Array.isArray(hoContent)) {
-              hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
-            } else if (typeof hoContent === 'object' && hoContent.content) {
-              hoContent = hoContent.content
-            }
-
-            if (typeof hoContent === 'string') {
-              content += "\n" + hoContent
-            }
-          }
-
-          // Extract 목 (sub-items) if present
-          if (ho.목 && Array.isArray(ho.목)) {
-            for (const mok of ho.목) {
-              if (mok.목내용) {
-                let mokContent = mok.목내용
-
-                // Handle array format
-                if (Array.isArray(mokContent)) {
-                  mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
-                } else if (typeof mokContent === 'object' && mokContent.content) {
-                  mokContent = mokContent.content
-                }
-
-                if (typeof mokContent === 'string') {
-                  content += "\n  " + mokContent
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  } else if (allItems.length > 0) {
-    // 항내용 없고 호만 있는 경우: 호만 추가
-    // (본문은 조문내용에서 처리됨)
-    for (const ho of allItems) {
-      if (ho.호내용) {
-        let hoContent = ho.호내용
-
-        // Handle array format
-        if (Array.isArray(hoContent)) {
-          hoContent = hoContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
-        } else if (typeof hoContent === 'object' && hoContent.content) {
-          hoContent = hoContent.content
-        }
-
-        if (typeof hoContent === 'string') {
-          content += "\n" + hoContent
-        }
-      }
-
-      // Extract 목 (sub-items) if present
-      if (ho.목 && Array.isArray(ho.목)) {
-        for (const mok of ho.목) {
-          if (mok.목내용) {
-            let mokContent = mok.목내용
-
-            // Handle array format
-            if (Array.isArray(mokContent)) {
-              mokContent = mokContent.map(c => typeof c === 'string' ? c : (c?.content || '')).join("\n")
-            } else if (typeof mokContent === 'object' && mokContent.content) {
-              mokContent = mokContent.content
-            }
-
-            if (typeof mokContent === 'string') {
-              content += "\n  " + mokContent
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return content.trim()
-}
+import { extractContentFromHangArray, formatDate } from "./law-data-utils"
 
 /**
  * Detect law type from name
@@ -440,20 +286,6 @@ function generateMarkdown(metadata: ParsedLawMetadata, articles: ParsedLawArticl
   return md
 }
 
-/**
- * Format date string from YYYYMMDD to YYYY-MM-DD or readable format
- */
-function formatDate(dateStr: string): string {
-  if (!dateStr || dateStr.length !== 8) {
-    return dateStr
-  }
-
-  const year = dateStr.substring(0, 4)
-  const month = dateStr.substring(4, 6)
-  const day = dateStr.substring(6, 8)
-
-  return `${year}년 ${month}월 ${day}일`
-}
 
 /**
  * Fetch law data from law.go.kr API
@@ -547,10 +379,10 @@ export async function parseLawByNameOrId(
       error: "여러 후보가 있습니다",
       candidates
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      error: error.message || "알 수 없는 오류"
+      error: error instanceof Error ? error.message : "알 수 없는 오류"
     }
   }
 }

@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 interface SearchResult {
   id: string
@@ -75,7 +76,7 @@ async function searchLaws(query: string, apiKey: string, maxResults: number): Pr
 
     return { totalCount, results }
   } catch (error) {
-    console.error("[search-all] Laws error:", error)
+    debugLogger.error("[search-all] Laws error:", error)
     return { totalCount: 0, results: [] }
   }
 }
@@ -125,7 +126,7 @@ async function searchAdminRules(query: string, apiKey: string, maxResults: numbe
 
     return { totalCount, results }
   } catch (error) {
-    console.error("[search-all] AdminRules error:", error)
+    debugLogger.error("[search-all] AdminRules error:", error)
     return { totalCount: 0, results: [] }
   }
 }
@@ -175,7 +176,7 @@ async function searchOrdinances(query: string, apiKey: string, maxResults: numbe
 
     return { totalCount, results }
   } catch (error) {
-    console.error("[search-all] Ordinances error:", error)
+    debugLogger.error("[search-all] Ordinances error:", error)
     return { totalCount: 0, results: [] }
   }
 }
@@ -218,7 +219,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response)
 
   } catch (error) {
-    console.error("[search-all] Error:", error)
+    debugLogger.error("[search-all] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "통합 검색 중 오류 발생" },
       { status: 500 }

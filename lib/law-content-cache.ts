@@ -14,6 +14,7 @@
  */
 
 import type { LawMeta, LawArticle } from "./law-types"
+import { debugLogger } from "./debug-logger"
 
 const DB_NAME = "LexDiffCache"
 const DB_VERSION = 11 // admin-rule-cache와 동일 DB 공유 → 버전 통일
@@ -85,7 +86,7 @@ async function cleanExpiredCache(): Promise<void> {
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache cleanup.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. Skipping cache cleanup.`)
       db.close()
       return
     }
@@ -114,7 +115,7 @@ async function cleanExpiredCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error("Failed to clean expired law content cache:", error)
+    debugLogger.error("Failed to clean expired law content cache:", error)
   }
 }
 
@@ -128,7 +129,7 @@ export async function setLawContentCache(
 ): Promise<void> {
   try {
     if (!lawId) {
-      console.warn('⚠️ lawId가 없어 캐시 저장 건너뜀')
+      debugLogger.warning('lawId가 없어 캐시 저장 건너뜀')
       return
     }
 
@@ -136,7 +137,7 @@ export async function setLawContentCache(
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache save.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. Skipping cache save.`)
       db.close()
       return
     }
@@ -180,7 +181,7 @@ export async function setLawContentCache(
       // ✅ 트랜잭션 중단(abort) 에러 핸들링
       tx.onabort = () => {
         const error = tx.error
-        console.warn(`⚠️ Transaction aborted:`, error)
+        debugLogger.warning(`Transaction aborted:`, error)
         reject(error || new Error('Transaction aborted'))
       }
     })
@@ -188,7 +189,7 @@ export async function setLawContentCache(
     db.close()
 
     // 백그라운드로 만료된 캐시 정리
-    cleanExpiredCache().catch(console.error)
+    cleanExpiredCache().catch((e) => debugLogger.error("Cache cleanup failed:", e))
   } catch (error) {
     // ✅ VersionError는 조용히 무시 (DB 업그레이드 중)
     if (error instanceof Error && error.name === 'VersionError') {
@@ -200,12 +201,12 @@ export async function setLawContentCache(
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+        debugLogger.error("IndexedDB 삭제 실패:", deleteError)
       }
       return
     }
 
-    console.error("❌ 캐시 저장 실패:", error)
+    debugLogger.error("캐시 저장 실패:", error)
   }
 }
 
@@ -226,7 +227,7 @@ export async function getLawContentCacheByQuery(
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️  [Phase 7] Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
+      debugLogger.warning(`[Phase 7] Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
       db.close()
       return null
     }
@@ -236,7 +237,7 @@ export async function getLawContentCacheByQuery(
 
     // ✅ Index 존재 여부 확인
     if (!store.indexNames.contains("searchKey")) {
-      console.warn(`⚠️  [Phase 7] Index "searchKey" not found. DB may need re-initialization.`)
+      debugLogger.warning(`[Phase 7] Index "searchKey" not found. DB may need re-initialization.`)
       db.close()
       return null
     }
@@ -258,20 +259,20 @@ export async function getLawContentCacheByQuery(
     // 만료 체크
     const expiryTime = Date.now() - CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
     if (entry.timestamp < expiryTime) {
-      clearLawContentCache(entry.lawId, entry.effectiveDate).catch(console.error)
+      clearLawContentCache(entry.lawId, entry.effectiveDate).catch((e) => debugLogger.error("Cache clear failed:", e))
       return null
     }
 
     return entry
   } catch (error) {
-    console.error("❌ 캐시 조회 실패 (검색어):", error)
+    debugLogger.error("캐시 조회 실패 (검색어):", error)
 
     // NotFoundError: object store not found - IndexedDB 스키마 불일치
     if (error instanceof DOMException && error.name === "NotFoundError") {
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+        debugLogger.error("IndexedDB 삭제 실패:", deleteError)
       }
     }
 
@@ -289,7 +290,7 @@ export async function getLawContentCache(
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. DB may need re-initialization.`)
       db.close()
       return null
     }
@@ -333,20 +334,20 @@ export async function getLawContentCache(
     const expiryTime = Date.now() - CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
     if (entry.timestamp < expiryTime) {
       // 만료된 캐시는 비동기로 삭제
-      clearLawContentCache(lawId, entry.effectiveDate).catch(console.error)
+      clearLawContentCache(lawId, entry.effectiveDate).catch((e) => debugLogger.error("Cache clear failed:", e))
       return null
     }
 
     return entry
   } catch (error) {
-    console.error("❌ 캐시 조회 실패:", error)
+    debugLogger.error("캐시 조회 실패:", error)
 
     // NotFoundError: object store not found - IndexedDB 스키마 불일치
     if (error instanceof DOMException && error.name === "NotFoundError") {
       try {
         indexedDB.deleteDatabase(DB_NAME)
       } catch (deleteError) {
-        console.error("❌ IndexedDB 삭제 실패:", deleteError)
+        debugLogger.error("IndexedDB 삭제 실패:", deleteError)
       }
     }
 
@@ -364,7 +365,7 @@ export async function clearLawContentCache(
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache delete.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. Skipping cache delete.`)
       db.close()
       return
     }
@@ -382,7 +383,7 @@ export async function clearLawContentCache(
 
     db.close()
   } catch (error) {
-    console.error("Failed to clear law content cache:", error)
+    debugLogger.error("Failed to clear law content cache:", error)
   }
 }
 
@@ -393,7 +394,7 @@ export async function clearAllLawContentCache(): Promise<void> {
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Skipping cache clear.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. Skipping cache clear.`)
       db.close()
       return
     }
@@ -409,7 +410,7 @@ export async function clearAllLawContentCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error("Failed to clear all law content cache:", error)
+    debugLogger.error("Failed to clear all law content cache:", error)
   }
 }
 
@@ -425,7 +426,7 @@ export async function getLawContentCacheStats(): Promise<{
 
     // ✅ Object store 존재 여부 확인
     if (!db.objectStoreNames.contains(CONTENT_STORE)) {
-      console.warn(`⚠️ Object store "${CONTENT_STORE}" not found. Returning empty stats.`)
+      debugLogger.warning(`Object store "${CONTENT_STORE}" not found. Returning empty stats.`)
       db.close()
       return { totalEntries: 0, totalSize: 0, oldestEntry: null, newestEntry: null }
     }
@@ -460,7 +461,7 @@ export async function getLawContentCacheStats(): Promise<{
       newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
     }
   } catch (error) {
-    console.error("Failed to get cache stats:", error)
+    debugLogger.error("Failed to get cache stats:", error)
     return {
       totalEntries: 0,
       totalSize: 0,

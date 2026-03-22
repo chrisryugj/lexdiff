@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils"
 import { formatPrecedentDate } from "@/lib/precedent-parser"
 import { sanitizeForRender } from "@/lib/sanitize-html-render"
 import { generateLinks } from "@/lib/unified-link-generator"
+import { useTruncationTooltip } from "@/hooks/use-truncation-tooltip"
+import { TruncationTooltip } from "@/components/shared/truncation-tooltip"
 import type { PrecedentSearchResult, PrecedentDetail } from "@/lib/precedent-parser"
 
 interface PrecedentSectionProps {
@@ -163,56 +165,7 @@ function PrecedentListItem({
   isSelected: boolean
   onClick: () => void
 }) {
-  const [showTooltip, setShowTooltip] = React.useState(false)
-  const [isTruncated, setIsTruncated] = React.useState(false)
-  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
-  const titleRef = React.useRef<HTMLDivElement>(null)
-
-  // ResizeObserver로 truncated 상태 동적 감지 + 폰트 로딩 대기
-  React.useEffect(() => {
-    const element = titleRef.current
-    if (!element) return
-
-    let mounted = true
-
-    const checkTruncated = () => {
-      if (!mounted || !element) return
-      // scrollHeight가 clientHeight보다 크면 잘림 (line-clamp-2)
-      const isTrunc = element.scrollHeight > element.clientHeight ||
-                      (precedent.name?.length || 0) > 30
-      setIsTruncated(isTrunc)
-    }
-
-    // 폰트 로딩 후 체크 (Pretendard 로딩 대기)
-    const init = async () => {
-      try {
-        if (document.fonts?.ready) {
-          await document.fonts.ready
-        }
-      } catch {
-        // fonts API 실패 시 무시
-      }
-      // 렌더링 안정화를 위해 여러 프레임 대기
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          checkTruncated()
-        })
-      })
-    }
-    init()
-
-    const observer = new ResizeObserver(checkTruncated)
-    observer.observe(element)
-
-    return () => {
-      mounted = false
-      observer.disconnect()
-    }
-  }, [precedent.name])
-
-  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY })
-  }, [])
+  const tooltip = useTruncationTooltip<HTMLDivElement>({ watchValue: precedent.name, multiLine: true, lengthFallback: 30 })
 
   return (
     <button
@@ -221,36 +174,22 @@ function PrecedentListItem({
         isSelected && "border-primary bg-primary/5"
       )}
       onClick={onClick}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      onMouseMove={handleMouseMove}
+      onMouseEnter={tooltip.onMouseEnter}
+      onMouseLeave={tooltip.onMouseLeave}
+      onMouseMove={tooltip.onMouseMove}
       style={{ fontFamily: "Pretendard, sans-serif" }}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="relative">
             <div
-              ref={titleRef}
+              ref={tooltip.ref}
               className="font-bold text-sm md:text-base leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2"
             >
               {precedent.name}
             </div>
 
-            {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
-            {showTooltip && isTruncated && (
-              <div
-                className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
-                style={{
-                  fontFamily: "Pretendard, sans-serif",
-                  left: `${mousePos.x + 12}px`,
-                  top: `${mousePos.y + 16}px`,
-                }}
-              >
-                <p className="text-xs text-popover-foreground line-clamp-2 break-words">
-                  {precedent.name}
-                </p>
-              </div>
-            )}
+            <TruncationTooltip show={tooltip.showTooltip && tooltip.isTruncated} position={tooltip.tooltipPosition} text={precedent.name || ''} />
           </div>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground">

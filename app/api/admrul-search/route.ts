@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 /**
  * GET /api/admrul-search
@@ -44,14 +45,14 @@ export async function GET(request: NextRequest) {
     apiUrl.searchParams.set("display", display)
     apiUrl.searchParams.set("page", page)
 
-    console.log("[admrul-search] Fetching:", apiUrl.toString())
+    debugLogger.debug("[admrul-search] Fetching:", apiUrl.toString())
 
     const response = await fetch(apiUrl.toString(), {
       next: { revalidate: 3600 }, // Cache for 1 hour
     })
 
     if (!response.ok) {
-      console.error("[admrul-search] API error:", response.status)
+      debugLogger.error("[admrul-search] API error:", response.status)
       return NextResponse.json(
         { error: "Failed to fetch admin rules" },
         { status: response.status }
@@ -61,11 +62,11 @@ export async function GET(request: NextRequest) {
     const xmlText = await response.text()
 
     // Debug: Log first 1000 characters of response
-    console.log("[admrul-search] Response preview:", xmlText.substring(0, 1000))
+    debugLogger.debug("[admrul-search] Response preview:", xmlText.substring(0, 1000))
 
     // Check for HTML error page
     if (xmlText.includes("<!DOCTYPE html")) {
-      console.error("[admrul-search] Received HTML error page")
+      debugLogger.error("[admrul-search] Received HTML error page")
       return NextResponse.json(
         { error: "Invalid response from law.go.kr API" },
         { status: 502 }
@@ -79,10 +80,10 @@ export async function GET(request: NextRequest) {
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     })
-  } catch (error: any) {
-    console.error("[admrul-search] Error:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admrul-search] Error:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

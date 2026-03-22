@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 import { load, type CheerioAPI, type Cheerio } from "cheerio"
 import type { Element } from "domhandler"
 import sanitizeHtml from "sanitize-html"
@@ -124,17 +125,25 @@ export async function GET(req: Request) {
       targetUrl = `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}/${encodeURIComponent(joLabel)}`
     }
 
+    // 상대 경로는 law.go.kr 기준으로 절대 URL 변환
+    if (targetUrl.startsWith('/')) {
+      targetUrl = `https://www.law.go.kr${targetUrl}`
+    } else if (targetUrl.startsWith('//')) {
+      targetUrl = `https:${targetUrl}`
+    }
+
     // If the incoming URL is a DRF endpoint, ensure OC is present
     try {
       const LAW_OC = process.env.LAW_OC || ""
-      const u = new URL(targetUrl, "https://www.law.go.kr")
+      const u = new URL(targetUrl)
       if (u.pathname.includes("/DRF/lawService.do") && LAW_OC && !u.searchParams.has("OC")) {
         u.searchParams.set("OC", LAW_OC)
         targetUrl = u.toString()
       }
     } catch {}
 
-    if (!targetUrl.startsWith('/') && !validateExternalUrl(targetUrl)) {
+    // 모든 URL 변환 후 최종 검증 (SSRF 방어)
+    if (!validateExternalUrl(targetUrl)) {
       return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
     }
 
@@ -180,9 +189,9 @@ export async function GET(req: Request) {
       sanitized = sanitizeKeepAnchors(whole)
     }
     if (debug) {
-      console.log("[law-html] url:", targetUrl)
-      console.log("[law-html] joLabel:", joLabel)
-      console.log("[law-html] sanitized length:", sanitized.length)
+      debugLogger.debug("[law-html] url:", targetUrl)
+      debugLogger.debug("[law-html] joLabel:", joLabel)
+      debugLogger.debug("[law-html] sanitized length:", sanitized.length)
     }
     return NextResponse.json({ html: sanitized })
   } catch (e) {

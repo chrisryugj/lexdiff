@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 /**
  * GET /api/admrul
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
       apiUrl.searchParams.set("LM", lm)
     }
 
-    console.log("[admrul] Fetching:", apiUrl.toString())
+    debugLogger.debug("[admrul] Fetching:", apiUrl.toString())
 
     const response = await fetch(apiUrl.toString(), {
       // No caching for large admin rules (over 2MB causes Next.js cache warnings)
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      console.error("[admrul] API error:", response.status)
+      debugLogger.error("[admrul] API error:", response.status)
       return NextResponse.json(
         { error: "Failed to fetch admin rule content" },
         { status: response.status }
@@ -61,12 +62,12 @@ export async function GET(request: NextRequest) {
     const xmlText = await response.text()
 
     // Debug: Log response size and preview
-    console.log(`[admrul] Response size: ${xmlText.length} bytes (${(xmlText.length / 1024 / 1024).toFixed(2)} MB)`)
-    console.log("[admrul] Response preview:", xmlText.substring(0, 1000))
+    debugLogger.debug(`[admrul] Response size: ${xmlText.length} bytes (${(xmlText.length / 1024 / 1024).toFixed(2)} MB)`)
+    debugLogger.debug("[admrul] Response preview:", xmlText.substring(0, 1000))
 
     // Check for HTML error page
     if (xmlText.includes("<!DOCTYPE html")) {
-      console.error("[admrul] Received HTML error page")
+      debugLogger.error("[admrul] Received HTML error page")
       return NextResponse.json(
         { error: "Invalid response from law.go.kr API" },
         { status: 502 }
@@ -80,10 +81,10 @@ export async function GET(request: NextRequest) {
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     })
-  } catch (error: any) {
-    console.error("[admrul] Error:", error)
+  } catch (error: unknown) {
+    debugLogger.error("[admrul] Error:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

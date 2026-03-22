@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 export interface InterpretationDetail {
   name: string         // 안건명
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(detail)
 
   } catch (error) {
-    console.error("[interpretation-text] Error:", error)
+    debugLogger.error("[interpretation-text] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "해석례 조회 중 오류 발생" },
       { status: 500 }

@@ -3,6 +3,7 @@
  */
 
 import { linkifyRefsB } from "./unified-link-generator"
+import { escapeHtml } from "./law-data-utils"
 
 /** 정규식 특수문자 이스케이프 */
 function escapeRegExp(str: string): string {
@@ -472,17 +473,6 @@ export function formatAdminRuleHTML(content: string, baseLawName?: string): stri
   return text
 }
 
-/**
- * HTML 특수문자 이스케이프
- */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-}
 
 /**
  * 개정 태그 키워드를 4가지 타입으로 분류

@@ -8,14 +8,15 @@ import { CopyButton } from "@/components/ui/copy-button"
 import { RevisionHistory } from "@/components/revision-history"
 import { PrecedentSection } from "@/components/precedent-section"
 import { ArticleSuggestions } from "@/components/law-viewer/article-suggestions"
-import type { LawArticle, LawMeta } from "@/lib/law-types"
+import type { LawArticle, LawMeta, RevisionHistoryItem } from "@/lib/law-types"
+import type { PrecedentSearchResult, PrecedentDetail } from "@/lib/precedent-parser"
 
 interface LawViewerSingleArticleProps {
   // 데이터
   activeArticle: LawArticle
   activeArticleHtml: string
   meta: LawMeta
-  revisionHistory: any[]
+  revisionHistory: RevisionHistoryItem[]
 
   // 설정
   fontSize: number
@@ -38,13 +39,13 @@ interface LawViewerSingleArticleProps {
   // 판례 관련 (optional)
   showPrecedents?: boolean
   precedentViewMode?: "bottom" | "side"
-  precedents?: any[]
+  precedents?: PrecedentSearchResult[]
   precedentTotalCount?: number
   loadingPrecedents?: boolean
   precedentsError?: string | null
-  selectedPrecedent?: any
+  selectedPrecedent?: PrecedentDetail | null
   loadingPrecedentDetail?: boolean
-  handleViewPrecedentDetail?: (prec: any) => void
+  handleViewPrecedentDetail?: (prec: PrecedentSearchResult) => void
   expandPrecedentPanel?: () => void
   collapsePrecedentPanel?: () => void
 }
@@ -182,7 +183,7 @@ export function LawViewerSingleArticle({
             totalCount={precedentTotalCount}
             loading={loadingPrecedents}
             error={precedentsError}
-            selectedPrecedent={selectedPrecedent}
+            selectedPrecedent={selectedPrecedent ?? null}
             loadingDetail={loadingPrecedentDetail}
             viewMode={precedentViewMode}
             onViewDetail={handleViewPrecedentDetail}

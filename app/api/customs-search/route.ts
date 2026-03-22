@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { debugLogger } from "@/lib/debug-logger"
 
 export interface CustomsSearchResult {
   id: string           // 법령해석일련번호
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error("[customs-search] Error:", error)
+    debugLogger.error("[customs-search] Error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "관세청 해석 검색 중 오류 발생" },
       { status: 500 }

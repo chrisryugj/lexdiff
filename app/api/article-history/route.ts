@@ -30,19 +30,19 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("조문별 변경이력 API 호출", { lawId, jo })
-    console.log("[조문이력 API] Full URL:", url)
+    debugLogger.debug("[조문이력 API] Full URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
     })
 
     const text = await response.text()
-    console.log("[조문이력 API] Response status:", response.status)
-    console.log("[조문이력 API] Response length:", text.length)
+    debugLogger.debug("[조문이력 API] Response status:", response.status)
+    debugLogger.debug("[조문이력 API] Response length:", text.length)
 
     // Check if it's an error HTML response
     if (text.includes("<!DOCTYPE html") || text.includes("<html")) {
-      console.error("[v0] [조문이력 API] Received HTML error page")
+      debugLogger.error("[조문이력 API] Received HTML error page")
       return NextResponse.json({
         error: "법제처 API가 HTML 오류 페이지를 반환했습니다 (조문별 이력 API 미지원 가능성)",
         details: "이 법령은 조문별 개정이력 조회를 지원하지 않을 수 있습니다"
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("[조문이력 API] Error:", error)
+    debugLogger.error("[조문이력 API] Error:", error)
     debugLogger.error("조문별 변경이력 조회 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

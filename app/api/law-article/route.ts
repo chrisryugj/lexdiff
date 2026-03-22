@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { debugLogger } from "@/lib/debug-logger"
 import { executeTool } from '@/lib/fc-rag/tool-adapter'
 
 export async function GET(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ html: `<div style="white-space:pre-wrap">${html}</div>` })
   } catch (error) {
-    console.error('[law-article] Error:', error)
+    debugLogger.error('[law-article] Error:', error)
     return NextResponse.json({
       html: `<p>조문 조회 중 오류가 발생했습니다.</p>`,
     })

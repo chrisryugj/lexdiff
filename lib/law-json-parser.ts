@@ -1,91 +1,6 @@
 import type { LawArticle, LawData } from "./law-types"
-
-/**
- * Helper: Convert article number + branch number to JO code
- * 예: (2, 0) → { code: "000200", display: "제2조" }
- * 예: (38, 2) → { code: "003802", display: "제38조의2" }
- */
-function convertArticleNumberToCode(
-  articleNum: string | number,
-  branchNum?: string | number,
-): { code: string; display: string } {
-  const mainNum = typeof articleNum === "string" ? Number.parseInt(articleNum) : articleNum
-  const branch = branchNum ? (typeof branchNum === "string" ? Number.parseInt(branchNum) : branchNum) : 0
-
-  if (isNaN(mainNum)) {
-    return { code: "000000", display: "제0조" }
-  }
-
-  const code = mainNum.toString().padStart(4, "0") + branch.toString().padStart(2, "0")
-  const display = branch > 0 ? "제" + mainNum + "조의" + branch : "제" + mainNum + "조"
-
-  return { code, display }
-}
-
-/**
- * Helper: 중첩 배열 평탄화 후 문자열 결합 (<img> 태그 제외)
- */
-function flattenArrayContent(value: any): string {
-  if (typeof value === "string") return value
-  if (!Array.isArray(value)) return ""
-
-  const flatten = (arr: any[]): string[] => {
-    const result: string[] = []
-    for (const item of arr) {
-      if (typeof item === "string") {
-        // <img> 태그만 제외 (표 테두리는 유지)
-        if (!item.startsWith("<img") && !item.startsWith("</img")) {
-          result.push(item)
-        }
-      } else if (Array.isArray(item)) {
-        result.push(...flatten(item))
-      }
-    }
-    return result
-  }
-  return flatten(value).join("\n")
-}
-
-/**
- * Helper: Extract content from 항 array (recursive for 호/목)
- */
-function extractContentFromHangArray(hangArray: any[]): string {
-  let content = ""
-
-  if (!Array.isArray(hangArray)) {
-    return content
-  }
-
-  for (const hang of hangArray) {
-    // Extract 항내용 (paragraph content)
-    if (hang.항내용) {
-      const hangContent = flattenArrayContent(hang.항내용)
-      content += (content ? "\n" : "") + hangContent
-    }
-
-    // Extract 호 (items) within 항
-    if (hang.호 && Array.isArray(hang.호)) {
-      for (const ho of hang.호) {
-        if (ho.호내용) {
-          const hoContent = flattenArrayContent(ho.호내용)
-          content += "\n" + hoContent
-        }
-
-        // Extract 목 (sub-items) within 호
-        if (ho.목 && Array.isArray(ho.목)) {
-          for (const mok of ho.목) {
-            if (mok.목내용) {
-              const mokContent = flattenArrayContent(mok.목내용)
-              content += "\n" + mokContent
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return content
-}
+import { convertArticleNumberToCode, flattenArrayContent, extractContentFromHangArray } from "./law-data-utils"
+import { debugLogger } from "./debug-logger"
 
 /**
  * Main parser: JSON 법령 데이터 → LawData
@@ -222,7 +137,7 @@ export function parseLawJSON(jsonData: any): LawData {
       articleCount: articles.length,
     }
   } catch (error) {
-    console.error("JSON 파싱 오류", error)
+    debugLogger.error("JSON 파싱 오류", error)
     throw error
   }
 }

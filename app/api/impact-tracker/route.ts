@@ -14,19 +14,7 @@ import {
   isQuotaExceeded,
   recordAIUsage,
 } from '@/lib/usage-tracker'
-
-function getClientIP(request: NextRequest): string {
-  const vercelIP = request.headers.get('x-vercel-forwarded-for')
-  if (vercelIP) return vercelIP.split(',')[0].trim()
-
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-
-  const realIP = request.headers.get('x-real-ip')
-  if (realIP) return realIP
-
-  return '127.0.0.1'
-}
+import { getClientIP } from '@/lib/get-client-ip'
 
 export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request)

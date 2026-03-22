@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 import { LawViewerAnalysisMenu } from "./law-viewer-analysis-menu"
 import { useLawViewerContext } from "./law-viewer-context"
-import type { LawArticle } from "@/lib/law-types"
+import type { LawArticle, ThreeTierData } from "@/lib/law-types"
 import type { PrecedentSearchResult } from "@/lib/precedent-parser"
 
 interface LawViewerActionButtonsProps {
@@ -24,8 +24,8 @@ interface LawViewerActionButtonsProps {
   // 위임법령
   tierViewMode: "1-tier" | "2-tier" | "3-tier"
   setTierViewMode: (mode: "1-tier" | "2-tier" | "3-tier") => void
-  threeTierDelegation: any
-  threeTierCitation: any
+  threeTierDelegation: ThreeTierData | null
+  threeTierCitation: ThreeTierData | null
   isLoadingThreeTier: boolean
   fetchThreeTierData: () => Promise<void>
   shouldDisableDelegationButton: boolean

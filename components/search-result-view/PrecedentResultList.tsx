@@ -6,12 +6,15 @@
 
 "use client"
 
-import React, { memo, useState, useRef, useEffect, useCallback } from "react"
+import React, { memo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { generatePageNumbers } from "@/lib/pagination-utils"
+import { useTruncationTooltip } from "@/hooks/use-truncation-tooltip"
+import { TruncationTooltip } from "@/components/shared/truncation-tooltip"
 import type { PrecedentSearchResult } from "@/lib/precedent-parser"
 
 // ============================================================
@@ -220,57 +223,7 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
   index,
   onSelect,
 }: PrecedentResultCardProps) {
-  const [showTooltip, setShowTooltip] = useState(false)
-  const [isTruncated, setIsTruncated] = useState(false)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const titleRef = useRef<HTMLHeadingElement>(null)
-
-  // ResizeObserver로 truncated 상태 동적 감지 + 폰트 로딩 대기
-  useEffect(() => {
-    const element = titleRef.current
-    if (!element) return
-
-    let mounted = true
-
-    const checkTruncated = () => {
-      if (!mounted || !element) return
-      // scrollWidth가 clientWidth보다 크면 잘림
-      // fallback: 문자열이 충분히 길면 잘렸을 가능성 높음 (20자 이상)
-      const isTrunc = element.scrollWidth > element.clientWidth ||
-                      (precedent.name?.length || 0) > 25
-      setIsTruncated(isTrunc)
-    }
-
-    // 폰트 로딩 후 체크 (Pretendard 로딩 대기)
-    const init = async () => {
-      try {
-        if (document.fonts?.ready) {
-          await document.fonts.ready
-        }
-      } catch {
-        // fonts API 실패 시 무시
-      }
-      // 렌더링 안정화를 위해 여러 프레임 대기
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          checkTruncated()
-        })
-      })
-    }
-    init()
-
-    const observer = new ResizeObserver(checkTruncated)
-    observer.observe(element)
-
-    return () => {
-      mounted = false
-      observer.disconnect()
-    }
-  }, [precedent.name])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY })
-  }, [])
+  const tooltip = useTruncationTooltip<HTMLHeadingElement>({ watchValue: precedent.name, lengthFallback: 25 })
 
   // 법원 배지 색상
   const getCourtBadgeClass = (court: string) => {
@@ -304,9 +257,9 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
   return (
     <button
       onClick={() => onSelect(precedent)}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      onMouseMove={handleMouseMove}
+      onMouseEnter={tooltip.onMouseEnter}
+      onMouseLeave={tooltip.onMouseLeave}
+      onMouseMove={tooltip.onMouseMove}
       className="group relative w-full p-4 md:p-5 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-xl hover:border-blue-500/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 30}ms`,
@@ -316,28 +269,14 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
       {/* 사건명 - 한 줄 말줄임 */}
       <div className="relative mb-2.5">
         <h4
-          ref={titleRef}
+          ref={tooltip.ref}
           title={precedent.name || '사건명 없음'}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
         >
           {precedent.name || '사건명 없음'}
         </h4>
 
-        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
-        {showTooltip && isTruncated && (
-          <div
-            className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
-            style={{
-              fontFamily: "Pretendard, sans-serif",
-              left: `${mousePos.x + 12}px`,
-              top: `${mousePos.y + 16}px`,
-            }}
-          >
-            <p className="text-xs text-popover-foreground line-clamp-2 break-words">
-              {precedent.name}
-            </p>
-          </div>
-        )}
+        <TruncationTooltip show={tooltip.showTooltip && tooltip.isTruncated} position={tooltip.tooltipPosition} text={precedent.name || ''} />
       </div>
 
       {/* 배지들 - 1열 컴팩트 배치 */}
@@ -383,21 +322,3 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
   )
 })
 
-// 페이지 번호 생성 헬퍼
-function generatePageNumbers(current: number, total: number): (number | string)[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1)
-  }
-
-  const pages: (number | string)[] = []
-
-  if (current <= 4) {
-    pages.push(1, 2, 3, 4, 5, '...', total)
-  } else if (current >= total - 3) {
-    pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total)
-  } else {
-    pages.push(1, '...', current - 1, current, current + 1, '...', total)
-  }
-
-  return pages
-}

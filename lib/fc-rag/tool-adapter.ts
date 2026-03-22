@@ -219,8 +219,11 @@ function stableStringify(obj: Record<string, unknown>): string {
 interface ToolDef {
   name: string
   description: string
+  // `any` is intentional: Zod schemas return diverse parsed types, and tool schemas
+  // have dynamic index signatures that can't be narrowed without generics overhead.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: { parse: (data: unknown) => any; [key: string]: any }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: (client: LawApiClient, input: any) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
 }
 

@@ -229,7 +229,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.log("Law search error:", error)
+    debugLogger.error("Law search error:", error)
     debugLogger.error("법령 검색 실패", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "알 수 없는 오류" }, { status: 500 })
   }

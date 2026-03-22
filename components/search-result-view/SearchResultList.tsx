@@ -12,37 +12,12 @@ import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TruncationTooltip } from "@/components/shared/truncation-tooltip"
+import { useTruncationTooltip } from "@/hooks/use-truncation-tooltip"
 import { formatDate } from "@/lib/revision-parser"
+import { generatePageNumbers } from "@/lib/pagination-utils"
 import { getLawTypeBadgeClass } from "./utils"
 import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery, InterpretationSearchResult, RulingSearchResult } from "./types"
-
-// ============================================================
-// 헬퍼 함수
-// ============================================================
-
-/** 페이지네이션 번호 생성 (판례 리스트와 동일) */
-function generatePageNumbers(currentPage: number, totalPages: number): (number | string)[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1)
-  }
-
-  const pages: (number | string)[] = [1]
-
-  if (currentPage > 3) pages.push('...')
-
-  const start = Math.max(2, currentPage - 1)
-  const end = Math.min(totalPages - 1, currentPage + 1)
-
-  for (let i = start; i <= end; i++) {
-    pages.push(i)
-  }
-
-  if (currentPage < totalPages - 2) pages.push('...')
-
-  pages.push(totalPages)
-
-  return pages
-}
 
 // ============================================================
 // 법령 검색 결과 리스트
@@ -130,39 +105,16 @@ const LawResultCard = memo(function LawResultCard({
   index,
   onSelect,
 }: LawResultCardProps) {
-  const [showTooltip, setShowTooltip] = React.useState(false)
-  const [isTruncated, setIsTruncated] = React.useState(false)
-  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
-  const titleRef = React.useRef<HTMLHeadingElement>(null)
   const lawName = String(law.lawName)
-
-  // ResizeObserver로 truncated 상태 동적 감지
-  React.useEffect(() => {
-    const element = titleRef.current
-    if (!element) return
-
-    const checkTruncated = () => {
-      setIsTruncated(element.scrollWidth > element.clientWidth)
-    }
-
-    checkTruncated()
-
-    const observer = new ResizeObserver(checkTruncated)
-    observer.observe(element)
-
-    return () => observer.disconnect()
-  }, [lawName])
-
-  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY })
-  }, [])
+  const { ref, isTruncated, showTooltip, tooltipPosition, onMouseEnter, onMouseMove, onMouseLeave } =
+    useTruncationTooltip<HTMLHeadingElement>({ watchValue: lawName })
 
   return (
     <button
       onClick={() => onSelect(law)}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      onMouseMove={handleMouseMove}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onMouseMove={onMouseMove}
       className="group relative p-4 md:p-5 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
@@ -172,28 +124,18 @@ const LawResultCard = memo(function LawResultCard({
       {/* 법령명 - 한 줄 말줄임 */}
       <div className="relative mb-2.5">
         <h4
-          ref={titleRef}
+          ref={ref}
           title={lawName}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
         >
           {lawName}
         </h4>
 
-        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
-        {showTooltip && isTruncated && (
-          <div
-            className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
-            style={{
-              fontFamily: "Pretendard, sans-serif",
-              left: `${mousePos.x + 12}px`,
-              top: `${mousePos.y + 16}px`,
-            }}
-          >
-            <p className="text-xs text-popover-foreground line-clamp-2 break-words">
-              {lawName}
-            </p>
-          </div>
-        )}
+        <TruncationTooltip
+          show={showTooltip && isTruncated}
+          position={tooltipPosition}
+          text={lawName}
+        />
       </div>
 
       {/* 배지들 - 1열 컴팩트 배치 */}
@@ -482,39 +424,16 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
   index,
   onSelect,
 }: OrdinanceResultCardProps) {
-  const [showTooltip, setShowTooltip] = React.useState(false)
-  const [isTruncated, setIsTruncated] = React.useState(false)
-  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 })
-  const titleRef = React.useRef<HTMLHeadingElement>(null)
   const ordinName = String(ordinance.ordinName)
-
-  // ResizeObserver로 truncated 상태 동적 감지
-  React.useEffect(() => {
-    const element = titleRef.current
-    if (!element) return
-
-    const checkTruncated = () => {
-      setIsTruncated(element.scrollWidth > element.clientWidth)
-    }
-
-    checkTruncated()
-
-    const observer = new ResizeObserver(checkTruncated)
-    observer.observe(element)
-
-    return () => observer.disconnect()
-  }, [ordinName])
-
-  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY })
-  }, [])
+  const { ref, isTruncated, showTooltip, tooltipPosition, onMouseEnter, onMouseMove, onMouseLeave } =
+    useTruncationTooltip<HTMLHeadingElement>({ watchValue: ordinName })
 
   return (
     <button
       onClick={() => onSelect(ordinance)}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      onMouseMove={handleMouseMove}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onMouseMove={onMouseMove}
       className="group relative p-4 md:p-5 bg-card/50 backdrop-blur-sm border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 text-left overflow-hidden animate-fade-in"
       style={{
         animationDelay: `${index * 50}ms`,
@@ -524,28 +443,18 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
       {/* 조례명 - 한 줄 말줄임 */}
       <div className="relative mb-2.5">
         <h4
-          ref={titleRef}
+          ref={ref}
           title={ordinName}
           className="font-bold text-sm md:text-base leading-tight truncate group-hover:text-primary transition-colors"
         >
           {ordinName}
         </h4>
 
-        {/* 툴팁 - 실제로 잘렸을 때만 표시, 2줄까지 */}
-        {showTooltip && isTruncated && (
-          <div
-            className="fixed z-[9999] max-w-xs p-2 bg-popover/95 backdrop-blur border border-border rounded-lg shadow-2xl pointer-events-none"
-            style={{
-              fontFamily: "Pretendard, sans-serif",
-              left: `${mousePos.x + 12}px`,
-              top: `${mousePos.y + 16}px`,
-            }}
-          >
-            <p className="text-xs text-popover-foreground line-clamp-2 break-words">
-              {ordinName}
-            </p>
-          </div>
-        )}
+        <TruncationTooltip
+          show={showTooltip && isTruncated}
+          position={tooltipPosition}
+          text={ordinName}
+        />
       </div>
 
       {/* 배지들 - 1열 컴팩트 배치 */}

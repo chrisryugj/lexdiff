@@ -33,6 +33,7 @@ export async function GET(request: Request) {
 
     const url = `${LAW_API_BASE}?${params.toString()}`
     debugLogger.info("자치법규 본문 API 호출", { ordinId, ordinSeq })
+    debugLogger.debug("Ordinance API URL:", url)
 
     const response = await fetch(url, {
       next: { revalidate: 3600 },
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
     })
 
     const text = await response.text()
+    debugLogger.debug("Ordinance response status:", response.status)
 
     if (!response.ok) {
       debugLogger.error("자치법규 본문 API 오류", { status: response.status, body: text.substring(0, 500) })
