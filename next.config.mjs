@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // korean-law-mcp의 네이티브 의존성(cfb, pdfjs-dist 등)을 서버사이드 번들링에서 제외
-  serverExternalPackages: ['korean-law-mcp', 'kordoc', 'cfb', 'pdfjs-dist', 'jszip'],
+  serverExternalPackages: ['korean-law-mcp', 'kordoc', 'cfb', 'jszip'],
   images: {
     unoptimized: true,
   },
