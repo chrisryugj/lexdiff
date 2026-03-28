@@ -277,7 +277,7 @@ function SearchResultViewComponent({
             articles: cached.lawData.articles.map(a => ({
               jo: a.joNumber,
               joNum: a.joLabel,
-              title: '',
+              title: a.title || '',
               content: a.content,
               isPreamble: false,
             })),

@@ -30,8 +30,10 @@ async function parsePdfDirect(buffer: ArrayBuffer): Promise<ParseResult> {
         constructor(init?: number[]) { if (init) this.m = init }
       }
     }
-    const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist/legacy/build/pdf.mjs")
-    GlobalWorkerOptions.workerSrc = ""
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+    // Vercel 서버리스: worker 비활성화 (fake worker 사용)
+    pdfjs.GlobalWorkerOptions.workerSrc = "data:,"
+    const { getDocument } = pdfjs
 
     const data = new Uint8Array(buffer)
     const doc = await getDocument({

@@ -45,6 +45,7 @@ export interface SearchResultCache {
     articles: Array<{
       joNumber: string
       joLabel: string
+      title?: string
       content: string
       isDeleted?: boolean
       revisionInfo?: string

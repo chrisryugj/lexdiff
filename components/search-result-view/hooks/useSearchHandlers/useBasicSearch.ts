@@ -77,6 +77,7 @@ async function fetchOrdinanceDirect(
               articles: parsedData.articles.map(a => ({
                 joNumber: a.jo,
                 joLabel: a.joNum,
+                title: a.title || '',
                 content: a.content,
                 isDeleted: false,
               })),

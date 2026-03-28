@@ -166,6 +166,7 @@ export function useFetchLawContent(deps: HandlerDeps) {
                 articles: articles.map(a => ({
                   joNumber: a.jo,
                   joLabel: a.joNum,
+                  title: a.title || '',
                   content: a.content,
                   isDeleted: false,
                 })),

@@ -149,6 +149,7 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
                 articles: articles.map(a => ({
                   joNumber: a.jo,
                   joLabel: a.joNum,
+                  title: a.title || '',
                   content: a.content,
                   isDeleted: false,
                 })),
