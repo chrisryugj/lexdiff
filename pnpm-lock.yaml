@@ -162,8 +162,8 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
       kordoc:
-        specifier: ^1.0.2
-        version: 1.0.2(pdfjs-dist@5.5.207)
+        specifier: ^1.2.0
+        version: 1.2.0(pdfjs-dist@5.5.207)
       korean-law-mcp:
         specifier: ^2.1.3
         version: 2.1.3
@@ -3110,8 +3110,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  kordoc@1.0.2:
-    resolution: {integrity: sha512-XeVNsumXO4R3xKGlY4Fx031p6N844qNv6XCPDAmGfnlsL5XvBVJpjca6xFqZhIcMA05n5gqX88tkyTIGdDoWZA==}
+  kordoc@1.2.0:
+    resolution: {integrity: sha512-SBfzmJMm0J/WgL7HmsiQfWDUfhacR/sB8ytog8/4qr7FenetKXANZz56Thjof2TmnqXaKJwlXtW6V839dBHRog==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -7107,7 +7107,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  kordoc@1.0.2(pdfjs-dist@5.5.207):
+  kordoc@1.2.0(pdfjs-dist@5.5.207):
     dependencies:
       '@modelcontextprotocol/sdk': 1.28.0(zod@3.25.76)
       '@xmldom/xmldom': 0.9.8
