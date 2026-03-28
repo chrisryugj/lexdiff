@@ -10,6 +10,19 @@
 
 import { parseHwpx, parseHwp, isHwpxFile, isOldHwpFile, isPdfFile } from "kordoc"
 import type { ParseResult } from "kordoc"
+// Vercel 서버리스(Node.js): DOMMatrix polyfill (pdfjs-dist가 참조)
+if (typeof globalThis.DOMMatrix === "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(globalThis as any).DOMMatrix = class DOMMatrix {
+    m: number[] = [1, 0, 0, 1, 0, 0]
+    constructor(init?: number[]) { if (init) this.m = init }
+  }
+}
+
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs"
+
+// Node.js/Vercel: worker 비활성화 (static import 시점에 설정해야 유효)
+GlobalWorkerOptions.workerSrc = ""
 
 // ─── 타입 re-export ─────────────────────────────────
 
@@ -21,20 +34,6 @@ export { isHwpxFile, isOldHwpFile, isPdfFile }
 
 async function parsePdfDirect(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // Vercel 서버리스(Node.js)에서 DOMMatrix가 없으므로 polyfill
-    if (typeof globalThis.DOMMatrix === "undefined") {
-      // pdfjs-dist가 DOMMatrix를 참조하지만 텍스트 추출에는 불필요
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(globalThis as any).DOMMatrix = class DOMMatrix {
-        m: number[] = [1, 0, 0, 1, 0, 0]
-        constructor(init?: number[]) { if (init) this.m = init }
-      }
-    }
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-    // Node.js 환경: worker 비활성화
-    pdfjs.GlobalWorkerOptions.workerSrc = ""
-    const { getDocument } = pdfjs
-
     const data = new Uint8Array(buffer)
     const doc = await getDocument({
       data,
