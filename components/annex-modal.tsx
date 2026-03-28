@@ -75,9 +75,10 @@ export function AnnexModal({
   const [annexData, setAnnexData] = useState<LawAnnex | null>(null)
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("markdown")
-  const [fileType, setFileType] = useState<"pdf" | "hwp" | "unknown">("unknown")
+  const [fileType, setFileType] = useState<"pdf" | "hwp" | "hwpx" | "unknown">("unknown")
   const [fontSize, setFontSize] = useState(14)
   const contentRef = useRef<HTMLDivElement>(null)
+  const savedScrollRef = useRef<number>(0)
 
   // 조례 여부 판별 (자치법규)
   const isOrdinance = /조례/.test(lawName) ||
@@ -188,7 +189,7 @@ export function AnnexModal({
           const fileCheckRes = await fetch(`/api/annex-pdf?flSeq=${flSeq}`, {
             method: "HEAD",
           })
-          const detectedFileType = fileCheckRes.headers.get("X-File-Type") as "pdf" | "hwp" | "unknown" || "unknown"
+          const detectedFileType = fileCheckRes.headers.get("X-File-Type") as "pdf" | "hwp" | "hwpx" | "unknown" || "unknown"
           setFileType(detectedFileType)
         } catch {
           setFileType("pdf")
@@ -256,15 +257,24 @@ export function AnnexModal({
     }
   }, [isOpen, annexNumber, lawName, fetchAnnexData])
 
-  // 모달 닫힐 때 상태 초기화
+  // 모달 열릴 때 스크롤 위치 저장, 닫힐 때 복원
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      savedScrollRef.current = window.scrollY
+    } else {
+      // 상태 초기화
       setLoadingState("idle")
       setError(null)
       setAnnexData(null)
       setMarkdown(null)
       setViewMode("markdown")
       setFileType("unknown")
+      // 스크롤 위치 복원
+      if (savedScrollRef.current > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, savedScrollRef.current)
+        })
+      }
     }
   }, [isOpen])
 
@@ -356,7 +366,7 @@ export function AnnexModal({
               onClick={handleDownload}
               disabled={!annexData?.pdfLink}
               className="h-7 w-7 hidden sm:flex"
-              title={fileType === "hwp" ? "HWP 다운로드" : "PDF 다운로드"}
+              title={fileType === "hwp" || fileType === "hwpx" ? "HWP 다운로드" : "PDF 다운로드"}
             >
               <Icon name="download" className="w-3.5 h-3.5" />
             </Button>
@@ -477,7 +487,7 @@ export function AnnexModal({
                 {annexData?.annexName || `별표 ${annexNumber}`}
               </p>
               <p className="text-sm text-muted-foreground">
-                {fileType === "hwp" ? "HWP" : "PDF"} 원문을 확인하세요.
+                {fileType === "hwp" || fileType === "hwpx" ? "HWP" : "PDF"} 원문을 확인하세요.
               </p>
             </div>
             <div className="flex gap-2">

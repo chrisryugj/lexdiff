@@ -547,6 +547,11 @@ function extractLawNameBeforeAnnex(text: string, annexIndex: number): string | u
     const between = beforeText.substring(lastMatch.index + lastMatch[0].length)
     // 중간에 다른 「」가 없어야 함
     if (!between.includes('「')) {
+      // 문장 경계 체크: "~다." + 공백/줄바꿈 또는 항 번호(①②③...)가 있으면
+      // 별표는 인용 법령이 아닌 현재 법령의 것
+      if (/다\.\s|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(between)) {
+        return undefined
+      }
       return lastMatch[1]
     }
   }

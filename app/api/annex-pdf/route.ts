@@ -58,10 +58,14 @@ export async function GET(request: Request) {
     const bytes = new Uint8Array(buffer.slice(0, 8))
     const isPdfBySignature = bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 // %PDF
     const isHwpBySignature = bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0 // OLE (HWP)
+    const isZipBySignature = bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04 // ZIP (HWPX)
 
     // Content-Type과 시그니처 종합 판단
+    // 법제처가 HWPX 파일도 content-type "hwp"로 보내는 경우가 있으므로
+    // ZIP 시그니처면 HWPX로 판별 (HWP5 OLE2와 구분)
     const isPdf = contentType.includes("pdf") || isPdfBySignature
-    const isHwp = contentType.includes("hwp") || isHwpBySignature
+    const isHwpx = isZipBySignature && (contentType.includes("hwp") || contentType.includes("zip"))
+    const isHwp = !isHwpx && (contentType.includes("hwp") || isHwpBySignature)
 
     debugLogger.info("파일 타입 감지", {
       contentType,
@@ -112,7 +116,7 @@ export async function GET(request: Request) {
         "Content-Type": responseContentType,
         "Content-Disposition": `${disposition}; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        "X-File-Type": isPdf ? "pdf" : isHwp ? "hwp" : "unknown",
+        "X-File-Type": isPdf ? "pdf" : isHwp ? "hwp" : isHwpx ? "hwpx" : "unknown",
         // PDF 임베딩 허용
         "X-Frame-Options": "SAMEORIGIN",
         "Content-Security-Policy": "frame-ancestors 'self'",

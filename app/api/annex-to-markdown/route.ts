@@ -1,11 +1,7 @@
-import { GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
-import { parseAnnexFile, isHwpxFile, isOldHwpFile, isPdfFile } from "@/lib/annex-parser"
-import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
+import { parseAnnexFile } from "@/lib/annex-parser"
 import { validateExternalUrl } from "@/lib/url-validator"
-import { AI_CONFIG } from "@/lib/ai-config"
-import { getClientIP } from "@/lib/get-client-ip"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
 function getBaseUrl(request: Request): string {
@@ -13,19 +9,7 @@ function getBaseUrl(request: Request): string {
   return `${url.protocol}//${url.host}`
 }
 
-function buildPdfPrompt(lawName?: string, annexNumber?: string) {
-  return `다음 PDF는 ${lawName || "법령"}의 ${annexNumber || "별표"}입니다.
-
-한국어 마크다운으로만 변환하세요.
-- 표는 가능한 한 마크다운 표 형식으로 유지합니다.
-- 제목, 항목 번호, 들여쓰기 구조를 보존합니다.
-- 페이지 번호나 반복 머리글은 제거합니다.
-- 설명 문장 없이 변환 결과만 출력합니다.`
-}
-
 export async function POST(request: Request) {
-  const clientIP = getClientIP(request)
-
   try {
     const { pdfUrl, annexNumber, lawName } = await request.json()
 
@@ -36,7 +20,7 @@ export async function POST(request: Request) {
     const baseUrl = getBaseUrl(request)
     const fullPdfUrl = pdfUrl.startsWith("/") ? `${baseUrl}${pdfUrl}` : pdfUrl
 
-    // 상대 경로도 반드시 허용된 내부 경로인지 검증 (SSRF 방지)
+    // SSRF 방지: 허용된 경로만
     if (pdfUrl.startsWith("/")) {
       const allowedPrefixes = ["/api/annex-pdf"]
       if (!allowedPrefixes.some((p: string) => pdfUrl.startsWith(p))) {
@@ -55,14 +39,13 @@ export async function POST(request: Request) {
 
     const fileBuffer = await fileResponse.arrayBuffer()
 
-    // 통합 파서: HWPX + 구형 HWP + PDF 모두 지원
+    // kordoc 통합 파서: HWPX, HWP5, PDF 모두 순수 파싱
     const result = await parseAnnexFile(fileBuffer)
 
-    if (result.success && result.markdown) {
+    if (result.success) {
       debugLogger.success(`Annex parsed (${result.fileType})`, {
         annexNumber,
         markdownLength: result.markdown.length,
-        pageCount: result.pageCount,
       })
       return NextResponse.json({
         markdown: result.markdown,
@@ -70,77 +53,25 @@ export async function POST(request: Request) {
       })
     }
 
-    // 파싱 실패 시 분기
-    if (isOldHwpFile(fileBuffer)) {
-      debugLogger.warning("HWP5 파싱 실패, 다운로드 안내", { error: result.error })
+    // result.success === false → error 필드 접근 가능
+    if (result.fileType === "hwp") {
       return NextResponse.json({
         error: result.error || "구형 HWP 파일 파싱에 실패했습니다.",
         fileType: "old-hwp",
       }, { status: 400 })
     }
 
-    if (isPdfFile(fileBuffer) && result.isImageBased) {
-      debugLogger.info("이미지 기반 PDF, Gemini Vision 폴백", { pageCount: result.pageCount })
-      // 이미지 기반 PDF → Gemini Vision으로 폴백
-    } else if (isPdfFile(fileBuffer) && result.success === false) {
-      debugLogger.warning("PDF 파싱 실패, Gemini Vision 폴백", { error: result.error })
-      // PDF 파싱 실패 → Gemini Vision으로 폴백
-    } else if (isHwpxFile(fileBuffer)) {
-      debugLogger.warning("HWPX 파싱 실패, Gemini Vision 폴백", { error: result.error })
-      // HWPX 실패 → Gemini Vision으로 폴백
+    if (result.isImageBased) {
+      return NextResponse.json({
+        error: result.error || "이미지 기반 PDF입니다. 텍스트 추출이 불가합니다.",
+        fileType: "image-pdf",
+      }, { status: 400 })
     }
-
-    // 파싱 실패 → Gemini Vision AI 변환 (PDF 이미지 기반 또는 파서 실패)
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-      debugLogger.error("GEMINI_API_KEY is missing")
-      return NextResponse.json(
-        { error: "AI 서비스가 설정되지 않았습니다." },
-        { status: 500 }
-      )
-    }
-
-    if (await isQuotaExceeded(clientIP)) {
-      return NextResponse.json(
-        { error: "일일 AI 사용 시도를 초과했습니다." },
-        { status: 429, headers: await getUsageHeaders(clientIP) }
-      )
-    }
-
-    await recordAIUsage(clientIP)
-
-    const ai = new GoogleGenAI({ apiKey })
-    const response = await ai.models.generateContent({
-      model: AI_CONFIG.gemini.lite,
-      contents: [
-        {
-          inlineData: {
-            mimeType: "application/pdf",
-            data: Buffer.from(fileBuffer).toString("base64"),
-          },
-        },
-        {
-          text: buildPdfPrompt(lawName, annexNumber),
-        },
-      ],
-    })
-
-    const markdown = response.text
-    if (!markdown || markdown.length < 10) {
-      throw new Error("마크다운 변환 결과가 비어 있습니다.")
-    }
-
-    await recordAITokens(clientIP, markdown.length)
-
-    debugLogger.success("Annex conversion complete", {
-      annexNumber,
-      markdownLength: markdown.length,
-    })
 
     return NextResponse.json({
-      markdown,
-      source: "gemini-vision",
-    })
+      error: result.error || "파일 파싱에 실패했습니다.",
+      fileType: result.fileType,
+    }, { status: 400 })
   } catch (error) {
     debugLogger.error("Annex conversion failed", error)
     return NextResponse.json(
