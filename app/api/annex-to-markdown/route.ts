@@ -73,10 +73,11 @@ export async function POST(request: Request) {
       fileType: result.fileType,
     }, { status: 400 })
   } catch (error) {
-    debugLogger.error("Annex conversion failed", error)
+    const errMsg = error instanceof Error ? error.message : String(error)
+    debugLogger.error("Annex conversion failed", { error: errMsg })
     return NextResponse.json(
       {
-        error: "별표 변환 중 오류가 발생했습니다.",
+        error: `별표 변환 중 오류: ${errMsg}`,
         markdown: null,
         source: "error",
       },
