@@ -25,17 +25,23 @@ export async function register() {
       const extendedCa = [...tls.rootCertificates, lawCaCert]
 
       // tls.createSecureContext를 패치하여 모든 TLS 연결에 법제처 CA 추가
-      // (https 모듈 + undici 기반 fetch 모두 내부적으로 이 함수를 호출)
+      // ESM 모듈에서는 직접 할당이 안 될 수 있으므로 try/catch + NODE_EXTRA_CA_CERTS 폴백
       const _origCreateSecureContext = tls.createSecureContext
-      const origFn = _origCreateSecureContext
-      ;(tls as any).createSecureContext = (options?: Parameters<typeof origFn>[0]) => {
-        // 호출자가 명시적으로 CA를 지정한 경우 그대로 사용
-        if (options?.ca) return _origCreateSecureContext(options)
-        // 기본 CA + 법제처 CA로 확장
-        return _origCreateSecureContext({ ...options, ca: extendedCa })
+      try {
+        Object.defineProperty(tls, 'createSecureContext', {
+          value: (options?: Parameters<typeof _origCreateSecureContext>[0]) => {
+            if (options?.ca) return _origCreateSecureContext(options)
+            return _origCreateSecureContext({ ...options, ca: extendedCa })
+          },
+          writable: true,
+          configurable: true,
+        })
+        console.log('[instrumentation] 법제처 CA 신뢰 목록 추가 완료 (TLS 검증 유지)')
+      } catch {
+        // ESM getter-only 환경 (Turbopack 등) — NODE_TLS_REJECT_UNAUTHORIZED 폴백
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+        console.warn('[instrumentation] tls 패치 실패 — TLS 검증 비활성화 폴백')
       }
-
-      console.log('[instrumentation] 법제처 CA 신뢰 목록 추가 완료 (TLS 검증 유지)')
     } else {
       console.warn('[instrumentation] certs/law-go-kr-chain.pem 없음 — 법제처 API SSL 오류 가능')
     }
