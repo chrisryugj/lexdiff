@@ -115,7 +115,7 @@ export function AnnexModal({
   }, [annexData, lawName, annexNumber])
 
   // 별표 데이터 가져오기
-  const fetchAnnexData = useCallback(async () => {
+  const fetchAnnexData = useCallback(async (skipCache = false) => {
     if (!lawName || !annexNumber) return
 
     setLoadingState("fetching-list")
@@ -126,7 +126,7 @@ export function AnnexModal({
     try {
       // 1. 캐시 확인 (lawId 우선, 없으면 lawName으로 fallback)
       const cacheKey = lawId || lawName
-      if (cacheKey) {
+      if (!skipCache && cacheKey) {
         const cached = await getAnnexCache(cacheKey, annexNumber)
         if (cached) {
           setMarkdown(cached.markdown)
@@ -353,6 +353,16 @@ export function AnnexModal({
             </div>
 
             {/* 기능 버튼들 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { fetchAnnexData(true) }}
+              disabled={isLoading}
+              className="h-7 w-7 hidden sm:flex"
+              title="캐시 무시 새로고침"
+            >
+              <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
             {markdown && (
               <CopyButton
                 getText={() => markdown}
@@ -405,7 +415,7 @@ export function AnnexModal({
             <Icon name="alert-circle" className="w-12 h-12 text-destructive/60" />
             <p className="text-sm text-destructive text-center whitespace-pre-line">{error}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={fetchAnnexData}>
+              <Button variant="outline" size="sm" onClick={() => { fetchAnnexData() }}>
                 <Icon name="refresh-cw" className="w-4 h-4 mr-2" />
                 다시 시도
               </Button>
