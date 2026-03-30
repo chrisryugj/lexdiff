@@ -158,8 +158,10 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     if (!contentEl) return
 
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
+      const target = (e.target as HTMLElement).closest("a") as HTMLAnchorElement | null
       if (target && target.tagName === "A") {
+        // 외부 링크 (target="_blank")는 기본 동작 허용
+        if (target.getAttribute("target") === "_blank") return
         e.preventDefault()
         e.stopPropagation()
         if (onContentClickRef.current) {
