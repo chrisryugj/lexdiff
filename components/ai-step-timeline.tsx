@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Icon } from "@/components/ui/icon"
 import type { ToolCallLogEntry } from "@/components/search-result-view/types"
 
-/** call/result 페어링 → 완료/진행 중 단계 목록 */
+/** call/result 페어링 → 완료/진행 중 단계 목록 (사고 단계 포함) */
 function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
     const steps: Array<{
         name: string
@@ -15,6 +15,7 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
         success?: boolean
         summary?: string
         statusMessages: string[]
+        isThinking?: boolean
     }> = []
 
     const statusBefore = new Map<number, string[]>()
@@ -35,9 +36,11 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
     const calls = logs.map((l, i) => ({ ...l, _idx: i })).filter(l => l.type === 'call')
     const results = logs.filter(l => l.type === 'result')
 
-    for (const call of calls) {
+    for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci]
         const matchResult = results.find(r => r.name === call.name && r.timestamp && call.timestamp && r.timestamp >= call.timestamp)
         const msgs = statusBefore.get(call._idx) || []
+
         if (matchResult) {
             steps.push({
                 name: call.name || '',
@@ -49,6 +52,32 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
                 summary: matchResult.summary,
                 statusMessages: msgs,
             })
+
+            // 다음 tool_call까지의 "사고" 시간 — 1.5초 이상이면 별도 단계로 표시
+            const nextCall = calls[ci + 1]
+            if (nextCall && matchResult.timestamp && nextCall.timestamp) {
+                const thinkingMs = nextCall.timestamp - matchResult.timestamp
+                if (thinkingMs > 1500) {
+                    steps.push({
+                        name: 'thinking',
+                        displayName: 'AI 분석 중',
+                        status: 'completed',
+                        durationMs: thinkingMs,
+                        statusMessages: [],
+                        isThinking: true,
+                    })
+                }
+            }
+            // 마지막 도구 결과 후 스트리밍 중이면 "사고 중" 표시
+            else if (!nextCall && isStreaming && call.name !== 'generate_answer') {
+                steps.push({
+                    name: 'thinking',
+                    displayName: 'AI 분석 중',
+                    status: 'in-progress',
+                    statusMessages: [],
+                    isThinking: true,
+                })
+            }
         } else {
             steps.push({
                 name: call.name || '',
@@ -60,6 +89,7 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
         }
     }
 
+    // 도구 호출 없이 스트리밍 중일 때
     if (calls.length === 0 && isStreaming && logs.length > 0) {
         steps.push({
             name: 'waiting',
@@ -102,26 +132,38 @@ export function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: To
                 <div key={`${step.name}-${i}`}>
                     <div className="flex items-center gap-2.5 text-sm">
                         {step.status === 'completed' ? (
-                            <Icon name="check-circle" size={15} className="text-emerald-500 shrink-0" />
+                            step.isThinking ? (
+                                <Icon name="brain" size={15} className="text-violet-400 shrink-0" />
+                            ) : (
+                                <Icon name="check-circle" size={15} className="text-emerald-500 shrink-0" />
+                            )
                         ) : (
-                            <Icon name="loader" size={15} className="text-brand-gold animate-spin shrink-0" />
+                            step.isThinking ? (
+                                <Icon name="brain" size={15} className="text-violet-400 animate-pulse shrink-0" />
+                            ) : (
+                                <Icon name="loader" size={15} className="text-brand-gold animate-spin shrink-0" />
+                            )
                         )}
                         <span className={`flex-1 truncate ${
                             step.status === 'completed'
-                                ? 'text-gray-600 dark:text-gray-400'
+                                ? step.isThinking
+                                    ? 'text-violet-400 dark:text-violet-400'
+                                    : 'text-gray-600 dark:text-gray-400'
                                 : 'font-medium text-gray-800 dark:text-gray-200'
                         }`}>
                             {step.displayName}
                         </span>
                         {step.status === 'completed' && step.durationMs != null ? (
-                            <span className="text-xs text-gray-400 tabular-nums shrink-0">
+                            <span className={`text-xs tabular-nums shrink-0 ${
+                                step.isThinking ? 'text-violet-400' : 'text-gray-400'
+                            }`}>
                                 {(step.durationMs / 1000).toFixed(1)}초
                             </span>
                         ) : step.status === 'in-progress' && isStreaming ? (
                             <AiStepTimer />
                         ) : null}
                     </div>
-                    {step.status === 'in-progress' && isStreaming && lastStatusMessage && (
+                    {step.status === 'in-progress' && isStreaming && lastStatusMessage && !step.isThinking && (
                         <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                             {lastStatusMessage}
                         </div>
