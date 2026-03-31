@@ -51,8 +51,9 @@ export async function parseAnnexFile(buffer: ArrayBuffer): Promise<AnnexParseRes
   if (!result.success && result.fileType === "pdf" && !result.isImageBased) {
     try {
       return await pdfFallback(buffer)
-    } catch {
-      // fallback도 실패하면 원래 에러 반환
+    } catch (fallbackErr) {
+      const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+      return { ...result, error: `${result.error} [fallback: ${msg}]` } as ParseResult
     }
   }
   return result
