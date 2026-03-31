@@ -83,9 +83,6 @@ import { extractPrecedentKeywords, ExtractKeywordsSchema } from 'korean-law-mcp/
 import { summarizePrecedent, SummarizePrecedentSchema } from 'korean-law-mcp/tools/precedent-summary'
 import { searchEnglishLaw, searchEnglishLawSchema, getEnglishLawText, getEnglishLawTextSchema } from 'korean-law-mcp/tools/english-law'
 
-// ── Easy Law (생활법령 콘텐츠) ──
-import { getLifeLawCategories, getLifeLawCategoriesSchema, getLifeLawDetail, getLifeLawDetailSchema, getLifeLawFaq, getLifeLawFaqSchema, searchLifeLawContent, searchLifeLawContentSchema } from 'korean-law-mcp/tools/easy-law'
-
 // ── Utils (조문번호 변환) ──
 import { parseJoCode, ParseJoCodeSchema } from 'korean-law-mcp/tools/utils'
 
@@ -204,12 +201,6 @@ export const TOOLS: ToolDef[] = [
   // ══ English Law ══
   { name: 'search_english_law', description: '영문 법령 검색.', schema: searchEnglishLawSchema, handler: searchEnglishLaw },
   { name: 'get_english_law_text', description: '영문 법령 전문 조회.', schema: getEnglishLawTextSchema, handler: getEnglishLawText },
-
-  // ══ Easy Law (생활법령) ══
-  { name: 'get_life_law_categories', description: '생활법령 카테고리 목록 조회.', schema: getLifeLawCategoriesSchema, handler: getLifeLawCategories },
-  { name: 'get_life_law_detail', description: '생활법령 콘텐츠 상세 조회. id 필요.', schema: getLifeLawDetailSchema, handler: getLifeLawDetail },
-  { name: 'get_life_law_faq', description: '생활법령 FAQ 조회. id 필요.', schema: getLifeLawFaqSchema, handler: getLifeLawFaq },
-  { name: 'search_life_law_content', description: '생활법령 콘텐츠 검색. 일상 질문→생활법령.', schema: searchLifeLawContentSchema, handler: searchLifeLawContent },
 
   // ══ Utils ══
   { name: 'parse_jo_code', description: '조문번호↔JO코드 변환. "제38조"↔"003800".', schema: ParseJoCodeSchema, handler: (_client, input) => parseJoCode(input) },
