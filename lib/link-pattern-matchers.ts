@@ -547,9 +547,10 @@ function extractLawNameBeforeAnnex(text: string, annexIndex: number): string | u
     const between = beforeText.substring(lastMatch.index + lastMatch[0].length)
     // 중간에 다른 「」가 없어야 함
     if (!between.includes('「')) {
-      // 문장 경계 체크: "~다." + 공백/줄바꿈 또는 항 번호(①②③...)가 있으면
-      // 별표는 인용 법령이 아닌 현재 법령의 것
-      if (/다\.\s|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(between)) {
+      // 문장 경계 체크: 마침표+공백/줄바꿈 또는 항 번호(①②③...)가 있으면
+      // 별표는 인용 법령이 아닌 현재 법령(조례 등)의 것
+      // 예: 「지방공무원 복무규정」에 근거하여 규정함.\n별표 1 → 현재 법령 별표
+      if (/\.\s|\n|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(between)) {
         return undefined
       }
       // 위임 근거 체크: 「법명」과 별표 사이에 "제X조" 조문 참조가 있으면
