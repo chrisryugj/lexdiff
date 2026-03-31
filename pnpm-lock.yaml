@@ -162,8 +162,8 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
       kordoc:
-        specifier: ^1.6.0
-        version: 1.6.0(pdfjs-dist@5.5.207)
+        specifier: ^1.6.1
+        version: 1.6.1(pdfjs-dist@5.5.207)
       korean-law-mcp:
         specifier: ^2.1.3
         version: 2.1.3
@@ -2218,6 +2218,7 @@ packages:
   '@xmldom/xmldom@0.9.8':
     resolution: {integrity: sha512-p96FSY54r+WJ50FIOsCOjyj/wavs8921hG5+kVMmZgKcvIKxMXHTrjNJvRgWa/zuX3B6t2lijLNFaOyuxUH+2A==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -3110,8 +3111,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  kordoc@1.6.0:
-    resolution: {integrity: sha512-1CsssKda+zsB3dzBrmHwfcUlL5RZENW6C1Fn+vxW0GcpnP7SmE/7tMW7kXNTwUHMqcMDhngLoV7gRuXHEzIqCA==}
+  kordoc@1.6.1:
+    resolution: {integrity: sha512-HuuK0n/kRq9cMWd4VXsi4q0+bZJ20EXQgP2OLdPfHkfNrId5EoCydgE8AIrwNA1zeS0ZtvjOg7zhJf4AnRxL5A==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -7107,7 +7108,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  kordoc@1.6.0(pdfjs-dist@5.5.207):
+  kordoc@1.6.1(pdfjs-dist@5.5.207):
     dependencies:
       '@modelcontextprotocol/sdk': 1.28.0(zod@3.25.76)
       '@xmldom/xmldom': 0.9.8
