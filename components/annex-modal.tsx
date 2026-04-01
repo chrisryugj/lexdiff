@@ -60,6 +60,39 @@ function extractAnnexNum(text: string): string {
   return text
 }
 
+/**
+ * 묶음 별표 범위 매칭: annexName에 "[별표1~5]" 같은 범위가 있으면 targetNum 포함 여부 확인
+ */
+function matchesAnnexRange(annexName: string, targetNum: string): boolean {
+  const num = parseInt(targetNum, 10)
+  if (isNaN(num)) return false
+
+  const rangePattern = /별표\s*(\d+)\s*[~\-]\s*(\d+)/
+  const match = annexName.match(rangePattern)
+  if (!match) return false
+
+  const start = parseInt(match[1], 10)
+  const end = parseInt(match[2], 10)
+  return num >= start && num <= end
+}
+
+/**
+ * 묶음 별표 마크다운에서 특정 별표 섹션만 추출
+ * "## [별표 N]" 헤더 기준으로 분리
+ */
+function extractAnnexSection(markdown: string, targetNum: string): string {
+  const num = parseInt(targetNum, 10)
+  if (isNaN(num)) return markdown
+
+  // "## [별표 N]" 또는 "## [별표N]" 헤더로 섹션 분리
+  const escapedNum = String(num)
+  const sectionPattern = new RegExp(
+    `(##\\s*\\[별표\\s*${escapedNum}\\][\\s\\S]*?)(?=##\\s*\\[별표\\s*\\d|$)`
+  )
+  const match = markdown.match(sectionPattern)
+  return match ? match[1].trim() : markdown
+}
+
 export function AnnexModal({
   isOpen,
   onClose,
@@ -129,7 +162,11 @@ export function AnnexModal({
       if (!skipCache && cacheKey) {
         const cached = await getAnnexCache(cacheKey, annexNumber)
         if (cached) {
-          setMarkdown(cached.markdown)
+          // 묶음 별표 캐시인 경우 요청 섹션만 추출
+          const cachedMd = cached.annexName && matchesAnnexRange(cached.annexName, extractAnnexNum(annexNumber))
+            ? extractAnnexSection(cached.markdown, extractAnnexNum(annexNumber))
+            : cached.markdown
+          setMarkdown(cachedMd)
           setAnnexData({
             annexId: "",
             annexNumber: cached.annexNumber,
@@ -162,11 +199,16 @@ export function AnnexModal({
       )
       const searchPool = sameLawAnnexes.length > 0 ? sameLawAnnexes : annexes
 
-      // 3b. 번호 매칭
-      const targetAnnex = searchPool.find((a) => {
+      // 3b. 번호 매칭 (정확한 번호 → 범위 매칭 순)
+      let targetAnnex = searchPool.find((a) => {
         const num = extractAnnexNum(a.annexNumber)
         return num === targetNum
       })
+
+      // 3b-2. 범위 매칭: [별표1~5] 같은 묶음 별표에서 요청 번호가 범위 내인지 확인
+      if (!targetAnnex && targetNum) {
+        targetAnnex = searchPool.find((a) => matchesAnnexRange(a.annexName, targetNum))
+      }
 
       // 3c. 폴백: 같은 법령의 첫 번째 별표, 없으면 전체 첫 번째
       const finalAnnex = targetAnnex
@@ -208,10 +250,17 @@ export function AnnexModal({
           }),
         })
 
+        // 묶음 별표 여부 판별 (범위 매칭으로 찾은 경우)
+        const isBundledAnnex = finalAnnex.annexName && matchesAnnexRange(finalAnnex.annexName, targetNum)
+
         if (mdRes.ok) {
           const mdData = await mdRes.json()
           if (mdData.markdown) {
-            setMarkdown(mdData.markdown)
+            // 묶음 별표면 요청한 섹션만 추출
+            const finalMarkdown = isBundledAnnex
+              ? extractAnnexSection(mdData.markdown, targetNum)
+              : mdData.markdown
+            setMarkdown(finalMarkdown)
 
             // 캐시 저장 (lawId 또는 lawName으로)
             const saveKey = lawId || finalAnnex.lawId || lawName
