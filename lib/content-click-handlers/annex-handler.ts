@@ -7,6 +7,20 @@
 import { debugLogger } from '@/lib/debug-logger'
 import type { ContentClickContext, ContentClickActions } from './types'
 
+/**
+ * 유사 법령명 판별: 의회/시행령 등 접미사 차이만 있는 같은 계열 법령인지
+ * "광진구의회 복무 조례" vs "광진구 복무 조례" → true
+ * "관세법" vs "광진구 복무 조례" → false
+ */
+function isSimilarLawName(a: string, b: string): boolean {
+  if (!a || !b) return false
+  const normalize = (s: string) => s.replace(/\s+/g, '').replace(/의회/, '')
+  const na = normalize(a)
+  const nb = normalize(b)
+  // 의회 제거 후 같거나, 한쪽이 다른쪽을 포함
+  return na === nb || na.includes(nb) || nb.includes(na)
+}
+
 /** 별표 모달 열기 액션 확장 */
 export interface AnnexActions {
   openAnnexModal?: (annexNumber: string, lawName: string, lawId?: string) => void
@@ -26,27 +40,36 @@ export async function handleAnnexRef(
 
   const { meta, refModal } = context
 
-  // 법령명 결정 우선순위:
-  // 1. data-law 속성 (링크에 직접 지정된 법령명)
-  // 2. refModal.lawName (모달에서 현재 보고 있는 법령)
-  // 3. meta.lawTitle (법령 뷰어에서 보고 있는 법령)
+  // 법령명 결정: 별표는 거의 항상 현재 보고 있는 법령 소속
+  // currentLaw가 유효하면 우선 사용, data-law는 명백히 다른 법령일 때만
   const dataLaw = target.getAttribute('data-law')
   const currentLaw = refModal?.lawName || meta.lawTitle
+  const hasValidCurrentLaw = currentLaw && currentLaw !== 'AI 답변' && currentLaw.trim() !== ''
 
-  // 시행령/시행규칙에서 모법명이 data-law로 잡힌 경우 보정
-  // 예: 현재 "지방공무원법 시행령"인데 data-law="지방공무원법" → 시행령의 별표가 맞음
   let lawName: string | undefined
-  if (dataLaw && currentLaw && dataLaw !== currentLaw) {
-    const isCurrentDecree = /\s*(시행령|시행규칙)/.test(currentLaw)
-    const parentLawName = currentLaw.replace(/\s*(시행령|시행규칙)$/, '')
-    if (isCurrentDecree && dataLaw === parentLawName) {
-      // 모법명이 추출된 것이므로, 현재 시행령의 별표로 간주
-      debugLogger.info('[annex-handler] 모법 → 시행령 보정', { dataLaw, currentLaw })
+  if (hasValidCurrentLaw && dataLaw && dataLaw !== currentLaw) {
+    // data-law가 currentLaw와 유사한 법령이면 currentLaw 우선
+    // (예: "광진구의회 복무 조례" vs "광진구 복무 조례" → currentLaw 사용)
+    if (isSimilarLawName(dataLaw, currentLaw)) {
+      debugLogger.info('[annex-handler] 유사 법령 → currentLaw 우선', { dataLaw, currentLaw })
       lawName = currentLaw
     } else {
-      lawName = dataLaw
+      // 시행령/시행규칙에서 모법명이 data-law로 잡힌 경우 보정
+      const isCurrentDecree = /\s*(시행령|시행규칙)/.test(currentLaw)
+      const parentLawName = currentLaw.replace(/\s*(시행령|시행규칙)$/, '')
+      if (isCurrentDecree && dataLaw === parentLawName) {
+        debugLogger.info('[annex-handler] 모법 → 시행령 보정', { dataLaw, currentLaw })
+        lawName = currentLaw
+      } else {
+        // 명백히 다른 법령의 별표 참조 (예: 「관세법」 별표 1)
+        lawName = dataLaw
+      }
     }
+  } else if (hasValidCurrentLaw) {
+    // data-law 없음 → currentLaw 사용
+    lawName = currentLaw
   } else {
+    // currentLaw 없음 (AI 답변 등) → data-law 사용
     lawName = dataLaw || currentLaw
   }
 
