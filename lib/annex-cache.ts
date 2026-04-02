@@ -8,7 +8,7 @@
 import type { AnnexCacheEntry } from "./law-types"
 
 const DB_NAME = "LexDiffAnnexCache"
-const DB_VERSION = 1
+const DB_VERSION = 2  // v2: kordoc 파서 통합 후 캐시 무효화 (2026-04-02)
 const ANNEX_STORE = "annexMarkdownCache"
 const CACHE_EXPIRY_DAYS = 30 // 별표는 변경 빈도가 낮으므로 30일
 
@@ -23,12 +23,14 @@ async function openDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
 
-      // 별표 마크다운 캐시 스토어
-      if (!db.objectStoreNames.contains(ANNEX_STORE)) {
-        const store = db.createObjectStore(ANNEX_STORE, { keyPath: "key" })
-        store.createIndex("timestamp", "timestamp", { unique: false })
-        store.createIndex("lawName", "lawName", { unique: false })
+      // 버전 업그레이드 시 기존 캐시 삭제 (파서 개선 반영)
+      if (db.objectStoreNames.contains(ANNEX_STORE)) {
+        db.deleteObjectStore(ANNEX_STORE)
       }
+
+      const store = db.createObjectStore(ANNEX_STORE, { keyPath: "key" })
+      store.createIndex("timestamp", "timestamp", { unique: false })
+      store.createIndex("lawName", "lawName", { unique: false })
     }
   })
 }

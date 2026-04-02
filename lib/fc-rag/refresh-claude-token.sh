@@ -1,12 +1,11 @@
 #!/bin/bash
 # Claude OAuth access token 사전 갱신 (cron용)
-# refresh token으로 직접 Anthropic OAuth endpoint 호출 — CLI 실행 불필요
-# apiKeyHelper(get-claude-token.sh)가 실시간 fallback, 이건 사전 예방용 안전장치
+# CLI를 non-bare 모드로 실행 → CLI가 내부적으로 OAuth refresh 수행
+# 직접 OAuth endpoint curl 호출 제거 → rate limit 회피
 
 LOG_FILE="$HOME/.claude/token-refresh.log"
 CRED_FILE="$HOME/.claude/.credentials.json"
-CLIENT_ID="9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-TOKEN_URL="https://platform.claude.com/v1/oauth/token"
+CLAUDE_BIN="/Users/mong-e/.local/bin/claude"
 
 # 현재 토큰 만료 시간 확인
 EXPIRES_AT=$(python3 -c "import json; print(json.load(open('$CRED_FILE'))['claudeAiOauth']['expiresAt'])" 2>/dev/null)
@@ -18,73 +17,28 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] token expires in ${REMAINING_MIN}min" >> "$
 
 # 만료 2시간 전부터 갱신 시도
 if [ "$REMAINING_MS" -lt 7200000 ]; then
-  REFRESH_TOKEN=$(python3 -c "import json; print(json.load(open('$CRED_FILE'))['claudeAiOauth']['refreshToken'])" 2>/dev/null)
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] refreshing token via CLI..." >> "$LOG_FILE"
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] refreshing token via OAuth..." >> "$LOG_FILE"
+  # non-bare CLI 실행 → 내부 OAuth 갱신 트리거
+  RESULT=$("$CLAUDE_BIN" --print --max-turns 1 -- "respond with OK" 2>/dev/null)
 
-  RESPONSE=$(curl -s --max-time 15 -X POST "$TOKEN_URL" \
-    -H 'Content-Type: application/x-www-form-urlencoded' \
-    --data-urlencode "grant_type=refresh_token" \
-    --data-urlencode "refresh_token=${REFRESH_TOKEN}" \
-    --data-urlencode "client_id=${CLIENT_ID}" 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    # 갱신 후 만료 시간 재확인
+    NEW_EXPIRES=$(python3 -c "import json; print(json.load(open('$CRED_FILE'))['claudeAiOauth']['expiresAt'])" 2>/dev/null)
+    NEW_REMAINING=$(( (NEW_EXPIRES - $(python3 -c "import time; print(int(time.time()*1000))")) / 60000 ))
 
-  # pipe로 안전하게 전달
-  RESULT=$(echo "$RESPONSE" | python3 -c "
-import json, time, sys
-try:
-    r = json.load(sys.stdin)
-    if 'access_token' not in r:
-        print(f'FAIL: {r.get(\"error\",{}).get(\"type\",\"unknown\")}')
-        sys.exit(1)
-    creds = json.load(open(sys.argv[1]))
-    creds['claudeAiOauth']['accessToken'] = r['access_token']
-    creds['claudeAiOauth']['expiresAt'] = int(time.time()*1000) + r.get('expires_in', 28800) * 1000
-    if 'refresh_token' in r:
-        creds['claudeAiOauth']['refreshToken'] = r['refresh_token']
-    json.dump(creds, open(sys.argv[1], 'w'))
-    remaining_h = r.get('expires_in', 28800) / 3600
-    print(f'OK: new token valid for {remaining_h:.1f}h')
-except Exception as e:
-    print(f'FAIL: {e}')
-    sys.exit(1)
-" "$CRED_FILE" 2>&1)
+    if [ "$NEW_EXPIRES" != "$EXPIRES_AT" ]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] OK: token refreshed via CLI, new expiry in ${NEW_REMAINING}min" >> "$LOG_FILE"
+    else
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] CLI ran OK but token unchanged (${NEW_REMAINING}min left)" >> "$LOG_FILE"
+    fi
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAIL: CLI refresh failed" >> "$LOG_FILE"
 
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $RESULT" >> "$LOG_FILE"
-
-  # rate limit 또는 실패 시 60초 후 1회 재시도
-  if echo "$RESULT" | grep -qE "FAIL|rate_limit"; then
-    sleep 60
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] retrying after rate limit..." >> "$LOG_FILE"
-
-    REFRESH_TOKEN=$(python3 -c "import json; print(json.load(open('$CRED_FILE'))['claudeAiOauth']['refreshToken'])" 2>/dev/null)
-
-    RESPONSE2=$(curl -s --max-time 15 -X POST "$TOKEN_URL" \
-      -H 'Content-Type: application/x-www-form-urlencoded' \
-      --data-urlencode "grant_type=refresh_token" \
-      --data-urlencode "refresh_token=${REFRESH_TOKEN}" \
-      --data-urlencode "client_id=${CLIENT_ID}" 2>/dev/null)
-
-    RESULT2=$(echo "$RESPONSE2" | python3 -c "
-import json, time, sys
-try:
-    r = json.load(sys.stdin)
-    if 'access_token' not in r:
-        print(f'FAIL: {r.get(\"error\",{}).get(\"type\",\"unknown\")}')
-        sys.exit(1)
-    creds = json.load(open(sys.argv[1]))
-    creds['claudeAiOauth']['accessToken'] = r['access_token']
-    creds['claudeAiOauth']['expiresAt'] = int(time.time()*1000) + r.get('expires_in', 28800) * 1000
-    if 'refresh_token' in r:
-        creds['claudeAiOauth']['refreshToken'] = r['refresh_token']
-    json.dump(creds, open(sys.argv[1], 'w'))
-    remaining_h = r.get('expires_in', 28800) / 3600
-    print(f'OK: new token valid for {remaining_h:.1f}h')
-except Exception as e:
-    print(f'FAIL: {e}')
-    sys.exit(1)
-" "$CRED_FILE" 2>&1)
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] retry: $RESULT2" >> "$LOG_FILE"
+    # 토큰 만료 임박(30분 이내)이면 setup-token 필요 경고
+    if [ "$REMAINING_MIN" -lt 30 ]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: token expires in ${REMAINING_MIN}min. Run: claude setup-token" >> "$LOG_FILE"
+    fi
   fi
 else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] token still valid, skipping refresh" >> "$LOG_FILE"

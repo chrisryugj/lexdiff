@@ -1,14 +1,16 @@
 #!/bin/bash
 # apiKeyHelper: Claude --bare 모드에서 유효한 OAuth access token 제공
 # 1. .credentials.json에서 토큰 읽기
-# 2. 만료 2시간 전이면 refresh token으로 직접 갱신
+# 2. 만료 2시간 전이면 CLI 기반 갱신 시도 (rate limit 백오프 포함)
 # 3. stdout으로 access token 출력 (apiKeyHelper 규약)
 
 CRED_FILE="$HOME/.claude/.credentials.json"
 LOCK_FILE="/tmp/claude-token-refresh.lock"
-CLIENT_ID="9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-TOKEN_URL="https://platform.claude.com/v1/oauth/token"
+BACKOFF_FILE="/tmp/claude-token-refresh-backoff"
+BACKOFF_SECONDS=1800  # rate limit 시 30분 백오프
 REFRESH_THRESHOLD_MS=7200000  # 2시간
+CLAUDE_BIN="/Users/mong-e/.local/bin/claude"
+LOG_FILE="$HOME/.claude/token-refresh.log"
 
 # .credentials.json 읽기
 read_creds() {
@@ -28,95 +30,79 @@ EXPIRES_AT=$(echo "$CREDS" | sed -n '3p')
 NOW_MS=$(python3 -c "import time; print(int(time.time()*1000))")
 REMAINING_MS=$((EXPIRES_AT - NOW_MS))
 
-# 토큰이 아직 유효하면 바로 반환
+# 토큰이 아직 충분히 유효하면 바로 반환
 if [ "$REMAINING_MS" -gt "$REFRESH_THRESHOLD_MS" ]; then
   echo "$ACCESS_TOKEN"
   exit 0
 fi
 
-# 만료 임박 — refresh 시도 (lock으로 동시 실행 방지)
+# 백오프 체크 — 최근 갱신 실패했으면 기존 토큰 반환 (재시도 안 함)
+if [ -f "$BACKOFF_FILE" ]; then
+  BACKOFF_AGE=$(( $(date +%s) - $(stat -f %m "$BACKOFF_FILE" 2>/dev/null || echo 0) ))
+  if [ "$BACKOFF_AGE" -lt "$BACKOFF_SECONDS" ]; then
+    # 백오프 중 — 토큰 유효하면 기존 반환, 만료면 에러
+    if [ "$REMAINING_MS" -gt 0 ]; then
+      echo "$ACCESS_TOKEN"
+      exit 0
+    else
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: EXPIRED + backoff active (${BACKOFF_AGE}s/${BACKOFF_SECONDS}s)" >> "$LOG_FILE"
+      echo "TOKEN_EXPIRED" >&2
+      exit 1
+    fi
+  else
+    rm -f "$BACKOFF_FILE"
+  fi
+fi
+
+# 동시 실행 방지
 if [ -f "$LOCK_FILE" ]; then
-  # 다른 프로세스가 refresh 중 — 기존 토큰 반환
-  echo "$ACCESS_TOKEN"
-  exit 0
+  LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0) ))
+  if [ "$LOCK_AGE" -lt 60 ]; then
+    # 다른 프로세스가 refresh 중 — 기존 토큰 반환
+    if [ "$REMAINING_MS" -gt 0 ]; then
+      echo "$ACCESS_TOKEN"
+    else
+      echo "TOKEN_EXPIRED" >&2
+      exit 1
+    fi
+    exit 0
+  fi
+  rm -f "$LOCK_FILE"  # stale lock 제거
 fi
 
 touch "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
-RESPONSE=$(curl -s --max-time 10 -X POST "$TOKEN_URL" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode "grant_type=refresh_token" \
-  --data-urlencode "refresh_token=${REFRESH_TOKEN}" \
-  --data-urlencode "client_id=${CLIENT_ID}" 2>/dev/null)
+# CLI 기반 갱신: non-bare 모드 실행 → CLI가 내부적으로 OAuth refresh 처리
+# (직접 OAuth endpoint curl 호출 대신 CLI 메커니즘 활용 → rate limit 회피)
+REFRESH_OUTPUT=$("$CLAUDE_BIN" --print --max-turns 1 -- "respond with OK" 2>/dev/null)
 
-# 응답 파싱 + .credentials.json 업데이트
-NEW_TOKEN=$(echo "$RESPONSE" | python3 -c "
-import sys, json, time
-try:
-    r = json.load(sys.stdin)
-    if 'access_token' not in r:
-        sys.exit(1)
-    new_access = r['access_token']
-    expires_in = r.get('expires_in', 28800)
-    new_refresh = r.get('refresh_token', '')
+if [ $? -eq 0 ]; then
+  # CLI 실행 성공 → credentials.json이 갱신됐을 수 있음, 다시 읽기
+  NEW_CREDS=$(read_creds)
+  NEW_TOKEN=$(echo "$NEW_CREDS" | sed -n '1p')
+  NEW_EXPIRES=$(echo "$NEW_CREDS" | sed -n '3p')
+  NEW_REMAINING=$((NEW_EXPIRES - $(python3 -c "import time; print(int(time.time()*1000))")))
 
-    # .credentials.json 업데이트
-    creds = json.load(open('$CRED_FILE'))
-    creds['claudeAiOauth']['accessToken'] = new_access
-    creds['claudeAiOauth']['expiresAt'] = int(time.time()*1000) + expires_in * 1000
-    if new_refresh:
-        creds['claudeAiOauth']['refreshToken'] = new_refresh
-    json.dump(creds, open('$CRED_FILE', 'w'))
-
-    print(new_access)
-except:
-    sys.exit(1)
-" 2>/dev/null)
-
-if [ $? -eq 0 ] && [ -n "$NEW_TOKEN" ]; then
-  echo "$NEW_TOKEN"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: token refreshed via OAuth" >> "$HOME/.claude/token-refresh.log"
-else
-  # 1차 실패 — 5초 후 재시도
-  sleep 5
-  RESPONSE2=$(curl -s --max-time 15 -X POST "$TOKEN_URL" \
-    -H 'Content-Type: application/x-www-form-urlencoded' \
-    --data-urlencode "grant_type=refresh_token" \
-    --data-urlencode "refresh_token=${REFRESH_TOKEN}" \
-    --data-urlencode "client_id=${CLIENT_ID}" 2>/dev/null)
-
-  NEW_TOKEN2=$(echo "$RESPONSE2" | python3 -c "
-import sys, json, time
-try:
-    r = json.load(sys.stdin)
-    if 'access_token' not in r:
-        sys.exit(1)
-    new_access = r['access_token']
-    expires_in = r.get('expires_in', 28800)
-    new_refresh = r.get('refresh_token', '')
-    creds = json.load(open('$CRED_FILE'))
-    creds['claudeAiOauth']['accessToken'] = new_access
-    creds['claudeAiOauth']['expiresAt'] = int(time.time()*1000) + expires_in * 1000
-    if new_refresh:
-        creds['claudeAiOauth']['refreshToken'] = new_refresh
-    json.dump(creds, open('$CRED_FILE', 'w'))
-    print(new_access)
-except:
-    sys.exit(1)
-" 2>/dev/null)
-
-  if [ $? -eq 0 ] && [ -n "$NEW_TOKEN2" ]; then
-    echo "$NEW_TOKEN2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: token refreshed via OAuth (retry)" >> "$HOME/.claude/token-refresh.log"
-  elif [ "$REMAINING_MS" -gt 0 ]; then
-    # 토큰 아직 유효 — 기존 토큰 반환
-    echo "$ACCESS_TOKEN"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: refresh failed, using existing token (${REMAINING_MS}ms left)" >> "$HOME/.claude/token-refresh.log"
-  else
-    # 토큰 만료됨 — 만료 토큰 반환하지 않고 에러
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: EXPIRED token, refresh failed (${REMAINING_MS}ms)" >> "$HOME/.claude/token-refresh.log"
-    echo "TOKEN_EXPIRED" >&2
-    exit 1
+  if [ -n "$NEW_TOKEN" ] && [ "$NEW_REMAINING" -gt 0 ]; then
+    echo "$NEW_TOKEN"
+    if [ "$NEW_EXPIRES" != "$EXPIRES_AT" ]; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: token refreshed via CLI (${NEW_REMAINING}ms left)" >> "$LOG_FILE"
+    fi
+    exit 0
   fi
+fi
+
+# CLI 기반 갱신 실패 — 백오프 설정
+touch "$BACKOFF_FILE"
+
+if [ "$REMAINING_MS" -gt 0 ]; then
+  # 토큰 아직 유효 — 기존 토큰 반환
+  echo "$ACCESS_TOKEN"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: CLI refresh failed, using existing token (${REMAINING_MS}ms left)" >> "$LOG_FILE"
+else
+  # 토큰 만료 — 에러
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] apiKeyHelper: EXPIRED token, CLI refresh failed. Run: claude setup-token" >> "$LOG_FILE"
+  echo "TOKEN_EXPIRED" >&2
+  exit 1
 fi
