@@ -75,7 +75,7 @@ trap 'rm -f "$LOCK_FILE"' EXIT
 
 # CLI 기반 갱신: non-bare 모드 실행 → CLI가 내부적으로 OAuth refresh 처리
 # (직접 OAuth endpoint curl 호출 대신 CLI 메커니즘 활용 → rate limit 회피)
-REFRESH_OUTPUT=$("$CLAUDE_BIN" --print --max-turns 1 -- "respond with OK" 2>/dev/null)
+REFRESH_OUTPUT=$(echo "respond with OK" | "$CLAUDE_BIN" --print 2>/dev/null)
 
 if [ $? -eq 0 ]; then
   # CLI 실행 성공 → credentials.json이 갱신됐을 수 있음, 다시 읽기
