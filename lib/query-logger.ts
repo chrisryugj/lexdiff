@@ -33,15 +33,33 @@ export interface QueryLogEntry {
   error: string | null
 }
 
-/** 질의 로그 한 줄 append. Vercel 환경이면 스킵. */
+/** 질의 로그 append. 로컬: 파일, Vercel: Hermes API로 전송. */
 export function appendQueryLog(entry: QueryLogEntry): void {
-  if (process.env.VERCEL) return
   const line = JSON.stringify(entry) + '\n'
+
+  if (process.env.VERCEL) {
+    // Vercel: Hermes API로 로그 전송 (fire-and-forget)
+    const hermesUrl = process.env.HERMES_API_URL
+    const hermesKey = process.env.HERMES_API_KEY
+    if (hermesUrl && hermesKey) {
+      fetch(`${hermesUrl}/api/fc-rag-log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${hermesKey}`,
+        },
+        body: JSON.stringify(entry),
+      }).catch(() => {})
+    }
+    return
+  }
+
+  // 로컬: 파일 저장
   try {
     if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true })
     appendFileSync(LOG_FILE, line)
   } catch { /* 로깅 실패는 무시 */ }
-  // Hermes 대시보드용 로그 (로컬 전용)
+  // Hermes 대시보드용 동시 기록
   if (HERMES_LOG_DIR && HERMES_LOG_FILE) {
     try {
       if (!existsSync(HERMES_LOG_DIR)) mkdirSync(HERMES_LOG_DIR, { recursive: true })
