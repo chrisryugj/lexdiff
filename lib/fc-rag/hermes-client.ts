@@ -60,6 +60,7 @@ export async function* callAnthropicStream(
       { role: 'user', content: userContent },
     ],
     stream: true,
+    skip_context_files: true,
   }
 
   debugLogger.debug(`[hermes] calling ${HERMES_BASE}/v1/chat/completions, prompt: ${userContent.length} chars`)
