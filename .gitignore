@@ -53,3 +53,4 @@ NUL
 /evaluation/results/
 .env*.local
 demo/node_modules
+meari.env.local
