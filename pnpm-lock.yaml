@@ -165,8 +165,8 @@ importers:
         specifier: ^1.7.2
         version: 1.7.2(pdfjs-dist@5.5.207)
       korean-law-mcp:
-        specifier: ^2.1.3
-        version: 2.1.3
+        specifier: ^3.2.1
+        version: 3.2.1
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -671,6 +671,12 @@ packages:
     peerDependencies:
       hono: ^4
 
+  '@hono/node-server@1.19.13':
+    resolution: {integrity: sha512-TsQLe4i2gvoTtrHje625ngThGBySOgSK3Xo2XRYOdqGN1teR8+I7vchQC46uLJi8OF62YTYA3AhSpumtkhsaKQ==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
+
   '@hugeicons/core-free-icons@3.0.0':
     resolution: {integrity: sha512-ujB8fh7dVj506bvOcZwTLS/r8T/Ev6rCLvgpdwKPHAFdBuNTbyuppTFX7n1vWnmqvJzh//giN9dqjHjyu1o+5w==}
 
@@ -847,8 +853,8 @@ packages:
     resolution: {integrity: sha512-6rqTdFt67AAAzln3NOKsXRmv5ZzPkgbfaebKBqUbts7vK1GZudqnrun5a8d3M/h955cam9RHZ6Jb4Y1XhnmFPg==}
     engines: {node: '>=18'}
 
-  '@modelcontextprotocol/sdk@1.27.1':
-    resolution: {integrity: sha512-sr6GbP+4edBwFndLbM60gf07z0FQ79gaExpnsjMGePXqFcSSb7t6iscpjk9DhFhwd+mTEQrzNafGP8/iGGFYaA==}
+  '@modelcontextprotocol/sdk@1.28.0':
+    resolution: {integrity: sha512-gmloF+i+flI8ouQK7MWW4mOwuMh4RePBuPFAEPC6+pdqyWOUMDOixb6qZ69owLJpz6XmyllCouc4t8YWO+E2Nw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -857,8 +863,8 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@modelcontextprotocol/sdk@1.28.0':
-    resolution: {integrity: sha512-gmloF+i+flI8ouQK7MWW4mOwuMh4RePBuPFAEPC6+pdqyWOUMDOixb6qZ69owLJpz6XmyllCouc4t8YWO+E2Nw==}
+  '@modelcontextprotocol/sdk@1.29.0':
+    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -2220,6 +2226,10 @@ packages:
     engines: {node: '>=14.6'}
     deprecated: this version has critical issues, please update to the latest version
 
+  '@xmldom/xmldom@0.9.9':
+    resolution: {integrity: sha512-qycIHAucxy/LXAYIjmLmtQ8q9GPnMbnjG1KXhWm9o5sCr6pOYDATkMPiTNa6/v8eELyqOQ2FsEqeoFYmgv/gJg==}
+    engines: {node: '>=14.6'}
+
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
@@ -2555,8 +2565,8 @@ packages:
     resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
     engines: {node: '>=12'}
 
-  dotenv@17.3.1:
-    resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
+  dotenv@17.4.1:
+    resolution: {integrity: sha512-k8DaKGP6r1G30Lx8V4+pCsLzKr8vLmV2paqEj1Y55GdAgJuIqpRp5FfajGF8KtwMxCz9qJc6wUIJnm053d/WCw==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -2708,6 +2718,12 @@ packages:
 
   express-rate-limit@8.3.1:
     resolution: {integrity: sha512-D1dKN+cmyPWuvB+G2SREQDzPY1agpBIcTa9sJxOPMCNeH3gwzhqJRDWCXW3gg0y//+LQ/8j52JbMROWyrKdMdw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
+
+  express-rate-limit@8.3.2:
+    resolution: {integrity: sha512-77VmFeJkO0/rvimEDuUC5H30oqUC4EyOhyGccfqoLebB0oiEYfM7nwPrsDsBL1gsTpwfzX8SFy2MT3TDyRq+bg==}
     engines: {node: '>= 16'}
     peerDependencies:
       express: '>= 4.11'
@@ -2907,6 +2923,10 @@ packages:
 
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
+
+  hono@4.12.12:
+    resolution: {integrity: sha512-p1JfQMKaceuCbpJKAPKVqyqviZdS0eUxH9v82oWo1kb9xjQ5wA6iP3FNVAPDFlz5/p7d45lO+BpSk1tuSZMF4Q==}
+    engines: {node: '>=16.9.0'}
 
   hono@4.12.8:
     resolution: {integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A==}
@@ -3121,8 +3141,18 @@ packages:
       pdfjs-dist:
         optional: true
 
-  korean-law-mcp@2.1.3:
-    resolution: {integrity: sha512-IscUwFqT+1Qp4xCiDCV4PWPh69FmeMURjuWUlhtYNol+VfJhihaGGFsxon1zSi09q1fIDFbzqoP9PdVXLSEAbg==}
+  kordoc@2.2.6:
+    resolution: {integrity: sha512-OmZQuI2VicPWzr0HIc6tPp4CcN2dLQblzQb6jm1/KheUWb+XIJp12XwiXwPOiVw5PjQ0+MlCkiPRV1Qxwf/7AA==}
+    engines: {node: '>=18'}
+    hasBin: true
+    peerDependencies:
+      pdfjs-dist: '>=4.0.0'
+    peerDependenciesMeta:
+      pdfjs-dist:
+        optional: true
+
+  korean-law-mcp@3.2.1:
+    resolution: {integrity: sha512-5RUWg1tloqzYYSSAeIZZs8+Hn2ROvr7bOrD1v9jZ7MOS7YXb56baee5hOVD5lT30tFSEMsL/AFmaYJwv75lYRA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -3571,6 +3601,10 @@ packages:
     resolution: {integrity: sha512-ueGLflrrnvwB3xuo/uGob5pd5FN7l0MsLf0Z87o/UQmRtwjvfylfc9MurIxRAWywCYTgrvpXBcqjV4OfCYGCIQ==}
     engines: {node: '>=16.20.0'}
 
+  pkce-challenge@5.0.1:
+    resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
+    engines: {node: '>=16.20.0'}
+
   postcss@8.4.31:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
     engines: {node: ^10 || ^12 || >=14}
@@ -3632,6 +3666,10 @@ packages:
 
   raw-body@3.0.1:
     resolution: {integrity: sha512-9G8cA+tuMS75+6G/TzW8OtLzmBDMo8p1JRxN5AZ+LAp8uxGA8V8GZm4GQ4/N5QNQEnLmg6SS7wyuSmbKepiKqA==}
+    engines: {node: '>= 0.10'}
+
+  raw-body@3.0.2:
+    resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
   react-dom@19.2.0:
@@ -4567,6 +4605,10 @@ snapshots:
     dependencies:
       hono: 4.12.8
 
+  '@hono/node-server@1.19.13(hono@4.12.12)':
+    dependencies:
+      hono: 4.12.12
+
   '@hugeicons/core-free-icons@3.0.0': {}
 
   '@hugeicons/react-pro@0.3.2(react@19.2.0)':
@@ -4715,7 +4757,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.27.1(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.28.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.11(hono@4.12.8)
       ajv: 8.18.0
@@ -4737,9 +4779,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.28.0(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
     dependencies:
-      '@hono/node-server': 1.19.11(hono@4.12.8)
+      '@hono/node-server': 1.19.13(hono@4.12.12)
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       content-type: 1.0.5
@@ -4748,12 +4790,12 @@ snapshots:
       eventsource: 3.0.7
       eventsource-parser: 3.0.6
       express: 5.2.1
-      express-rate-limit: 8.3.1(express@5.2.1)
-      hono: 4.12.8
+      express-rate-limit: 8.3.2(express@5.2.1)
+      hono: 4.12.12
       jose: 6.2.2
       json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.1
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
       zod: 3.25.76
       zod-to-json-schema: 3.25.1(zod@3.25.76)
     transitivePeerDependencies:
@@ -6086,6 +6128,8 @@ snapshots:
 
   '@xmldom/xmldom@0.9.8': {}
 
+  '@xmldom/xmldom@0.9.9': {}
+
   accepts@2.0.0:
     dependencies:
       mime-types: 3.0.1
@@ -6415,7 +6459,7 @@ snapshots:
 
   dotenv@17.2.3: {}
 
-  dotenv@17.3.1: {}
+  dotenv@17.4.1: {}
 
   dunder-proto@1.0.1:
     dependencies:
@@ -6596,6 +6640,11 @@ snapshots:
       express: 5.1.0
 
   express-rate-limit@8.3.1(express@5.2.1):
+    dependencies:
+      express: 5.2.1
+      ip-address: 10.1.0
+
+  express-rate-limit@8.3.2(express@5.2.1):
     dependencies:
       express: 5.2.1
       ip-address: 10.1.0
@@ -6900,6 +6949,8 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
+  hono@4.12.12: {}
+
   hono@4.12.8: {}
 
   html-encoding-sniffer@4.0.0:
@@ -7122,18 +7173,30 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  korean-law-mcp@2.1.3:
+  kordoc@2.2.6(pdfjs-dist@5.5.207):
     dependencies:
-      '@modelcontextprotocol/sdk': 1.27.1(zod@3.25.76)
-      '@xmldom/xmldom': 0.9.8
+      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@xmldom/xmldom': 0.9.9
       cfb: 1.2.2
-      commander: 14.0.3
-      dotenv: 17.3.1
-      express: 5.2.1
+      commander: 13.1.0
       jszip: 3.10.1
+      zod: 3.25.76
+    optionalDependencies:
+      pdfjs-dist: 5.5.207
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+
+  korean-law-mcp@3.2.1:
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@xmldom/xmldom': 0.9.9
+      commander: 14.0.3
+      dotenv: 17.4.1
+      express: 5.2.1
+      kordoc: 2.2.6(pdfjs-dist@5.5.207)
       pdfjs-dist: 5.5.207
       zod: 3.25.76
-      zod-to-json-schema: 3.25.1(zod@3.25.76)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - supports-color
@@ -7753,6 +7816,8 @@ snapshots:
 
   pkce-challenge@5.0.0: {}
 
+  pkce-challenge@5.0.1: {}
+
   postcss@8.4.31:
     dependencies:
       nanoid: 3.3.11
@@ -7876,6 +7941,13 @@ snapshots:
     dependencies:
       bytes: 3.1.2
       http-errors: 2.0.0
+      iconv-lite: 0.7.0
+      unpipe: 1.0.0
+
+  raw-body@3.0.2:
+    dependencies:
+      bytes: 3.1.2
+      http-errors: 2.0.1
       iconv-lite: 0.7.0
       unpipe: 1.0.0
 
