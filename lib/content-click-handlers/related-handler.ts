@@ -51,6 +51,28 @@ export async function handleRelatedRef(
 
   const kind = target.getAttribute('data-kind') || 'decree'
 
+  // 모달 내부 클릭: 현재 법령의 시행령/시행규칙을 모달 히스토리에 추가
+  if (context.refModal.open && context.refModal.lawName) {
+    const baseName = context.refModal.lawName.replace(/\s*(시행령|시행규칙)$/, '')
+    const relatedLawName =
+      kind === 'decree' ? `${baseName} 시행령`
+        : kind === 'rule' ? `${baseName} 시행규칙`
+          : baseName
+
+    // 현재 모달 상태를 히스토리에 저장
+    if (context.refModal.html) {
+      actions.setRefModalHistory(prev => [...prev, {
+        title: context.refModal.title || '',
+        html: context.refModal.html,
+        lawName: context.refModal.lawName,
+        articleNumber: context.refModal.articleNumber,
+      }])
+    }
+
+    await actions.openExternalLawArticleModal(relatedLawName, '')
+    return
+  }
+
   // AI 답변 모드: 법령명 추론하여 새 창으로 열기
   if (aiAnswerMode) {
     const { inferLawNameFromArticle } = await import('@/lib/ai-law-inference')

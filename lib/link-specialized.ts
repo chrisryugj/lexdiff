@@ -274,7 +274,7 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     /\[(별표)\s*(\d+)?(?:의(\d+))?\]/g,
     (match, _type, num1, num2, offset: number, fullString: string) => {
       // 이미 링크로 변환된 부분 제외
-      const beforeText = fullString.substring(Math.max(0, offset - 150), offset)
+      const beforeText = fullString.substring(Math.max(0, offset - 500), offset)
       if (beforeText.includes('](annex://')) return match
 
       const lawNamePattern = /「([^」]+)」/g
@@ -348,6 +348,29 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
       }
 
       return `[${displayText}](annex://${encodedLaw}/${encodeURIComponent(annexId)})`
+    }
+  )
+
+  // 패턴 3c: "같은 법 (시행령/시행규칙) 제X조" → 앞의 「법령명」 참조
+  result = result.replace(
+    /같은\s*법\s*(시행령|시행규칙)?\s*제\s*(\d+)\s*조(?:의\s*(\d+))?/g,
+    (match, suffix, joNum, subNum, offset: number, fullString: string) => {
+      const beforeText = fullString.substring(Math.max(0, offset - 500), offset)
+      const lawNamePattern = /「([^」]+)」/g
+      let lawName: string | undefined
+      let lastMatch: RegExpExecArray | null = null
+      while ((lastMatch = lawNamePattern.exec(beforeText)) !== null) {
+        lawName = lastMatch[1]
+      }
+      if (!lawName) return match
+
+      // 「소비자기본법」 ... 같은 법 시행령 제X조 → "소비자기본법 시행령"
+      let targetLaw = lawName.trim().replace(/\s*(시행령|시행규칙)$/, '')
+      if (suffix) targetLaw += ` ${suffix}`
+
+      const article = `제${joNum}조${subNum ? '의' + subNum : ''}`
+      const encodedLaw = encodeURIComponent(targetLaw)
+      return `[${match}](law://${encodedLaw}/${encodeURIComponent(article)})`
     }
   )
 
