@@ -3,12 +3,6 @@
  * 57개 도구의 import, 정의, API 클라이언트 싱글턴
  */
 
-// Vercel serverless 환경에서 DOMMatrix 미존재 → annex(PDF) 모듈 로드 실패 방지
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  // @ts-expect-error minimal polyfill for pdfjs-dist compatibility
-  globalThis.DOMMatrix = class DOMMatrix { constructor() { return Object.create(null) } }
-}
-
 import { LawApiClient } from 'korean-law-mcp/lib/api-client'
 import { debugLogger } from '../debug-logger'
 
