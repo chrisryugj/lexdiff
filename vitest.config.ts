@@ -9,7 +9,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['node_modules', '.next', 'dist'],
+    // demo/ 서브 폴더는 자체 package.json + node_modules를 가지며 vitest 스캔 대상 아님
+    exclude: ['node_modules', '.next', 'dist', 'demo/**', '**/demo/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

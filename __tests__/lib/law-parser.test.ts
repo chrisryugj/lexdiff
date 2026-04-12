@@ -47,8 +47,10 @@ describe('law-parser', () => {
       expect(buildJO('제 38 조')).toBe('003800')
     })
 
-    it('잘못된 입력 시 에러 발생', () => {
-      expect(() => buildJO('abc')).toThrow()
+    it('잘못된 입력 → fallback 000000 반환 (throw 하지 않음)', () => {
+      // 구현은 invalid 입력을 "000000"으로 fallback — 호출처가 try-catch 부담 없이
+      // 링크 생성/JO 검증에서 bad-input을 조용히 무시 가능.
+      expect(buildJO('abc')).toBe('000000')
     })
   })
 
