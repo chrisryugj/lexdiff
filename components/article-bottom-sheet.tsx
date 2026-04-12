@@ -92,57 +92,62 @@ export function ArticleBottomSheet({
     setStartY(e.clientY)
   }
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return
-
-    const currentY = e.clientY
-    const deltaY = startY - currentY
-    const vh = window.innerHeight / 100
-    const newHeightVh = currentHeight + deltaY / vh
-
-    const constrainedHeight = Math.max(
-      snapPoints[0],
-      Math.min(snapPoints[snapPoints.length - 1], newHeightVh)
-    )
-
-    setCurrentHeight(constrainedHeight)
-  }
-
-  const handleMouseUp = () => {
-    setIsDragging(false)
-
-    let closestSnapIndex = 0
-    let minDiff = Math.abs(currentHeight - snapPoints[0])
-
-    snapPoints.forEach((snap, index) => {
-      const diff = Math.abs(currentHeight - snap)
-      if (diff < minDiff) {
-        minDiff = diff
-        closestSnapIndex = index
-      }
-    })
-
-    if (currentHeight < snapPoints[0] - 5) {
-      onClose()
-      return
-    }
-
-    setSnapIndex(closestSnapIndex)
-    setCurrentHeight(snapPoints[closestSnapIndex])
-    setStartY(0)
-  }
+  // PERF-11: 핸들러를 effect 내부로 이동 + ref로 stale state 방지
+  // 매 render마다 새 함수가 만들어지면 removeEventListener가 다른 참조를 제거하여 listener 누적
+  const dragStateRef = useRef({ startY: 0, currentHeight: snapPoints[0] })
+  useEffect(() => {
+    dragStateRef.current = { startY, currentHeight }
+  }, [startY, currentHeight])
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove)
-      window.addEventListener("mouseup", handleMouseUp)
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove)
-        window.removeEventListener("mouseup", handleMouseUp)
-      }
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { startY: sy, currentHeight: ch } = dragStateRef.current
+      const currentY = e.clientY
+      const deltaY = sy - currentY
+      const vh = window.innerHeight / 100
+      const newHeightVh = ch + deltaY / vh
+
+      const constrainedHeight = Math.max(
+        snapPoints[0],
+        Math.min(snapPoints[snapPoints.length - 1], newHeightVh)
+      )
+
+      setCurrentHeight(constrainedHeight)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDragging, startY, currentHeight])
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      const ch = dragStateRef.current.currentHeight
+
+      let closestSnapIndex = 0
+      let minDiff = Math.abs(ch - snapPoints[0])
+      snapPoints.forEach((snap, index) => {
+        const diff = Math.abs(ch - snap)
+        if (diff < minDiff) {
+          minDiff = diff
+          closestSnapIndex = index
+        }
+      })
+
+      if (ch < snapPoints[0] - 5) {
+        onClose()
+        return
+      }
+
+      setSnapIndex(closestSnapIndex)
+      setCurrentHeight(snapPoints[closestSnapIndex])
+      setStartY(0)
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [isDragging, snapPoints, onClose])
 
   // Prevent body scroll when sheet is open
   useEffect(() => {

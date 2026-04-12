@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { debugLogger } from "./debug-logger"
 
 export interface ErrorReport {
   id: string
@@ -50,7 +51,7 @@ export const useErrorReportStore = create<ErrorReportStore>((set, get) => ({
       apiLogs,
     }
 
-    console.error("[v0] [에러 리포트]", report)
+    debugLogger.error("[error-report]", report)
 
     set((state) => ({
       currentError: report,

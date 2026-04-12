@@ -147,7 +147,8 @@ export async function POST(request: NextRequest) {
           logQueryType = String(d?.queryType || '')
         }
         if (evt.type === 'citation_verification') {
-          logVerifiedCount = ((evt.citations as unknown[]) || []).filter((c: any) => c?.verified).length
+          const cits = (evt.citations as Array<{ verified?: boolean }> | undefined) || []
+          logVerifiedCount = cits.filter((c) => c?.verified).length
         }
         if (evt.type === 'error') logError = String(evt.message || 'unknown')
         send(data)

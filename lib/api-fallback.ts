@@ -240,7 +240,7 @@ export async function withRetry<T>(
       }
     } catch (error) {
       lastError = error
-      console.error(`❌ [Error] ${apiName}: 시도 ${attempt + 1} 실패`, error)
+      debugLogger.error(`❌ [Error] ${apiName}: 시도 ${attempt + 1} 실패`, error)
 
       // 재시도 가능한 에러인지 확인
       if (!retryConfig.retryableErrors?.(error) || attempt === retryConfig.maxRetries) {

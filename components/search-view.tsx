@@ -65,9 +65,11 @@ export function SearchView({
   }, [])
 
   useEffect(() => {
+    // UX-8: 모바일에서도 빠른 감지 — threshold 0/0.05 + 더 큰 음수 rootMargin으로
+    // 첫 픽셀 노출 시점에 reveal (모바일 좁은 viewport 대응)
     const featuresObserver = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) setFeaturesRevealed(true)
-    }, { threshold: 0.15, rootMargin: "0px 0px -80px 0px" })
+    }, { threshold: [0, 0.05], rootMargin: "0px 0px -40px 0px" })
 
     if (featuresRef.current) featuresObserver.observe(featuresRef.current)
     return () => { featuresObserver.disconnect() }

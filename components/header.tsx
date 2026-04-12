@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +18,7 @@ interface HeaderProps {
 
 export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick }: HeaderProps) {
   const [favoritesCount, setFavoritesCount] = useState(0)
+  const router = useRouter()
 
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
@@ -32,9 +34,11 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
     e.preventDefault()
     if (onReset) {
       onReset()
+      window.history.pushState({}, "", "/")
+    } else {
+      // UX-7: onReset 미전달 시에도 상태 정리되도록 router.push로 풀 네비
+      router.push("/")
     }
-    window.history.pushState({}, "", "/")
-    // 최상단으로 부드럽게 스크롤
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 

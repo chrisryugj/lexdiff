@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react"
+import { memo, useEffect, useMemo, useState, useRef, useCallback } from "react"
 import dynamic from 'next/dynamic'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,26 @@ const AnnexModal = dynamic(
   () => import("@/components/annex-modal").then(m => m.AnnexModal),
   { ssr: false }
 )
+
+// PERF-7: 스트리밍 중 100ms 타이머를 격리 컴포넌트로 분리 — 부모 리렌더 폭주 차단
+const LiveStreamTimer = memo(function LiveStreamTimer({
+  startRef,
+  className,
+  suffix = 's',
+}: {
+  startRef: React.MutableRefObject<number | null>
+  className?: string
+  suffix?: string
+}) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (startRef.current) setVal((Date.now() - startRef.current) / 1000)
+    }, 100)
+    return () => clearInterval(id)
+  }, [startRef])
+  return <span className={className}>{val.toFixed(1)}{suffix}</span>
+})
 
 
 const DEFAULT_FONT_SIZE = 15
@@ -228,7 +248,7 @@ export function AIAnswerContent({
       prevStreamingRef.current = isStreaming
     }, [isStreaming])
 
-    // 스트리밍 경과 시간 타이머
+    // 스트리밍 경과 시간 — PERF-7: streaming 중에는 ref만 갱신, 종료 시 한 번만 final setState
     const [streamElapsed, setStreamElapsed] = useState(0)
     const streamStartRef = useRef<number | null>(null)
 
@@ -238,13 +258,9 @@ export function AIAnswerContent({
           streamStartRef.current = Date.now()
           setStreamElapsed(0)
         }
-        const interval = setInterval(() => {
-          if (streamStartRef.current) {
-            setStreamElapsed((Date.now() - streamStartRef.current) / 1000)
-          }
-        }, 100)
-        return () => clearInterval(interval)
-      } else {
+      } else if (streamStartRef.current) {
+        // 종료 시점에 final 값 한 번만 set — 표시는 LiveStreamTimer가 100ms로 별도
+        setStreamElapsed((Date.now() - streamStartRef.current) / 1000)
         streamStartRef.current = null
       }
     }, [isStreaming])
@@ -513,7 +529,11 @@ export function AIAnswerContent({
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI 분석 진행 중</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-mono tabular-nums text-muted-foreground">{streamElapsed.toFixed(1)}초</span>
+                                            <LiveStreamTimer
+                                                startRef={streamStartRef}
+                                                className="text-sm font-mono tabular-nums text-muted-foreground"
+                                                suffix="초"
+                                            />
                                             <span className="text-sm font-medium text-gray-500 tabular-nums">{Math.round(searchProgress)}%</span>
                                         </div>
                                     </div>
@@ -620,20 +640,36 @@ export function AIAnswerContent({
                     </>
                 )}
 
-                {/* 답변 내용 렌더링 - 스트리밍 중에도 answer_token 실시간 표시 */}
+                {/* 답변 내용 렌더링
+                    P1-AI-5: 스트리밍/타이핑 중에는 plain text(공백 보존),
+                    완료 후에만 LegalMarkdownRenderer 호출 — 반토막 토큰의 markdown 파싱 에러/링크 깨짐 방지
+                    P1-1: 두 렌더러 wrapper에 동일 leading 클래스 + 짧은 fade로 전환 점프 완화 */}
                 {displayedContent && (
                     <div
                         style={{ fontSize: `${fontSize}px` }}
-                        className="animate-in fade-in duration-200"
+                        className="animate-in fade-in duration-200 leading-relaxed text-foreground"
                     >
-                        <LegalMarkdownRenderer
-                            content={displayedContent}
-                            onLawClick={onLawClick}
-                            onAnnexClick={handleAnnexClick}
-                        />
-                        {/* 타이핑 중 커서 표시 */}
-                        {isTyping && (
-                            <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1" />
+                        {(isStreaming || isTyping) ? (
+                            <div
+                                key="ai-stream-plain"
+                                className="whitespace-pre-wrap break-words transition-opacity duration-150"
+                            >
+                                {displayedContent}
+                                {isTyping && (
+                                    <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1 align-middle" />
+                                )}
+                            </div>
+                        ) : (
+                            <div
+                                key="ai-stream-markdown"
+                                className="transition-opacity duration-150"
+                            >
+                                <LegalMarkdownRenderer
+                                    content={displayedContent}
+                                    onLawClick={onLawClick}
+                                    onAnnexClick={handleAnnexClick}
+                                />
+                            </div>
                         )}
                     </div>
                 )}

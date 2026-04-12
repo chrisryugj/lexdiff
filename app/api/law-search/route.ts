@@ -101,9 +101,9 @@ export async function GET(request: Request) {
         url: exactUrl,
       })
 
-      const exactResponse = await fetchWithTimeout(exactUrl, {
-        next: { revalidate: 3600 },
-      })
+      // API-5: Next data cache 비활성 (URL에 OC 포함되어 디스크 덤프 시 키 노출 우려)
+      // 응답 헤더의 Cache-Control로만 캐싱 — Vercel/CF Edge가 해당 헤더 따라 처리
+      const exactResponse = await fetchWithTimeout(exactUrl, { cache: "no-store" })
 
       if (exactResponse.ok) {
         const exactText = await exactResponse.text()
@@ -136,7 +136,7 @@ export async function GET(request: Request) {
       })
 
       const firstUrl = `${LAW_API_BASE}?${firstParams.toString()}`
-      const firstResponse = await fetchWithTimeout(firstUrl, { next: { revalidate: 3600 } })
+      const firstResponse = await fetchWithTimeout(firstUrl, { cache: "no-store" })
 
       if (!firstResponse.ok) {
         throw new Error(`API 응답 오류: ${firstResponse.status}`)
@@ -166,7 +166,7 @@ export async function GET(request: Request) {
           })
 
           const pageUrl = `${LAW_API_BASE}?${pageParams.toString()}`
-          const pageResponse = await fetchWithTimeout(pageUrl, { next: { revalidate: 3600 } })
+          const pageResponse = await fetchWithTimeout(pageUrl, { cache: "no-store" })
 
           if (!pageResponse.ok) continue
 
@@ -216,9 +216,7 @@ export async function GET(request: Request) {
       url,
     })
 
-    const response = await fetchWithTimeout(url, {
-      next: { revalidate: 3600 },
-    })
+    const response = await fetchWithTimeout(url, { cache: "no-store" })
 
     if (!response.ok) {
       const text = await response.text()

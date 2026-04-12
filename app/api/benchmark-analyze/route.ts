@@ -30,9 +30,16 @@ async function fetchOrdinanceText(ordinanceSeq: string): Promise<string> {
     const list = Array.isArray(articles) ? articles : [articles]
     if (list.length === 0) return ''
 
-    return list
-      .filter((a: any) => a?.조문여부 === 'Y' || a?.조문여부 === '조문' || a?.조내용 || a?.조문내용)
-      .map((a: any) => {
+    type OrdinanceArticle = {
+      조문여부?: string
+      조내용?: string
+      조문내용?: string
+      조제목?: string
+      조문제목?: string
+    }
+    return (list as OrdinanceArticle[])
+      .filter((a) => a?.조문여부 === 'Y' || a?.조문여부 === '조문' || a?.조내용 || a?.조문내용)
+      .map((a) => {
         const title = a?.조제목 || a?.조문제목 || ''
         const content = a?.조내용 || a?.조문내용 || ''
         return `${title ? `(${title}) ` : ''}${content}`

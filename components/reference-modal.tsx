@@ -151,39 +151,16 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     return () => clearTimeout(timer)
   }, [isOpen])
 
-  // Attach event listener to the content div after render
-  useEffect(() => {
-    if (!isOpen || loading) return
-
-    const contentEl = contentRef.current
-    if (!contentEl) return
-
-    const handleClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest("a") as HTMLAnchorElement | null
-      if (target && target.tagName === "A") {
-        // 외부 링크 (target="_blank")는 기본 동작 허용
-        if (target.getAttribute("target") === "_blank") return
-        e.preventDefault()
-        e.stopPropagation()
-        if (onContentClickRef.current) {
-          // Synthesize the nativeEvent property React handlers expect
-          const syntheticLike = Object.assign(e, {
-            nativeEvent: e,
-            isDefaultPrevented: () => e.defaultPrevented,
-            isPropagationStopped: () => false,
-            persist: () => {},
-          }) as unknown as React.MouseEvent<HTMLDivElement>
-          onContentClickRef.current(syntheticLike)
-        }
-      }
-    }
-
-    contentEl.addEventListener("click", handleClick, true)
-
-    return () => {
-      contentEl.removeEventListener("click", handleClick, true)
-    }
-  }, [isOpen, loading, html])
+  // P1-LV-7: 네이티브 listener 대신 React onClick 핸들러 사용
+  // 동기화된 React 이벤트 시스템 사용 → MouseEvent → SyntheticEvent 캐스팅 제거
+  const handleContentClickReact = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest("a") as HTMLAnchorElement | null
+    if (!target || target.tagName !== "A") return
+    if (target.getAttribute("target") === "_blank") return
+    e.preventDefault()
+    e.stopPropagation()
+    onContentClickRef.current?.(e)
+  }, [])
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (!o ? onClose() : null)}>
@@ -333,6 +310,7 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             <style>{LAW_CONTENT_STYLES}</style>
             <div
               ref={contentRef}
+              onClick={handleContentClickReact}
               className={`law-article-content prose prose-sm max-w-none break-words px-4 sm:px-6 pt-2 pb-4 sm:pb-6 overflow-x-hidden ${forceWhiteTheme
                 ? "bg-white text-gray-900 [&_a]:text-blue-600 [&_a:hover]:text-blue-800"
                 : "dark:prose-invert"

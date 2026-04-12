@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,9 @@ import { AIAnswerSidebar } from "@/components/law-viewer-ai-answer"
 import { useLawViewerContext } from "./law-viewer-context"
 import type { LawArticle } from "@/lib/law-types"
 import type { ParsedRelatedLaw } from "@/lib/law-parser"
+
+// P1-2: 모듈 상수로 안정화 — 매 렌더 새 배열 참조 방지
+const BOTTOM_SHEET_SNAP_POINTS = [40, 70, 90]
 
 interface LawViewerSidebarProps {
   // 상태
@@ -52,6 +56,8 @@ export function LawViewerSidebar({
     aiAnswerMode, isPrecedent, isOrdinance, meta,
     favorites, onToggleFavorite, formatSimpleJo, isFavorite,
   } = useLawViewerContext()
+  // P1-2: ArticleBottomSheet effect churn 방지
+  const handleBottomSheetClose = useCallback(() => setIsArticleListExpanded(false), [setIsArticleListExpanded])
   // FAB 카운트: AIAnswerSidebar와 동일한 필터링+중복제거 적용
   const aiRelatedCount = (() => {
     const seen = new Set<string>()
@@ -208,9 +214,9 @@ export function LawViewerSidebar({
       {/* Mobile Bottom Sheet for Article List */}
       <ArticleBottomSheet
         isOpen={isArticleListExpanded}
-        onClose={() => setIsArticleListExpanded(false)}
+        onClose={handleBottomSheetClose}
         title={aiAnswerMode ? "관련 법령 목록" : isPrecedent ? "목차" : "조문 목록"}
-        snapPoints={[40, 70, 90]}
+        snapPoints={BOTTOM_SHEET_SNAP_POINTS}
       >
         {aiAnswerMode ? (
           <AIAnswerSidebar

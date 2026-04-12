@@ -5,6 +5,26 @@ import { motion, useMotionTemplate, useMotionValue } from "motion/react"
 
 import { cn } from "@/lib/utils"
 
+// PERF-8: 단일 전역 리스너 + 구독 패턴 — 카드 수만큼 곱셈 방지
+// 이전: 각 카드가 pointerout/blur/visibilitychange 3개 글로벌 리스너 등록
+const resetSubscribers = new Set<() => void>()
+let listenersRegistered = false
+
+function ensureGlobalListeners() {
+  if (listenersRegistered || typeof window === "undefined") return
+  listenersRegistered = true
+  const fanout = () => resetSubscribers.forEach((fn) => fn())
+  const handleGlobalPointerOut = (e: PointerEvent) => {
+    if (!e.relatedTarget) fanout()
+  }
+  const handleVisibility = () => {
+    if (document.visibilityState !== "visible") fanout()
+  }
+  window.addEventListener("pointerout", handleGlobalPointerOut)
+  window.addEventListener("blur", fanout)
+  document.addEventListener("visibilitychange", handleVisibility)
+}
+
 interface MagicCardProps {
   children?: React.ReactNode
   className?: string
@@ -45,26 +65,11 @@ export function MagicCard({
   }, [reset])
 
   useEffect(() => {
-    const handleGlobalPointerOut = (e: PointerEvent) => {
-      if (!e.relatedTarget) {
-        reset()
-      }
-    }
-
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        reset()
-      }
-    }
-
-    window.addEventListener("pointerout", handleGlobalPointerOut)
-    window.addEventListener("blur", reset)
-    document.addEventListener("visibilitychange", handleVisibility)
-
+    // PERF-8: 단일 전역 리스너 + 구독 등록
+    ensureGlobalListeners()
+    resetSubscribers.add(reset)
     return () => {
-      window.removeEventListener("pointerout", handleGlobalPointerOut)
-      window.removeEventListener("blur", reset)
-      document.removeEventListener("visibilitychange", handleVisibility)
+      resetSubscribers.delete(reset)
     }
   }, [reset])
 
