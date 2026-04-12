@@ -137,37 +137,22 @@ if (typeof setInterval !== 'undefined' && !__g.__lexdiff_conv_cleanup_started__)
 
 const convKey = (id: string) => `lexdiff:conv:${id}`
 
-async function readEntries(conversationId: string): Promise<ConversationEntry[]> {
-  const redis = getRedis()
-  if (redis) {
-    try {
-      const raw = await redis.get<ConversationEntry[]>(convKey(conversationId))
-      return Array.isArray(raw) ? raw : []
-    } catch {
-      // Redis 일시 장애 → Map fallback 시도
-    }
-  }
-  return conversationStore.get(conversationId) ?? []
-}
+/**
+ * H-ARC1: Redis는 source-of-truth, Map은 Redis 일시 장애에 대비한 fallback 캐시.
+ * 이전 구현은 Redis 성공 시 Map을 전혀 갱신하지 않아 Redis 장애가 발생하면
+ * Map이 빈 상태 → 대화 이력 유실. 모든 read/write 경로에서 Map 동기화 유지.
+ */
 
-async function writeEntries(conversationId: string, entries: ConversationEntry[]): Promise<void> {
-  const redis = getRedis()
-  if (redis) {
-    try {
-      await redis.set(convKey(conversationId), entries, { ex: CONV_MAX_AGE_S })
-      return
-    } catch {
-      // Redis 일시 장애 → Map fallback
-    }
-  }
-  // 로컬 fallback: 사이즈 한도 + 타임스탬프 관리
+function mapEvictAndStore(conversationId: string, entries: ConversationEntry[]): void {
   const now = Date.now()
+  // TTL 만료된 항목 정리
   for (const [id, ts] of conversationTimestamps) {
     if (now - ts > CONV_MAX_AGE_MS) {
       conversationStore.delete(id)
       conversationTimestamps.delete(id)
     }
   }
+  // 사이즈 한도 LRU eviction
   while (conversationStore.size >= CONV_MAX_SIZE) {
     let oldestId: string | null = null
     let oldestTs = Infinity
@@ -180,6 +165,35 @@ async function writeEntries(conversationId: string, entries: ConversationEntry[]
   }
   conversationStore.set(conversationId, entries)
   conversationTimestamps.set(conversationId, now)
+}
+
+async function readEntries(conversationId: string): Promise<ConversationEntry[]> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const raw = await redis.get<ConversationEntry[]>(convKey(conversationId))
+      const entries = Array.isArray(raw) ? raw : []
+      // Redis 성공 결과를 Map에 캐시 → 이후 Redis 장애 시 fallback 가능
+      mapEvictAndStore(conversationId, entries)
+      return entries
+    } catch {
+      // Redis 일시 장애 → Map fallback
+    }
+  }
+  return conversationStore.get(conversationId) ?? []
+}
+
+async function writeEntries(conversationId: string, entries: ConversationEntry[]): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(convKey(conversationId), entries, { ex: CONV_MAX_AGE_S })
+    } catch {
+      // Redis 장애는 throw하지 않고 Map에만 저장 → best-effort
+    }
+  }
+  // Redis 성공 여부와 무관하게 Map에도 동기화. Map은 Redis fallback 역할.
+  mapEvictAndStore(conversationId, entries)
 }
 
 export async function getConversationContext(conversationId?: string): Promise<string> {

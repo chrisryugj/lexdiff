@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
-import { ErrorBoundary } from "@/components/error-boundary"
+import { ErrorBoundary, UnhandledRejectionWatcher } from "@/components/error-boundary"
 import { MotionProvider } from "@/components/providers/motion-provider"
 import "./globals.css"
 
@@ -34,6 +34,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ErrorBoundary>
+            <UnhandledRejectionWatcher />
             <MotionProvider>
               {children}
             </MotionProvider>

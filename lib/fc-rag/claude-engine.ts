@@ -56,12 +56,21 @@ export async function* executeClaudeRAGStream(
   }
 
   // ── 분류기 기반 Pre-evidence 수집 ──
-  if (!collectedEvidence) {
+  // H-ARC2: 매 tool 호출 전후로 signal.aborted 체크 → 취소 시 즉시 중단.
+  // 기존 구현은 tool 호출 사이에 체크가 없어 사용자 취소 후에도 3-4회 추가 호출 진행.
+  const checkAbort = (): boolean => {
+    if (signal?.aborted) return true
+    return false
+  }
+
+  if (!collectedEvidence && !checkAbort()) {
     const preResults: string[] = []
 
     if (complexity === 'simple') {
       yield { type: 'status', message: '관련 법령 사전 검색 중...', progress: 12 }
+      if (checkAbort()) return
       const aiSearch = await executeTool('search_ai_law', { query }, signal)
+      if (checkAbort()) return
       if (!aiSearch.isError && aiSearch.result.length > 200) {
         yield { type: 'tool_call', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], query }
         yield { type: 'tool_result', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], success: true, summary: summarizeToolResult('search_ai_law', aiSearch) }
@@ -69,7 +78,9 @@ export async function* executeClaudeRAGStream(
       }
     } else if (complexity === 'moderate') {
       yield { type: 'status', message: '도메인별 법령 사전 수집 중...', progress: 12 }
+      if (checkAbort()) return
       const aiSearch = await executeTool('search_ai_law', { query }, signal)
+      if (checkAbort()) return
       if (!aiSearch.isError && aiSearch.result.length > 200) {
         yield { type: 'tool_call', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], query }
         yield { type: 'tool_result', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], success: true, summary: summarizeToolResult('search_ai_law', aiSearch) }
@@ -80,14 +91,18 @@ export async function* executeClaudeRAGStream(
           || query.match(/([\w가-힣]+법)/)?.[1]
 
         if (queryType === 'consequence' && extractedLaw) {
+          if (checkAbort()) return
           const penaltySearch = await executeTool('search_ai_law', { query: `${extractedLaw} 벌칙 과태료` }, signal)
+          if (checkAbort()) return
           if (!penaltySearch.isError && penaltySearch.result.length > 100) {
             yield { type: 'tool_call', name: 'search_ai_law', displayName: '벌칙 조문 검색', query: `${extractedLaw} 벌칙` }
             yield { type: 'tool_result', name: 'search_ai_law', displayName: '벌칙 조문 검색', success: true, summary: summarizeToolResult('search_ai_law', penaltySearch) }
             preResults.push(penaltySearch.result)
           }
         } else if (queryType === 'scope' && extractedLaw) {
+          if (checkAbort()) return
           const annexSearch = await executeTool('get_annexes', { lawName: extractedLaw }, signal)
+          if (checkAbort()) return
           if (!annexSearch.isError && annexSearch.result.length > 100) {
             yield { type: 'tool_call', name: 'get_annexes', displayName: '별표/서식 조회', query: extractedLaw }
             yield { type: 'tool_result', name: 'get_annexes', displayName: '별표/서식 조회', success: true, summary: summarizeToolResult('get_annexes', annexSearch) }
@@ -95,7 +110,9 @@ export async function* executeClaudeRAGStream(
           }
         } else if (queryType === 'procedure') {
           const lawName = extractedLaw || query.replace(/절차|방법|신청|어떻게/g, '').trim().slice(0, 20)
+          if (checkAbort()) return
           const threeSearch = await executeTool('search_ai_law', { query: `${lawName} 절차 신청 서류` }, signal)
+          if (checkAbort()) return
           if (!threeSearch.isError && threeSearch.result.length > 100) {
             preResults.push(threeSearch.result)
           }

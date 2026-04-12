@@ -12,6 +12,7 @@ import type { RevisionHistoryItem } from "@/lib/law-types"
 import { debugLogger } from "@/lib/debug-logger"
 import { sanitizeForRender } from "@/lib/sanitize-html-render"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useFocusTopmostDialog } from "@/hooks/use-focus-topmost-dialog"
 
 interface ComparisonModalProps {
   isOpen: boolean
@@ -170,24 +171,8 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
     }
   }, [isOpen, lawId, mst, loadRevisionHistory, loadComparison])
 
-  // 접근성: 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
-  useEffect(() => {
-    if (!isOpen) return
-
-    const timer = setTimeout(() => {
-      // F6: open 상태 + topmost 다이얼로그 선택
-      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
-      const dialog = dialogs[dialogs.length - 1]
-      if (dialog) {
-        const firstFocusable = dialog.querySelector<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-        firstFocusable?.focus()
-      }
-    }, 150)
-
-    return () => clearTimeout(timer)
-  }, [isOpen])
+  // H-UX1: 중첩 다이얼로그 안전 + 닫힘 시 직전 포커스 복원
+  useFocusTopmostDialog(isOpen)
 
 
   useEffect(() => {

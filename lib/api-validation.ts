@@ -74,7 +74,12 @@ export const ragRequestSchema = z.object({
     .transform(val => val.trim())
     .transform(val => val.replace(/<[^>]*>/g, ''))
     .transform(val => val.replace(/javascript:|data:|vbscript:/gi, '')),
-  conversationId: z.string().max(200).optional(),
+  // H-SEC2: UUID v4 또는 최소 엔트로피 포맷만 허용. 짧은/예측 가능한 ID는
+  // 타 세션 대화 기록 열람 가능성 → 400.
+  // 허용: crypto.randomUUID() 결과 (UUID v4) 또는 16자+ base36/hex.
+  conversationId: z.string()
+    .regex(/^[0-9a-zA-Z_-]{16,64}$/, 'conversationId must be 16-64 chars [A-Za-z0-9_-]')
+    .optional(),
   preEvidence: z.string().max(5000).optional(),
   metadataFilter: z.string().optional(),
 })

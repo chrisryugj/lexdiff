@@ -40,24 +40,8 @@ const nextConfig = {
           },
         ],
       },
-      {
-        // API 라우트 CORS 제한
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: process.env.NEXT_PUBLIC_SITE_URL || 'https://lexdiff.vercel.app',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, X-User-API-Key',
-          },
-        ],
-      },
+      // H-SEC3: CORS는 middleware.ts에서 origin 화이트리스트 echo 방식으로 처리.
+      // 정적 헤더 방식은 단일 origin만 허용해 프리뷰/멀티 도메인 대응 불가.
     ]
   },
 }

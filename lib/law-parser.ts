@@ -408,9 +408,21 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
 
   // 패턴 4: 인라인 법령명 제N조 패턴 (인용 괄호 없음)
   // 예: 도로법 제61조, 도로법 시행령 제63조
-  // 주의: 이미 「」로 캡처된 것은 제외
-  const unquotedLawPattern = /(?<!「)([가-힣a-zA-Z0-9·]{2,20}(?:법률|법|령|규칙|조례)(?:\s*시행령|\s*시행규칙)?)\s*제0*(\d+)조(?:의0*(\d+))?/g
+  // H-RAG3: false positive 가드 강화
+  //   (1) lookbehind (?<![가-힣]) — 직전이 한글이면 어미/조사 연결로 간주하고 skip
+  //       ("엄마는 제정법" 같은 paraphrase false-fire 방지)
+  //   (2) 블랙리스트 — 일반 명사로 자주 쓰이는 *법* 단어 제외
+  //   (3) 후처리: 최종 lawName 길이 < 3 거부 ("이법", "성법" 등 단문 noise)
+  const unquotedLawPattern = /(?<!「)(?<![가-힣])([가-힣a-zA-Z0-9·]{2,20}(?:법률|법|령|규칙|조례)(?:\s*시행령|\s*시행규칙)?)\s*제0*(\d+)조(?:의0*(\d+))?/g
   let unquotedMatch
+
+  // 일반 명사로 흔히 쓰여 법령명으로 오탐되는 블랙리스트.
+  // 진짜 법령명에 포함되면 두 글자 이상의 접두어가 붙어 있어야 함.
+  const UNQUOTED_BLACKLIST = new Set<string>([
+    '방법', '요령', '수법', '용법', '제정법', '개정법', '현행법', '해당법',
+    '본법', '동법', '구법', '신법', '실정법', '자연법', '관습법', '성문법',
+    '시행령', '시행규칙',
+  ])
 
   while ((unquotedMatch = unquotedLawPattern.exec(markdown)) !== null) {
     const lawName = unquotedMatch[1].trim()
@@ -422,6 +434,12 @@ export function extractRelatedLaws(markdown: string): ParsedRelatedLaw[] {
 
     // 단독 '시행령', '시행규칙' 등 부모 법령명 없이 불완전한 법령명 제외
     if (/^시행(령|규칙)$/.test(lawName)) continue
+
+    // H-RAG3: 블랙리스트 매칭 (접두어 없는 단일 명사 제외)
+    if (UNQUOTED_BLACKLIST.has(lawName)) continue
+
+    // H-RAG3: 최소 3자 — "성법", "법" 등 noise 차단
+    if (lawName.length < 3) continue
 
     // 중복 체크: 같은 법령+조문이 이미 있는지 확인
     const isDuplicate = laws.some(l =>

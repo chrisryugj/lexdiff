@@ -175,9 +175,21 @@ export async function POST(request: NextRequest) {
           const isTransient = (msg: string) => /타임아웃|timeout|ECONNRESET|EPIPE|ETIMEDOUT/i.test(msg)
           let cliSuccess = false
 
+          // H-RAG2: 하이브리드 buffering.
+          //  - attempt 0: 즉시 스트리밍 (사용자 체감 레이턴시 우선)
+          //  - attempt 1+: buffer 후 성공 확정시에만 일괄 flush
+          //  → 실패한 시도의 partial answer_token이 클라이언트에 남지 않음.
+          type StreamEvent = Parameters<typeof send>[0]
           for (let attempt = 0; attempt < 2 && !cliSuccess; attempt++) {
-            if (attempt > 0) {
-              // F1: 재시도 전에 클라이언트에 누적 버퍼/툴로그 초기화 신호
+            const isRetry = attempt > 0
+            const retryBuffer: StreamEvent[] = []
+            const emit = (event: StreamEvent) => {
+              if (isRetry) retryBuffer.push(event)
+              else sendAndLog(event)
+            }
+
+            if (isRetry) {
+              // 이전 시도에서 send된 partial 데이터를 클라에서 초기화시킴
               sendAndLog({ type: "stream_reset", reason: "retry" })
               sendAndLog({ type: "status", message: "Hermes 타임아웃 — 재시도 중...", progress: 3 })
               traceLogger.addEvent(traceId, 'hermes_retry', { attempt })
@@ -207,16 +219,20 @@ export async function POST(request: NextRequest) {
                   const warningMessage = getUsageWarningMessage(usageStats)
                   if (warningMessage) {
                     const warnings = [...(event.data.warnings || []), warningMessage]
-                    sendAndLog({ ...event, data: { ...event.data, warnings } })
+                    emit({ ...event, data: { ...event.data, warnings } })
                     continue
                   }
                 }
               }
 
-              sendAndLog(event)
+              emit(event)
             }
 
             if (!claudeHadError) {
+              // retry 성공 시 버퍼링된 이벤트 일괄 flush
+              if (isRetry) {
+                for (const bufferedEvent of retryBuffer) sendAndLog(bufferedEvent)
+              }
               cliSuccess = true
             } else if (attempt === 0 && isTransient(errorMessage)) {
               continue // 1회 재시도

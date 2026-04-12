@@ -1,8 +1,27 @@
 'use client'
 
-import { Component, type ReactNode } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import { Icon } from '@/components/ui/icon'
 import { Button } from '@/components/ui/button'
+
+/**
+ * H-UX2: 전역 unhandled promise rejection 리스너.
+ * async onClick 핸들러가 reject되면 React가 삼키므로 window 레벨에서 로깅/토스트.
+ * Layout에서 <UnhandledRejectionWatcher /> 한 번만 마운트.
+ */
+export function UnhandledRejectionWatcher() {
+  useEffect(() => {
+    const handler = (e: PromiseRejectionEvent) => {
+      const reason = e.reason
+      const message = reason instanceof Error ? reason.message : String(reason ?? 'unknown')
+      // console.error는 개발 편의용. Sentry 연동이 있다면 해당 클라이언트로 교체.
+      console.error('[unhandledrejection]', message, reason)
+    }
+    window.addEventListener('unhandledrejection', handler)
+    return () => window.removeEventListener('unhandledrejection', handler)
+  }, [])
+  return null
+}
 
 interface Props {
   children: ReactNode

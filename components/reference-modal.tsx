@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { CopyButton } from "@/components/ui/copy-button"
 import { sanitizeForRender } from "@/lib/sanitize-html-render"
+import { useFocusTopmostDialog } from "@/hooks/use-focus-topmost-dialog"
 
 interface PrecedentMeta {
   court?: string
@@ -132,24 +133,8 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     return null
   }, [title])
 
-  // 접근성: 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
-  useEffect(() => {
-    if (!isOpen) return
-
-    const timer = setTimeout(() => {
-      // F6: open 상태인 가장 위(topmost) 다이얼로그를 선택 — 중첩 모달 안전
-      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
-      const dialog = dialogs[dialogs.length - 1]
-      if (dialog) {
-        const firstFocusable = dialog.querySelector<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-        firstFocusable?.focus()
-      }
-    }, 150) // Dialog 애니메이션 완료 후
-
-    return () => clearTimeout(timer)
-  }, [isOpen])
+  // H-UX1: topmost 다이얼로그 포커스 + 닫힘 시 직전 포커스 복원 (custom hook)
+  useFocusTopmostDialog(isOpen)
 
   // P1-LV-7: 네이티브 listener 대신 React onClick 핸들러 사용
   // 동기화된 React 이벤트 시스템 사용 → MouseEvent → SyntheticEvent 캐스팅 제거

@@ -198,8 +198,13 @@ export function useAiSearch(deps: HandlerDeps) {
         if (userKey) headers['X-User-API-Key'] = userKey
       } catch { /* SSR or private browsing */ }
 
-      // conversationId 확정 및 state 저장 (follow-up에서 재사용)
-      const actualConvId = conversationId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      // H-SEC2: 높은 엔트로피가 필요한 conversationId는 crypto.randomUUID()로 생성.
+      // 기존 q-{timestamp}-{5자} 포맷은 열거 공격에 취약.
+      const actualConvId = conversationId || (
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+      )
       if (!conversationId) {
         actions.setConversationId(actualConvId)
       }

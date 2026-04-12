@@ -229,14 +229,67 @@ export async function correctToolArgs(
 // ─── search_ai_law 결과 관련성 재정렬 (Context Precision 향상) ───
 
 /**
- * search_ai_law 결과를 쿼리 키워드 매칭으로 재정렬.
- * 쿼리와 관련 없는 조문을 후순위로 밀어 Gemini가 핵심 조문에 집중하게 함.
+ * H-RAG1: BM25 기반 reranker.
+ * 기존 keyword-frequency scoring은 긴 조문에 유리하고 짧은 조문을 과소평가.
+ * BM25는 문서 길이 정규화를 포함해 법률 도메인에서 더 안정적.
  *
- * 점수 기준:
- * - 법령명에 쿼리 키워드 포함 시 +3/키워드
- * - 조문 내용에 쿼리 키워드 포함 시 +1/키워드
- * - "제N조" 형태 매칭 시 +5 (사용자가 조문 지정)
+ * 파라미터: k1=1.2, b=0.75 (web search 표준값, 법률 문서에서도 실전 검증된 범위)
+ * 법령명에는 x3 가중치, 조문 번호 완전 일치는 별도 large boost.
  */
+const BM25_K1 = 1.2
+const BM25_B = 0.75
+
+const SUFFIX_STOPWORDS_RE = /(?:은|는|이|가|을|를|에|의|로|으로|와|과|에서|한|하는|대한|대해|인가요|인지|위한|있는|없는|되는|되어|해서|해|줘)$/
+const WHOLE_STOPWORDS = new Set(['무엇', '어떤', '어떻게', '것', '및', '또는', '경우', '알려', '설명', '궁금', '내용', '관련'])
+
+function extractKeywords(query: string): string[] {
+  return query
+    .replace(/[「」]/g, '')
+    .split(/\s+/)
+    .map(w => w.replace(SUFFIX_STOPWORDS_RE, ''))
+    .filter(w => w.length >= 2 && !WHOLE_STOPWORDS.has(w))
+}
+
+/** 문서의 term frequency — 법령명/본문 분리 가중치 위해 필드별 카운트 */
+interface DocStats {
+  firstLine: string
+  body: string
+  totalLen: number
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0
+  let count = 0
+  let pos = 0
+  while ((pos = haystack.indexOf(needle, pos)) !== -1) {
+    count++
+    pos += needle.length
+  }
+  return count
+}
+
+function bm25DocumentFreq(keyword: string, docs: DocStats[]): number {
+  let df = 0
+  for (const d of docs) if (countOccurrences(d.firstLine + ' ' + d.body, keyword) > 0) df++
+  return df
+}
+
+function bm25Idf(df: number, N: number): number {
+  // Okapi BM25+ IDF: log((N - df + 0.5) / (df + 0.5) + 1)
+  return Math.log((N - df + 0.5) / (df + 0.5) + 1)
+}
+
+function bm25ScoreDoc(keyword: string, doc: DocStats, idf: number, avgDL: number): number {
+  // 법령명(첫 라인) 매칭에는 ×3 가중치 적용 — effective term frequency.
+  const tfBody = countOccurrences(doc.body, keyword)
+  const tfTitle = countOccurrences(doc.firstLine, keyword)
+  const tf = tfBody + tfTitle * 3
+  if (tf === 0) return 0
+  const numerator = tf * (BM25_K1 + 1)
+  const denominator = tf + BM25_K1 * (1 - BM25_B + BM25_B * (doc.totalLen / Math.max(1, avgDL)))
+  return idf * (numerator / denominator)
+}
+
 export function rerankAiSearchResult(text: string, query: string): string {
   const headerMatch = text.match(/^[^\n]*(?:검색|총)[^\n]*\n/)
   const header = headerMatch ? headerMatch[0] : ''
@@ -245,40 +298,43 @@ export function rerankAiSearchResult(text: string, query: string): string {
   const blocks = body.split(/(?=📜\s)/).filter(b => b.trim().length > 0)
   if (blocks.length <= 1) return text  // 1건 이하면 재정렬 불필요
 
-  // 쿼리에서 키워드 추출 (불용어 제거)
-  const suffixStopWords = /(?:은|는|이|가|을|를|에|의|로|으로|와|과|에서|한|하는|대한|대해|인가요|인지|위한|있는|없는|되는|되어|해서|해|줘)$/
-  const wholeStopWords = new Set(['무엇', '어떤', '어떻게', '것', '및', '또는', '경우', '알려', '설명', '궁금', '내용', '관련'])
-  const keywords = query
-    .replace(/[「」]/g, '')
-    .split(/\s+/)
-    .map(w => w.replace(suffixStopWords, ''))
-    .filter(w => w.length >= 2 && !wholeStopWords.has(w))
+  const keywords = extractKeywords(query)
 
-  // 쿼리에서 조문번호 추출
+  // 쿼리에서 조문번호 추출 (완전 일치 large boost)
   const queryArticles = new Set(
     Array.from(query.matchAll(/제(\d+)조(?:의(\d+))?/g))
       .map(m => m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`)
   )
 
-  const scored = blocks.map(block => {
+  // 문서 통계 준비
+  const docs: DocStats[] = blocks.map(b => {
+    const firstLine = b.split('\n')[0] || ''
+    return { firstLine, body: b.slice(firstLine.length), totalLen: b.length }
+  })
+  const N = docs.length
+  const avgDL = docs.reduce((s, d) => s + d.totalLen, 0) / N
+
+  // 키워드별 IDF 선계산
+  const idfMap = new Map<string, number>()
+  for (const kw of keywords) {
+    const df = bm25DocumentFreq(kw, docs)
+    idfMap.set(kw, bm25Idf(df, N))
+  }
+
+  const scored = blocks.map((block, i) => {
+    const doc = docs[i]
     let score = 0
-    const firstLine = block.split('\n')[0] || ''  // 📜 법령명 라인
-
-    // 법령명 키워드 매칭 (가중치 높음)
     for (const kw of keywords) {
-      if (firstLine.includes(kw)) score += 3
-      else if (block.includes(kw)) score += 1
+      const idf = idfMap.get(kw) ?? 0
+      score += bm25ScoreDoc(kw, doc, idf, avgDL)
     }
-
-    // 조문번호 직접 매칭 (가중치 최고)
+    // 조문번호 완전 일치 — BM25와 별개로 절대 우선
     for (const art of queryArticles) {
-      if (block.includes(art)) score += 5
+      if (block.includes(art)) score += 10
     }
-
     return { block, score }
   })
 
-  // 점수 내림차순 정렬
   scored.sort((a, b) => b.score - a.score)
 
   // 관련성 없는 노이즈 제거: score > 0 결과가 3건 이상이면 score 0 결과 드롭

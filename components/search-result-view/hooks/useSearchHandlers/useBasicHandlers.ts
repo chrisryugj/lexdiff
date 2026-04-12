@@ -325,7 +325,11 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
   // ============================================================
   // 기타 핸들러
   // ============================================================
-  const handleCitationClick = useCallback(async (lawName: string, jo: string, article: string) => {
+  // H-UX2: async 불필요 (await 없음). 동기 핸들러로 변환해 onClick에
+  //        전달해도 Promise rejection이 삼켜지는 리스크 제거.
+  const handleCitationClick = useCallback((lawName: string, jo: string, article: string) => {
+    // parameter jo는 외부 계약 유지용. 현재는 로그만 남김.
+    void jo
     debugLogger.info('인용된 조문 클릭', { lawName, article })
   }, [])
 
