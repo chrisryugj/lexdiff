@@ -63,6 +63,12 @@ export async function GET(request: Request) {
       delegationLength: delegationText.length,
     })
 
+    // API-11: 법제처가 HTML 에러 페이지를 200으로 보내는 경우 감지
+    const trimmed = delegationText.trimStart()
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+      throw new Error('법제처 응답이 HTML 형식입니다 (서버 에러 페이지일 가능성)')
+    }
+
     // JSON 파싱
     const delegationJson = JSON.parse(delegationText)
 

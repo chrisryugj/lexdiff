@@ -6,11 +6,14 @@
  */
 
 import type { AnnexCacheEntry } from "./law-types"
+import { debugLogger } from "./debug-logger"
 
 const DB_NAME = "LexDiffAnnexCache"
 const DB_VERSION = 2  // v2: kordoc 파서 통합 후 캐시 무효화 (2026-04-02)
 const ANNEX_STORE = "annexMarkdownCache"
 const CACHE_EXPIRY_DAYS = 30 // 별표는 변경 빈도가 낮으므로 30일
+// PERF-2: 무제한 누적 방지 (별표는 PDF/HWP 마크다운 — 수십 KB×무제한 폭증 우려)
+const MAX_ANNEX_ENTRIES = 200
 
 // IndexedDB 초기화
 async function openDB(): Promise<IDBDatabase> {
@@ -78,13 +81,13 @@ export async function getAnnexCache(
     // 만료 체크
     const expiryTime = Date.now() - CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000
     if (entry.timestamp < expiryTime) {
-      clearAnnexCache(lawId, annexNumber).catch(console.error)
+      clearAnnexCache(lawId, annexNumber).catch((e) => debugLogger.warning("[annex-cache] clearAnnex", e))
       return null
     }
 
     return entry
   } catch (error) {
-    console.error("❌ 별표 캐시 조회 실패:", error)
+    debugLogger.error("❌ 별표 캐시 조회 실패:", error)
     return null
   }
 }
@@ -134,10 +137,42 @@ export async function setAnnexCache(
 
     db.close()
 
-    // 백그라운드로 만료된 캐시 정리
-    cleanExpiredAnnexCache().catch(console.error)
+    // 백그라운드로 만료된 캐시 정리 + LRU eviction
+    cleanExpiredAnnexCache().catch((e) => debugLogger.warning("[annex-cache] cleanExpired error", e))
+    evictOldestAnnexEntries().catch((e) => debugLogger.warning("[annex-cache] evict error", e))
   } catch (error) {
-    console.error("❌ 별표 캐시 저장 실패:", error)
+    debugLogger.error("❌ 별표 캐시 저장 실패:", error)
+  }
+}
+
+// PERF-2: MAX_ANNEX_ENTRIES 초과 시 오래된 항목 제거
+async function evictOldestAnnexEntries(): Promise<void> {
+  try {
+    const db = await openDB()
+    if (!db.objectStoreNames.contains(ANNEX_STORE)) { db.close(); return }
+    const tx = db.transaction(ANNEX_STORE, "readwrite")
+    const store = tx.objectStore(ANNEX_STORE)
+    const countReq = store.count()
+    countReq.onsuccess = () => {
+      const total = countReq.result
+      if (total <= MAX_ANNEX_ENTRIES) return
+      const removeCount = total - MAX_ANNEX_ENTRIES
+      const index = store.index("timestamp")
+      const cursorReq = index.openCursor()
+      let removed = 0
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result
+        if (cursor && removed < removeCount) {
+          cursor.delete()
+          removed++
+          cursor.continue()
+        }
+      }
+    }
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); tx.onerror = () => resolve() })
+    db.close()
+  } catch (error) {
+    debugLogger.warning("[annex-cache] evictOldest error", error)
   }
 }
 
@@ -168,7 +203,7 @@ export async function clearAnnexCache(
 
     db.close()
   } catch (error) {
-    console.error("❌ 별표 캐시 삭제 실패:", error)
+    debugLogger.error("❌ 별표 캐시 삭제 실패:", error)
   }
 }
 
@@ -207,7 +242,7 @@ async function cleanExpiredAnnexCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error("❌ 만료된 별표 캐시 정리 실패:", error)
+    debugLogger.error("❌ 만료된 별표 캐시 정리 실패:", error)
   }
 }
 
@@ -234,6 +269,6 @@ export async function clearAllAnnexCache(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error("❌ 별표 캐시 전체 삭제 실패:", error)
+    debugLogger.error("❌ 별표 캐시 전체 삭제 실패:", error)
   }
 }

@@ -137,8 +137,9 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
     if (!isOpen) return
 
     const timer = setTimeout(() => {
-      // 뒤로가기 버튼이 있으면 그걸 포커스, 아니면 첫 번째 버튼
-      const dialog = document.querySelector('[role="dialog"]')
+      // F6: open 상태인 가장 위(topmost) 다이얼로그를 선택 — 중첩 모달 안전
+      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
+      const dialog = dialogs[dialogs.length - 1]
       if (dialog) {
         const firstFocusable = dialog.querySelector<HTMLElement>(
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

@@ -21,13 +21,21 @@ export function useLawViewerThreeTier(
   const [delegationActiveTab, setDelegationActiveTab] = useState<"law" | "decree" | "rule" | "admin">("decree")
 
   // Panel sizes for drag resize (2-tier views)
-  const [delegationPanelSize, setDelegationPanelSize] = useState<number>(() => {
+  const [delegationPanelSize, setDelegationPanelSizeState] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lawViewerDelegationSplit')
-      return saved ? parseInt(saved) : 35
+      const saved = localStorage.getItem('lex:lawViewer:delegationSplit') ?? localStorage.getItem('lawViewerDelegationSplit')
+      const parsed = saved ? parseInt(saved, 10) : NaN
+      return Number.isFinite(parsed) ? parsed : 35
     }
     return 35
   })
+  // P1-LV-4: 변경 시 localStorage 저장
+  const setDelegationPanelSize = (size: number) => {
+    setDelegationPanelSizeState(size)
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('lex:lawViewer:delegationSplit', String(size)) } catch { /* quota */ }
+    }
+  }
 
   // Reset delegation panel state when law changes
   useEffect(() => {

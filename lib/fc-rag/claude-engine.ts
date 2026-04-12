@@ -179,9 +179,12 @@ export async function* executeClaudeRAGStream(
           throw new Error('Claude 응답이 비어있습니다.')
         }
 
-        // 메타 답변 감지: 실질 내용 없는 짧은 응답 → 에러로 전환하여 Gemini 폴백 유도
-        const isMetaAnswer = answer.length < 100 ||
-          (answer.length < 150 && /추가\s*조회|추가.*필요|부족|확인되지\s*않|수집.*없|확인하겠|조회하겠|검색하겠/.test(answer))
+        // 메타 답변 감지: 실질 내용 없는 응답 → Gemini 폴백 유도
+        // F10: 키워드 매칭이 핵심 신호. 짧은 정의형 답변(80~100자)도 정상이므로 length 기준 완화
+        const hasMetaPhrase = /추가\s*조회|추가.*필요|부족|확인되지\s*않|수집.*없|확인하겠|조회하겠|검색하겠/.test(answer)
+        const isMetaAnswer =
+          answer.length < 40 ||                       // 너무 짧은 응답만 무조건 reject
+          (answer.length < 200 && hasMetaPhrase)      // 메타 키워드 있을 때만 200자 미만 reject
         if (isMetaAnswer) {
           throw new Error(`메타 답변 감지 (${answer.length}ch) — 실질 답변 없음`)
         }

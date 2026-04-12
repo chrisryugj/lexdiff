@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
@@ -81,6 +82,8 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       return
     }
 
+    // P1-LV-11: 이전 컨트롤러 abort 후 새로 생성
+    abortRef.current?.abort()
     abortRef.current = new AbortController()
     const signal = abortRef.current.signal
 
@@ -146,7 +149,8 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       setError(err instanceof Error ? err.message : String(err))
       setStep('error')
     }
-  }, [meta])
+    // P1-LV-10: meta 객체 전체가 아니라 안정적인 식별자만 deps로
+  }, [meta.lawId, meta.mst, meta.lawTitle])
 
   useEffect(() => {
     if (isOpen) {
@@ -196,9 +200,11 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       <DialogContent
         showCloseButton={false}
         className="w-full max-w-[100vw] sm:max-w-[750px] h-[75vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10"
-        aria-describedby={undefined}
       >
-        <VisuallyHidden.Root><DialogTitle>위임입법 미비 탐지</DialogTitle></VisuallyHidden.Root>
+        <VisuallyHidden.Root>
+          <DialogTitle>위임입법 미비 탐지</DialogTitle>
+          <DialogDescription>법령 본문에서 위임 조항을 추출하고 시행령·시행규칙·행정규칙과의 매칭을 분석합니다.</DialogDescription>
+        </VisuallyHidden.Root>
         {/* ── Header ── */}
         <div className="border-b border-border bg-muted/30 px-4 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">

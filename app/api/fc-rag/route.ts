@@ -55,6 +55,25 @@ function convertForVerification(fcCitations: FCRAGCitation[]): {
   return { verifiable, skipped }
 }
 
+// AbortSignal.any 폴백 — Node 20.3 미만 / 일부 엣지 런타임 대비
+function combineSignals(signals: AbortSignal[]): AbortSignal {
+  if (typeof (AbortSignal as unknown as { any?: unknown }).any === 'function') {
+    return (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any(signals)
+  }
+  const controller = new AbortController()
+  const onAbort = (reason: unknown) => {
+    if (!controller.signal.aborted) controller.abort(reason)
+  }
+  for (const s of signals) {
+    if (s.aborted) {
+      onAbort(s.reason)
+      break
+    }
+    s.addEventListener('abort', () => onAbort(s.reason), { once: true })
+  }
+  return controller.signal
+}
+
 export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request)
   const userApiKey = request.headers.get("X-User-API-Key") || undefined
@@ -77,16 +96,17 @@ export async function POST(request: NextRequest) {
 
   const { query, conversationId, preEvidence } = validation.data
 
+  // 사용자 API 키 경로에도 quota 적용 — bypass 차단 (S2)
+  // 사용자 키가 있어도 IP 기준 별도 한도(완화)를 두어 Hermes/Gemini 비용 도용 차단
   let usageHeaders: Record<string, string> | undefined
+  if (await isQuotaExceeded(clientIP)) {
+    return Response.json(
+      { error: "일일 AI 검색 시도를 초과했습니다. 내일 다시 시도해 주세요." },
+      { status: 429, headers: await getUsageHeaders(clientIP) }
+    )
+  }
+  await recordAIUsage(clientIP)
   if (!userApiKey) {
-    if (await isQuotaExceeded(clientIP)) {
-      return Response.json(
-        { error: "일일 AI 검색 시도를 초과했습니다. 내일 다시 시도해 주세요." },
-        { status: 429, headers: await getUsageHeaders(clientIP) }
-      )
-    }
-
-    await recordAIUsage(clientIP)
     usageHeaders = await getUsageHeaders(clientIP)
   }
 
@@ -133,16 +153,19 @@ export async function POST(request: NextRequest) {
         send(data)
       }
 
-      // request.signal + cancel() 양쪽 모두 반응하는 합성 signal
-        const combinedSignal = AbortSignal.any([request.signal, abortController.signal])
+      // request.signal + cancel() 양쪽 모두 반응하는 합성 signal (E1: 폴백 적용)
+      const combinedSignal = combineSignals([request.signal, abortController.signal])
+      // E2: 동일 응답 안에서 token 이중 차감 방지
+      let tokensRecorded = false
 
       try {
         let handled = false
         let source: 'hermes' | 'gemini' = 'gemini'
 
-        // ── Hermes Primary (통일 경로) ──
-        // 로컬: localhost:8642 직접 / Vercel: HERMES_API_URL(CF Worker) 경유
-        try {
+        // ── Hermes Primary ──
+        // 사용자 자체 API 키 사용 시엔 Gemini로 직행 (Hermes 비용 도용 차단)
+        if (!userApiKey) {
+          try {
           traceLogger.addEvent(traceId, 'hermes_start', {})
           sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
 
@@ -153,6 +176,8 @@ export async function POST(request: NextRequest) {
 
           for (let attempt = 0; attempt < 2 && !cliSuccess; attempt++) {
             if (attempt > 0) {
+              // F1: 재시도 전에 클라이언트에 누적 버퍼/툴로그 초기화 신호
+              sendAndLog({ type: "stream_reset", reason: "retry" })
               sendAndLog({ type: "status", message: "Hermes 타임아웃 — 재시도 중...", progress: 3 })
               traceLogger.addEvent(traceId, 'hermes_retry', { attempt })
             }
@@ -175,7 +200,8 @@ export async function POST(request: NextRequest) {
 
               if (event.type === "answer") {
                 lastAnswerCitations = event.data.citations || []
-                if (!userApiKey) {
+                if (!tokensRecorded) {
+                  tokensRecorded = true
                   const usageStats = await recordAITokens(clientIP, event.data.answer.length)
                   const warningMessage = getUsageWarningMessage(usageStats)
                   if (warningMessage) {
@@ -206,7 +232,19 @@ export async function POST(request: NextRequest) {
               const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
               if (verifiable.length > 0) {
                 sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
-                const verified = await verifyAllCitations(verifiable)
+                // P1-AI-7: 검증 timeout (10s) — 법제처 hang 방지
+                const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
+                  verifyAllCitations(verifiable),
+                  new Promise<VerifiedCitation[]>((_, reject) =>
+                    setTimeout(() => reject(new Error('citation verification timeout')), 10_000)
+                  ),
+                ]).catch(() =>
+                  verifiable.map<VerifiedCitation>((c) => ({
+                    ...c,
+                    verified: false,
+                    verificationMethod: 'skipped',
+                  }))
+                )
                 sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {
@@ -217,15 +255,18 @@ export async function POST(request: NextRequest) {
           handled = true
           source = 'hermes'
           traceLogger.completeTrace(traceId, 'hermes')
-        } catch (hermesError) {
-          traceLogger.addEvent(traceId, 'hermes_failed', {
-            message: hermesError instanceof Error ? hermesError.message : 'unknown',
-            fallback: 'gemini',
-          })
+          } catch (hermesError) {
+            traceLogger.addEvent(traceId, 'hermes_failed', {
+              message: hermesError instanceof Error ? hermesError.message : 'unknown',
+              fallback: 'gemini',
+            })
+          }
         }
 
         // ── Gemini Fallback ──
         if (!handled) {
+          // F1: Hermes 도중에 흘려보낸 답변/툴 로그가 있다면 클라에서 비우게 함
+          sendAndLog({ type: "stream_reset", reason: "fallback" })
           sendAndLog({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
           traceLogger.addEvent(traceId, 'gemini_start', {})
 
@@ -242,7 +283,8 @@ export async function POST(request: NextRequest) {
               geminiAnswerSent = true
               lastAnswerCitations = event.data.citations || []
 
-              if (!userApiKey) {
+              if (!userApiKey && !tokensRecorded) {
+                tokensRecorded = true
                 const usageStats = await recordAITokens(clientIP, event.data.answer.length)
                 const warningMessage = getUsageWarningMessage(usageStats)
 
@@ -277,7 +319,19 @@ export async function POST(request: NextRequest) {
               const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
               if (verifiable.length > 0) {
                 sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
-                const verified = await verifyAllCitations(verifiable)
+                // P1-AI-7: 검증 timeout (10s) — 법제처 hang 방지
+                const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
+                  verifyAllCitations(verifiable),
+                  new Promise<VerifiedCitation[]>((_, reject) =>
+                    setTimeout(() => reject(new Error('citation verification timeout')), 10_000)
+                  ),
+                ]).catch(() =>
+                  verifiable.map<VerifiedCitation>((c) => ({
+                    ...c,
+                    verified: false,
+                    verificationMethod: 'skipped',
+                  }))
+                )
                 sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
               }
             } catch (error) {

@@ -48,6 +48,7 @@ NUL
 .claude/plans/
 .claude/todos/
 .claude/session-env/
+.claude/memory/
 
 # RAGAS evaluation results
 /evaluation/results/

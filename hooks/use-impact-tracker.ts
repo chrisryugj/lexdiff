@@ -83,6 +83,13 @@ export function useImpactTracker() {
 
   const abortRef = useRef<AbortController | null>(null)
 
+  // F7: 언마운트 시 진행 중 SSE 강제 중단
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
   const prevStepRef = useRef<ImpactStep>('resolving')
   const prevMessageRef = useRef<string>('')
 

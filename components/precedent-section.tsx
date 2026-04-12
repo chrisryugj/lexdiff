@@ -30,6 +30,7 @@ interface PrecedentSectionProps {
   onViewDetail: (precedent: PrecedentSearchResult) => void
   onExpand: () => void
   onCollapse: () => void
+  onShowMore?: () => void
 }
 
 export function PrecedentSection({
@@ -42,7 +43,8 @@ export function PrecedentSection({
   viewMode,
   onViewDetail,
   onExpand,
-  onCollapse
+  onCollapse,
+  onShowMore,
 }: PrecedentSectionProps) {
   const [isOpen, setIsOpen] = React.useState(true)
 
@@ -142,9 +144,9 @@ export function PrecedentSection({
             ))}
           </div>
 
-          {totalCount > 5 && (
+          {totalCount > 5 && onShowMore && (
             <div className="mt-3 text-center">
-              <Button variant="outline" size="sm" className="text-xs">
+              <Button variant="outline" size="sm" className="text-xs" onClick={onShowMore}>
                 더 보기 ({totalCount - 5}건 더)
               </Button>
             </div>
@@ -253,7 +255,6 @@ export function PrecedentDetailPanel({
   const processHtml = React.useCallback((html: string) => {
     if (!html) return ''
     const cleaned = html
-      .replace(/<br\\>/g, '<br>')
       .replace(/<br\s*\/?>/gi, '<br>')
       .replace(/&nbsp;/g, ' ')
       // 【】 뒤의 연속 공백을 탭 하나로 정리

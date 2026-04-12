@@ -45,8 +45,25 @@ export async function GET(request: Request) {
       throw new Error(`파일 다운로드 실패: ${response.status}`)
     }
 
+    // API-9: 사이즈 상한 (50MB) — Vercel 메모리 폭탄 방지
+    const MAX_FILE_SIZE = 50 * 1024 * 1024
+    const contentLength = parseInt(response.headers.get("content-length") || "0", 10)
+    if (contentLength > MAX_FILE_SIZE) {
+      debugLogger.error("별표 파일이 너무 큼", { contentLength })
+      return new Response(JSON.stringify({ error: "파일 크기가 너무 큽니다 (50MB 초과)" }), {
+        status: 413,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
     const contentType = response.headers.get("content-type") || ""
     const buffer = await response.arrayBuffer()
+    if (buffer.byteLength > MAX_FILE_SIZE) {
+      return new Response(JSON.stringify({ error: "파일 크기가 너무 큽니다" }), {
+        status: 413,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
 
     // HTML 오류 페이지 감지
     if (contentType.includes("text/html")) {

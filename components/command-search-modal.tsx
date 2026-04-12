@@ -59,6 +59,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -69,18 +70,25 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   const fetchSuggestions = useCallback(async (q: string) => {
     if (!q || q.length < 1) {
       setSuggestions([])
+      setSuggestionsError(null)
       return
     }
 
     setIsLoadingSuggestions(true)
+    setSuggestionsError(null)
     try {
       const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
-      if (res.ok) {
+      if (!res.ok) {
+        setSuggestionsError('자동완성을 불러올 수 없습니다')
+        setSuggestions([])
+      } else {
         const data = await res.json()
         setSuggestions(data.suggestions || [])
       }
-    } catch (error) {
-      console.error("[CommandSearchModal] Failed to fetch suggestions:", error)
+    } catch {
+      // UX-1: 사용자 피드백 — 단순 console.error 제거
+      setSuggestionsError('자동완성을 불러올 수 없습니다')
+      setSuggestions([])
     } finally {
       setIsLoadingSuggestions(false)
     }
@@ -96,13 +104,14 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       if (recent) {
         try {
           setRecentSearches(JSON.parse(recent).slice(0, 10)) // 최대 10개 로드
-        } catch (error) {
-          console.error('Failed to parse recent searches:', error)
+        } catch {
+          setRecentSearches([])
         }
       }
 
-      // 입력창 포커스
-      setTimeout(() => inputRef.current?.focus(), 100)
+      // 입력창 포커스 (PERF-9: cleanup 추가)
+      const focusTimer = setTimeout(() => inputRef.current?.focus(), 100)
+      return () => clearTimeout(focusTimer)
     } else {
       // 모달 닫힐 때 상태 초기화
       setSearchQuery("")
@@ -111,8 +120,9 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     }
   }, [isOpen])
 
-  // debounced 쿼리 변경 시 자동완성 호출
+  // debounced 쿼리 변경 시 자동완성 호출 (UX-3: 선택 인덱스 초기화)
   useEffect(() => {
+    setSelectedIndex(-1)
     if (isOpen && debouncedQuery.trim()) {
       fetchSuggestions(debouncedQuery.trim())
     } else {

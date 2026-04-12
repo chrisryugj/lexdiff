@@ -3,6 +3,7 @@ import { debugLogger } from "@/lib/debug-logger"
 import { parseAnnexFile } from "@/lib/annex-parser"
 import { validateExternalUrl } from "@/lib/url-validator"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { safeErrorResponse } from "@/lib/api-error"
 
 function getBaseUrl(request: Request): string {
   const url = new URL(request.url)
@@ -75,13 +76,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error)
     debugLogger.error("Annex conversion failed", { error: errMsg })
-    return NextResponse.json(
-      {
-        error: `별표 변환 중 오류: ${errMsg}`,
-        markdown: null,
-        source: "error",
-      },
-      { status: 500 }
-    )
+    return safeErrorResponse(error, "별표 변환에 실패했습니다")
   }
 }

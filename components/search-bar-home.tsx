@@ -100,7 +100,11 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
                   actions.setQuery(e.target.value)
                   actions.setSelectedIndex(-1)
                 }}
-                onFocus={() => actions.setShowDropdown(true)}
+                onFocus={() => {
+                  // UX-2: 드롭다운 열 때 이전 선택 초기화
+                  actions.setShowDropdown(true)
+                  actions.setSelectedIndex(-1)
+                }}
                 onKeyDown={handleKeyDown}
                 className={cn(
                   "h-16 pl-14 pr-4 text-base sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",

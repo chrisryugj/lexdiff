@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -26,6 +26,11 @@ export function HelpGuideSheet({
   defaultTab = 'law',
 }: HelpGuideSheetProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab)
+
+  // UX-9: 시트 열릴 때 또는 defaultTab 변경 시 동기화
+  useEffect(() => {
+    if (open) setActiveTab(defaultTab)
+  }, [open, defaultTab])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

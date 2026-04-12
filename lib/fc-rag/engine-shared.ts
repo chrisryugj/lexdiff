@@ -86,7 +86,10 @@ const CONV_MAX_SIZE = 500 // Map 크기 상한 (메모리 보호)
 const conversationTimestamps = new Map<string, number>()
 
 // 주기적 TTL 정리 (새 대화 저장이 없어도 메모리 회수)
-if (typeof setInterval !== 'undefined') {
+// P1-AI-1: HMR/멀티 import 방어 — globalThis 가드로 한 번만 등록
+const __g = globalThis as unknown as { __lexdiff_conv_cleanup_started__?: boolean }
+if (typeof setInterval !== 'undefined' && !__g.__lexdiff_conv_cleanup_started__) {
+  __g.__lexdiff_conv_cleanup_started__ = true
   const _convCleanupTimer = setInterval(() => {
     const now = Date.now()
     for (const [id, ts] of conversationTimestamps) {

@@ -33,22 +33,40 @@ export interface QueryLogEntry {
   error: string | null
 }
 
+// PII 마스킹: 주민등록번호, 전화번호, 이메일, 카드번호
+function maskPII(text: string): string {
+  if (!text) return text
+  return text
+    .replace(/\b\d{6}-?[1-4]\d{6}\b/g, '[RRN]')
+    .replace(/\b01[016789][- ]?\d{3,4}[- ]?\d{4}\b/g, '[PHONE]')
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[EMAIL]')
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, (m) => (m.replace(/[^\d]/g, '').length >= 13 ? '[CARD]' : m))
+}
+
+function sanitizeEntry(entry: QueryLogEntry): QueryLogEntry {
+  const cleaned = maskPII(entry.query || '')
+  // 추가 안전: 너무 긴 질의는 1000자로 절단 (디스크/네트워크 오용 방지)
+  const truncated = cleaned.length > 1000 ? cleaned.slice(0, 1000) + '…' : cleaned
+  return { ...entry, query: truncated }
+}
+
 /** 질의 로그 append. 로컬: 파일, Vercel: Hermes API로 전송. */
 export function appendQueryLog(entry: QueryLogEntry): void {
-  const line = JSON.stringify(entry) + '\n'
+  const safe = sanitizeEntry(entry)
+  const line = JSON.stringify(safe) + '\n'
 
   if (process.env.VERCEL) {
-    // Vercel: Hermes API로 로그 전송 (fire-and-forget)
+    // Vercel: Hermes API로 로그 전송 (fire-and-forget) — https + 키 모두 필수
     const hermesUrl = process.env.HERMES_API_URL
     const hermesKey = process.env.HERMES_API_KEY
-    if (hermesUrl && hermesKey) {
+    if (hermesUrl && hermesKey && hermesUrl.startsWith('https://')) {
       fetch(`${hermesUrl}/api/fc-rag-log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${hermesKey}`,
         },
-        body: JSON.stringify(entry),
+        body: line,
       }).catch(() => {})
     }
     return

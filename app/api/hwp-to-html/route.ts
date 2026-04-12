@@ -27,13 +27,20 @@ export async function POST(request: Request) {
     debugLogger.info("[hwp-to-html] HWP 변환 시작", { hwpUrl })
 
     // 1. HWP 파일 다운로드
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000')
+    if (process.env.NODE_ENV === 'production' && !baseUrl) {
+      return NextResponse.json({ error: "서버 설정 오류", success: false }, { status: 500 })
+    }
     const fullUrl = hwpUrl.startsWith("/") ? `${baseUrl}${hwpUrl}` : hwpUrl
 
-    // 상대 경로도 반드시 허용된 내부 경로인지 검증 (SSRF 방지)
+    // API-2: 상대 경로 strict 검증 — exact prefix + path traversal 차단
     if (hwpUrl.startsWith("/")) {
-      const allowedPrefixes = ["/api/annex-pdf"]
-      if (!allowedPrefixes.some(p => hwpUrl.startsWith(p))) {
+      // path traversal 차단
+      if (hwpUrl.includes('..') || hwpUrl.includes('//')) {
+        return NextResponse.json({ error: "허용되지 않은 내부 경로입니다.", success: false }, { status: 400 })
+      }
+      // exact prefix match: /api/annex-pdf 또는 /api/annex-pdf?...
+      if (!/^\/api\/annex-pdf(?:\?|$)/.test(hwpUrl)) {
         return NextResponse.json({ error: "허용되지 않은 내부 경로입니다.", success: false }, { status: 400 })
       }
     } else if (!validateExternalUrl(fullUrl)) {

@@ -137,9 +137,16 @@ export function useRelatedPrecedentCases({
 
         setRelatedCases(related)
       } catch (e) {
-        if ((e as Error).name === 'AbortError') return
+        if ((e as Error).name === 'AbortError') {
+          // P2-LV-4: abort된 경우에도 loading 해제 (재진입 시 stuck 방지)
+          setLoadingRelatedCases(false)
+          return
+        }
         debugLogger.error('관련 심급 검색 실패:', e)
+        // P2-LV-8: 실패 시 캐시 무효화 → 재시도 가능
+        lastSearchedNameRef.current = null
         setRelatedCases([])
+        setLoadingRelatedCases(false)
       } finally {
         if (!signal.aborted) {
           setLoadingRelatedCases(false)
@@ -154,9 +161,17 @@ export function useRelatedPrecedentCases({
     }
   }, [isPrecedent, showRelatedCases, currentCaseName, currentCaseNumber])
 
-  // 관련 심급 판례 클릭 → ReferenceModal로 상세 표시 (기존 판례 모달과 동일 스타일)
+  // P1-LV-8: 클릭 fetch abort + 최신 요청 ID 가드
+  const detailAbortRef = useRef<AbortController | null>(null)
+  const detailReqIdRef = useRef(0)
+
   const handleRelatedPrecedentClick = async (prec: PrecedentSearchResult) => {
-    // 로딩 표시
+    detailAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    detailAbortRef.current = ctrl
+    const reqId = ++detailReqIdRef.current
+    const isStale = () => ctrl.signal.aborted || reqId !== detailReqIdRef.current
+
     setRefModal({
       open: true,
       title: `판례 조회 중...`,
@@ -164,9 +179,11 @@ export function useRelatedPrecedentCases({
     })
 
     try {
-      const res = await fetch(`/api/precedent-detail?id=${prec.id}`)
+      const res = await fetch(`/api/precedent-detail?id=${encodeURIComponent(prec.id)}`, { signal: ctrl.signal })
+      if (isStale()) return
       if (res.ok) {
         const detail = await res.json()
+        if (isStale()) return
         const html = buildPrecedentHtml(detail)
         setRefModal({
           open: true,
@@ -187,6 +204,7 @@ export function useRelatedPrecedentCases({
         })
       }
     } catch (e) {
+      if (isStale() || (e as { name?: string })?.name === 'AbortError') return
       debugLogger.error('판례 상세 조회 실패:', e)
       setRefModal({
         open: true,

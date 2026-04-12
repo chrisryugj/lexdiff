@@ -151,9 +151,19 @@ export function AnnexModal({
     window.open(downloadUrl, '_blank')
   }, [annexData, lawName, annexNumber])
 
+  // P1-LV-6: AbortController + 최신 요청 ID 가드
+  const annexAbortRef = useRef<AbortController | null>(null)
+  const annexReqIdRef = useRef(0)
+
   // 별표 데이터 가져오기
   const fetchAnnexData = useCallback(async (skipCache = false) => {
     if (!lawName || !annexNumber) return
+
+    annexAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    annexAbortRef.current = ctrl
+    const reqId = ++annexReqIdRef.current
+    const isStale = () => ctrl.signal.aborted || reqId !== annexReqIdRef.current
 
     setLoadingState("fetching-list")
     setError(null)
@@ -165,6 +175,7 @@ export function AnnexModal({
       const cacheKey = lawId || lawName
       if (!skipCache && cacheKey) {
         const cached = await getAnnexCache(cacheKey, annexNumber)
+        if (isStale()) return
         if (cached) {
           // 묶음 별표 캐시인 경우 요청 섹션만 추출
           const cachedMd = cached.annexName && matchesAnnexRange(cached.annexName, extractAnnexNum(annexNumber))
@@ -186,12 +197,13 @@ export function AnnexModal({
       }
 
       // 2. 별표 목록 조회
-      const res = await fetch(`/api/law-annexes?query=${encodeURIComponent(lawName)}&knd=1`)
+      const res = await fetch(`/api/law-annexes?query=${encodeURIComponent(lawName)}&knd=1`, { signal: ctrl.signal })
       if (!res.ok) {
         throw new Error("별표 목록을 불러올 수 없습니다")
       }
 
       const data = await res.json()
+      if (isStale()) return
       const annexes: LawAnnex[] = data.annexes || []
 
       // 3. 별표 매칭 (lawName + annexNumber 우선, 번호만 매칭 후순위)
@@ -234,10 +246,13 @@ export function AnnexModal({
         try {
           const fileCheckRes = await fetch(`/api/annex-pdf?flSeq=${flSeq}`, {
             method: "HEAD",
+            signal: ctrl.signal,
           })
+          if (isStale()) return
           const detectedFileType = fileCheckRes.headers.get("X-File-Type") as "pdf" | "hwp" | "hwpx" | "unknown" || "unknown"
           setFileType(detectedFileType)
         } catch {
+          if (isStale()) return
           setFileType("pdf")
         }
 
@@ -252,7 +267,9 @@ export function AnnexModal({
             annexNumber: `별표 ${annexNumber}`,
             lawName,
           }),
+          signal: ctrl.signal,
         })
+        if (isStale()) return
 
         // 묶음 별표 여부 판별 (범위 매칭으로 찾은 경우)
         const isBundledAnnex = finalAnnex.annexName && matchesAnnexRange(finalAnnex.annexName, targetNum)
@@ -296,8 +313,10 @@ export function AnnexModal({
         }
       }
 
+      if (isStale()) return
       setLoadingState("done")
     } catch (err) {
+      if (isStale() || (err as { name?: string })?.name === 'AbortError') return
       setError(err instanceof Error ? err.message : "별표를 불러올 수 없습니다")
       setLoadingState("error")
     }
@@ -311,24 +330,28 @@ export function AnnexModal({
   }, [isOpen, annexNumber, lawName, fetchAnnexData])
 
   // 모달 열릴 때 스크롤 위치 저장, 닫힐 때 복원
+  // P2-LV-9: 상태 초기화는 닫힘 애니메이션 종료 후로 지연 — 빈 화면 깜빡임 방지
   useEffect(() => {
     if (isOpen) {
       savedScrollRef.current = window.scrollY
-    } else {
-      // 상태 초기화
+      return
+    }
+    // 진행 중 fetch 취소
+    annexAbortRef.current?.abort()
+    const t = setTimeout(() => {
       setLoadingState("idle")
       setError(null)
       setAnnexData(null)
       setMarkdown(null)
       setViewMode("markdown")
       setFileType("unknown")
-      // 스크롤 위치 복원
-      if (savedScrollRef.current > 0) {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, savedScrollRef.current)
-        })
-      }
+    }, 250)
+    if (savedScrollRef.current > 0) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, savedScrollRef.current)
+      })
     }
+    return () => clearTimeout(t)
   }, [isOpen])
 
   // 로딩 메시지
