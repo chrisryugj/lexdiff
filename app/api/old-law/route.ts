@@ -160,11 +160,11 @@ export async function GET(request: Request) {
     const validHistory = findValidHistoryAtDate(histories, efYd)
 
     if (!validHistory) {
+      // API-8: 에러 응답 바디 축소 — 내부 연혁 리스트 노출 금지
       return NextResponse.json({
         error: "해당 시점의 법령을 찾을 수 없습니다",
         lawName,
         efYd,
-        histories: histories.slice(0, 5),
       }, { status: 404 })
     }
 

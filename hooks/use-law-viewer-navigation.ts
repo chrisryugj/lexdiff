@@ -56,6 +56,9 @@ export function useLawViewerNavigation({
       const activeEl = document.activeElement
       if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA') return
       if (isModalOpen) return
+      // P2-LV-3: 다른 Radix Dialog가 열려 있으면 키보드 네비 차단
+      if (typeof document !== 'undefined' &&
+          document.querySelector('[role="dialog"][data-state="open"]')) return
 
       const currentIndex = actualArticles.findIndex(a => a.jo === activeJo)
       if (currentIndex === -1) return

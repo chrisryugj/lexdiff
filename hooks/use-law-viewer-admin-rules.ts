@@ -19,11 +19,19 @@ export function useLawViewerAdminRules(articleNumber: string, meta: LawMeta) {
   const [adminRuleMobileTab, setAdminRuleMobileTab] = useState<"law" | "adminRule">("law")
   const [loadedAdminRulesCount, setLoadedAdminRulesCount] = useState<number>(0)
   const [hasEverLoaded, setHasEverLoaded] = useState(false) // 로딩 완료 여부 추적
-  const [adminRulePanelSize, setAdminRulePanelSize] = useState<number>(() => {
+  const [adminRulePanelSize, setAdminRulePanelSizeState] = useState<number>(() => {
     if (typeof window === 'undefined') return 50
-    const saved = localStorage.getItem('adminRulePanelSize')
-    return saved ? Number.parseInt(saved, 10) : 50
+    const saved = localStorage.getItem('lex:lawViewer:adminRulePanelSize') ?? localStorage.getItem('adminRulePanelSize')
+    const parsed = saved ? Number.parseInt(saved, 10) : NaN
+    return Number.isFinite(parsed) ? parsed : 50
   })
+  // P1-LV-5: 변경 시 localStorage 저장
+  const setAdminRulePanelSize = (size: number) => {
+    setAdminRulePanelSizeState(size)
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('lex:lawViewer:adminRulePanelSize', String(size)) } catch { /* quota */ }
+    }
+  }
 
   // showAdminRules 변경 시 sessionStorage에 저장
   useEffect(() => {

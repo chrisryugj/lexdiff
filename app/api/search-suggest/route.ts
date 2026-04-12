@@ -21,9 +21,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { expandQuery } from '@/lib/query-expansion'
 import { containsLocalGovName, extractLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
+import { getClientIP } from '@/lib/get-client-ip'
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
+
+// API-1: 자동완성 in-memory rate limit (IP 기준 분당 60회)
+// 외부 6개 API 호출로 증폭되므로 DDoS 방지 필수
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX = 60
+const rateLimitMap = new Map<string, number[]>()
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const timestamps = rateLimitMap.get(ip) || []
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+  if (recent.length >= RATE_LIMIT_MAX) {
+    rateLimitMap.set(ip, recent)
+    return false
+  }
+  recent.push(now)
+  rateLimitMap.set(ip, recent)
+  // 가벼운 GC: 1000건 초과 시 가장 오래된 키 절반 제거
+  if (rateLimitMap.size > 1000) {
+    const entries = Array.from(rateLimitMap.entries())
+    entries.sort((a, b) => Math.max(...a[1]) - Math.max(...b[1]))
+    for (const [k] of entries.slice(0, 500)) rateLimitMap.delete(k)
+  }
+  return true
+}
 
 // 도메인별 AI 질문 템플릿
 const AI_QUESTION_TEMPLATES: Record<string, string[]> = {
@@ -216,6 +241,15 @@ interface Suggestion {
 }
 
 export async function GET(request: NextRequest) {
+  // API-1: rate limit
+  const ip = getClientIP(request)
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { suggestions: [], error: 'rate limit exceeded' },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
+
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get('q')?.trim() || ''
   const queryLower = query.toLowerCase()
@@ -224,6 +258,10 @@ export async function GET(request: NextRequest) {
 
   if (!query || query.length < 1) {
     return NextResponse.json({ suggestions: [] })
+  }
+  // 길이 가드
+  if (query.length > 100) {
+    return NextResponse.json({ suggestions: [], error: 'query too long' }, { status: 400 })
   }
 
   const suggestions: Suggestion[] = []

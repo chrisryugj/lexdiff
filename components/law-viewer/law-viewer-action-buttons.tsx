@@ -181,17 +181,21 @@ export function LawViewerActionButtons({
               variant="outline"
               size="sm"
               disabled={isLoadingThreeTier || (tierViewMode === "1-tier" && shouldDisableDelegationButton)}
-              onClick={async () => {
+              onClick={() => {
+                // 모바일 onClick 규칙 (CLAUDE.md): async 금지 → .then().catch()
                 if (tierViewMode === "1-tier") {
-                  // 2단 뷰로 전환 (데이터 없으면 먼저 로드)
-                  if (!threeTierDelegation && !threeTierCitation) await fetchThreeTierData()
-                  setTierViewMode("2-tier")
-                  // 행정규칙 탭이 선택되어 있고 데이터가 로드된 적 있으면 자동으로 활성화
-                  if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
-                    setShowAdminRules(true)
-                  }
+                  const ensureLoaded = (!threeTierDelegation && !threeTierCitation)
+                    ? fetchThreeTierData()
+                    : Promise.resolve()
+                  ensureLoaded
+                    .then(() => {
+                      setTierViewMode("2-tier")
+                      if (delegationActiveTab === "admin" && loadedAdminRulesCount > 0) {
+                        setShowAdminRules(true)
+                      }
+                    })
+                    .catch(() => { /* fetchThreeTierData 내부 에러 처리 */ })
                 } else {
-                  // 1단 뷰로 복귀 (showAdminRules는 유지 - 패널 재오픈 시 복원용)
                   setTierViewMode("1-tier")
                 }
               }}

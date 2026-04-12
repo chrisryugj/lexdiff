@@ -9,9 +9,25 @@
 
 import { debugLogger } from '../debug-logger'
 
+const IS_PROD = process.env.NODE_ENV === 'production'
 const HERMES_BASE = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
-const HERMES_KEY = process.env.HERMES_API_KEY || 'lexdiff-hermes-local'
+const HERMES_KEY = process.env.HERMES_API_KEY || (IS_PROD ? '' : 'lexdiff-hermes-local')
 const HERMES_MODEL = process.env.HERMES_MODEL || 'hermes-agent'
+
+// 프로덕션 + 런타임(빌드 time 아님) 검증을 호출 시점에 수행
+// Vercel 빌드 단계에선 'phase-production-build'에서 모듈이 평가되므로 throw 금지
+const IS_BUILD_PHASE = process.env.NEXT_PHASE === 'phase-production-build'
+
+function ensureHermesConfig(): void {
+  if (!IS_PROD || IS_BUILD_PHASE) return
+  if (!HERMES_KEY) {
+    throw new Error('[hermes] HERMES_API_KEY 환경변수가 필수입니다 (production)')
+  }
+  const isLoopback = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(HERMES_BASE)
+  if (!isLoopback && !HERMES_BASE.startsWith('https://')) {
+    throw new Error('[hermes] HERMES_API_URL은 https여야 합니다 (production)')
+  }
+}
 
 export interface DirectMessage {
   role: 'user' | 'assistant'
@@ -46,6 +62,7 @@ export async function* callAnthropicStream(
   messages: DirectMessage[],
   options?: { signal?: AbortSignal; maxTurns?: number },
 ): AsyncGenerator<ClaudeStreamEvent> {
+  ensureHermesConfig()
   const { signal } = options || {}
 
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
@@ -92,6 +109,57 @@ export async function* callAnthropicStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
+  // 한 줄을 처리해 yield할 이벤트 배열을 반환 (generator 외부에서 호출)
+  const processLine = (line: string): ClaudeStreamEvent[] => {
+    const events: ClaudeStreamEvent[] = []
+    const trimmed = line.trim()
+    if (!trimmed) return events
+    if (trimmed.startsWith('event:')) return events
+    if (!trimmed.startsWith('data:')) return events
+    const data = trimmed.slice(5).trim()
+    if (!data || data === '[DONE]') return events
+
+    // hermes.tool.progress 이벤트 데이터 (heuristic)
+    if (data.includes('"tool"') && data.includes('"label"')) {
+      try {
+        const toolEvent = JSON.parse(data) as { tool?: string }
+        if (toolEvent.tool) {
+          const name = stripMcpPrefix(toolEvent.tool)
+          events.push({ type: 'tool_call', name, input: {} })
+          events.push({ type: 'tool_result', name, content: '(Hermes 내부 실행)', isError: false })
+        }
+      } catch { /* JSON parse 실패 무시 */ }
+      return events
+    }
+
+    let chunk: Record<string, unknown>
+    try { chunk = JSON.parse(data) } catch { return events }
+
+    const choices = chunk.choices as Array<Record<string, unknown>> | undefined
+    if (!choices || choices.length === 0) return events
+
+    const choice = choices[0]
+    const delta = choice.delta as Record<string, unknown> | undefined
+    const finishReason = choice.finish_reason as string | null
+
+    if (delta?.content && typeof delta.content === 'string') {
+      fullText += delta.content
+      events.push({ type: 'text', text: delta.content })
+    }
+
+    if (finishReason) {
+      stopReason = finishReason === 'stop' ? 'end_turn' : finishReason
+      const chunkUsage = chunk.usage as Record<string, number> | undefined
+      if (chunkUsage) {
+        usage = {
+          inputTokens: chunkUsage.prompt_tokens || 0,
+          outputTokens: chunkUsage.completion_tokens || 0,
+        }
+      }
+    }
+    return events
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -99,78 +167,24 @@ export async function* callAnthropicStream(
 
       buffer += decoder.decode(value, { stream: true })
 
-      // SSE 파싱: 줄 단위로 처리
       const lines = buffer.split('\n')
-      buffer = lines.pop() || '' // 마지막 불완전한 줄은 버퍼에 유지
+      buffer = lines.pop() || ''
 
       for (const line of lines) {
-        const trimmed = line.trim()
-
-        // 커스텀 이벤트: hermes.tool.progress
-        if (trimmed.startsWith('event:')) {
-          const eventType = trimmed.slice(6).trim()
-          if (eventType === 'hermes.tool.progress') {
-            // 다음 data: 줄에서 도구 정보 추출 — 이미 lines에 있을 수 있음
-            continue
-          }
-          continue
-        }
-
-        if (!trimmed.startsWith('data:')) continue
-        const data = trimmed.slice(5).trim()
-
-        if (data === '[DONE]') continue
-
-        // hermes.tool.progress 이벤트 데이터
-        if (data.includes('"tool"') && data.includes('"label"')) {
-          try {
-            const toolEvent = JSON.parse(data)
-            if (toolEvent.tool) {
-              const name = stripMcpPrefix(toolEvent.tool)
-              yield { type: 'tool_call', name, input: {} }
-              // Hermes는 도구 완료 시 별도 이벤트 없음 — 합성 tool_result 생성
-              yield { type: 'tool_result', name, content: '(Hermes 내부 실행)', isError: false }
-            }
-          } catch { /* JSON parse 실패 무시 */ }
-          continue
-        }
-
-        // OpenAI SSE 청크 파싱
-        let chunk: Record<string, unknown>
-        try {
-          chunk = JSON.parse(data)
-        } catch { continue }
-
-        const choices = chunk.choices as Array<Record<string, unknown>> | undefined
-        if (!choices || choices.length === 0) continue
-
-        const choice = choices[0]
-        const delta = choice.delta as Record<string, unknown> | undefined
-        const finishReason = choice.finish_reason as string | null
-
-        // 텍스트 청크
-        if (delta?.content && typeof delta.content === 'string') {
-          fullText += delta.content
-          yield { type: 'text', text: delta.content }
-        }
-
-        // 완료
-        if (finishReason) {
-          stopReason = finishReason === 'stop' ? 'end_turn' : finishReason
-
-          // usage가 finish 청크에 포함될 수 있음
-          const chunkUsage = chunk.usage as Record<string, number> | undefined
-          if (chunkUsage) {
-            usage = {
-              inputTokens: chunkUsage.prompt_tokens || 0,
-              outputTokens: chunkUsage.completion_tokens || 0,
-            }
-          }
-        }
+        for (const ev of processLine(line)) yield ev
       }
     }
+
+    // ✅ 루프 종료 후 잔여 버퍼 drain (CLAUDE.md 핵심 규칙)
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      for (const line of buffer.split('\n')) {
+        for (const ev of processLine(line)) yield ev
+      }
+      buffer = ''
+    }
   } finally {
-    reader.releaseLock()
+    try { reader.releaseLock() } catch { /* noop */ }
   }
 
   if (!fullText) {
@@ -194,6 +208,7 @@ export async function callAnthropic(
   messages: DirectMessage[],
   options?: { maxTokens?: number; signal?: AbortSignal },
 ): Promise<DirectResponse> {
+  ensureHermesConfig()
   const { maxTokens = 4096, signal } = options || {}
 
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')

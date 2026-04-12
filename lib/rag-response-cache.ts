@@ -30,28 +30,44 @@ export interface RAGCacheEntry {
   hitCount: number  // 캐시 히트 횟수
 }
 
-// IndexedDB 초기화
-async function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+// IndexedDB 초기화 (P1-AI-2: 모듈 레벨 singleton 캐시)
+let dbPromise: Promise<IDBDatabase> | null = null
+
+function openDBOnce(): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') {
+    return Promise.reject(new Error('IndexedDB unavailable'))
+  }
+  if (dbPromise) return dbPromise
+  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-
+    request.onerror = () => {
+      dbPromise = null
+      reject(request.error)
+    }
+    request.onsuccess = () => {
+      const db = request.result
+      // 다른 탭이 upgrade하려고 할 때 close → block 방지
+      db.onversionchange = () => {
+        try { db.close() } catch { /* ignore */ }
+        dbPromise = null
+      }
+      resolve(db)
+    }
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
-
-      // 기존 스토어 삭제 (버전 업그레이드 시)
       if (db.objectStoreNames.contains(CACHE_STORE)) {
         db.deleteObjectStore(CACHE_STORE)
       }
-
-      // RAG 응답 캐시 스토어 생성
       const store = db.createObjectStore(CACHE_STORE, { keyPath: 'key' })
       store.createIndex('timestamp', 'timestamp', { unique: false })
       store.createIndex('hitCount', 'hitCount', { unique: false })
     }
   })
+  return dbPromise
+}
+
+async function openDB(): Promise<IDBDatabase> {
+  return openDBOnce()
 }
 
 /**
@@ -224,26 +240,22 @@ export async function cacheResponse(
       hitCount: 0
     }
 
-    const tx = db.transaction(CACHE_STORE, 'readwrite')
-    const store = tx.objectStore(CACHE_STORE)
-
+    // P1-AI-3: put → eviction을 한 readwrite tx 안에서 처리하여 race 방지
     await new Promise<void>((resolve, reject) => {
-      const request = store.put(entry)
-
-      request.onsuccess = () => {
-        resolve()
-      }
-
-      request.onerror = () => reject(request.error)
+      const tx = db.transaction(CACHE_STORE, 'readwrite')
+      const store = tx.objectStore(CACHE_STORE)
+      store.put(entry)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
     })
 
-    // 만료된 캐시 정리
-    await cleanExpiredCache()
+    // 만료/초과 정리는 별도 tx로 백그라운드에서 처리 (실패해도 무시)
+    cleanExpiredCache().catch(() => {})
 
-    // 최대 항목 수 초과 시 오래된 항목 삭제
-    const count = await getCount(db)
+    const count = await getCount(db).catch(() => 0)
     if (count > MAX_ENTRIES) {
-      await cleanOldestEntries(db, count - MAX_ENTRIES)
+      await cleanOldestEntries(db, count - MAX_ENTRIES).catch(() => {})
     }
   } catch {
     // Failed to write cache - silently ignore
@@ -309,39 +321,43 @@ export async function getCacheStats(): Promise<{
 }> {
   try {
     const db = await openDB()
-    const tx = db.transaction(CACHE_STORE, 'readonly')
-    const store = tx.objectStore(CACHE_STORE)
-
-    const entries: RAGCacheEntry[] = []
+    // 통계는 cursor 한 번으로 누적값만 계산 — entries 배열에 메모리 적재 금지
+    let totalEntries = 0
+    let totalHits = 0
+    let oldestEntry: number | null = null
+    let newestEntry: number | null = null
+    let timestampSum = 0
 
     await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CACHE_STORE, 'readonly')
+      const store = tx.objectStore(CACHE_STORE)
       const request = store.openCursor()
-
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result
         if (cursor) {
-          entries.push(cursor.value)
+          const v = cursor.value as RAGCacheEntry
+          totalEntries++
+          totalHits += v.hitCount
+          timestampSum += v.timestamp
+          if (oldestEntry === null || v.timestamp < oldestEntry) oldestEntry = v.timestamp
+          if (newestEntry === null || v.timestamp > newestEntry) newestEntry = v.timestamp
           cursor.continue()
         } else {
           resolve()
         }
       }
-
       request.onerror = () => reject(request.error)
     })
 
-    const totalHits = entries.reduce((sum, e) => sum + e.hitCount, 0)
-    const timestamps = entries.map(e => e.timestamp)
     const now = Date.now()
-
     return {
-      totalEntries: entries.length,
+      totalEntries,
       totalHits,
-      oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : null,
-      newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
-      avgAge: timestamps.length > 0
-        ? timestamps.reduce((sum, t) => sum + (now - t), 0) / timestamps.length / 1000 / 60  // minutes
-        : 0
+      oldestEntry,
+      newestEntry,
+      avgAge: totalEntries > 0
+        ? (now - timestampSum / totalEntries) / 1000 / 60  // minutes
+        : 0,
     }
   } catch {
     return {

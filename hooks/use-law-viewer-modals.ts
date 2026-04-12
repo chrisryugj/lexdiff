@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { LawMeta, LawArticle } from '@/lib/law-types'
 import { formatJO } from '@/lib/law-parser'
 import { debugLogger } from '@/lib/debug-logger'
@@ -37,6 +37,7 @@ interface ModalHistoryItem {
   forceWhiteTheme?: boolean
   lawName?: string
   articleNumber?: string
+  precedentMeta?: PrecedentMeta
 }
 
 /** 별표 모달 상태 */
@@ -60,7 +61,30 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     lawName: '',
   })
 
-  /** 모달 히스토리에 현재 상태 저장 (상한 15 — 메모리 누적 방지) */
+  // F5: 모달 fetch 취소 + stale state 방지
+  const abortRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      abortRef.current?.abort()
+    }
+  }, [])
+  // 새 모달 작업 시작 시 호출 → 이전 작업 abort
+  function startModalRequest(): AbortController {
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    return ctrl
+  }
+  // setRefModal 호출 전에 컨트롤러가 abort/언마운트되었는지 검사
+  function safeSetRefModal(ctrl: AbortController, state: ModalState) {
+    if (!mountedRef.current || ctrl.signal.aborted || ctrl !== abortRef.current) return
+    setRefModal(state)
+  }
+
+  /** 모달 히스토리에 현재 상태 저장 (상한 10 — 메모리 누적 방지, PERF-10) */
   function pushHistory() {
     if (refModal.open && refModal.title) {
       setRefModalHistory(prev => {
@@ -70,17 +94,19 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
           forceWhiteTheme: refModal.forceWhiteTheme,
           lawName: refModal.lawName,
           articleNumber: refModal.articleNumber,
+          precedentMeta: refModal.precedentMeta,  // P1-LV-1
         }]
-        return next.length > 15 ? next.slice(next.length - 15) : next
+        return next.length > 10 ? next.slice(next.length - 10) : next
       })
     }
   }
 
   /** ModalResult를 ModalState로 적용 */
-  function applyResult(result: ModalResult) {
+  function applyResult(ctrl: AbortController, result: ModalResult) {
     pushHistory()
-    setRefModal({
+    safeSetRefModal(ctrl, {
       open: true,
+      loading: false,  // P1-LV-3
       title: result.title,
       html: result.html,
       lawName: result.lawName,
@@ -92,6 +118,7 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
   // Handler: open external law article modal
   async function openExternalLawArticleModal(lawName: string, articleLabel: string, efYd?: string, isOldLaw?: boolean) {
     const cleanedLawName = lawName.replace(/[「」『』]/g, '').trim()
+    const ctrl = startModalRequest()
 
     // 로딩 상태로 모달 먼저 열기
     setRefModal({
@@ -111,12 +138,14 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       if (isOrdinance) {
         try {
           const result = await fetchOrdinanceArticle(cleanedLawName, articleLabel)
-          applyResult(result)
+          applyResult(ctrl, result)
           return
         } catch (ordinError) {
+          if (ctrl.signal.aborted) return
           debugLogger.error('[citation] 자치법규 조회 실패, 법제처 링크로 폴백', ordinError)
-          setRefModal({
+          safeSetRefModal(ctrl, {
             open: true,
+            loading: false,
             title: `${cleanedLawName} ${articleLabel}`,
             html: `<div class="space-y-3"><p>자치법규 조회 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.ORDINANCE_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 보기 →</a></div></div>`,
             lawName: cleanedLawName,
@@ -128,10 +157,12 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
       // ── 법령 검색으로 lawId/mst 얻기 ──
       const { lawId, mst } = await searchLawByName(cleanedLawName)
+      if (ctrl.signal.aborted) return
 
       if (!lawId && !mst) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: cleanedLawName,
           html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
         })
@@ -144,9 +175,10 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       if (efYd) {
         try {
           const result = await fetchOldLawArticle(cleanedLawName, articleLabel, efYd, joCode)
-          applyResult(result)
+          applyResult(ctrl, result)
           return
         } catch (oldLawErr) {
+          if (ctrl.signal.aborted) return
           debugLogger.error('[citation] 구법령 조회 실패, 현행법으로 폴백', oldLawErr)
           // 아래 현행법 조회로 폴백
         }
@@ -160,19 +192,23 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
       try {
         const result = await fetchCurrentLawArticle(cleanedLawName, articleLabel, joCode, lawId, mst, isOldLawRequest, efYd)
-        applyResult(result)
+        applyResult(ctrl, result)
       } catch (fetchErr) {
+        if (ctrl.signal.aborted) return
         debugLogger.error('[citation] eflaw fetch 오류', fetchErr)
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: `${cleanedLawName} ${articleLabel}`,
           html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
         })
       }
     } catch (err) {
+      if (ctrl.signal.aborted) return
       debugLogger.error('[citation] 전체 오류', err)
-      setRefModal({
+      safeSetRefModal(ctrl, {
         open: true,
+        loading: false,
         title: `${cleanedLawName} ${articleLabel}`,
         html: `<div class="space-y-3"><p>조문을 불러오는 중 오류가 발생했습니다.</p><div class="pt-3 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}/${encodeURIComponent(articleLabel)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기</a></div></div>`,
       })
@@ -182,11 +218,13 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
   // Helper: open related law (decree or rule) modal
   async function openRelatedLawModal(kind: "decree" | "rule") {
     const kindLabel = kind === "decree" ? "시행령" : "시행규칙"
+    const ctrl = startModalRequest()
 
     try {
       if (!meta.lawId && !meta.mst) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: `${meta.lawTitle} ${kindLabel}`,
           html: `<p>관련 법령 정보를 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.BASE}/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
@@ -197,15 +235,17 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       if (meta.lawId) hierarchyParams.append("lawId", meta.lawId)
       else if (meta.mst) hierarchyParams.append("mst", meta.mst)
 
-      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`)
+      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`, { signal: ctrl.signal })
       const hierarchyXml = await hierarchyRes.text()
+      if (ctrl.signal.aborted) return
 
       const { parseHierarchyXML } = await import("@/lib/hierarchy-parser")
       const hierarchy = parseHierarchyXML(hierarchyXml)
 
       if (!hierarchy?.lowerLaws?.length) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: `${meta.lawTitle} ${kindLabel}`,
           html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
@@ -215,8 +255,9 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       const relatedLaw = hierarchy.lowerLaws.find((l) => l.type === kind)
 
       if (!relatedLaw) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: `${meta.lawTitle} ${kindLabel}`,
           html: `<p>${kindLabel}을 찾을 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(meta.lawTitle + " " + kindLabel)}" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
         })
@@ -233,14 +274,17 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
         }
       }
 
-      setRefModal({
+      safeSetRefModal(ctrl, {
         open: true,
+        loading: false,
         title: relatedLaw.lawName,
         html: `<div class="space-y-3"><p>해당 ${kindLabel}을 찾았습니다.</p><p class="text-sm"><strong>${relatedLaw.lawName}</strong></p><div class="flex gap-2 mt-4"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(relatedLaw.lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 전문 보기</a></div></div>`,
       })
-    } catch {
-      setRefModal({
+    } catch (e) {
+      if (ctrl.signal.aborted || (e as { name?: string })?.name === 'AbortError') return
+      safeSetRefModal(ctrl, {
         open: true,
+        loading: false,
         title: `${meta.lawTitle} ${kindLabel}`,
         html: `<p>${kindLabel} 조회 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.BASE}/" target="_blank" rel="noopener">법제처에서 검색하기</a></p>`,
       })
@@ -249,15 +293,18 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
   // Helper: fetch law hierarchy and show in modal
   async function openLawHierarchyModal(lawName: string) {
+    const ctrl = startModalRequest()
     try {
-      const searchRes = await fetch(`/api/law-search?${new URLSearchParams({ query: lawName })}`)
+      const searchRes = await fetch(`/api/law-search?${new URLSearchParams({ query: lawName })}`, { signal: ctrl.signal })
       const searchXml = await searchRes.text()
+      if (ctrl.signal.aborted) return
       const lawIdMatch = searchXml.match(/<법령ID>([^<]+)<\/법령ID>/)
       const mstMatch = searchXml.match(/<법령일련번호>([^<]+)<\/법령일련번호>/)
 
       if (!lawIdMatch && !mstMatch) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: lawName,
           html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기 →</a></p>`,
           forceWhiteTheme: true,
@@ -272,15 +319,17 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       if (lawId) hierarchyParams.append("lawId", lawId)
       else if (mst) hierarchyParams.append("mst", mst)
 
-      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`)
+      const hierarchyRes = await fetch(`/api/hierarchy?${hierarchyParams.toString()}`, { signal: ctrl.signal })
       const hierarchyXml = await hierarchyRes.text()
+      if (ctrl.signal.aborted) return
 
       const { parseHierarchyXML } = await import("@/lib/hierarchy-parser")
       const hierarchy = parseHierarchyXML(hierarchyXml)
 
       if (!hierarchy) {
-        setRefModal({
+        safeSetRefModal(ctrl, {
           open: true,
+          loading: false,
           title: lawName,
           html: `<p>법령 체계도를 불러올 수 없습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
           forceWhiteTheme: true,
@@ -321,10 +370,12 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
 
       html += `<div class="pt-2 border-t"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">법제처에서 전문 보기 →</a></div></div>`
 
-      setRefModal({ open: true, title: `${lawName} 체계도`, html, forceWhiteTheme: true })
-    } catch {
-      setRefModal({
+      safeSetRefModal(ctrl, { open: true, loading: false, title: `${lawName} 체계도`, html, forceWhiteTheme: true })
+    } catch (e) {
+      if (ctrl.signal.aborted || (e as { name?: string })?.name === 'AbortError') return
+      safeSetRefModal(ctrl, {
         open: true,
+        loading: false,
         title: lawName,
         html: `<p>법령 체계도를 불러오는 중 오류가 발생했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(lawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 보기 →</a></p>`,
         forceWhiteTheme: true,
@@ -332,11 +383,13 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     }
   }
 
-  // Handler: modal back navigation
+  // Handler: modal back navigation (P1-LV-1: precedentMeta 보존)
   const handleRefModalBack = () => {
     const lastItem = refModalHistory[refModalHistory.length - 1]
     if (lastItem) {
-      setRefModal({ open: true, ...lastItem })
+      // 새 모달 작업이 아니므로 이전 abort 무력화
+      abortRef.current?.abort()
+      setRefModal({ open: true, loading: false, ...lastItem })
       setRefModalHistory(prev => prev.slice(0, -1))
     }
   }

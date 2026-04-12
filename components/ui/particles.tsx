@@ -4,35 +4,22 @@ import React, {
   ComponentPropsWithoutRef,
   useEffect,
   useRef,
-  useState,
 } from "react"
 
 import { cn } from "@/lib/utils"
 
-interface MousePosition {
-  x: number
-  y: number
-}
-
-function MousePosition(): MousePosition {
-  const [mousePosition, setMousePosition] = useState<MousePosition>({
-    x: 0,
-    y: 0,
-  })
-
+// PERF-4: setState 대신 ref만 갱신 — 매 mousemove마다 리렌더 폭주 방지
+function useMousePositionRef() {
+  const positionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      setMousePosition({ x: event.clientX, y: event.clientY })
+      positionRef.current.x = event.clientX
+      positionRef.current.y = event.clientY
     }
-
-    window.addEventListener("mousemove", handleMouseMove)
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove)
-    }
+    window.addEventListener("mousemove", handleMouseMove, { passive: true })
+    return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
-
-  return mousePosition
+  return positionRef
 }
 
 interface ParticlesProps extends ComponentPropsWithoutRef<"div"> {
@@ -93,12 +80,16 @@ export const Particles: React.FC<ParticlesProps> = ({
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const context = useRef<CanvasRenderingContext2D | null>(null)
   const circles = useRef<Circle[]>([])
-  const mousePosition = MousePosition()
+  const mousePositionRef = useMousePositionRef()
   const mouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1
   const rafID = useRef<number | null>(null)
   const resizeTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  // PERF-5: prop 값을 ref로 안정화 — animate 루프에서 stale closure 방지
+  const propsRef = useRef({ quantity, staticity, ease, size, vx, vy, color })
+  propsRef.current = { quantity, staticity, ease, size, vx, vy, color }
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -130,10 +121,6 @@ export const Particles: React.FC<ParticlesProps> = ({
   }, [color])
 
   useEffect(() => {
-    onMouseMove()
-  }, [mousePosition.x, mousePosition.y])
-
-  useEffect(() => {
     initCanvas()
   }, [refresh])
 
@@ -146,8 +133,9 @@ export const Particles: React.FC<ParticlesProps> = ({
     if (canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect()
       const { w, h } = canvasSize.current
-      const x = mousePosition.x - rect.left - w / 2
-      const y = mousePosition.y - rect.top - h / 2
+      const mp = mousePositionRef.current
+      const x = mp.x - rect.left - w / 2
+      const y = mp.y - rect.top - h / 2
       const inside = x < w / 2 && x > -w / 2 && y < h / 2 && y > -h / 2
       if (inside) {
         mouse.current.x = x
@@ -252,6 +240,7 @@ export const Particles: React.FC<ParticlesProps> = ({
   }
 
   const animate = () => {
+    onMouseMove() // 매 프레임 마우스 위치 동기화 (setState 없음)
     clearContext()
     circles.current.forEach((circle: Circle, i: number) => {
       // Handle the alpha value

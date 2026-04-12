@@ -64,6 +64,15 @@ ${sanitizePromptInput(params.newContent).substring(0, 3000)}
 export async function POST(request: Request) {
   const clientIP = getClientIP(request)
 
+  // API-10: quota 체크 + 선예약을 try 밖으로 — Redis 예외가 silent 500으로 새지 않게
+  if (await isQuotaExceeded(clientIP)) {
+    return NextResponse.json(
+      { error: "일일 AI 사용 시도를 초과했습니다." },
+      { status: 429, headers: await getUsageHeaders(clientIP) }
+    )
+  }
+  await recordAIUsage(clientIP)
+
   try {
     const contentLength = Number(request.headers.get("content-length") || "0")
     if (contentLength > 200_000) {
@@ -88,15 +97,6 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
-
-    if (await isQuotaExceeded(clientIP)) {
-      return NextResponse.json(
-        { error: "일일 AI 사용 시도를 초과했습니다." },
-        { status: 429, headers: await getUsageHeaders(clientIP) }
-      )
-    }
-
-    await recordAIUsage(clientIP)
 
     debugLogger.info("AI summary request", { lawTitle, joNum, effectiveDate, isPrecedent })
 

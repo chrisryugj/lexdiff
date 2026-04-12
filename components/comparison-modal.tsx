@@ -175,7 +175,9 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
     if (!isOpen) return
 
     const timer = setTimeout(() => {
-      const dialog = document.querySelector('[role="dialog"]')
+      // F6: open 상태 + topmost 다이얼로그 선택
+      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
+      const dialog = dialogs[dialogs.length - 1]
       if (dialog) {
         const firstFocusable = dialog.querySelector<HTMLElement>(
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -190,7 +192,8 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
   useEffect(() => {
     if (comparison && targetJo && oldScrollRef.current && newScrollRef.current) {
-      setTimeout(() => {
+      // P2-LV-7: setTimeout cleanup 추가, P1-LV-12: scrollIntoView → scrollTop 직접 조작
+      const t = setTimeout(() => {
         const targetArticleNum = Number.parseInt(targetJo.substring(0, 4), 10)
         const targetText = `제${targetArticleNum}조`
 
@@ -198,12 +201,9 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
         const newDiv = newScrollRef.current
 
         if (oldDiv && newDiv) {
-          // DOM querySelector로 정확한 요소 위치 기반 스크롤 (HTML 인덱스 비율 방식보다 정확)
           const findArticleElement = (container: HTMLElement): HTMLElement | null => {
-            // data-jo 속성이 있는 요소 우선 탐색
             const byDataJo = container.querySelector(`[data-jo="${targetJo}"]`) as HTMLElement | null
             if (byDataJo) return byDataJo
-            // 텍스트 내용으로 조문 제목 탐색 (h3, h4, strong, b 등)
             const headings = container.querySelectorAll('h3, h4, strong, b, .article-title')
             for (const el of headings) {
               if (el.textContent?.includes(targetText)) return el as HTMLElement
@@ -211,17 +211,22 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
             return null
           }
 
+          // scrollIntoView는 모든 스크롤 조상에 영향 → iOS body 점프 발생.
+          // 컨테이너의 scrollTop을 직접 조작.
+          const scrollContainerToElement = (container: HTMLElement, target: HTMLElement) => {
+            const top = target.offsetTop - container.offsetTop
+            container.scrollTo({ top, behavior: 'smooth' })
+          }
+
           const oldTarget = findArticleElement(oldDiv)
           if (oldTarget) {
-            oldTarget.scrollIntoView({ behavior: "smooth", block: "start" })
-            // 신법 패널: 동일 조문을 독립적으로 탐색
+            scrollContainerToElement(oldDiv, oldTarget)
             const newTarget = findArticleElement(newDiv)
-            if (newTarget) {
-              newTarget.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
+            if (newTarget) scrollContainerToElement(newDiv, newTarget)
           }
         }
       }, 300)
+      return () => clearTimeout(t)
     }
   }, [comparison, targetJo])
 
@@ -285,8 +290,11 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
   const handleRevisionSelect = (revision: RevisionHistoryItem) => {
     // 조문별 개정이력은 날짜 정보만 있으므로 해당 날짜의 버전을 로드
-    // date는 "YYYY-MM-DD" 형식이므로 "YYYYMMDD"로 변환
     const revisionDate = revision.date.replace(/-/g, '')
+    // P2-LV-11: revisionStack/currentRevisionIndex를 새 선택 위치로 갱신
+    const next = { date: revisionDate, number: undefined }
+    setRevisionStack([{ date: undefined, number: undefined }, next])
+    setCurrentRevisionIndex(1)
     loadComparison(revisionDate, undefined)
     // 사이드바 열린 상태 유지 (닫지 않음)
   }
@@ -305,7 +313,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
   }, [comparison])
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="w-full max-w-[100vw] sm:max-w-[950px] h-[65vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10">
         <DialogHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-0 shrink-0">
           <div className="flex items-start justify-between gap-2">

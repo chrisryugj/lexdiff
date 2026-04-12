@@ -1,6 +1,7 @@
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { safeErrorResponse } from "@/lib/api-error"
 
 const LAW_API_KEY = process.env.LAW_OC
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   const mst = searchParams.get("mst")
 
   if (!LAW_API_KEY) {
-    return new Response("LAW_OC API key not configured", { status: 500 })
+    return NextResponse.json({ error: "LAW_OC API key not configured" }, { status: 500 })
   }
 
   try {
@@ -48,19 +49,17 @@ export async function GET(request: NextRequest) {
           debugLogger.debug("[hierarchy API] Found MST:", finalMst)
         } else {
           debugLogger.error("[hierarchy API] MST not found in search results")
-          return new Response("Law not found", { status: 404 })
+          return NextResponse.json({ error: "Law not found" }, { status: 404 })
         }
       } else {
         debugLogger.error("[hierarchy API] Search failed:", searchResponse.status)
-        return new Response("Failed to search for law", { status: searchResponse.status })
+        return NextResponse.json({ error: "Failed to search for law" }, { status: 502 })
       }
     }
 
     // MST나 lawId로 체계도 본문 조회
     if (!finalMst && !finalLawId) {
-      return new Response("Missing required parameter: lawName, lawId, or mst", {
-        status: 400,
-      })
+      return NextResponse.json({ error: "Missing required parameter" }, { status: 400 })
     }
 
     const params = new URLSearchParams({
@@ -85,10 +84,8 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      debugLogger.error("[hierarchy API] Failed:", { status: response.status, statusText: response.statusText })
-      return new Response(`Failed to fetch hierarchy: ${response.statusText}`, {
-        status: response.status,
-      })
+      debugLogger.error("[hierarchy API] Failed:", { status: response.status })
+      return NextResponse.json({ error: "Failed to fetch hierarchy" }, { status: 502 })
     }
 
     const xmlText = await response.text()
@@ -100,7 +97,6 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    debugLogger.error("[hierarchy API] Error:", error)
-    return new Response("Internal server error", { status: 500 })
+    return safeErrorResponse(error, "법령 체계도 조회에 실패했습니다")
   }
 }

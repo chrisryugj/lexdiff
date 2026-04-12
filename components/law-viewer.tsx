@@ -147,6 +147,29 @@ function LawViewerComponent({
   const [revisionHistory, setRevisionHistory] = useState<RevisionHistoryItem[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [showImpactAnalysis, setShowImpactAnalysis] = useState(false)
+  // F8: 모든 setTimeout 추적 → unmount 시 일괄 clear
+  const pendingTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+  const safeSetTimeout = useCallback((fn: () => void, ms: number) => {
+    const t = setTimeout(() => {
+      pendingTimers.current.delete(t)
+      fn()
+    }, ms)
+    pendingTimers.current.add(t)
+    return t
+  }, [])
+  // F4: 조문 fetch 취소용 + 최신 요청 ID 가드
+  const articleAbortRef = useRef<AbortController | null>(null)
+  const articleReqIdRef = useRef(0)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      pendingTimers.current.forEach(clearTimeout)
+      pendingTimers.current.clear()
+      articleAbortRef.current?.abort()
+    }
+  }, [])
 
   // ✅ AI 답변 법령 링크 클릭 핸들러
   const handleLawLinkClick = (lawName: string, article?: string) => {
@@ -215,7 +238,7 @@ function LawViewerComponent({
   useEffect(() => {
     setLoadedArticles(actualArticles)
     articleRefs.current = {}
-  }, [articles])
+  }, [actualArticles])
 
   const activeArticle = useMemo(() => loadedArticles.find((a) => a.jo === activeJo), [loadedArticles, activeJo])
 
@@ -302,12 +325,12 @@ function LawViewerComponent({
       setTierViewMode("1-tier")
 
       if (!isFullView && contentRef.current) {
-        setTimeout(() => {
+        safeSetTimeout(() => {
           contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
         }, 100)
       }
     }
-  }, [selectedJo, isFullView])
+  }, [selectedJo, isFullView, activeJo, safeSetTimeout])
 
   // Reset admin rules state when law changes
   useEffect(() => {
@@ -390,85 +413,75 @@ function LawViewerComponent({
     setRefModal,
   })
 
-  const handleArticleClick = async (jo: string) => {
+  const handleArticleClick = useCallback((jo: string) => {
 
     // Close article list on mobile after selection
     setIsArticleListExpanded(false)
 
-    // ✅ 단문 조회 모드에서만 스크롤을 top으로 (전문 조회는 VirtualizedFullArticleView가 처리)
+    // ✅ 단문 조회 모드에서만 스크롤을 top으로
     if (!isFullView) {
-      // Scroll content area to top - do this first before any state updates
       const scrollToTop = () => {
         if (contentRef.current) {
           const scrollContainer = contentRef.current.querySelector('[data-radix-scroll-area-viewport]')
           if (scrollContainer) {
             scrollContainer.scrollTop = 0
-            // Also use scrollTo for better browser compatibility
             scrollContainer.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
           }
         }
       }
 
-      // Scroll immediately
       scrollToTop()
-
-      // Scroll again after a short delay to ensure it works after state updates
-      setTimeout(scrollToTop, 50)
+      safeSetTimeout(scrollToTop, 50)
     }
 
     // Check if article is already loaded
     const existingArticle = loadedArticles.find((a) => a.jo === jo)
 
     if (!existingArticle && !isOrdinance && (meta.lawId || meta.mst)) {
-      // Article not loaded - fetch it dynamically
+      // F4: 이전 fetch 취소 + 요청 ID 가드
+      articleAbortRef.current?.abort()
+      const ctrl = new AbortController()
+      articleAbortRef.current = ctrl
+      const reqId = ++articleReqIdRef.current
+
       setLoadingJo(jo)
 
-      try {
-        const params = new URLSearchParams()
-        if (meta.lawId) {
-          params.append("lawId", meta.lawId)
-        } else if (meta.mst) {
-          params.append("mst", meta.mst)
-        }
-        params.append("jo", jo)
+      const params = new URLSearchParams()
+      if (meta.lawId) params.append("lawId", meta.lawId)
+      else if (meta.mst) params.append("mst", meta.mst)
+      params.append("jo", jo)
 
-        const response = await fetch(`/api/eflaw?${params.toString()}`)
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
+      ;(async () => {
+        try {
+          const response = await fetch(`/api/eflaw?${params.toString()}`, { signal: ctrl.signal })
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          const xmlText = await response.text()
+          const { parseLawXML } = await import("@/lib/law-xml-parser")
+          const parsed = parseLawXML(xmlText)
 
-        const xmlText = await response.text()
-        const { parseLawXML } = await import("@/lib/law-xml-parser")
-        const parsed = parseLawXML(xmlText)
+          if (!mountedRef.current || reqId !== articleReqIdRef.current) return
 
-        // Add newly fetched article to loadedArticles
-        if (parsed.articles.length > 0) {
-          const newArticle = parsed.articles[0]
-          setLoadedArticles((prev) => {
-            // Avoid duplicates
-            const existing = prev.find((a) => a.jo === newArticle.jo)
-            if (existing) {
-              return prev
-            }
-            return [...prev, newArticle]
-          })
+          if (parsed.articles.length > 0) {
+            const newArticle = parsed.articles[0]
+            setLoadedArticles((prev) => {
+              if (prev.find((a) => a.jo === newArticle.jo)) return prev
+              return [...prev, newArticle]
+            })
+          }
+        } catch (error) {
+          if ((error as { name?: string })?.name === 'AbortError') return
+          debugLogger.warning('[LawViewer] article fetch failed', error)
+        } finally {
+          if (mountedRef.current && reqId === articleReqIdRef.current) {
+            setLoadingJo(null)
+          }
         }
-      } catch (error) {
-        debugLogger.warning('[LawViewer] article fetch failed', error)
-      } finally {
-        setLoadingJo(null)
-      }
+      })()
     }
 
-    // Always set active JO after loading attempt
+    // Always set active JO immediately (UI 반응성)
     setActiveJo(jo)
-
-    // ✅ 전문 조회 모드는 VirtualizedFullArticleView의 useEffect에서 자동 스크롤
-    // 단문 조회 모드만 여기서 처리
-    if (!isFullView) {
-      // 단문 조회 모드 로직 (필요시 추가)
-    }
-  }
+  }, [isFullView, loadedArticles, isOrdinance, meta.lawId, meta.mst, safeSetTimeout])
 
   // Keyboard/Swipe navigation (refModal, handleArticleClick 선언 이후)
   const { swipeRef, swipeHint, dismissSwipeHint } = useLawViewerNavigation({
@@ -490,7 +503,9 @@ function LawViewerComponent({
       : meta.lawTitle
     await navigator.clipboard.writeText(`${title}\n\n${textContent}`)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    safeSetTimeout(() => {
+      if (mountedRef.current) setCopied(false)
+    }, 2000)
   }
 
   const openLawCenter = useCallback(() => {
@@ -818,6 +833,7 @@ function LawViewerComponent({
             onClose={() => {
               setRefModal({ open: false })
               setRefModalHistory([]) // 히스토리 초기화
+              setLastExternalRef(null) // P1-LV-2: stale 외부 ref 초기화
             }}
             title={refModal.title || "연결된 본문"}
             html={refModal.html}
