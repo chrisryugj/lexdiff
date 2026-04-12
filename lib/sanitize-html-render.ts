@@ -42,10 +42,31 @@ const sanitizeOptions: Parameters<typeof sanitizeHtml>[1] = {
 }
 
 /**
+ * sanitize 결과 LRU 캐시
+ * 모달 히스토리 뒤로가기 시 동일 html을 재방문하는 패턴이 많아서
+ * 같은 html 재처리하는 수백ms 비용을 0으로 만듦
+ */
+const SANITIZE_CACHE_MAX = 32
+const sanitizeCache = new Map<string, string>()
+
+/**
  * 렌더링 전 HTML sanitize
  * 법령/판례 HTML에서 허용된 태그/속성만 통과시킴
  */
 export function sanitizeForRender(html: string): string {
   if (!html) return ''
-  return sanitizeHtml(html, sanitizeOptions)
+  const cached = sanitizeCache.get(html)
+  if (cached !== undefined) {
+    // LRU: 최근 사용으로 이동
+    sanitizeCache.delete(html)
+    sanitizeCache.set(html, cached)
+    return cached
+  }
+  const result = sanitizeHtml(html, sanitizeOptions)
+  sanitizeCache.set(html, result)
+  if (sanitizeCache.size > SANITIZE_CACHE_MAX) {
+    const oldestKey = sanitizeCache.keys().next().value
+    if (oldestKey !== undefined) sanitizeCache.delete(oldestKey)
+  }
+  return result
 }

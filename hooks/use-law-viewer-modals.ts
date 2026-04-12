@@ -60,16 +60,19 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
     lawName: '',
   })
 
-  /** 모달 히스토리에 현재 상태 저장 */
+  /** 모달 히스토리에 현재 상태 저장 (상한 15 — 메모리 누적 방지) */
   function pushHistory() {
     if (refModal.open && refModal.title) {
-      setRefModalHistory(prev => [...prev, {
-        title: refModal.title!,
-        html: refModal.html,
-        forceWhiteTheme: refModal.forceWhiteTheme,
-        lawName: refModal.lawName,
-        articleNumber: refModal.articleNumber,
-      }])
+      setRefModalHistory(prev => {
+        const next = [...prev, {
+          title: refModal.title!,
+          html: refModal.html,
+          forceWhiteTheme: refModal.forceWhiteTheme,
+          lawName: refModal.lawName,
+          articleNumber: refModal.articleNumber,
+        }]
+        return next.length > 15 ? next.slice(next.length - 15) : next
+      })
     }
   }
 

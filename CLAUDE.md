@@ -12,7 +12,7 @@
 - **Hermes Agent API** (OpenAI-compatible) — GPT-5.4 + Codex OAuth
   - 로컬: `http://127.0.0.1:8642` 직접 호출
   - Vercel: `HERMES_API_URL` (CF Worker → Quick Tunnel → Hermes API) 경유
-- korean-law-mcp v3.2.1 (18도구)은 Hermes가 네이티브 관리
+- korean-law-mcp v3.2.2 (15 노출 / 91 내부 도구)은 Hermes가 네이티브 관리
 - SSE 스트리밍: 중간 tool_call/tool_result 이벤트를 실시간 전달 → UI 진행상황 표시
 - tool-adapter, tool-tiers, prompts, fast-path는 **양쪽 LLM이 공유**하는 인프라
 - `inferComplexity` + `inferQueryType` + `detectDomain` → `buildSystemPrompt`로 전처리 파이프라인 구성
