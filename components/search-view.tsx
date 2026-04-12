@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { ApiKeyInput } from "@/components/settings/api-key-input"
 import { useApiKey } from "@/hooks/use-api-key"
+import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 
 const FavoritesDialog = dynamic(
@@ -48,46 +49,19 @@ export function SearchView({
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
+  const isHeaderVisible = useScrollDirection()  // PERF-3: 통합 훅 사용
 
   const featuresRef = useRef<HTMLElement>(null)
-  const lastScrollY = useRef(0)
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
 
   const isLoading = isSearching || ragLoading
 
-  // Libre Bodoni italic 폰트 로드 후 리페인트 강제 (마지막 f 글리프 클리핑 방지)
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe((favs) => {
       setFavoritesCount(favs.length)
     })
     setFavoritesCount(favoritesStore.getFavorites().length)
-
-    const handleScroll = () => {
-      const y = window.scrollY
-      if (y < 30) {
-        setIsHeaderVisible(true)
-        lastScrollY.current = y
-        return
-      }
-      const delta = y - lastScrollY.current
-      if (Math.abs(delta) > 8) {
-        setIsHeaderVisible(delta <= 0)
-        lastScrollY.current = y
-      }
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-      scrollTimer.current = setTimeout(() => {
-        setIsHeaderVisible(true)
-      }, 200)
-    }
-    window.addEventListener("scroll", handleScroll, { passive: true })
-
-    return () => {
-      unsubscribe()
-      window.removeEventListener("scroll", handleScroll)
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-    }
+    return () => { unsubscribe() }
   }, [])
 
   useEffect(() => {

@@ -9,6 +9,7 @@ import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws, type ParsedRelatedLaw } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from "@/lib/rag-response-cache"
+import type { VerifiedCitation } from "@/lib/citation-verifier"
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
 
@@ -37,7 +38,7 @@ export function useAiSearch(deps: HandlerDeps) {
     }
   }, [state.aiAnswerContent, state.userQuery, state.aiCitations, state.aiQueryType, state.aiConfidenceLevel, actions])
 
-  const persistVerifiedCitations = useCallback(async (query: string, citations: any[]) => {
+  const persistVerifiedCitations = useCallback(async (query: string, citations: VerifiedCitation[]) => {
     try {
       const { saveSearchResult, getSearchResult } = await import('@/lib/search-result-store')
       const currentState = window.history.state
@@ -292,7 +293,21 @@ export function useAiSearch(deps: HandlerDeps) {
     }
 
     // ── SSE 이벤트 핸들러 ──
-    function handleSSEEvent(event: any, query: string) {
+    // FCRAG 이벤트는 type별 union이지만 외부 소스이므로 unknown으로 받고 내부 cast
+    function handleSSEEvent(rawEvent: unknown, query: string) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const event = rawEvent as Record<string, any>
+
+      // F1: 서버가 retry/fallback 시 송출하는 stream_reset — 누적 버퍼/로그를 비워 답변 중복 표시 방지
+      if (event.type === 'stream_reset') {
+        streamBufferRef.current = ''
+        answerTokenStartedRef.current = false
+        answerReceivedRef.current = false
+        actions.setAiAnswerContent('')
+        actions.clearToolCallLogs()
+        return
+      }
+
       switch (event.type) {
         case 'status': {
           // Bridge는 phase/message만 보내고 progress 숫자를 포함하지 않으므로 phase → progress 매핑
@@ -435,7 +450,7 @@ export function useAiSearch(deps: HandlerDeps) {
         case 'citation_verification': {
           // 검증된 citation으로 교체
           if (event.citations && event.citations.length > 0) {
-            const verifiedCount = event.citations.filter((c: any) => c.verified).length
+            const verifiedCount = (event.citations as VerifiedCitation[]).filter((c) => c.verified).length
             actions.setAiCitations(event.citations)
             persistVerifiedCitations(query, event.citations)
             // 검증 완료 로그 추가
@@ -481,6 +496,7 @@ export function useAiSearch(deps: HandlerDeps) {
     async function saveCaches(
       query: string,
       processedContent: string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: any,
       relatedLaws: ParsedRelatedLaw[],
       searchFailed: boolean
@@ -519,7 +535,8 @@ export function useAiSearch(deps: HandlerDeps) {
       } catch (e) { debugLogger.error('RAG 캐시 저장 실패', e) }
     }
 
-  }, [actions, toast, state.isSearching, persistVerifiedCitations])
+    // P1-AI-6: state.isSearching은 본문에서 사용되지 않으므로 deps에서 제거 (불필요한 재생성 방지)
+  }, [actions, toast, persistVerifiedCitations])
 
   /** 연속 대화 추가 질문 */
   const handleFollowUp = useCallback((followUpQuery: string) => {

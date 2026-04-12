@@ -137,7 +137,9 @@ export async function executeTool(
     const parsedArgs = tool.schema.parse(args)
 
     // 개별 도구 타임아웃 (법제처 API hang 방지)
-    const TOOL_TIMEOUT_MS = 30_000
+    // P1-AI-8: chain 도구는 내부적으로 여러 API를 순차 호출하므로 더 긴 timeout 필요
+    const isChainTool = name.startsWith('chain_')
+    const TOOL_TIMEOUT_MS = isChainTool ? 90_000 : 30_000
     let timer: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`도구 타임아웃 (${TOOL_TIMEOUT_MS}ms): ${name}`)), TOOL_TIMEOUT_MS)

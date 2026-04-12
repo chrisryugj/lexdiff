@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useScrollDirection } from '@/hooks/use-scroll-direction'
 import type { ImpactStep } from '@/lib/impact-tracker/types'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
@@ -73,9 +74,7 @@ export function ImpactTrackerView({
   const autoStarted = useRef(false)
 
   // 헤더 스크롤 표시/숨김
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const lastScrollY = useRef(0)
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHeaderVisible = useScrollDirection()  // PERF-3
 
   // 레퍼런스 모달 (법령뷰어와 동일한 훅 사용)
   const emptyMeta = useRef({ lawTitle: '', fetchedAt: '' }).current
@@ -99,29 +98,7 @@ export function ImpactTrackerView({
     }
   }, [initialRequest, startAnalysis])
 
-  // 스크롤 핸들러 (헤더 표시/숨김)
-  useEffect(() => {
-    const handleScroll = () => {
-      const y = window.scrollY
-      if (y < 30) {
-        setIsHeaderVisible(true)
-        lastScrollY.current = y
-        return
-      }
-      const delta = y - lastScrollY.current
-      if (Math.abs(delta) > 8) {
-        setIsHeaderVisible(delta <= 0)
-        lastScrollY.current = y
-      }
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-      scrollTimer.current = setTimeout(() => setIsHeaderVisible(true), 200)
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-    }
-  }, [])
+  // PERF-3: 스크롤 헤더 로직은 useScrollDirection으로 이전
 
 
   const lastRequestRef = useRef<ImpactTrackerRequest | null>(null)

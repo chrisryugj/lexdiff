@@ -242,6 +242,8 @@ export const Particles: React.FC<ParticlesProps> = ({
   const animate = () => {
     onMouseMove() // 매 프레임 마우스 위치 동기화 (setState 없음)
     clearContext()
+    // PERF-5: stale closure 방지 — propsRef에서 최신 값 읽기
+    const { staticity: curStaticity, ease: curEase, vx: curVx, vy: curVy } = propsRef.current
     circles.current.forEach((circle: Circle, i: number) => {
       // Handle the alpha value
       const edge = [
@@ -262,14 +264,14 @@ export const Particles: React.FC<ParticlesProps> = ({
       } else {
         circle.alpha = circle.targetAlpha * remapClosestEdge
       }
-      circle.x += circle.dx + vx
-      circle.y += circle.dy + vy
+      circle.x += circle.dx + curVx
+      circle.y += circle.dy + curVy
       circle.translateX +=
-        (mouse.current.x / (staticity / circle.magnetism) - circle.translateX) /
-        ease
+        (mouse.current.x / (curStaticity / circle.magnetism) - circle.translateX) /
+        curEase
       circle.translateY +=
-        (mouse.current.y / (staticity / circle.magnetism) - circle.translateY) /
-        ease
+        (mouse.current.y / (curStaticity / circle.magnetism) - circle.translateY) /
+        curEase
 
       drawCircle(circle, true)
 

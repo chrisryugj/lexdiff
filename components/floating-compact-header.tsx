@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
+import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { m } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
@@ -40,7 +41,7 @@ export function FloatingCompactHeader({
 }: FloatingCompactHeaderProps) {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
-  const [isVisible, setIsVisible] = useState(true)
+  const isVisible = useScrollDirection()  // PERF-3: 통합 훅
 
   // 즐겨찾기 개수 추적
   useEffect(() => {
@@ -54,46 +55,21 @@ export function FloatingCompactHeader({
     }
   }, [])
 
-  // 스크롤 감지 — 스크롤 중 숨김, 멈추면 복귀
-  const lastScrollY = useRef(0)
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
+  // PERF-3: scrolled (>20px) 상태만 별도 추적 (방향성 로직은 useScrollDirection이 담당)
   useEffect(() => {
+    let rafId: number | null = null
     const handleScroll = () => {
-      const y = window.scrollY
-      setScrolled(y > 20)
-
-      // 최상단이면 항상 표시
-      if (y < 30) {
-        setIsVisible(true)
-        lastScrollY.current = y
-        return
-      }
-
-      // 스크롤 방향 감지: 아래로 일정 이상 움직이면 숨김
-      const delta = y - lastScrollY.current
-      if (Math.abs(delta) > 8) {
-        if (delta > 0) {
-          // 아래로 스크롤 → 숨김
-          setIsVisible(false)
-        } else {
-          // 위로 스크롤 → 즉시 표시
-          setIsVisible(true)
-        }
-        lastScrollY.current = y
-      }
-
-      // 스크롤 멈춤 감지 (200ms 무반응 → 복귀)
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-      scrollTimer.current = setTimeout(() => {
-        setIsVisible(true)
-      }, 200)
+      if (rafId != null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        setScrolled(window.scrollY > 20)
+      })
     }
-
+    handleScroll()
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+      if (rafId != null) cancelAnimationFrame(rafId)
     }
   }, [])
 

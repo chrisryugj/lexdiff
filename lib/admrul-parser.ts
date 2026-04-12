@@ -41,53 +41,6 @@ export interface AdminRuleArticle {
 }
 
 /**
- * 행정규칙 제1조(목적)만 빠르게 추출 (경량 버전)
- * 전체 파싱 없이 제1조만 추출하여 성능 최적화
- */
-export function parseAdminRulePurposeOnly(xmlText: string): {
-  name: string
-  id: string
-  purpose: AdminRuleArticle | null
-} | null {
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(xmlText, "text/xml")
-
-  const serviceNode = doc.querySelector("AdmRulService")
-  if (!serviceNode) return null
-
-  const infoNode = serviceNode.querySelector("행정규칙기본정보")
-  if (!infoNode) return null
-
-  const name = infoNode.querySelector("행정규칙명")?.textContent?.trim() || ""
-  const id = infoNode.querySelector("행정규칙ID")?.textContent?.trim() || ""
-
-  // 모든 조문내용 가져오기 (첫 번째가 "제1장" 같은 경우 있음)
-  const contentNodes = serviceNode.querySelectorAll("조문내용")
-  if (!contentNodes || contentNodes.length === 0) {
-    return { name, id, purpose: null }
-  }
-
-  // 제1조를 찾을 때까지 순회
-  for (const contentNode of contentNodes) {
-    const content = contentNode.textContent?.trim() || ""
-
-    // 제1조(목적) 패턴 매칭
-    const purposeMatch = content.match(/(제1조)\s*(?:\(([^)]+)\))?\s*([\s\S]+)/)
-
-    if (purposeMatch) {
-      const purpose: AdminRuleArticle = {
-        number: purposeMatch[1], // "제1조"
-        title: purposeMatch[2] || undefined, // "목적"
-        content: purposeMatch[3].trim(),
-      }
-      return { name, id, purpose }
-    }
-  }
-
-  return { name, id, purpose: null }
-}
-
-/**
  * 행정규칙 목록 XML 파싱
  */
 export function parseAdminRuleList(xmlText: string): AdminRuleListItem[] {

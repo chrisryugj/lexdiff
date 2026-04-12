@@ -241,14 +241,15 @@ export default function Home() {
   }
 
   // AI 게이트 인증 성공 래퍼 (인증 후 자동 재검색)
+  // UX-10: race 방지 — query를 클로저에 캡처하고 ref는 즉시 비움
   const handleGateSubmitWithRetry = (pin: string): boolean => {
     const result = handleGateSubmit(pin)
-    if (result && gateRetryQueryRef.current) {
-      const query = gateRetryQueryRef.current
-      gateRetryQueryRef.current = null
-      // 다음 틱에서 검색 실행 (게이트 다이얼로그 닫힌 후)
-      setTimeout(() => handleSearch({ lawName: query }), 0)
-    }
+    if (!result) return result
+    const query = gateRetryQueryRef.current
+    if (!query) return result
+    gateRetryQueryRef.current = null  // 동기 즉시 클리어 → 후속 호출 중복 차단
+    // 게이트 다이얼로그 닫힘 애니메이션 후 검색 실행
+    setTimeout(() => handleSearch({ lawName: query }), 0)
     return result
   }
 

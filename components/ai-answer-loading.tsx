@@ -10,11 +10,36 @@
 
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { memo, useEffect, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Terminal, TypingAnimation, AnimatedSpan } from "@/components/ui/terminal"
 import { AnimatedCircularProgressBar } from "@/components/ui/animated-circular-progress-bar"
 import { TypingAnimationSingle } from "@/components/ui/typing-animation-single"
+
+// PERF-6: 100ms 타이머가 부모를 매번 리렌더하던 것을 격리.
+// 이 컴포넌트만 100ms마다 리렌더되고 부모(AIAnswerLoading)는 progress 변화에만 반응.
+const ElapsedTimer = memo(function ElapsedTimer({ active }: { active: boolean }) {
+  const [elapsed, setElapsed] = useState(0)
+  const startRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!active) {
+      startRef.current = null
+      setElapsed(0)
+      return
+    }
+    startRef.current = Date.now()
+    setElapsed(0)
+    const interval = setInterval(() => {
+      if (startRef.current) setElapsed((Date.now() - startRef.current) / 1000)
+    }, 100)
+    return () => clearInterval(interval)
+  }, [active])
+  return (
+    <span className="text-[10px] font-mono text-gray-400 tabular-nums">
+      {elapsed.toFixed(1)}s
+    </span>
+  )
+})
 
 interface AIAnswerLoadingProps {
   /** 진행률 (0-100) */
@@ -34,33 +59,13 @@ const REAL_STAGES = [
 ] as const
 
 export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingProps) {
-  const [elapsedTime, setElapsedTime] = useState(0)
-  const startTimeRef = useRef<number | null>(null)
   const [hasStarted, setHasStarted] = useState(false)
   const [shouldHide, setShouldHide] = useState(false)
 
-  // 전체 프로세스 타이머 (0초부터 시작) - 기존 로직 유지
+  // PERF-6: elapsedTime 상태를 ElapsedTimer 자식 컴포넌트로 이전 (100ms 리렌더 격리)
   useEffect(() => {
-    if (searchProgress > 0 && !hasStarted) {
-      setHasStarted(true)
-      startTimeRef.current = Date.now()
-      setElapsedTime(0)
-    }
-
-    if (hasStarted && startTimeRef.current) {
-      const interval = setInterval(() => {
-        const elapsed = (Date.now() - startTimeRef.current!) / 1000
-        setElapsedTime(elapsed)
-      }, 100)
-
-      return () => clearInterval(interval)
-    }
-
-    if (searchProgress === 0 && hasStarted) {
-      setHasStarted(false)
-      startTimeRef.current = null
-      setElapsedTime(0)
-    }
+    if (searchProgress > 0 && !hasStarted) setHasStarted(true)
+    if (searchProgress === 0 && hasStarted) setHasStarted(false)
   }, [searchProgress, hasStarted])
 
   // 100% 도달 후 4500ms 대기 후 숨김 (마지막 애니메이션 3500ms + 여유 1000ms)
@@ -251,11 +256,9 @@ export function AIAnswerLoading({ searchProgress, className }: AIAnswerLoadingPr
           </AnimatedSpan>
         </Terminal>
 
-        {/* 터미널 하단 타이머 */}
+        {/* 터미널 하단 타이머 — 격리된 자식 컴포넌트 */}
         <div className="mt-2 opacity-30">
-          <span className="text-[10px] font-mono text-gray-400 tabular-nums">
-            {elapsedTime.toFixed(1)}s
-          </span>
+          <ElapsedTimer active={hasStarted} />
         </div>
       </div>
 

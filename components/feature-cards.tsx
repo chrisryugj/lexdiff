@@ -75,8 +75,11 @@ interface FeatureCardsProps {
   onToolClick?: (toolId: ToolCardId) => void
 }
 
+// UX-5: 항목 수를 한 곳에서 계산 — 카드 추가 시 itemsRevealed 길이 자동 동기화
+const TOTAL_ITEMS_COUNT = brandingCards.length + toolCards.length + 1
+
 export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProps) {
-  const [itemsRevealed, setItemsRevealed] = useState<boolean[]>(new Array(brandingCards.length + toolCards.length + 1).fill(false))
+  const [itemsRevealed, setItemsRevealed] = useState<boolean[]>(() => new Array(TOTAL_ITEMS_COUNT).fill(false))
   const itemRefs = useRef<(HTMLElement | null)[]>([])
 
   useEffect(() => {

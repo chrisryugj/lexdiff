@@ -604,7 +604,9 @@ function SearchResultViewComponent({
                           actions.setLawData(prev => prev ? { ...prev, selectedJo: jo } : null)
                         }}
                         onSelectCrossLaw={(lawTitle) => {
-                          handlers.handleSearch({ lawName: lawTitle, article: formatJO(state.articleNotFound!.requestedJo) })
+                          // UX-6: stale articleNotFound 가드 (콜백 시점 null 방어)
+                          const jo = state.articleNotFound?.requestedJo
+                          if (jo) handlers.handleSearch({ lawName: lawTitle, article: formatJO(jo) })
                         }}
                         onDismiss={() => actions.setArticleNotFound(null)}
                       />

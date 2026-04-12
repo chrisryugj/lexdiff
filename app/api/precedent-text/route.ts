@@ -70,7 +70,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(detail)
+    // API-7: 명시적 캐시 헤더 (판례 본문은 거의 불변)
+    return NextResponse.json(detail, {
+      headers: {
+        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    })
 
   } catch (error) {
     return safeErrorResponse(error, "판례 조회 중 오류 발생")

@@ -7,6 +7,8 @@
  * - 브라우저 종료 후에도 유지
  */
 
+import { debugLogger } from './debug-logger'
+
 const DB_NAME = 'LexDiffSearchCache'
 const STORE_NAME = 'searchResults'
 const DB_VERSION = 1
@@ -179,7 +181,7 @@ export async function saveSearchResult(cache: SearchResultCache): Promise<void> 
 
     db.close()
   } catch (error) {
-    console.error('Failed to save search result:', error)
+    debugLogger.error('Failed to save search result:', error)
     throw error
   }
 }
@@ -215,7 +217,7 @@ export async function getSearchResult(
 
     return cache
   } catch (error) {
-    console.error('Failed to get search result:', error)
+    debugLogger.error('Failed to get search result:', error)
     return null
   }
 }
@@ -237,7 +239,7 @@ export async function deleteSearchResult(searchId: string): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error('Failed to delete search result:', error)
+    debugLogger.error('Failed to delete search result:', error)
     throw error
   }
 }
@@ -271,7 +273,7 @@ export async function deleteExpiredResults(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error('Failed to delete expired results:', error)
+    debugLogger.error('Failed to delete expired results:', error)
   }
 }
 
@@ -293,7 +295,7 @@ export async function getAllSearchResults(): Promise<SearchResultCache[]> {
     db.close()
     return results
   } catch (error) {
-    console.error('Failed to get all search results:', error)
+    debugLogger.error('Failed to get all search results:', error)
     return []
   }
 }
@@ -315,7 +317,7 @@ export async function clearAllSearchResults(): Promise<void> {
 
     db.close()
   } catch (error) {
-    console.error('Failed to clear all search results:', error)
+    debugLogger.error('Failed to clear all search results:', error)
     throw error
   }
 }

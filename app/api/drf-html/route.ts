@@ -250,9 +250,21 @@ export async function GET(req: Request) {
     const sp = buildParams({ target: "eflaw", type: "HTML", OC, ID: lawId || undefined, MST: mstParam || undefined, JO: joParam, efYd: efYd || undefined })
     const url = `${DRF_BASE}?${sp.toString()}`
     debugLogger.debug("[drf-html] fetch:", url)
+    // API-4: 첫 fetch도 SSRF 방어 (DRF_BASE는 자체 조립이지만 일관성 + 응답 크기 가드)
+    if (!validateExternalUrl(url)) {
+      return NextResponse.json({ error: "허용되지 않은 URL입니다." }, { status: 400 })
+    }
     const res = await fetchWithTimeout(url, { next: { revalidate: 1800 } })
     const ctype = res.headers.get("content-type") || ""
+    // 응답 크기 상한 (10MB)
+    const contentLength = parseInt(res.headers.get("content-length") || "0", 10)
+    if (contentLength > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "응답 크기가 너무 큽니다" }, { status: 502 })
+    }
     const buf = Buffer.from(await res.arrayBuffer())
+    if (buf.byteLength > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "응답 크기가 너무 큽니다" }, { status: 502 })
+    }
     let html = buf.toString("utf8")
     if (/euc-kr|ks_c_5601|ms949/i.test(ctype) || /charset=(euc-kr|ks_c_5601|ms949)/i.test(html)) {
       try { html = iconv.decode(buf, "euc-kr") } catch {}

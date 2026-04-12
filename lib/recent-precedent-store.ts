@@ -6,6 +6,8 @@
  * - 최대 10개 보관
  */
 
+import { debugLogger } from './debug-logger'
+
 const STORAGE_KEY = 'lexdiff-recent-precedents'
 const MAX_RECENT = 10
 
@@ -30,7 +32,7 @@ export function getRecentPrecedents(): RecentPrecedent[] {
     if (!stored) return []
     return JSON.parse(stored)
   } catch (error) {
-    console.error('최근 판례 로드 실패:', error)
+    debugLogger.error('최근 판례 로드 실패:', error)
     return []
   }
 }
@@ -55,7 +57,7 @@ export async function addRecentPrecedent(precedent: Omit<RecentPrecedent, 'viewe
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
   } catch (error) {
-    console.error('[최근판례] 저장 실패:', error)
+    debugLogger.error('[최근판례] 저장 실패:', error)
   }
 }
 
@@ -68,7 +70,7 @@ export function removeRecentPrecedent(id: string): void {
     const updated = current.filter(p => p.id !== id)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
   } catch (error) {
-    console.error('최근 판례 삭제 실패:', error)
+    debugLogger.error('최근 판례 삭제 실패:', error)
   }
 }
 
@@ -79,6 +81,6 @@ export function clearRecentPrecedents(): void {
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch (error) {
-    console.error('최근 판례 전체 삭제 실패:', error)
+    debugLogger.error('최근 판례 전체 삭제 실패:', error)
   }
 }

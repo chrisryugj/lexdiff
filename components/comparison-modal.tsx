@@ -212,9 +212,11 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
           }
 
           // scrollIntoView는 모든 스크롤 조상에 영향 → iOS body 점프 발생.
-          // 컨테이너의 scrollTop을 직접 조작.
+          // getBoundingClientRect 기반 좌표 — offsetParent 차이를 우회.
           const scrollContainerToElement = (container: HTMLElement, target: HTMLElement) => {
-            const top = target.offsetTop - container.offsetTop
+            const containerRect = container.getBoundingClientRect()
+            const targetRect = target.getBoundingClientRect()
+            const top = targetRect.top - containerRect.top + container.scrollTop
             container.scrollTo({ top, behavior: 'smooth' })
           }
 
@@ -268,12 +270,11 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
     const oldDate = comparison.oldVersion.promulgationDate
     const oldNumber = comparison.oldVersion.promulgationNumber
 
-    if (currentRevisionIndex === revisionStack.length - 1) {
-      setRevisionStack([...revisionStack, { date: oldDate, number: oldNumber }])
-      setCurrentRevisionIndex(currentRevisionIndex + 1)
-    } else {
-      setCurrentRevisionIndex(currentRevisionIndex + 1)
-    }
+    // P2-LV-11: 표준 history stack 패턴 — 현재 위치 이후를 잘라내고 새 항목 push
+    const next = { date: oldDate, number: oldNumber }
+    const newStack = revisionStack.slice(0, currentRevisionIndex + 1).concat(next)
+    setRevisionStack(newStack)
+    setCurrentRevisionIndex(currentRevisionIndex + 1)
 
     loadComparison(oldDate, oldNumber)
   }

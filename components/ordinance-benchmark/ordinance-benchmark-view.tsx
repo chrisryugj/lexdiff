@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -73,23 +74,8 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   // 별표 모달
   const [annexState, setAnnexState] = useState({ open: false, annexNumber: '', lawName: '', lawId: '' })
 
-  // 헤더 스크롤
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true)
-  const lastScrollY = useRef(0)
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const y = window.scrollY
-      if (y < 30) { setIsHeaderVisible(true); lastScrollY.current = y; return }
-      const delta = y - lastScrollY.current
-      if (Math.abs(delta) > 8) { setIsHeaderVisible(delta <= 0); lastScrollY.current = y }
-      if (scrollTimer.current) clearTimeout(scrollTimer.current)
-      scrollTimer.current = setTimeout(() => setIsHeaderVisible(true), 200)
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  // PERF-3: 통합 훅
+  const isHeaderVisible = useScrollDirection()
 
   const {
     isSearching, isLoadingMore, progress, flatResults, keyword, error,

@@ -137,7 +137,7 @@ export async function setPrecedentSearchCache(
 ): Promise<void> {
   try {
     const db = await openDB()
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(SEARCH_STORE, "readwrite")
       const store = tx.objectStore(SEARCH_STORE)
 
@@ -152,7 +152,7 @@ export async function setPrecedentSearchCache(
       request.onsuccess = () => resolve()
       request.onerror = () => reject(request.error)
     })
-    // PERF-1: 별도 tx로 LRU 정리
+    // PERF-1: 별도 tx로 LRU 정리 (await 후 실행되도록 fix)
     evictOldest(db, SEARCH_STORE, MAX_SEARCH_ENTRIES).catch(() => {})
   } catch (error) {
     debugLogger.error("[precedent-cache] setSearchCache error:", error)
@@ -194,7 +194,7 @@ export async function setPrecedentDetailCache(
 ): Promise<void> {
   try {
     const db = await openDB()
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(DETAIL_STORE, "readwrite")
       const store = tx.objectStore(DETAIL_STORE)
 

@@ -1,3 +1,5 @@
+import { debugLogger } from './debug-logger'
+
 export interface LawHierarchy {
   lawId: string
   lawName: string
@@ -32,7 +34,7 @@ export function parseHierarchyXML(xmlText: string): LawHierarchy | null {
 
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.error("[hierarchy-parser] XML parsing error")
+      debugLogger.error("[hierarchy-parser] XML parsing error")
       return null
     }
 
@@ -44,7 +46,7 @@ export function parseHierarchyXML(xmlText: string): LawHierarchy | null {
     const effectiveDate = xmlDoc.querySelector("기본정보 시행일자")?.textContent?.trim()
 
     if (!lawId && !lawName) {
-      console.error("[hierarchy-parser] No law ID or name found")
+      debugLogger.error("[hierarchy-parser] No law ID or name found")
       return null
     }
 
@@ -143,7 +145,7 @@ export function parseHierarchyXML(xmlText: string): LawHierarchy | null {
       adminRules: adminRules.length > 0 ? adminRules : undefined,
     }
   } catch (error) {
-    console.error("[hierarchy-parser] Error:", error)
+    debugLogger.error("[hierarchy-parser] Error:", error)
     return null
   }
 }
@@ -164,7 +166,7 @@ export function parseHierarchySearchXML(xmlText: string): Array<{
 
     const parserError = xmlDoc.querySelector("parsererror")
     if (parserError) {
-      console.error("[hierarchy-parser] XML parsing error")
+      debugLogger.error("[hierarchy-parser] XML parsing error")
       return []
     }
 
@@ -198,7 +200,7 @@ export function parseHierarchySearchXML(xmlText: string): Array<{
 
     return results
   } catch (error) {
-    console.error("[hierarchy-parser] Error:", error)
+    debugLogger.error("[hierarchy-parser] Error:", error)
     return []
   }
 }
