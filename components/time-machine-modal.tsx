@@ -138,9 +138,12 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setError(null)
 
     try {
-      // Step 1: 연혁 조회
+      // Step 1: 연혁 조회 (lawId 우선 — ID 경로만 진짜 단일 법령 연혁 반환)
+      const historyParam = meta.lawId
+        ? `lawId=${encodeURIComponent(meta.lawId)}`
+        : `lawName=${encodeURIComponent(meta.lawTitle)}`
       const historyRes = await fetch(
-        `/api/law-history?lawName=${encodeURIComponent(meta.lawTitle)}&display=100`,
+        `/api/law-history?${historyParam}&display=100`,
         { signal }
       )
       if (!historyRes.ok) throw new Error('연혁 조회 실패')
