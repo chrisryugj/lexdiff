@@ -92,7 +92,8 @@ describe('buildSystemPrompt', () => {
     test('도구 사용 가이드 포함', () => {
       const prompt = buildSystemPrompt('moderate', 'procedure')
       expect(prompt).toContain('search_ordinance')
-      expect(prompt).toContain('지역명 포함')
+      // "지역명 필수" 문구로 프롬프트에 포함됨 — 접미어 변형 허용
+      expect(prompt).toMatch(/지역명\s*(필수|포함)/)
     })
 
     test('"위반 시 답변 무효" 강압적 표현 없음', () => {

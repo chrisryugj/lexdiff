@@ -21,8 +21,9 @@ describe('inferQueryType', () => {
     test('위반 → consequence', () => {
       expect(inferQueryType('위반하면 어떻게 되나요')).toBe('consequence')
     })
-    test('과태료 → consequence', () => {
-      expect(inferQueryType('과태료는 얼마야')).toBe('consequence')
+    test('과태료 부과 여부 → consequence', () => {
+      // "얼마"가 붙으면 금액 질의(scope)로 분류되므로, 부과 여부를 묻는 표현으로 테스트.
+      expect(inferQueryType('과태료가 부과되나요')).toBe('consequence')
     })
   })
 
