@@ -245,73 +245,11 @@ export function formatSimpleJo(jo: string, isOrdinance = false): string {
   return jo
 }
 
-/**
- * Parses article revision history XML response
- */
-export function parseArticleHistory(xml: string): RevisionHistoryItem[] {
-  debugLogger.debug("조문 변경이력 파싱 시작")
-
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(xml, "text/xml")
-
-  // Check for parsing errors
-  const parserError = doc.querySelector("parsererror")
-  if (parserError) {
-    debugLogger.error("XML 파싱 오류", { error: parserError.textContent })
-    return []
-  }
-
-  const items = doc.querySelectorAll("law")
-  const history: RevisionHistoryItem[] = []
-
-
-  items.forEach((item, index) => {
-    const lawInfo = item.querySelector("법령정보")
-    const articleInfo = item.querySelector("조문정보")
-
-    if (!lawInfo || !articleInfo) {
-      return
-    }
-
-    // Extract from 법령정보
-    const promulgationDate = lawInfo.querySelector("공포일자")?.textContent || ""
-    const promulgationNumber = lawInfo.querySelector("공포번호")?.textContent || ""
-    const revisionType = lawInfo.querySelector("제개정구분명")?.textContent || ""
-    const effectiveDate = lawInfo.querySelector("시행일자")?.textContent || ""
-    const department = lawInfo.querySelector("소관부처명")?.textContent || ""
-    const lawType = lawInfo.querySelector("법령구분명")?.textContent || ""
-
-    // Extract from 조문정보
-    const changeReason = articleInfo.querySelector("변경사유")?.textContent || ""
-    const articleLink = articleInfo.querySelector("조문링크")?.textContent || ""
-    const articleNumber = articleInfo.querySelector("조문번호")?.textContent || ""
-
-    // Format date as YYYY-MM-DD
-    const formatDate = (dateStr: string) => {
-      if (!dateStr || dateStr.length !== 8) return dateStr
-      return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
-    }
-
-    const fullArticleLink = articleLink ? `https://www.law.go.kr${articleLink}` : ""
-
-    const historyItem: RevisionHistoryItem = {
-      date: formatDate(promulgationDate),
-      type: revisionType,
-      description: changeReason,
-      promulgationDate: formatDate(promulgationDate),
-      promulgationNumber,
-      effectiveDate: formatDate(effectiveDate),
-      department,
-      lawType,
-      changeReason,
-      articleLink: fullArticleLink,
-    }
-
-    history.push(historyItem)
-  })
-
-  return history
-}
+// C3: `parseArticleHistory` (DOMParser 기반)은 사용되지 않는 dead export였음.
+// 실제 호출처는 `lib/revision-parser.ts`의 `parseArticleHistoryXML`이며
+// fast-xml-parser 기반으로 서버/클라이언트 모두 동작하도록 재작성됨.
+// `RevisionHistoryItem`은 다른 export에서 참조될 수 있어 re-export만 유지.
+export type { RevisionHistoryItem }
 
 /**
  * AI 답변에서 관련 법령 제목 파싱

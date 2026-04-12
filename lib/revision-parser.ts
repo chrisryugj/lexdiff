@@ -1,5 +1,11 @@
+/**
+ * C3: 서버/클라이언트 공통 XML 파서.
+ * 기존 DOMParser는 Node 런타임에 없어 SSR/route handler에서 ReferenceError.
+ * fast-xml-parser 기반으로 양쪽 런타임 모두 동작하도록 재작성.
+ */
 import { debugLogger } from "./debug-logger"
 import type { RevisionHistoryItem } from "./law-types"
+import { parseLawXml, extractText, asArray, isHtmlErrorPage } from "./xml-parser-helper"
 
 export interface RevisionInfo {
   promulgationDate: string
@@ -9,46 +15,56 @@ export interface RevisionInfo {
   lawName: string
 }
 
+interface RawArticleHistoryRoot {
+  // 법제처 XML 응답의 최상위는 가변 — law 리스트가 임의 위치에 존재 가능.
+  [key: string]: unknown
+}
+
+function findLawNodes(root: unknown): Array<Record<string, unknown>> {
+  if (!root || typeof root !== 'object') return []
+  const r = root as Record<string, unknown>
+  // 1) 최상위 `law` 직접
+  if (r.law) return asArray(r.law) as Array<Record<string, unknown>>
+  // 2) 최상위 래퍼(LawSearch / 법령 등) 내부 `law`
+  for (const v of Object.values(r)) {
+    if (v && typeof v === 'object') {
+      const inner = (v as Record<string, unknown>).law
+      if (inner) return asArray(inner) as Array<Record<string, unknown>>
+    }
+  }
+  return []
+}
+
 export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
   try {
-    const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(xmlText, "text/xml")
-
-    const parserError = xmlDoc.querySelector("parsererror")
-    if (parserError) {
-      throw new Error("XML 파싱 오류")
-    }
+    if (isHtmlErrorPage(xmlText)) return []
+    const root = parseLawXml<RawArticleHistoryRoot>(xmlText)
+    const lawNodes = findLawNodes(root)
+    if (lawNodes.length === 0) return []
 
     const history: RevisionHistoryItem[] = []
-    const lawElements = xmlDoc.querySelectorAll("law")
 
-    if (lawElements.length === 0) {
-      return []
+    for (const law of lawNodes) {
+      const lawInfo = law['법령정보'] as Record<string, unknown> | undefined
+      if (!lawInfo) continue
+
+      const promulgationDate = extractText(lawInfo['공포일자'])
+      const revisionType = extractText(lawInfo['제개정구분명'])
+
+      const articleInfo = law['조문정보'] as Record<string, unknown> | undefined
+      const changeReason = extractText(articleInfo?.['변경사유'])
+      const articleLinkRaw = extractText(articleInfo?.['조문링크'])
+      const articleLink = articleLinkRaw ? `https://www.law.go.kr${articleLinkRaw}` : undefined
+
+      if (!promulgationDate) continue
+
+      history.push({
+        date: formatDate(promulgationDate),
+        type: changeReason || revisionType || "개정",
+        description: revisionType,
+        articleLink,
+      })
     }
-
-    lawElements.forEach((law) => {
-      const lawInfo = law.querySelector("법령정보")
-      if (!lawInfo) return
-
-      const promulgationDate = lawInfo.querySelector("공포일자")?.textContent?.trim() || ""
-      const revisionType = lawInfo.querySelector("제개정구분명")?.textContent?.trim() || ""
-
-      const articleInfo = law.querySelector("조문정보")
-      const changeReason = articleInfo?.querySelector("변경사유")?.textContent?.trim() || ""
-      const articleLinkRaw = articleInfo?.querySelector("조문링크")?.textContent?.trim() || ""
-      const articleLink = articleLinkRaw ? `https://www.law.go.kr${articleLinkRaw}` : ""
-
-      if (promulgationDate) {
-        const formattedDate = formatDate(promulgationDate)
-
-        history.push({
-          date: formattedDate,
-          type: changeReason || revisionType || "개정",
-          description: revisionType,
-          articleLink: articleLink || undefined,
-        })
-      }
-    })
 
     return history
   } catch (error) {
@@ -57,100 +73,63 @@ export function parseArticleHistoryXML(xmlText: string): RevisionHistoryItem[] {
   }
 }
 
+// 법제처 응답에서 law/연혁 노드의 필드명이 스키마마다 다름 → alias 매핑 테이블.
+const FIELD_ALIASES: Record<keyof RevisionInfo, string[]> = {
+  promulgationDate: ['공포일자', '공포일', 'PromulgationDate', '공포년월일', '공포날짜'],
+  promulgationNumber: ['공포번호', '공포번', 'PromulgationNumber', '공포호'],
+  revisionType: ['제개정구분', '제개정구분명', '제개정', 'RevisionType', '개정구분', '개정종류', '개정타입'],
+  effectiveDate: ['시행일자', '시행일', 'EffectiveDate', '시행년월일', '시행날짜'],
+  lawName: ['법령명_한글', '법령명한글', '법령명', 'LawName', '법령이름'],
+}
+
+function pickField(node: Record<string, unknown>, aliases: string[]): string {
+  for (const key of aliases) {
+    const v = extractText(node[key])
+    if (v) return v
+  }
+  return ''
+}
+
+function findAllLawLikeNodes(root: unknown): Array<Record<string, unknown>> {
+  // 최상위 law 노드 우선, 없으면 재귀 탐색
+  const direct = findLawNodes(root)
+  if (direct.length > 0) return direct
+  const collected: Array<Record<string, unknown>> = []
+  const visit = (v: unknown, depth: number) => {
+    if (depth > 6 || !v || typeof v !== 'object') return
+    if (Array.isArray(v)) { v.forEach(x => visit(x, depth + 1)); return }
+    const obj = v as Record<string, unknown>
+    // 연혁/revision 노드로 추정되는 키를 가진 객체는 후보
+    if (obj['공포일자'] || obj['공포일'] || obj['PromulgationDate']) {
+      collected.push(obj)
+      return
+    }
+    for (const child of Object.values(obj)) visit(child, depth + 1)
+  }
+  visit(root, 0)
+  return collected
+}
+
 export function parseRevisionHistoryXML(xmlText: string): RevisionInfo[] {
   try {
-    const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(xmlText, "text/xml")
-
-    const parserError = xmlDoc.querySelector("parsererror")
-    if (parserError) {
-      throw new Error("XML 파싱 오류")
-    }
+    if (isHtmlErrorPage(xmlText)) return []
+    const root = parseLawXml<unknown>(xmlText)
+    const nodes = findAllLawLikeNodes(root)
+    if (nodes.length === 0) return []
 
     const revisions: RevisionInfo[] = []
-
-    const selectors = [
-      "법령 > 법령연혁 > 연혁",
-      "법령연혁 > 연혁",
-      "연혁",
-      "법령",
-      "law",
-      "LawInfo",
-      "기본정보",
-      "법령기본정보",
-      "개정이력",
-      "개정정보",
-      "RevisionHistory",
-      "Revision",
-    ]
-
-    let lawElements: NodeListOf<Element> | null = null
-
-    for (const selector of selectors) {
-      const elements = xmlDoc.querySelectorAll(selector)
-      if (elements.length > 0) {
-        lawElements = elements
-        break
-      }
+    for (const node of nodes) {
+      const promulgationDate = pickField(node, FIELD_ALIASES.promulgationDate)
+      const promulgationNumber = pickField(node, FIELD_ALIASES.promulgationNumber)
+      if (!promulgationDate && !promulgationNumber) continue
+      revisions.push({
+        promulgationDate: promulgationDate || "날짜미상",
+        promulgationNumber: promulgationNumber || "번호미상",
+        revisionType: pickField(node, FIELD_ALIASES.revisionType) || "개정",
+        effectiveDate: pickField(node, FIELD_ALIASES.effectiveDate),
+        lawName: pickField(node, FIELD_ALIASES.lawName),
+      })
     }
-
-    if (!lawElements || lawElements.length === 0) {
-      return []
-    }
-
-    lawElements.forEach((law) => {
-      const promulgationDate =
-        law.querySelector("공포일자")?.textContent ||
-        law.querySelector("공포일")?.textContent ||
-        law.querySelector("PromulgationDate")?.textContent ||
-        law.querySelector("공포년월일")?.textContent ||
-        law.querySelector("공포날짜")?.textContent ||
-        ""
-
-      const promulgationNumber =
-        law.querySelector("공포번호")?.textContent ||
-        law.querySelector("공포번")?.textContent ||
-        law.querySelector("PromulgationNumber")?.textContent ||
-        law.querySelector("공포호")?.textContent ||
-        ""
-
-      const revisionType =
-        law.querySelector("제개정구분")?.textContent ||
-        law.querySelector("제개정구분명")?.textContent ||
-        law.querySelector("제개정")?.textContent ||
-        law.querySelector("RevisionType")?.textContent ||
-        law.querySelector("개정구분")?.textContent ||
-        law.querySelector("개정종류")?.textContent ||
-        law.querySelector("개정타입")?.textContent ||
-        ""
-
-      const effectiveDate =
-        law.querySelector("시행일자")?.textContent ||
-        law.querySelector("시행일")?.textContent ||
-        law.querySelector("EffectiveDate")?.textContent ||
-        law.querySelector("시행년월일")?.textContent ||
-        law.querySelector("시행날짜")?.textContent ||
-        ""
-
-      const lawName =
-        law.querySelector("법령명_한글")?.textContent ||
-        law.querySelector("법령명한글")?.textContent ||
-        law.querySelector("법령명")?.textContent ||
-        law.querySelector("LawName")?.textContent ||
-        law.querySelector("법령이름")?.textContent ||
-        ""
-
-      if (promulgationDate || promulgationNumber) {
-        revisions.push({
-          promulgationDate: promulgationDate || "날짜미상",
-          promulgationNumber: promulgationNumber || "번호미상",
-          revisionType: revisionType || "개정",
-          effectiveDate,
-          lawName: lawName || "",
-        })
-      }
-    })
-
     return revisions
   } catch (error) {
     debugLogger.error("개정이력 파싱 실패", error)

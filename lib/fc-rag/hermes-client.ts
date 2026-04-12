@@ -46,11 +46,74 @@ export type ClaudeStreamEvent =
   | { type: 'text'; text: string }
   | { type: 'result'; text: string; stopReason: string; usage: { inputTokens: number; outputTokens: number } }
 
+export type HistoryMode = 'full' | 'latest-only'
+
+// C2: 전체 대화 히스토리를 전달하되, 과다 입력으로 413 방지를 위해 캡 적용.
+// 오래된 턴부터 드롭하며 마지막 user 턴은 반드시 포함.
+const MAX_HISTORY_CHARS = 40_000
+
+type OpenAIRoleMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+
+function normalizeContent(c: unknown): string {
+  return typeof c === 'string' ? c : JSON.stringify(c ?? '')
+}
+
+function buildOpenAIMessages(
+  systemPrompt: string,
+  messages: DirectMessage[],
+  historyMode: HistoryMode = 'full',
+): OpenAIRoleMessage[] {
+  const sys: OpenAIRoleMessage = { role: 'system', content: systemPrompt }
+
+  if (historyMode === 'latest-only') {
+    const last = [...messages].reverse().find(m => m.role === 'user')
+    if (!last) return [sys]
+    return [sys, { role: 'user', content: normalizeContent(last.content) }]
+  }
+
+  const mapped: OpenAIRoleMessage[] = messages.map(m => ({
+    role: m.role,
+    content: normalizeContent(m.content),
+  }))
+
+  let total = mapped.reduce((s, m) => s + m.content.length, 0)
+  let start = 0
+  // 마지막 항목(= 가장 최근 user)은 반드시 보존
+  while (total > MAX_HISTORY_CHARS && start < mapped.length - 1) {
+    total -= mapped[start].content.length
+    start++
+  }
+  return [sys, ...mapped.slice(start)]
+}
+
 /** MCP 도구 이름에서 hermes prefix 제거 */
 function stripMcpPrefix(name: string): string {
   return name
     .replace(/^mcp_korean_law_/, '')
     .replace(/^mcp__korean-law__/, '')
+}
+
+// C1: Hermes SSE 이벤트 타입 가드 — 문자열 heuristic 대신 JSON 구조 검증.
+interface HermesToolProgress {
+  tool: string
+  label?: string
+  status?: 'started' | 'completed' | 'error'
+}
+
+function isHermesToolProgress(obj: unknown): obj is HermesToolProgress {
+  if (!obj || typeof obj !== 'object') return false
+  const o = obj as Record<string, unknown>
+  return typeof o.tool === 'string' && !('choices' in o)
+}
+
+interface OpenAIChatChunk {
+  choices: Array<Record<string, unknown>>
+  usage?: Record<string, number>
+}
+
+function isOpenAIChatChunk(obj: unknown): obj is OpenAIChatChunk {
+  if (!obj || typeof obj !== 'object') return false
+  return Array.isArray((obj as Record<string, unknown>).choices)
 }
 
 /**
@@ -60,27 +123,22 @@ function stripMcpPrefix(name: string): string {
 export async function* callAnthropicStream(
   systemPrompt: string,
   messages: DirectMessage[],
-  options?: { signal?: AbortSignal; maxTurns?: number },
+  options?: { signal?: AbortSignal; maxTurns?: number; historyMode?: HistoryMode },
 ): AsyncGenerator<ClaudeStreamEvent> {
   ensureHermesConfig()
-  const { signal } = options || {}
+  const { signal, historyMode = 'full' } = options || {}
 
-  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-  const userContent = typeof lastUserMsg?.content === 'string'
-    ? lastUserMsg.content
-    : JSON.stringify(lastUserMsg?.content || '')
+  const openaiMessages = buildOpenAIMessages(systemPrompt, messages, historyMode)
+  const totalChars = openaiMessages.reduce((s, m) => s + m.content.length, 0)
 
   const body = {
     model: HERMES_MODEL,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
+    messages: openaiMessages,
     stream: true,
     skip_context_files: true,
   }
 
-  debugLogger.debug(`[hermes] calling ${HERMES_BASE}/v1/chat/completions, prompt: ${userContent.length} chars`)
+  debugLogger.debug(`[hermes] calling ${HERMES_BASE}/v1/chat/completions, messages: ${openaiMessages.length}, total: ${totalChars} chars`)
 
   const response = await fetch(`${HERMES_BASE}/v1/chat/completions`, {
     method: 'POST',
@@ -109,36 +167,49 @@ export async function* callAnthropicStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  // 한 줄을 처리해 yield할 이벤트 배열을 반환 (generator 외부에서 호출)
+  // C1: SSE 라인 처리 — JSON.parse 선행 후 shape guard로 분기.
+  // 문자열 heuristic(`data.includes('"tool"')`)은 사용자 질의 delta에 false-fire 가능.
   const processLine = (line: string): ClaudeStreamEvent[] => {
     const events: ClaudeStreamEvent[] = []
     const trimmed = line.trim()
-    if (!trimmed) return events
-    if (trimmed.startsWith('event:')) return events
-    if (!trimmed.startsWith('data:')) return events
+    if (!trimmed || trimmed.startsWith('event:') || !trimmed.startsWith('data:')) return events
     const data = trimmed.slice(5).trim()
     if (!data || data === '[DONE]') return events
 
-    // hermes.tool.progress 이벤트 데이터 (heuristic)
-    if (data.includes('"tool"') && data.includes('"label"')) {
-      try {
-        const toolEvent = JSON.parse(data) as { tool?: string }
-        if (toolEvent.tool) {
-          const name = stripMcpPrefix(toolEvent.tool)
-          events.push({ type: 'tool_call', name, input: {} })
-          events.push({ type: 'tool_result', name, content: '(Hermes 내부 실행)', isError: false })
-        }
-      } catch { /* JSON parse 실패 무시 */ }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(data)
+    } catch {
+      debugLogger.debug(`[hermes] non-JSON SSE line dropped: ${data.slice(0, 80)}`)
       return events
     }
 
-    let chunk: Record<string, unknown>
-    try { chunk = JSON.parse(data) } catch { return events }
+    // Hermes tool progress 이벤트 (OpenAI chunk와 구분: choices 없음 + tool:string)
+    if (isHermesToolProgress(parsed)) {
+      const name = stripMcpPrefix(parsed.tool)
+      const status = parsed.status
+      // status 미정이면 기존 동작 유지 (call+result 동시 발행)
+      if (status === undefined || status === 'started') {
+        events.push({ type: 'tool_call', name, input: {} })
+      }
+      if (status === undefined || status === 'completed') {
+        events.push({ type: 'tool_result', name, content: '(Hermes 내부 실행)', isError: false })
+      }
+      if (status === 'error') {
+        events.push({ type: 'tool_result', name, content: '(Hermes 도구 오류)', isError: true })
+      }
+      return events
+    }
 
-    const choices = chunk.choices as Array<Record<string, unknown>> | undefined
-    if (!choices || choices.length === 0) return events
+    if (!isOpenAIChatChunk(parsed)) {
+      // 알 수 없는 스키마 — drop하되 디버그 로그
+      debugLogger.debug(`[hermes] unknown SSE event shape dropped: ${data.slice(0, 120)}`)
+      return events
+    }
 
-    const choice = choices[0]
+    if (parsed.choices.length === 0) return events
+
+    const choice = parsed.choices[0]
     const delta = choice.delta as Record<string, unknown> | undefined
     const finishReason = choice.finish_reason as string | null
 
@@ -149,11 +220,10 @@ export async function* callAnthropicStream(
 
     if (finishReason) {
       stopReason = finishReason === 'stop' ? 'end_turn' : finishReason
-      const chunkUsage = chunk.usage as Record<string, number> | undefined
-      if (chunkUsage) {
+      if (parsed.usage) {
         usage = {
-          inputTokens: chunkUsage.prompt_tokens || 0,
-          outputTokens: chunkUsage.completion_tokens || 0,
+          inputTokens: parsed.usage.prompt_tokens || 0,
+          outputTokens: parsed.usage.completion_tokens || 0,
         }
       }
     }
@@ -206,22 +276,16 @@ export async function* callAnthropicStream(
 export async function callAnthropic(
   systemPrompt: string,
   messages: DirectMessage[],
-  options?: { maxTokens?: number; signal?: AbortSignal },
+  options?: { maxTokens?: number; signal?: AbortSignal; historyMode?: HistoryMode },
 ): Promise<DirectResponse> {
   ensureHermesConfig()
-  const { maxTokens = 4096, signal } = options || {}
+  const { maxTokens = 4096, signal, historyMode = 'full' } = options || {}
 
-  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-  const userContent = typeof lastUserMsg?.content === 'string'
-    ? lastUserMsg.content
-    : JSON.stringify(lastUserMsg?.content || '')
+  const openaiMessages = buildOpenAIMessages(systemPrompt, messages, historyMode)
 
   const body = {
     model: HERMES_MODEL,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
+    messages: openaiMessages,
     max_tokens: maxTokens,
     stream: false,
   }
