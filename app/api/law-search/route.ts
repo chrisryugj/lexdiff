@@ -4,25 +4,24 @@ import { safeErrorResponse } from "@/lib/api-error"
 import { normalizeLawSearchText, resolveLawAlias } from "@/lib/search-normalizer"
 import { validate, searchQuerySchema, createErrorResponse } from "@/lib/api-validation"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { parseLawSearchXml, isHtmlErrorPage } from "@/lib/xml-parser-helper"
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
 
 /**
- * 정확히 일치하는 법령명이 있는지 확인 (CDATA 처리 포함)
+ * 정확히 일치하는 법령명이 있는지 확인
+ * fast-xml-parser 기반 — CDATA/중첩/공백 모두 안전 처리
  */
 function hasExactLawMatch(xmlText: string, query: string): boolean {
+  if (isHtmlErrorPage(xmlText)) return false
   const normalizedQuery = query.replace(/\s+/g, '').replace(/"/g, '')
-  // CDATA 내부의 법령명 추출: <![CDATA[상법]]> 또는 일반 텍스트
-  const lawNameRegex = /<법령명한글>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령명한글>/g
-  let match
-  while ((match = lawNameRegex.exec(xmlText)) !== null) {
-    const lawName = match[1].replace(/\s+/g, '')
-    if (lawName === normalizedQuery) {
-      return true
-    }
+  try {
+    const { laws } = parseLawSearchXml(xmlText)
+    return laws.some((law) => law.lawNameHangul.replace(/\s+/g, '') === normalizedQuery)
+  } catch {
+    return false
   }
-  return false
 }
 
 /**

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { parseLawSearchXml, isHtmlErrorPage } from "@/lib/xml-parser-helper"
 
 interface SearchResult {
   id: string
@@ -47,34 +48,17 @@ async function searchLaws(query: string, apiKey: string, maxResults: number): Pr
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
     const xml = await response.text()
-    if (xml.includes("<!DOCTYPE html")) throw new Error("HTML response")
+    if (isHtmlErrorPage(xml)) throw new Error("HTML response")
 
-    const totalMatch = xml.match(/<totalCnt>([^<]*)<\/totalCnt>/)
-    const totalCount = totalMatch ? parseInt(totalMatch[1], 10) : 0
-
-    const results: SearchResult[] = []
-    const lawMatches = xml.matchAll(/<law[^>]*>([\s\S]*?)<\/law>/g)
-
-    for (const match of lawMatches) {
-      const content = match[1]
-      const extract = (tag: string) => {
-        // CDATA 지원
-        const cdataRegex = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`)
-        const cdataMatch = content.match(cdataRegex)
-        if (cdataMatch) return cdataMatch[1].trim()
-
-        const m = content.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))
-        return m ? m[1].trim() : ""
-      }
-
-      results.push({
-        id: extract("법령ID") || extract("MST"),
-        name: extract("법령명한글") || extract("법령명"),
-        type: "법령",
-        date: extract("시행일자"),
-        link: extract("법령상세링크")
-      })
-    }
+    // fast-xml-parser 기반 — CDATA/공백 안전
+    const { totalCount, laws } = parseLawSearchXml(xml)
+    const results: SearchResult[] = laws.map((law) => ({
+      id: law.lawId || law.mst,
+      name: law.lawNameHangul,
+      type: "법령",
+      date: law.effectiveDate,
+      link: law.detailLink,
+    }))
 
     return { totalCount, results }
   } catch (error) {

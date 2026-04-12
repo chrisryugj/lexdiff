@@ -225,7 +225,7 @@ export async function* executeGeminiRAGStream(
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
   // ── 대화 컨텍스트 ──
-  const prevContext = getConversationContext(conversationId)
+  const prevContext = await getConversationContext(conversationId)
 
   // ── preEvidence 있으면 fast-path 스킵 ──
   let geminiEvidence = preEvidence
@@ -395,7 +395,7 @@ export async function* executeGeminiRAGStream(
           : calcConfidence(allToolResults)
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         // 대화 컨텍스트 저장
-        storeConversation(conversationId, query, answer)
+        await storeConversation(conversationId, query, answer)
         yield {
           type: 'answer',
           data: {
