@@ -76,17 +76,48 @@ export const GEMINI_TIMEOUT: Record<QueryComplexity, number> = {
   complex: 60_000,
 }
 
-// ─── 대화 컨텍스트 스토어 (로컬 dev용, Bridge 경로는 서버사이드 세션 사용) ───
+// ─── 대화 컨텍스트 스토어 ───
+//
+// Vercel 멀티 인스턴스 일관성을 위해 Upstash Redis (KV) 백엔드를 우선 사용.
+// UPSTASH_REDIS_REST_URL/TOKEN 미설정 시 in-memory Map으로 자동 폴백 (로컬 dev 호환).
 
 interface ConversationEntry { query: string; answer: string }
-const conversationStore = new Map<string, ConversationEntry[]>()
 const CONV_MAX_ENTRIES = 5
-const CONV_MAX_AGE_MS = 30 * 60_000 // 30분
-const CONV_MAX_SIZE = 500 // Map 크기 상한 (메모리 보호)
+const CONV_MAX_AGE_S = 30 * 60 // 30분 (Redis TTL용 초 단위)
+const CONV_MAX_AGE_MS = CONV_MAX_AGE_S * 1000
+const CONV_MAX_SIZE = 500 // 로컬 Map 크기 상한 (메모리 보호)
+
+// Upstash Redis lazy init — 모듈 평가 시점이 아닌 첫 호출 시점에 생성
+type RedisLike = {
+  get<T>(key: string): Promise<T | null>
+  set(key: string, value: unknown, opts?: { ex?: number }): Promise<unknown>
+}
+let cachedRedis: RedisLike | null | undefined
+function getRedis(): RedisLike | null {
+  if (cachedRedis !== undefined) return cachedRedis
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) {
+    cachedRedis = null
+    return null
+  }
+  try {
+    // 동기 require로 lazy init — 빌드 시점 평가 회피
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis')
+    cachedRedis = new Redis({ url, token }) as unknown as RedisLike
+    return cachedRedis
+  } catch {
+    cachedRedis = null
+    return null
+  }
+}
+
+// ── 로컬 fallback 스토어 ──
+const conversationStore = new Map<string, ConversationEntry[]>()
 const conversationTimestamps = new Map<string, number>()
 
-// 주기적 TTL 정리 (새 대화 저장이 없어도 메모리 회수)
-// P1-AI-1: HMR/멀티 import 방어 — globalThis 가드로 한 번만 등록
+// 주기적 TTL 정리 (Map fallback 전용 — Redis는 ex 옵션으로 자동 만료)
 const __g = globalThis as unknown as { __lexdiff_conv_cleanup_started__?: boolean }
 if (typeof setInterval !== 'undefined' && !__g.__lexdiff_conv_cleanup_started__) {
   __g.__lexdiff_conv_cleanup_started__ = true
@@ -98,22 +129,38 @@ if (typeof setInterval !== 'undefined' && !__g.__lexdiff_conv_cleanup_started__)
         conversationTimestamps.delete(id)
       }
     }
-  }, 5 * 60_000) // 5분 간격
+  }, 5 * 60_000)
   if (typeof _convCleanupTimer === 'object' && 'unref' in _convCleanupTimer) {
     _convCleanupTimer.unref()
   }
 }
 
-export function getConversationContext(conversationId?: string): string {
-  if (!conversationId) return ''
-  const entries = conversationStore.get(conversationId)
-  if (!entries?.length) return ''
-  const recent = entries.slice(-3)
-  return recent.map((e, i) => `[이전 질문 ${i + 1}] ${e.query}\n[이전 답변 ${i + 1}] ${e.answer.slice(0, 500)}`).join('\n\n')
+const convKey = (id: string) => `lexdiff:conv:${id}`
+
+async function readEntries(conversationId: string): Promise<ConversationEntry[]> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const raw = await redis.get<ConversationEntry[]>(convKey(conversationId))
+      return Array.isArray(raw) ? raw : []
+    } catch {
+      // Redis 일시 장애 → Map fallback 시도
+    }
+  }
+  return conversationStore.get(conversationId) ?? []
 }
 
-export function storeConversation(conversationId: string | undefined, query: string, answer: string) {
-  if (!conversationId) return
+async function writeEntries(conversationId: string, entries: ConversationEntry[]): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(convKey(conversationId), entries, { ex: CONV_MAX_AGE_S })
+      return
+    } catch {
+      // Redis 일시 장애 → Map fallback
+    }
+  }
+  // 로컬 fallback: 사이즈 한도 + 타임스탬프 관리
   const now = Date.now()
   for (const [id, ts] of conversationTimestamps) {
     if (now - ts > CONV_MAX_AGE_MS) {
@@ -131,11 +178,28 @@ export function storeConversation(conversationId: string | undefined, query: str
     conversationStore.delete(oldestId)
     conversationTimestamps.delete(oldestId)
   }
-  const entries = conversationStore.get(conversationId) || []
-  entries.push({ query, answer: answer.slice(0, 2000) })
-  if (entries.length > CONV_MAX_ENTRIES) entries.shift()
   conversationStore.set(conversationId, entries)
   conversationTimestamps.set(conversationId, now)
+}
+
+export async function getConversationContext(conversationId?: string): Promise<string> {
+  if (!conversationId) return ''
+  const entries = await readEntries(conversationId)
+  if (!entries.length) return ''
+  const recent = entries.slice(-3)
+  return recent.map((e, i) => `[이전 질문 ${i + 1}] ${e.query}\n[이전 답변 ${i + 1}] ${e.answer.slice(0, 500)}`).join('\n\n')
+}
+
+export async function storeConversation(
+  conversationId: string | undefined,
+  query: string,
+  answer: string,
+): Promise<void> {
+  if (!conversationId) return
+  const existing = await readEntries(conversationId)
+  existing.push({ query, answer: answer.slice(0, 2000) })
+  while (existing.length > CONV_MAX_ENTRIES) existing.shift()
+  await writeEntries(conversationId, existing)
 }
 
 // ─── 유틸리티 ───

@@ -40,7 +40,7 @@ export async function* executeClaudeRAGStream(
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
   // ── 대화 컨텍스트 (follow-up 질의 시 이전 Q&A 참조) ──
-  const prevContext = getConversationContext(conversationId)
+  const prevContext = await getConversationContext(conversationId)
 
   // ── preEvidence 있으면 fast-path 스킵 (이미 조문 데이터 있음) ──
   let collectedEvidence = preEvidence
@@ -196,7 +196,7 @@ export async function* executeClaudeRAGStream(
           totalTokens: event.usage.inputTokens + event.usage.outputTokens,
         }
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
-        storeConversation(conversationId, query, answer)
+        await storeConversation(conversationId, query, answer)
 
         yield {
           type: 'answer',
