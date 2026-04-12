@@ -48,7 +48,7 @@
 | **UI** | React 19, TypeScript 5, Tailwind v4, shadcn/ui |
 | **AI (1순위)** | Claude Sonnet 4.6 — CLI subprocess (로컬) / Bridge 프록시 (Vercel) |
 | **AI (2순위/폴백)** | Gemini 3-Flash-Preview (Function Calling) |
-| **AI (요약)** | Claude CLI (callGateway) / Gemini 2.5-Flash-Lite (폴백) |
+| **AI (요약)** | Hermes Gateway `callGateway()` (GPT-5.4) / Gemini 2.5-Flash-Lite (폴백) |
 | **법령 도구** | korean-law-mcp (Function Calling 기반) |
 | **법령 데이터** | 법제처 Open API (law.go.kr/DRF/) |
 | **클라이언트 캐시** | IndexedDB (판례), localStorage (API 응답, 즐겨찾기) |
@@ -62,8 +62,8 @@
 
 ### 3.1 AI 자연어 검색 (FC-RAG)
 - **엔진**: FC-RAG (Function Calling RAG) — korean-law-mcp (60+ 도구) 기반
-- **2-Tier 라우팅**: Claude Sonnet 4.6 (CLI subprocess / Bridge) → Gemini Flash (폴백)
-- **환경 분기**: 로컬 = claude.exe spawn (stream-json) / Vercel = OpenClaw Bridge (CF Worker → Tunnel)
+- **2-Tier 라우팅**: Hermes Gateway (GPT-5.4 + Codex OAuth, OpenAI-compatible HTTP/SSE) → Gemini Flash (폴백)
+- **환경 분기 없음**: 로컬·Vercel 동일하게 `HERMES_API_URL`로 fetch. Vercel에서는 CF Worker → Quick Tunnel → Hermes로 라우팅. (이전 `claude.exe` subprocess / OpenClaw Bridge 경로는 모두 제거됨 — `claude-engine.ts` 등 함수명은 legacy)
 - **8가지 질의유형** 자동 분류: 정의, 요건, 절차, 비교, 적용, 결과, 범위, 면제
 - **16개 법률 도메인** 자동 감지: 세금, 관세, 노동, 개인정보, 건설, 의료, 교육, 금융, 병역 등
 - **4-Tier 도구 선택**: 항상(9) → 도메인별(16) → 컨텍스트(12) → 온디맨드(20+)
@@ -72,11 +72,11 @@
 - **preEvidence 즉답**: 조문 뷰어에서 이미 가진 데이터 → 도구 호출 0회 즉답
 - **인용 사후 검증**: law.go.kr eflaw API로 조문 실존 확인
 - **질의 로그**: traceId 기반 도구/소요시간/소스 기록
-- **파일**: `app/api/fc-rag/`, `lib/fc-rag/`, `lib/openclaw-client.ts`
+- **파일**: `app/api/fc-rag/`, `lib/fc-rag/` (`claude-engine.ts` + `hermes-client.ts`)
 
 ### 3.2 AI 법률 분석 요약
 - 신구법 비교 요약, 판례 요지 추출
-- Claude CLI callGateway → Gemini 폴백
+- Hermes Gateway `callGateway()` (GPT-5.4) → Gemini 폴백 (이름은 legacy, 실제는 Hermes HTTP 호출)
 - **파일**: `app/api/summarize/`, `components/ai-summary-dialog.tsx`
 
 ### 3.3 신구법 대비표
@@ -233,8 +233,7 @@
 | 소스 | 유형 | 인증 | 용도 |
 |------|------|------|------|
 | **법제처 Open API** | REST (XML/JSON) | `LAW_OC` 키 | 모든 법령, 판례, 해석례, 조례 |
-| **Claude CLI** | subprocess (stream-json) | OAuth (CLI 자동) | AI 1순위 (로컬) |
-| **OpenClaw Bridge** | SSE 스트리밍 | Token + CF Access | AI 1순위 (Vercel) |
+| **Hermes Gateway** | HTTP fetch + SSE (`/v1/chat/completions`) | `HERMES_API_KEY` (+ Codex OAuth는 Hermes 내부 처리) | AI 1순위 (로컬·Vercel 공통) |
 | **Google Gemini** | REST 스트리밍 | `GEMINI_API_KEY` | AI 2순위 (폴백) |
 | **IndexedDB** | 브라우저 DB | 클라이언트 | 판례 캐시 (7일 TTL) |
 | **localStorage** | 브라우저 저장소 | 클라이언트 | 즐겨찾기, 최근검색, API 응답 캐시 |

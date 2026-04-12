@@ -14,14 +14,17 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
 [/api/fc-rag] SSE 스트리밍 엔드포인트
     ↓
 ┌─────────────────────────────────────────────┐
-│  2-Tier AI 라우팅 (환경별 분기)               │
+│  2-Tier AI 라우팅                            │
 │                                             │
 │  ┌────────────────────────────────────────┐ │
-│  │ 1순위: Claude (Sonnet 4.6)             │ │
-│  │   로컬: claude.exe subprocess          │ │
-│  │         (stream-json 모드)             │ │
-│  │   Vercel: OpenClaw Bridge 프록시        │ │
-│  │         (CF Worker → Tunnel → 미니PC)  │ │
+│  │ 1순위: Hermes Gateway (GPT-5.4)        │ │
+│  │   HTTP fetch + SSE                     │ │
+│  │   POST /v1/chat/completions            │ │
+│  │   (OpenAI-compatible, stream:true)     │ │
+│  │   로컬: http://127.0.0.1:8642          │ │
+│  │   Vercel: CF Worker → Quick Tunnel     │ │
+│  │           → Hermes (동일 경로)          │ │
+│  │   ※ Codex OAuth + MCP는 Hermes가 관리  │ │
 │  └──────────┬─────────────────────────────┘ │
 │             │ 실패 시                        │
 │  ┌──────────▼─────────────────────────────┐ │
@@ -32,6 +35,8 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
 └─────────────────────────────────────────────┘
     ↓
 [korean-law-mcp tools] 법제처 API 실시간 호출
+    ↑ Primary 경로에서는 Hermes가 자식 프로세스로 직접 관리
+    ↑ Gemini 폴백 경로에서는 lexdiff가 tool-adapter로 직접 호출
     ↓
 [SSE Stream] status → tool_call → tool_result → answer → citation_verification
     ↓
@@ -53,11 +58,11 @@ type FCRAGStreamEvent =
   | { type: 'answer'; data: FCRAGResult }
   | { type: 'answer_token'; data: { text: string } }           // Bridge 스트리밍 토큰
   | { type: 'citation_verification'; citations: VerifiedCitation[] }
-  | { type: 'source'; source: 'claude' | 'openclaw' | 'gemini' }
+  | { type: 'source'; source: 'hermes' | 'gemini' }
   | { type: 'error'; message: string }
 ```
 
-**`answer_token`**: Claude CLI 로컬 경로 및 Bridge(Vercel) 경로에서 발생. Claude CLI의 텍스트 출력을 실시간 토큰 단위로 전달하여 타이핑 효과 구현. Gemini 경로는 최종 answer만 전송.
+**`answer_token`**: Hermes Gateway SSE 경로(로컬/Vercel 동일)에서 발생. Hermes의 OpenAI-호환 `delta.content` 청크를 그대로 토큰 단위로 전달하여 타이핑 효과 구현. Gemini 경로는 최종 answer만 전송.
 
 ### 2. SSE Buffer Handling (CRITICAL)
 
@@ -138,9 +143,10 @@ verified/unverified 배지 표시
 ### 코어 RAG 엔진
 | 파일 | 역할 |
 |------|------|
-| `app/api/fc-rag/route.ts` | SSE 스트리밍 엔드포인트 (환경별 분기: 로컬 CLI / Vercel Bridge) |
-| `lib/fc-rag/engine.ts` | RAG 실행 엔진 (executeClaudeRAGStream / executeGeminiRAGStream) |
-| `lib/fc-rag/anthropic-client.ts` | Claude CLI subprocess 클라이언트 (callAnthropic / callAnthropicStream) |
+| `app/api/fc-rag/route.ts` | SSE 스트리밍 엔드포인트 (Hermes Primary → Gemini 폴백) |
+| `lib/fc-rag/engine.ts` | RAG 엔진 진입점 (executeClaudeRAGStream / executeGeminiRAGStream re-export) |
+| `lib/fc-rag/claude-engine.ts` | **Primary 오케스트레이터** (legacy 네이밍 — 실제 LLM은 Hermes 경유 GPT-5.4) |
+| `lib/fc-rag/hermes-client.ts` | Hermes Gateway HTTP/SSE 클라이언트 — `fetch :8642/v1/chat/completions` |
 | `lib/fc-rag/tool-adapter.ts` | korean-law-mcp 도구 어댑터 (60+ 도구 등록) |
 | `lib/fc-rag/prompts.ts` | 8가지 질의유형별 시스템 프롬프트 |
 | `lib/fc-rag/tool-tiers.ts` | 도구 선택 (Tier 0/1/2/3) + 도메인 감지 |
@@ -149,10 +155,10 @@ verified/unverified 배지 표시
 | `lib/fc-rag/result-utils.ts` | 도구 결과 요약 + 파라미터 보정 |
 | `lib/fc-rag/quality-evaluator.ts` | 응답 품질 평가 |
 
-### OpenClaw Bridge (Vercel 전용)
-| 파일 | 역할 |
-|------|------|
-| `lib/openclaw-client.ts` | Bridge 클라이언트 (SSE 파싱, Circuit Breaker, Health Check) |
+### Hermes Gateway 연동
+- 로컬/Vercel 모두 동일한 Hermes Agent API를 사용. lexdiff는 OpenAI-compatible HTTP 클라이언트일 뿐, 별도 Bridge 코드 없음.
+- Vercel 환경에서는 `HERMES_API_URL`이 CF Worker → Quick Tunnel → Hermes로 라우팅됨 (lexdiff는 URL만 바뀔 뿐 동일 경로).
+- `child_process.spawn`, Claude CLI, stream-json 플래그 모두 코드베이스에 존재하지 않음.
 
 ### 인용 검증 & 후처리
 | 파일 | 역할 |
@@ -178,7 +184,7 @@ verified/unverified 배지 표시
 |------|------|
 | `lib/rag-response-cache.ts` | 응답 캐시 (LRU, 24시간 TTL) |
 | `lib/usage-tracker.ts` | API 사용량/쿼터 추적 (IP별 일일 제한) |
-| `lib/trace-logger.ts` | Claude vs Gemini 라우팅 추적 |
+| `lib/trace-logger.ts` | Hermes(Primary) vs Gemini(Fallback) 라우팅 추적 |
 | `lib/query-logger.ts` | 질의 로그 기록 (traceId, 도구, 소요시간 등) |
 
 ---
@@ -193,7 +199,7 @@ verified/unverified 배지 표시
 | **응답 캐시** | 동일 쿼리+인용 LRU 캐시 (24시간 TTL) |
 | **도구 결과 캐시** | API별 캐시 (3시간~24시간) |
 | **Chain 도구** | 7개 chain 매크로로 다단계 조회를 1턴에 처리 |
-| **Circuit Breaker** | Bridge 장애 시 5회 실패 → 2분 차단 후 자동 복구 |
+| **Hermes 장애 폴백** | Hermes 응답 실패/타임아웃 시 즉시 Gemini FC-RAG로 전환 |
 
 ---
 
@@ -204,21 +210,21 @@ verified/unverified 배지 표시
 | `GEMINI_API_KEY` | Google Gemini API 키 | ✅ (Gemini 폴백) |
 | `GEMINI_MODEL` | 모델 선택 (기본: gemini-3-flash-preview) | ❌ |
 | `LAW_OC` | 법제처 API 키 (korean-law-mcp) | ✅ |
-| `VERCEL` | Vercel 플랫폼 자동 설정 → Bridge 경로 활성화 | 자동 |
-| `OPENCLAW_URL` | OpenClaw Bridge URL | Vercel 시 |
-| `OPENCLAW_API_TOKEN` | Bridge 인증 토큰 | Vercel 시 |
-| `CF_ACCESS_CLIENT_ID` | Cloudflare Access | ❌ |
-| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access | ❌ |
+| `HERMES_API_URL` | Hermes Gateway URL (기본 `http://127.0.0.1:8642`, Vercel은 CF Worker URL) | ✅ |
+| `HERMES_API_KEY` | Hermes 게이트웨이 인증 키 | ✅ |
+| `HERMES_MODEL` | 모델 식별자 (기본 `hermes-agent`) | ❌ |
+| `CF_ACCESS_CLIENT_ID` | Cloudflare Access (Vercel→Tunnel) | Vercel 시 |
+| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access | Vercel 시 |
 
 ---
 
 ## 🚨 자주 발생하는 버그
 
 1. **AI 답변 잘림**: SSE buffer 루프 종료 후 잔여 처리 누락
-2. **source 라벨 오류**: route.ts와 프론트엔드 간 source 값 불일치 ('claude'/'openclaw'/'gemini')
-3. **Bridge 타임아웃**: 90초 초과 시 Circuit Breaker 확인, Gemini 폴백 정상 작동 여부
+2. **source 라벨 오류**: route.ts와 프론트엔드 간 source 값 불일치 ('hermes'/'gemini')
+3. **Hermes 타임아웃**: 90초 초과 시 Gemini 폴백 정상 작동 여부 확인
 4. **preEvidence 미전달**: article-suggestions → handleAiQuery 시 preEvidence 누락으로 불필요한 도구 호출
-5. **인코딩 깨짐**: Windows claude.exe subprocess에서 한글 → execFile UTF-16 경로 사용 필수
+5. **레거시 네이밍 혼동**: `claude-engine.ts` / `executeClaudeRAGStream` / `callAnthropicStream`은 이름만 Claude — 실제로는 Hermes Gateway 경유 GPT-5.4. 함수명 보고 Anthropic 직접 호출이라 가정 금지.
 
 ---
 
@@ -230,9 +236,9 @@ verified/unverified 배지 표시
 | **데이터 소스** | 사전 인덱싱된 법령 DB | 법제처 API 실시간 호출 |
 | **커버리지** | 인덱스된 법령만 | 모든 법령+해석례+판례+조례+행정규칙 |
 | **인용** | File Search 청크 | 도구 결과 + 수동 추출 + 사후 검증 |
-| **폴백** | 없음 | Claude → Gemini 2-tier 라우팅 |
-| **환경 분기** | 없음 | 로컬 (CLI subprocess) / Vercel (Bridge 프록시) |
+| **폴백** | 없음 | Hermes(GPT-5.4) → Gemini 2-tier 라우팅 |
+| **환경 분기** | 없음 | 로컬/Vercel 동일 (HERMES_API_URL만 변경) |
 
 ---
 
-**버전**: 3.0 | **업데이트**: 2026-03-21
+**버전**: 3.1 | **업데이트**: 2026-04-12

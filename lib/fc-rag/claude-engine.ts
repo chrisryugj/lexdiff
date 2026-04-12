@@ -22,9 +22,10 @@ import {
 } from './engine-shared'
 
 /**
- * Claude FC-RAG 스트리밍 실행 (Primary)
- * Claude CLI subprocess를 stream-json 모드로 spawn.
- * CLI가 korean-law MCP 도구를 네이티브로 호출, 중간 이벤트를 실시간 SSE로 전달.
+ * FC-RAG 스트리밍 실행 (Primary)
+ * Hermes Gateway(localhost:8642, OpenAI-compatible /v1/chat/completions, stream:true)에 HTTP SSE fetch.
+ * Hermes가 GPT-5.4(Codex OAuth) + korean-law-mcp를 자식 프로세스로 관리하며, lexdiff는 MCP를 직접 다루지 않음.
+ * (함수명 executeClaudeRAGStream은 legacy — 실제 LLM은 Hermes 경유 GPT-5.4)
  */
 export async function* executeClaudeRAGStream(
   query: string,
@@ -108,7 +109,7 @@ export async function* executeClaudeRAGStream(
     }
   }
 
-  // ── Full Pipeline: Claude CLI stream-json 모드로 실시간 도구 호출 추적 ──
+  // ── Full Pipeline: Hermes Gateway SSE로 실시간 tool_call/tool_result 추적 ──
   const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
 
   yield { type: 'status', message: 'AI가 법령을 검색하고 있습니다...', progress: 15 }

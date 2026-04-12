@@ -1,89 +1,69 @@
 # Active Context
 
-**마지막 업데이트**: 2026-03-23 (6차 프로덕션 코드리뷰 — 타임아웃/XSS/AbortController/보안 전면 개선)
+**마지막 업데이트**: 2026-04-12 (FC-RAG Primary 경로 문서 정정 — Hermes Gateway/GPT-5.4로 현행화, Claude CLI subprocess 흔적 제거)
 
 ## 현재 상태
 
-**6차 프로덕션급 전체 코드리뷰 완료.** 49파일, -175/+254줄. 빌드/린트 모두 통과. **미커밋 상태.**
+**FC-RAG Primary 경로 = Hermes Gateway 경유 GPT-5.4** (HTTP `:8642/v1/chat/completions` SSE).
+- `lib/fc-rag/hermes-client.ts`가 단일 진입. `child_process.spawn` / Claude CLI / stream-json 플래그 모두 코드베이스에 없음.
+- 함수명/파일명 `claude-engine.ts`, `executeClaudeRAGStream`, `callAnthropicStream`은 **legacy 네이밍**. 이름만 보고 Anthropic Claude 직접 호출이라 가정 금지.
+- korean-law-mcp는 Hermes가 자식 프로세스로 직접 관리. lexdiff는 MCP를 모름.
+- 2026-04-12: `claude-engine.ts:25-28, 111` 주석 + `important-docs/05-RAG_ARCHITECTURE.md`, `09-COMPONENT_ARCHITECTURE.md`, `17-SYSTEM_CURRENT_STATE.md` 정정 완료.
+
+**별표(annex) 파싱 kordoc 전환 완료.** HWPX/HWP5는 kordoc, PDF는 lexdiff 직접 처리 (Vercel 서버리스 호환). PDF 표 추출 개선 작업 진행 중.
 
 ## 프로젝트 관계 (중요!)
 
 | 레포 | 역할 | 실행 환경 |
 |------|------|----------|
 | **lexdiff** | 웹앱 (Next.js) — 자체 FC-RAG 엔진 (`lib/fc-rag/`) | Vercel/로컬 |
-| **chrisbot** (`github.com/chrisryugj/chrisbot`) | 미니PC 봇 — Bridge + nanobot | 미니PC (Mong NAS) |
+| **kordoc** (`github.com/chrisryugj/kordoc`) | HWP/HWPX/PDF → Markdown 변환 라이브러리 | npm 패키지 |
 
-**두 시스템은 완전 별개 파이프라인.** lexdiff FC-RAG 수정 ≠ nanobot 수정.
-
-### ✅ 완료된 작업 (2026-03-22 — 5차 코드리뷰)
+### ✅ 완료된 작업 (2026-03-28 — 별표 모달 재설계)
 
 | 카테고리 | 수정 내용 | 파일 |
 |----------|----------|------|
-| **SSRF 방지** | 상대경로 허용목록 검증 추가 | `hwp-to-html/route.ts`, `annex-to-markdown/route.ts` |
-| **XSS 방지** | HTML 텍스트 콘텐츠 escapeHtml 적용 | `link-pattern-matchers.ts`, `link-specialized.ts`, `ordinance-benchmark-view.tsx` |
-| **성능 (CRITICAL)** | 기본 props 모듈레벨 상수 + useCallback 적용 | `law-viewer.tsx` |
-| **에러 정보 노출** | safeErrorResponse 적용 + env var명 제거 | `old-law/route.ts`, `law-history/route.ts`, `summarize/route.ts` |
-| **IP 스푸핑** | X-Forwarded-For 신뢰 계층 문서화 | `get-client-ip.ts` |
-| **API 키 노출** | Gemini 에러 메시지 sanitize | `gemini-engine.ts` |
-| **DRY** | IndexedDB 헬퍼 추출 (~200줄) | `admin-rule-cache.ts` |
-| **DRY** | linkifyAndEscape 파이프라인 추출 (~100줄) | `law-xml-parser.tsx` |
-| **DRY** | 판례/조례 fetch 헬퍼 추출 (~80줄) | `useUnifiedSearch.ts` |
-| **DRY** | overlap splice 헬퍼 추출 (~50줄) | `link-pattern-matchers.ts` |
-| **DRY** | ConfidenceBadge/FontControls 추출 + typing O(n²)→O(n) | `law-viewer-ai-answer.tsx` |
-| **DRY** | comparison-modal useCallback + console.error→debugLogger | `comparison-modal.tsx` |
-| **로직 버그** | resolveConflicts regulation 타입 추가 | `unified-link-generator.ts` |
-| **로직 버그** | checkbox key 안정 식별자 + 타입 가드 | `ordinance-benchmark-view.tsx` |
-| **입력 검증** | display/page 클램핑 + keyword/focus 길이 제한 | 프록시 API 3개 + `benchmark-analyze/route.ts` |
-| **타입 안전성** | revisionHistory any[]→RevisionHistoryItem + 에러 로깅 | `law-viewer.tsx` |
-| **정리** | legalStop 중복 추출, _excludeRegion 제거, dead code, eviction 일관성 | `query-expansion.ts`, `gemini-engine.ts`, `law-xml-parser.tsx` |
-| **구조 개선** | 병렬 배열→ChangeWithDiff 단일 객체 | `impact-tracker/engine.ts` |
+| **kordoc 도입** | 자체 파서 5개 삭제 → kordoc 래퍼 | `lib/annex-parser/index.ts` |
+| **Gemini Vision 제거** | annex-to-markdown에서 AI 의존 완전 제거 (156→85줄) | `app/api/annex-to-markdown/route.ts` |
+| **HWPX/HWP5 구분** | 법제처 content-type "hwp"인 HWPX(ZIP) 파일 정확 판별 | `app/api/annex-pdf/route.ts` |
+| **별표 법령명 파싱** | 문장 경계(다. + ①②③) 체크로 잘못된 법령 연결 수정 | `lib/link-pattern-matchers.ts` |
+| **스크롤 복원** | 모달 닫을 때 savedScrollRef + requestAnimationFrame | `components/annex-modal.tsx` |
+| **PDF Vercel 호환** | DOMMatrix polyfill + worker 사전 주입 + static import | `lib/annex-parser/pdf-polyfill.ts`, `index.ts` |
+| **serverExternalPackages** | kordoc, jszip 추가 / pdfjs-dist 제거 (번들링 필요) | `next.config.mjs` |
 
-### ✅ 이전 완료 작업 (2026-03-22 — 4차 코드리뷰)
+### 🔧 진행 중 — PDF 표 추출 개선
 
-| 작업 | 파일 | 상태 |
+**상태**: kordoc `src/pdf/parser.ts`에 열 경계 학습 기반 테이블 빌더 작성 중. 미완성, 미커밋.
+
+**핵심 문제**:
+- gap 15px 고정 → 열 구분 부정확 (같은 열 gap 9px vs 다른 열 gap 10px)
+- 셀 내 줄바꿸(26면/58면)이 별도 행으로 분리
+- 비고 텍스트가 테이블로 오인식
+
+**해결 방향** (코드 작성 중):
+1. 가장 아이템 많은 행의 gap 분석 → minGap*2를 열 경계 threshold
+2. 테이블 후보: 4+ 아이템 + x 범위 넓음 + 평균 텍스트 길이 3+
+3. 왼쪽 열에 실질적 새 텍스트 있으면 새 행, 1-2글자면 continuation
+4. 비테이블 연속 2줄이면 테이블 종료
+
+**작업 파일**: `c:\github_project\kordoc\src\pdf\parser.ts` (미커밋)
+**lexdiff 반영**: kordoc 버전업 후 `pnpm update kordoc`
+
+### Vercel pdfjs-dist 호환 교훈 (중요!)
+
+| 문제 | 원인 | 해결 |
 |------|------|------|
-| SSRF 취약점 수정 | `app/api/law-html/route.ts` | ✅ |
-| 법률 파싱 3중 복사 통합 | `lib/law-data-utils.ts` | ✅ |
-| console.log→debugLogger 130회 전환 | API 22개 + lib 3개 | ✅ |
-| getClientIP 5중 복사 통합 | `lib/get-client-ip.ts` | ✅ |
-| Tooltip 4중 복사 제거 | `hooks/use-truncation-tooltip.ts` | ✅ |
-| LawViewer 중복 렌더링 제거 | `search-result-view/index.tsx` | ✅ |
+| DOMMatrix not defined | pdfjs-dist 모듈 로드 시 참조 | `pdf-polyfill.ts`에서 import 전 polyfill 주입 |
+| workerSrc="" 무효 | pdfjs v5가 `workerSrc \|\|= "./pdf.worker.mjs"`로 덮어씀 | `globalThis.pdfjsWorker`에 worker 모듈 static import로 사전 주입 |
+| serverExternalPackages에 pdfjs-dist 포함 시 | 외부 모듈로 로드되면 fake worker의 dynamic import 실패 | pdfjs-dist는 **번들링에 포함** (serverExternalPackages에서 제거) |
+| ES 모듈 import 호이스팅 | 인라인 polyfill이 import보다 늦게 실행 | 별도 파일(`pdf-polyfill.ts`)로 분리 |
 
-### ✅ 완료된 작업 (2026-03-23 — 6차 코드리뷰)
+### 📋 다음 할 일
 
-| 카테고리 | 수정 내용 | 파일 |
-|----------|----------|------|
-| **가용성 (CRITICAL)** | fetchWithTimeout 공유 래퍼 + 33개 라우트 일괄 적용 (15초) | `lib/fetch-with-timeout.ts` + 33개 route.ts |
-| **XSS (CRITICAL)** | lawName escapeHtml + cleanPrecedentHtml 전체 태그 strip + href safeHref | modals, useUnifiedSearch, SearchResultList |
-| **스크롤 (CRITICAL)** | HTML 인덱스 비율→DOM querySelector+scrollIntoView | `comparison-modal.tsx` |
-| **DRY (CRITICAL)** | formatSimpleJo 47줄 중복→law-parser 재사용 (2줄) | `law-viewer.tsx` |
-| **보안 헤더** | proxy.ts에 X-Content-Type-Options, X-Frame-Options 등 추가 | `proxy.ts` |
-| **POST body 검증** | proxy.ts에 라우트별 Content-Length 상한 추가 | `proxy.ts` |
-| **CLI injection** | `--` argument terminator 추가 (2곳) | `anthropic-client.ts` |
-| **SSRF** | drf-html iframe src validateExternalUrl 추가 | `drf-html/route.ts` |
-| **Host injection** | article-title origin→getInternalOrigin (VERCEL_URL 우선) | `article-title/route.ts` |
-| **timing-safe** | debug/traces timingSafeEqual 적용 | `debug/traces/route.ts` |
-| **Race condition** | AbortController 3훅 추가 (three-tier, impact-analysis, comparison-modal) | 3 hooks |
-| **Toast 리스너** | useEffect deps [state]→[] (불필요한 재등록 방지) | `use-toast.ts` |
-| **Timer 누수** | tool-adapter try/finally clearTimeout | `tool-adapter.ts` |
-| **stderr 제한** | anthropic-client 10KB 상한 | `anthropic-client.ts` |
-| **console.error** | debugLogger로 통일 (3파일 5건) | precedents 관련 3 hooks |
-| **모달 상태** | comparison-modal 닫힘 시 초기화 + 중복 로깅 제거 | `comparison-modal.tsx` |
-
-### 다음 할 일 (7차 리뷰)
-
-- **law-viewer.tsx 추가 분리**: keyboard/swipe 네비 훅 추출 (~60줄), citations 병합 순수함수 추출 (~45줄), props 그룹화 훅 추출 (~60줄) → 770줄 목표
-- **search-result-view/index.tsx 캐시 복원 패턴 DRY**: 7회 반복 패턴을 헬퍼 함수로 추출
-- **any[] 타입 제거**: types.ts aiRelatedLaws, useSearchState precedentResults/interpretationResults/rulingResults
-- **gemini-engine eviction 중복**: allToolResults eviction 코드 헬퍼 추출 (DRY)
-- **use-ordinance-benchmark unmount abort**: abortRef cleanup useEffect 추가
-- **use-swipe handlers 의존성**: inline 객체→ref 패턴으로 안정화
-- **use-content-click-handlers deps 불안정**: context/actions ref 패턴
-- **useSearchState state 객체 useMemo**: 매 렌더마다 새 참조 방지
-- **search-all maxResults 바운드 체크**: Math.min(max, 100) 추가
-- **customs-search/tax-tribunal-search display/page 바운드**: 일관 클램핑
-- **annex-viewer bylNo/lsiSeq 숫자 검증**: /^\d+$/ 추가
-- **impact-analysis/relation-graph try-catch**: safeErrorResponse 적용
+- [ ] **kordoc PDF 표 추출 완성**: 열 경계 학습, 행 병합, 비고 영역 분리
+- [ ] **kordoc 버전업 + npm publish**
+- [ ] **lexdiff pnpm update kordoc** → PDF 표 품질 자동 반영
+- [ ] **lexdiff PDF 파서도 동기화** (현재 lexdiff는 자체 PDF 파서 유지 — Vercel 호환 이유)
 
 ### 쿼리 확장 핵심 파일
 

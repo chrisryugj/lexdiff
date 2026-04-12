@@ -155,8 +155,8 @@ answer 이벤트 → 빠른 응답
 |------|------|
 | `LAW_OC` | 법제처 API 인증키 (korean-law-mcp) |
 | `GEMINI_API_KEY` | Gemini AI (폴백) |
-| `OPENCLAW_URL` | OpenClaw Bridge URL (Vercel 전용) |
-| `OPENCLAW_API_TOKEN` | Bridge 인증 토큰 (Vercel 전용) |
+| `HERMES_API_URL` | Hermes Gateway URL (기본 `http://127.0.0.1:8642`, Vercel은 CF Worker URL) |
+| `HERMES_API_KEY` | Hermes 게이트웨이 인증 키 |
 
 ---
 
