@@ -141,8 +141,10 @@ export function buildAnalysis(
     analyzedAt: new Date().toISOString(),
   }
 
-  // 캐싱
-  setCachedAnalysis(mst, analysis)
+  // 캐싱 — 빈 결과는 저장하지 않음 (첫 시도 실패 시 재시도 가능하도록)
+  if (mst && results.length > 0) {
+    setCachedAnalysis(mst, analysis)
+  }
 
   return analysis
 }

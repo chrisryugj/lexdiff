@@ -9,8 +9,8 @@ export const AI_CONFIG = {
     /** FC-RAG 엔진 등 주요 추론용 */
     primary: process.env.GEMINI_MODEL || 'gemini-3-flash-preview',
     /** 조례 벤치마크, 분석 등 범용 */
-    standard: process.env.GEMINI_STANDARD_MODEL || 'gemini-2.5-flash',
+    standard: process.env.GEMINI_STANDARD_MODEL || 'gemini-3-flash-preview',
     /** 요약, 별표 변환, 분류 등 경량 작업용 */
-    lite: process.env.GEMINI_LITE_MODEL || 'gemini-2.5-flash-lite',
+    lite: process.env.GEMINI_LITE_MODEL || 'gemini-3.1-flash-lite-preview',
   },
 } as const

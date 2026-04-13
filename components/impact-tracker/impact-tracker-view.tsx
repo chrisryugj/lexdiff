@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { UserMenu } from '@/components/user-menu'
 import { useImpactTracker } from '@/hooks/use-impact-tracker'
 import { useLawViewerModals } from '@/hooks/use-law-viewer-modals'
 import { LawStatsFooter } from '@/components/shared/law-stats-footer'
@@ -193,6 +194,13 @@ export function ImpactTrackerView({
                 </>
               )}
               <ThemeToggle />
+              <UserMenu
+                onLoginClick={() => window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+                  detail: { returnView: { mode: 'impact-tracker' } }
+                }))}
+                onFavoriteSelect={() => {}}
+                onAllFavoritesClick={() => {}}
+              />
               <Button variant="ghost" size="sm" onClick={onBack} title="뒤로가기" className="hover:bg-gray-200 dark:hover:bg-gray-800">
                 <Icon name="arrow-left" size={18} className="text-gray-600 dark:text-gray-400" />
               </Button>

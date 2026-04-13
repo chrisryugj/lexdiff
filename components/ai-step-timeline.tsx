@@ -103,7 +103,7 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
     return { steps, lastStatusMessage: lastStatus?.message || lastStatus?.displayName }
 }
 
-/** 실시간 경과 타이머 */
+/** 실시간 경과 타이머 — 뱃지 스타일 */
 function AiStepTimer() {
     const [elapsed, setElapsed] = useState(0)
     const startRef = useRef(Date.now())
@@ -116,8 +116,11 @@ function AiStepTimer() {
     }, [])
 
     return (
-        <span className="text-xs text-brand-gold tabular-nums shrink-0">
-            {elapsed.toFixed(1)}초
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand-gold/10 ring-1 ring-brand-gold/20 text-brand-gold shrink-0">
+            <Icon name="clock" className="h-2.5 w-2.5 opacity-80" />
+            <span className="text-[10px] font-semibold tabular-nums leading-none">
+                {elapsed.toFixed(1)}s
+            </span>
         </span>
     )
 }
@@ -154,10 +157,15 @@ export function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: To
                             {step.displayName}
                         </span>
                         {step.status === 'completed' && step.durationMs != null ? (
-                            <span className={`text-xs tabular-nums shrink-0 ${
-                                step.isThinking ? 'text-violet-400' : 'text-gray-400'
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 shrink-0 ${
+                                step.isThinking
+                                    ? 'bg-violet-500/10 ring-violet-500/20 text-violet-500'
+                                    : 'bg-muted ring-border text-muted-foreground'
                             }`}>
-                                {(step.durationMs / 1000).toFixed(1)}초
+                                <Icon name="clock" className="h-2.5 w-2.5 opacity-80" />
+                                <span className="text-[10px] font-semibold tabular-nums leading-none">
+                                    {(step.durationMs / 1000).toFixed(1)}s
+                                </span>
                             </span>
                         ) : step.status === 'in-progress' && isStreaming ? (
                             <AiStepTimer />

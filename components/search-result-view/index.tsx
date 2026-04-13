@@ -17,6 +17,7 @@ import { LawViewer } from "@/components/law-viewer"
 import { ErrorReportDialog } from "@/components/error-report-dialog"
 import { ArticleNotFoundBanner } from "@/components/article-not-found-banner"
 import { LawViewerSkeleton } from "@/components/law-viewer-skeleton"
+import { AiAuthFallback } from "@/components/ai-auth-fallback"
 import { Icon } from "@/components/ui/icon"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -86,6 +87,10 @@ function SearchResultViewComponent({
 
   // 도움말 Sheet 상태
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
+  // AI 게이트는 전역 AiGateProvider가 관리 — 이벤트 발송으로 다이얼로그 오픈
+  const openLoginDialog = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', { detail: {} }))
+  }, [])
 
   // 📊 분석 도구 모달 상태
   const [delegationGapModal, setDelegationGapModal] = useState<{ isOpen: boolean; meta: LawMeta | null }>({
@@ -311,14 +316,15 @@ function SearchResultViewComponent({
 
           // ✅ 통합검색 분기
           const classification = cached.query.classification
-          if (classification && ['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
-            // 판례/해석례/재결례는 handleSearchInternal 스킵하고 전용 핸들러 사용
+          if (classification && ['precedent', 'interpretation', 'ruling', 'multi'].includes(classification.searchType)) {
+            // 판례/해석례/재결례/복합은 handleSearchInternal 스킵하고 전용 핸들러 사용
             debugLogger.info('📡 캐시 복원: 전용 핸들러 실행', { searchType: classification.searchType })
             // 핸들러가 자체적으로 setIsSearching(false) 처리함
             switch (classification.searchType) {
               case 'precedent': handlers.handlePrecedentSearch(cached.query); break
               case 'interpretation': handlers.handleInterpretationSearch(cached.query); break
               case 'ruling': handlers.handleRulingSearch(cached.query); break
+              case 'multi': handlers.handleMultiSearch(cached.query); break
             }
           } else {
             await handlers.handleSearchInternal(cached.query, abortController.signal)
@@ -420,7 +426,10 @@ function SearchResultViewComponent({
     onAiRefresh: handlers.handleAiRefresh,
     isPrecedent: state.lawData.isPrecedent,
     onRefresh: handlers.handleRefresh,
-    onDelegationGap: (meta: LawMeta) => setDelegationGapModal({ isOpen: true, meta }),
+    onDelegationGap: (meta: LawMeta) => {
+      console.log('[search-result-view] onDelegationGap 호출', { mst: meta?.mst, lawId: meta?.lawId, lawTitle: meta?.lawTitle })
+      setDelegationGapModal({ isOpen: true, meta })
+    },
     onTimeMachine: (meta: LawMeta) => setTimeMachineModal({ isOpen: true, meta }),
     onImpactTracker: (lawName: string) => onImpactTracker?.(lawName, 'impact'),
     onOrdinanceSync: (lawName: string) => onImpactTracker?.(lawName, 'ordinance-sync'),
@@ -452,7 +461,8 @@ function SearchResultViewComponent({
         onBack={handlers.handleReset}
         onHomeClick={onHomeClick}
         onFavoritesClick={handlers.handleFavoritesClick}
-        onSettingsClick={handlers.handleSettingsClick}
+        onLoginClick={openLoginDialog}
+        onFavoriteSelect={handlers.handleFavoriteSelect}
         onSearchClick={() => actions.setShowSearchModal(true)}
         onFocusModeToggle={() => actions.setIsFocusMode(!state.isFocusMode)}
         onHelpClick={() => setHelpSheetOpen(true)}
@@ -504,6 +514,17 @@ function SearchResultViewComponent({
                 actions.setIsSearching(false)
                 actions.updateProgress('complete', 0)
               }}
+            />
+          ) : state.isAiMode && state.aiAuthRequired ? (
+            /* AI 인증 필요 — 로그인/BYOK 폴백 화면 */
+            <AiAuthFallback
+              userQuery={state.userQuery || state.searchQuery}
+              onOpenGate={() => {
+                window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+                  detail: { query: state.userQuery || state.searchQuery }
+                }))
+              }}
+              onBack={handlers.handleReset}
             />
           ) : state.isAiMode ? (
             /* AI 모드: isSearching과 관계없이 LawViewer 표시 (ChatGPT 스타일 스트리밍) */
@@ -748,7 +769,7 @@ function SearchResultViewComponent({
       {!state.lawData && !state.lawSelectionState && !state.ordinanceSelectionState && (
         <footer className="border-t border-border py-6">
           <div className="container mx-auto px-6">
-            <p className="text-center text-xs text-muted-foreground/40">© 2025–2026 Chris ryu. All rights reserved.</p>
+            <p className="text-center text-xs text-muted-foreground/40">© 2025–2026 딴짓하는 류주임 @chris_gomdori. All rights reserved.</p>
           </div>
         </footer>
       )}

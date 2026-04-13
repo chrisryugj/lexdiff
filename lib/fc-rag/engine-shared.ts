@@ -6,7 +6,7 @@
 import { executeTool } from './tool-adapter'
 import { type LegalQueryType } from './prompts'
 import { TOOL_DISPLAY_NAMES } from './tool-tiers'
-import { cacheMSTEntries, detectFastPath, parseLawEntries, findBestMST } from './fast-path'
+import { cacheMSTEntries, detectFastPath, parseLawEntries, findBestMST, findBestOrdinanceSeq } from './fast-path'
 import { buildCitations } from './citations'
 import { summarizeToolResult } from './result-utils'
 import { AI_CONFIG } from '@/lib/ai-config'
@@ -276,6 +276,61 @@ export async function* handleFastPath(
     const searchResult = await executeTool(toolName, toolArgs, signal)
     yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult, toolArgs) }
     if (!searchResult.isError) {
+      yield { type: 'status', message: '완료', progress: 100 }
+      yield {
+        type: 'answer',
+        data: {
+          answer: searchResult.result,
+          citations: buildCitations([searchResult]),
+          confidenceLevel: 'medium',
+          complexity: 'simple',
+          queryType,
+        },
+      }
+      return true
+    }
+  }
+
+  // ── 패턴 A2: 조례/자치법규 검색 → search_ordinance → get_ordinance 직결 ──
+  if (fastPath.type === 'ordinance_search') {
+    yield { type: 'tool_call', name: 'search_ordinance', displayName: '자치법규 검색', query: fastPath.searchQuery }
+    yield { type: 'status', message: '자치법규를 검색하고 있습니다...', progress: 30 }
+    const searchResult = await executeTool('search_ordinance', { query: fastPath.searchQuery }, signal)
+    yield {
+      type: 'tool_result', name: 'search_ordinance', displayName: '자치법규 검색',
+      success: !searchResult.isError,
+      summary: summarizeToolResult('search_ordinance', searchResult, { query: fastPath.searchQuery }),
+    }
+
+    if (!searchResult.isError) {
+      const bestSeq = findBestOrdinanceSeq(searchResult.result, fastPath.searchQuery!)
+      if (bestSeq) {
+        yield { type: 'tool_call', name: 'get_ordinance', displayName: '자치법규 조회', query: `#${bestSeq}` }
+        yield { type: 'status', message: '자치법규 원문을 가져오는 중...', progress: 70 }
+        const ordResult = await executeTool('get_ordinance', { ordinSeq: bestSeq }, signal)
+        yield {
+          type: 'tool_result', name: 'get_ordinance', displayName: '자치법규 조회',
+          success: !ordResult.isError,
+          summary: summarizeToolResult('get_ordinance', ordResult, { ordinSeq: bestSeq }),
+        }
+
+        if (!ordResult.isError) {
+          yield { type: 'status', message: '완료', progress: 100 }
+          yield {
+            type: 'answer',
+            data: {
+              answer: ordResult.result,
+              citations: buildCitations([searchResult, ordResult]),
+              confidenceLevel: 'high',
+              complexity: 'simple',
+              queryType,
+            },
+          }
+          return true
+        }
+      }
+
+      // bestSeq 못 찾거나 get_ordinance 실패 → 검색 결과 리스트로 답변 (여전히 fast path 유효)
       yield { type: 'status', message: '완료', progress: 100 }
       yield {
         type: 'answer',

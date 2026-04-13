@@ -41,13 +41,16 @@ function parseInterpretationSearchXML(xml: string): {
       return tagMatch ? tagMatch[1].trim() : ""
     }
 
+    const id = extractTag("법령해석례일련번호")
     interpretations.push({
-      id: extractTag("법령해석례일련번호"),
+      id,
       name: extractTag("안건명"),
       number: extractTag("안건번호"),
       date: extractTag("회신일자"),
       agency: extractTag("회신기관명"),
-      link: extractTag("법령해석례상세링크")
+      // 법제처 Open API의 원본 링크는 /DRF/lawService.do?OC=...&target=expc 형식(API 키 노출 + raw HTML)이므로
+      // 사람이 보는 공개 상세 페이지(expcInfoP.do)로 재구성
+      link: id ? `https://www.law.go.kr/expcInfoP.do?expcSeq=${id}` : extractTag("법령해석례상세링크")
     })
   }
 

@@ -17,6 +17,7 @@ import type { LawMeta, LawArticle, ThreeTierArticle } from "@/lib/law-types"
 import { parseLawJSON } from "@/lib/law-json-parser"
 import { extractClauses, crossCheck, buildAnalysis, getCachedAnalysis } from "@/lib/delegation-gap/analyzer"
 import type { DelegationGapAnalysis, DelegationGapStep, DelegationGapResult } from "@/lib/delegation-gap/types"
+import { debugLogger } from "@/lib/debug-logger"
 
 // ── Props ───────────────────────────────────────────────────
 interface DelegationGapModalProps {
@@ -71,11 +72,18 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
   const abortRef = useRef<AbortController | null>(null)
 
   const runAnalysis = useCallback(async (skipCache = false) => {
-    if (!meta.mst && !meta.lawId) return
+    debugLogger.info('[DelegationGap] runAnalysis 시작', { mst: meta.mst, lawId: meta.lawId, lawTitle: meta.lawTitle, skipCache })
+    if (!meta.mst && !meta.lawId) {
+      debugLogger.error('[DelegationGap] 법령 식별자 없음', { meta })
+      setError('법령 식별자(mst/lawId)가 없어 분석할 수 없습니다. 법령을 다시 선택해 주세요.')
+      setStep('error')
+      return
+    }
 
     // 캐시 체크
     const cached = !skipCache && meta.mst ? getCachedAnalysis(meta.mst) : null
     if (cached) {
+      debugLogger.info('[DelegationGap] 캐시 HIT', { totalClauses: cached.totalClauses })
       setAnalysis(cached)
       setExtractedCount(cached.totalClauses)
       setStep('done')
@@ -94,18 +102,24 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       if (meta.lawId) eflawParams.set('lawId', meta.lawId)
       if (meta.mst) eflawParams.set('mst', meta.mst)
 
+      debugLogger.info('[DelegationGap] /api/eflaw 호출', { params: eflawParams.toString() })
       const eflawRes = await fetch(`/api/eflaw?${eflawParams}`, { signal })
       if (!eflawRes.ok) throw new Error('법률 전문 조회 실패')
       const eflawData = await eflawRes.json()
       const lawData = parseLawJSON(eflawData)
       const articles: LawArticle[] = lawData.articles
+      debugLogger.info('[DelegationGap] eflaw 결과', { articleCount: articles.length })
 
-      if (signal.aborted) return
+      if (signal.aborted) {
+        debugLogger.warning('[DelegationGap] aborted after eflaw')
+        return
+      }
 
       // Step 2: 위임 패턴 추출
       setStep('extracting')
       const clauses = extractClauses(articles)
       setExtractedCount(clauses.length)
+      debugLogger.info('[DelegationGap] extractClauses 완료', { clauseCount: clauses.length })
 
       if (clauses.length === 0) {
         setAnalysis(buildAnalysis(
@@ -126,12 +140,17 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
       if (meta.mst) ttParams.set('mst', meta.mst)
       else if (meta.lawId) ttParams.set('lawId', meta.lawId)
 
+      debugLogger.info('[DelegationGap] /api/three-tier 호출', { params: ttParams.toString() })
       const ttRes = await fetch(`/api/three-tier?${ttParams}`, { signal })
       if (!ttRes.ok) throw new Error('위임법령 데이터 조회 실패')
       const ttData = await ttRes.json()
       const threeTierArticles: ThreeTierArticle[] = ttData.delegation?.articles || []
+      debugLogger.info('[DelegationGap] three-tier 결과', { articleCount: threeTierArticles.length })
 
-      if (signal.aborted) return
+      if (signal.aborted) {
+        debugLogger.warning('[DelegationGap] aborted after three-tier')
+        return
+      }
 
       // Step 4: 크로스체크 + 결과 생성
       const results = crossCheck(clauses, threeTierArticles)
@@ -142,10 +161,15 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
         results,
       )
 
+      debugLogger.success('[DelegationGap] 분석 완료', { totalClauses: analysisResult.totalClauses, missing: analysisResult.missingCount, partial: analysisResult.partialCount })
       setAnalysis(analysisResult)
       setStep('done')
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return
+      if (err instanceof Error && err.name === 'AbortError') {
+        debugLogger.warning('[DelegationGap] AbortError (fetch 취소됨)')
+        return
+      }
+      debugLogger.error('[DelegationGap] 분석 실패', err)
       setError(err instanceof Error ? err.message : String(err))
       setStep('error')
     }
@@ -153,18 +177,18 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
   }, [meta.lawId, meta.mst, meta.lawTitle])
 
   useEffect(() => {
-    if (isOpen) {
-      setStep('scanning')
-      setAnalysis(null)
-      setError(null)
-      setExtractedCount(0)
-      setShowOnlyGaps(true)
-      runAnalysis()
-    }
-    return () => {
+    debugLogger.info('[DelegationGap] useEffect', { isOpen, mst: meta.mst, lawId: meta.lawId })
+    if (!isOpen) {
       abortRef.current?.abort()
+      return
     }
-  }, [isOpen, runAnalysis])
+    setStep('scanning')
+    setAnalysis(null)
+    setError(null)
+    setExtractedCount(0)
+    setShowOnlyGaps(true)
+    runAnalysis()
+  }, [isOpen, runAnalysis, meta.mst, meta.lawId])
 
   const filteredResults = analysis?.results.filter(
     r => !showOnlyGaps || r.status !== 'fulfilled'
@@ -199,7 +223,7 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent
         showCloseButton={false}
-        className="w-full max-w-[100vw] sm:max-w-[750px] h-[75vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10"
+        className="w-full max-w-[100vw] sm:max-w-[750px] h-[85vh] sm:h-[720px] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden border-primary/20 shadow-2xl shadow-primary/10"
       >
         <VisuallyHidden.Root>
           <DialogTitle>위임입법 미비 탐지</DialogTitle>
@@ -210,7 +234,7 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
           <div className="flex items-center gap-2 min-w-0">
             <Icon name="file-search" size={18} className="text-brand-navy dark:text-brand-gold shrink-0" />
             <div className="min-w-0">
-              <h3 className="font-semibold text-sm truncate">위임입법 미비 탐지</h3>
+              <h3 className="font-semibold text-sm truncate">위임입법 미비 탐지 <span className="text-[10px] font-normal text-muted-foreground">· 법령 전체 분석</span></h3>
               <p className="text-xs text-muted-foreground truncate">
                 {meta.lawTitle}
                 {meta.promulgation?.number && ` (${meta.promulgation.number})`}
@@ -340,7 +364,7 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
             </div>
 
             {/* Result Table */}
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               {filteredResults.length === 0 ? (
                 <div className="flex items-center justify-center h-full p-8">
                   <div className="text-center space-y-2">

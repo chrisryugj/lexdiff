@@ -39,12 +39,15 @@ function generateNonce(): string {
  * 파생한 script에도 신뢰를 전파한다.
  */
 export function buildCspWithNonce(nonce: string): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  const supabaseHost = supabaseUrl.replace(/\/+$/, '')
+
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://va.vercel-scripts.com https://vercel.live`,
     `style-src 'self' 'nonce-${nonce}'`,
-    "img-src 'self' https://www.law.go.kr data: blob:",
-    "connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com",
+    "img-src 'self' https://www.law.go.kr https://lh3.googleusercontent.com https://*.googleusercontent.com data: blob:",
+    `connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com https://vitals.vercel-insights.com https://vercel.live${supabaseHost ? ` ${supabaseHost}` : ''}`,
     "frame-ancestors 'self'",
     "font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:",
     // CSP violation 수집은 별도 endpoint 미구현 — 프로덕션 배포 시 추가 검토

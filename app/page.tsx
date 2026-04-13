@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { SearchView } from "@/components/search-view"
 import { SearchResultView } from "@/components/search-result-view"
@@ -29,8 +29,8 @@ import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import type { SearchStage } from "@/components/search-result-view/types"
 import type { ImpactTrackerRequest } from "@/lib/impact-tracker/types"
-import { AiGateDialog } from "@/components/ai-gate-dialog"
-import { useAiGate } from "@/hooks/use-ai-gate"
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser"
+import type { User } from "@supabase/supabase-js"
 import type { LawMeta } from "@/lib/law-types"
 
 // Dynamic imports: 초기 번들에서 제외 (사용자 액션 시에만 로드)
@@ -93,20 +93,42 @@ export default function Home() {
     mst: string
   }>({ isOpen: false, lawTitle: '', mst: '' })
 
-  // AI 인증 게이트 (Google 로그인)
-  const { showGate, requireAuth, handleClose: handleGateClose } = useAiGate()
-
-  // AI 게이트 이벤트 수신 (useAiSearch에서 게이트 미인증 시 발송)
+  // OAuth 리디렉션 복귀 시 pending AI query 자동 재실행.
+  // 전역 <AiGateProvider>가 dialog/requireAuth를 관리하지만, pending 복원은 search 전용이라 여기서 처리.
+  // 페이지가 새로 로드되면 useAiGate의 pendingAction 클로저가 휘발되므로 sessionStorage로 상태 유지.
+  const [gateUser, setGateUser] = useState<User | null>(null)
+  const [gateReady, setGateReady] = useState(false)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const query = (e as CustomEvent).detail?.query as string | undefined
-      requireAuth(() => {
-        if (query) handleSearch({ lawName: query })
-      })
-    }
-    window.addEventListener('lexdiff:ai-gate-required', handler)
-    return () => window.removeEventListener('lexdiff:ai-gate-required', handler)
-  }, [requireAuth])
+    const supabase = getSupabaseBrowserClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setGateUser(data.user)
+      setGateReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setGateUser(session?.user ?? null)
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  // 전역 게이트 프록시 — 인증 필요 시 이벤트로 Provider에 위임.
+  // Provider의 requireAuth가 이미 로그인된 사용자면 onSuccess를 즉시 실행한다.
+  const requireAuthGate = useCallback((onSuccess: () => void) => {
+    window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', { detail: { onSuccess } }))
+  }, [])
+
+  const pendingRestoredRef = useRef(false)
+  useEffect(() => {
+    if (!gateReady || !gateUser || pendingRestoredRef.current) return
+    let pending: string | null = null
+    try { pending = sessionStorage.getItem('lexdiff:pending-ai-query') } catch { /* ignore */ }
+    if (!pending) return
+    pendingRestoredRef.current = true
+    try { sessionStorage.removeItem('lexdiff:pending-ai-query') } catch { /* ignore */ }
+    debugLogger.info('🔁 OAuth 복귀 — pending AI query 재실행', { query: pending })
+    setSearchMode('rag')
+    handleSearch({ lawName: pending })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gateReady, gateUser])
 
   // 초기화: History API + IndexedDB 설정
   useEffect(() => {
@@ -118,8 +140,37 @@ export default function Home() {
     // History API 초기화
     initializeHistory()
 
-    // 현재 상태 확인
-    const currentState = getCurrentHistoryState()
+    // OAuth 복귀 시 pending-view 복원 (ordinance-benchmark / impact-tracker)
+    // history.state가 비어있으면 홈으로 가지만, sessionStorage에 정보 있으면 해당 뷰로 복귀
+    let pendingViewConsumed = false
+    try {
+      const pendingViewRaw = sessionStorage.getItem('lexdiff:pending-view')
+      if (pendingViewRaw) {
+        sessionStorage.removeItem('lexdiff:pending-view')
+        const pendingView = JSON.parse(pendingViewRaw) as { mode?: string; keyword?: string }
+        debugLogger.info('🔁 OAuth 복귀 — pending view 복원', pendingView)
+        if (pendingView.mode === 'ordinance-benchmark') {
+          setBenchmarkKeyword(pendingView.keyword || '')
+          setViewMode('ordinance-benchmark')
+          pendingViewConsumed = true
+        } else if (pendingView.mode === 'impact-tracker') {
+          // request 스냅샷 있으면 initialRequest로 주입 → view가 자동 재분석
+          try {
+            const rawReq = sessionStorage.getItem('lexdiff:impact-tracker-restore')
+            if (rawReq) {
+              sessionStorage.removeItem('lexdiff:impact-tracker-restore')
+              setImpactRequest(JSON.parse(rawReq) as ImpactTrackerRequest)
+            }
+          } catch { /* ignore */ }
+          setViewMode('impact-tracker')
+          setImpactKey(k => k + 1)
+          pendingViewConsumed = true
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 현재 상태 확인 (pending-view 복원한 경우 history.state 기반 복원은 스킵)
+    const currentState = pendingViewConsumed ? null : getCurrentHistoryState()
 
     if (currentState?.viewMode === 'precedent-detail' && currentState.searchId && currentState.precedentId) {
       // 새로고침 시 판례 상세 복원
@@ -261,7 +312,7 @@ export default function Home() {
 
   // 영향 추적기 이동 (비밀번호 게이트 적용)
   const handleImpactTracker = () => {
-    requireAuth(() => {
+    requireAuthGate(() => {
       pushImpactTrackerHistory({ lawNames: [], dateFrom: '', dateTo: '' })
       setViewMode('impact-tracker')
       setImpactKey(k => k + 1)
@@ -271,7 +322,7 @@ export default function Home() {
 
   // 법령 뷰어 → 영향 추적기 (법령명 자동 입력)
   const handleImpactTrackerFromViewer = (lawName: string, mode: 'impact' | 'ordinance-sync' = 'impact') => {
-    requireAuth(() => {
+    requireAuthGate(() => {
       const today = new Date().toISOString().slice(0, 10)
       const monthsAgo = mode === 'ordinance-sync' ? 12 : 3
       const from = new Date()
@@ -349,7 +400,7 @@ export default function Home() {
                 break
               case 'ordinance-sync':
                 // 미반영 탐지: 영향 추적기를 ordinance-sync 모드로
-                requireAuth(() => {
+                requireAuthGate(() => {
                   const today = new Date().toISOString().slice(0, 10)
                   const from = new Date()
                   from.setMonth(from.getMonth() - 12)
@@ -459,11 +510,7 @@ export default function Home() {
         />
       )}
 
-      {/* AI 인증 게이트 (Google 로그인) */}
-      <AiGateDialog
-        open={showGate}
-        onClose={handleGateClose}
-      />
+      {/* AI 인증 게이트는 <AiGateProvider>(layout)가 전역으로 관리 */}
     </>
   )
 }

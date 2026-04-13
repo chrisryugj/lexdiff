@@ -342,11 +342,7 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
     actions.setFavoritesDialogOpen(true)
   }, [actions])
 
-  const handleSettingsClick = useCallback(() => {
-    window.location.href = '/admin/settings'
-  }, [])
-
-  const fetchRelatedSearches = useCallback(async (lawName: string, currentResults: LawSearchResult[]) => {
+const fetchRelatedSearches = useCallback(async (lawName: string, currentResults: LawSearchResult[]) => {
     const { expandSearchSynonyms } = await import('@/lib/search-normalizer')
     const expansion = expandSearchSynonyms(lawName)
     if (expansion.expanded.length === 0) {
@@ -401,7 +397,6 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
     handleCitationClick,
     handleReset,
     handleFavoritesClick,
-    handleSettingsClick,
     fetchRelatedSearches,
     handleAiRefresh,
   }

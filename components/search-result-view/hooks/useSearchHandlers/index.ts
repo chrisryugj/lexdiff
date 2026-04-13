@@ -70,6 +70,14 @@ export function useSearchHandlers({
     actions.setUserQuery(query.rawQuery || fullQuery)
     debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode: effectiveForcedMode })
 
+    // 새 검색 시작 시 이전 AI 답변/도구 로그 즉시 클리어
+    // (in-flight 응답을 기다리는 동안 이전 결과가 화면에 남는 UX 혼란 방지)
+    actions.setAiAnswerContent('')
+    actions.setAiRelatedLaws([])
+    actions.setAiCitations([])
+    actions.clearToolCallLogs()
+    actions.setFileSearchFailed(false)
+
     // 통합검색: classification이 있으면 재감지 스킵
     const classification = query.classification
     if (classification) {
@@ -80,6 +88,14 @@ export function useSearchHandlers({
 
       if (['precedent', 'interpretation', 'ruling'].includes(classification.searchType)) {
         debugLogger.warning('⚠️ 판례/해석례/재결례는 전용 핸들러를 사용해야 함')
+        return
+      }
+
+      // AI 분류는 바로 AI 경로로 (재감지로 떨어뜨리지 말 것 — 자연어 질문 오파싱 위험)
+      if (classification.searchType === 'ai') {
+        debugLogger.info('✅ 사전 분류 AI → 재감지 스킵', { confidence: classification.confidence })
+        const aiQuery = query.rawQuery || fullQuery
+        await handleAiSearch(aiQuery, signal, skipCache)
         return
       }
 
@@ -212,7 +228,6 @@ export function useSearchHandlers({
     handleCitationClick: basicHandlers.handleCitationClick,
     handleReset: basicHandlers.handleReset,
     handleFavoritesClick: basicHandlers.handleFavoritesClick,
-    handleSettingsClick: basicHandlers.handleSettingsClick,
 
     // AI 연속 대화
     handleAiFollowUp: handleFollowUp,

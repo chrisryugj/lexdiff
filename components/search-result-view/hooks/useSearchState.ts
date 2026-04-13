@@ -81,6 +81,7 @@ export interface SearchState {
   aiConfidenceLevel: 'high' | 'medium' | 'low'
   aiIsTruncated: boolean
   aiSearchMeta: AISearchMeta | null
+  aiAuthRequired: boolean
 
   // RAG 상태
   ragLoading: boolean
@@ -152,6 +153,7 @@ export interface SearchStateActions {
   setAiConfidenceLevel: (level: 'high' | 'medium' | 'low') => void
   setAiIsTruncated: (value: boolean) => void
   setAiSearchMeta: (meta: AISearchMeta | null) => void
+  setAiAuthRequired: (value: boolean) => void
 
   // RAG 상태 업데이트
   setRagLoading: (value: boolean) => void
@@ -245,6 +247,7 @@ export function useSearchState({
   const [aiConfidenceLevel, setAiConfidenceLevel] = useState<'high' | 'medium' | 'low'>('high')
   const [aiIsTruncated, setAiIsTruncated] = useState(false)
   const [aiSearchMeta, setAiSearchMeta] = useState<AISearchMeta | null>(null)
+  const [aiAuthRequired, setAiAuthRequired] = useState(false)
 
   // ============================================================
   // RAG 상태
@@ -374,6 +377,7 @@ export function useSearchState({
     setAiConfidenceLevel('high')
     setAiIsTruncated(false)
     setAiSearchMeta(null)
+    setAiAuthRequired(false)
     setToolCallLogs([])
     setConversationId(null)
     setConversationHistory([])
@@ -424,6 +428,7 @@ export function useSearchState({
     aiConfidenceLevel,
     aiIsTruncated,
     aiSearchMeta,
+    aiAuthRequired,
     ragLoading,
     ragError,
     ragProgress,
@@ -477,6 +482,7 @@ export function useSearchState({
     setAiConfidenceLevel,
     setAiIsTruncated,
     setAiSearchMeta,
+    setAiAuthRequired,
     setRagLoading,
     setRagError,
     setRagProgress,

@@ -148,14 +148,14 @@ export function highlightDifferences(
   let oldHighlighted = oldContent
     .replace(
       /<P>/g,
-      '<span style="background: linear-gradient(to right, rgba(251, 113, 133, 0.15), rgba(251, 113, 133, 0.08)); color: rgb(244, 63, 94); font-weight: 500; padding: 2px 6px; border-radius: 4px; border-left: 2px solid rgba(244, 63, 94, 0.4);">',
+      '<span style="background: rgba(244, 63, 94, 0.11); padding: 2px 6px; border-radius: 3px; box-shadow: inset 3px 0 0 rgba(244, 63, 94, 0.6);">',
     )
     .replace(/<\/P>/g, "</span>")
 
   let newHighlighted = newContent
     .replace(
       /<P>/g,
-      '<span style="background: linear-gradient(to right, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08)); color: rgb(16, 185, 129); font-weight: 500; padding: 2px 6px; border-radius: 4px; border-left: 2px solid rgba(16, 185, 129, 0.4);">',
+      '<span style="background: rgba(16, 185, 129, 0.11); padding: 2px 6px; border-radius: 3px; box-shadow: inset 3px 0 0 rgba(16, 185, 129, 0.6);">',
     )
     .replace(/<\/P>/g, "</span>")
 
@@ -181,12 +181,10 @@ export function highlightDifferences(
     allowedAttributes: { span: ['style'], div: ['style'] },
     allowedStyles: {
       span: {
-        background: [/^linear-gradient\(/],
-        color: [/^rgb\(/],
-        'font-weight': [/^\d+$/],
+        background: [/^rgba?\(/],
         padding: [/.*/],
         'border-radius': [/.*/],
-        'border-left': [/.*/],
+        'box-shadow': [/.*/],
       },
       div: {
         'border-top': [/.*/],

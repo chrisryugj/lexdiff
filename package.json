@@ -2,6 +2,7 @@
   "name": "lexdiff",
   "version": "2.0.0",
   "private": true,
+  "license": "BSL-1.1",
   "packageManager": "pnpm@10.20.0",
   "scripts": {
     "build": "next build",
@@ -71,7 +72,7 @@
     "hwp.js": "^0.0.3",
     "iconv-lite": "^0.7.0",
     "jszip": "^3.10.1",
-    "kordoc": "^1.7.2",
+    "kordoc": "^2.2.6",
     "korean-law-mcp": "^3.2.1",
     "motion": "^12.23.26",
     "next": "^16.0.7",

@@ -23,10 +23,21 @@ const nextConfig = {
     ]
 
     if (!cspNonceEnabled) {
+      // Supabase URL에서 호스트만 추출해 connect-src에 추가 (프로젝트별 서브도메인 대응)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+      const supabaseHost = supabaseUrl.replace(/\/+$/, '')
+
       baseHeaders.push({
         key: 'Content-Security-Policy',
-        value:
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:;",
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' https://www.law.go.kr https://lh3.googleusercontent.com https://*.googleusercontent.com data: blob:",
+          `connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com https://vitals.vercel-insights.com https://vercel.live${supabaseHost ? ` ${supabaseHost}` : ''}`,
+          "frame-ancestors 'self'",
+          "font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:",
+        ].join('; ') + ';',
       })
     }
 

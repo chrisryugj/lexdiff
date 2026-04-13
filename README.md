@@ -137,7 +137,15 @@ IndexedDB · Vitest · Framer Motion
 
 ## 라이선스
 
-[MIT](./LICENSE)
+**Business Source License 1.1 (BSL-1.1)**
+
+이 프로젝트는 [BSL-1.1](LICENSE) 라이선스가 적용됩니다.
+
+- ✅ 비프로덕션(개발, 테스트, 평가 등) 용도로만 사용 가능합니다.
+- ❌ **프로덕션 환경에서의 사용(상업적 이용 포함)은 금지됩니다.**
+- 🕒 **전환 일자(Change Date, 2030-04-14)** 이후에는 `Apache License 2.0`으로 자동 전환됩니다.
+
+라이선스 관련 특수한 문의가 필요하시다면 [GitHub Issues](https://github.com/chrisryugj/lexdiff/issues)를 이용해주세요.
 
 ---
 

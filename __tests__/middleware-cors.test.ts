@@ -2,7 +2,7 @@
  * H-SEC3: CORS origin 화이트리스트 매칭
  */
 import { describe, test, expect } from 'vitest'
-import { isAllowedOrigin } from '@/middleware'
+import { isAllowedOrigin } from '@/proxy'
 
 describe('isAllowedOrigin (H-SEC3)', () => {
   test('정적 프로덕션 도메인 허용', () => {

@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { buildCspWithNonce } from '@/middleware'
+import { buildCspWithNonce } from '@/proxy'
 
 describe('buildCspWithNonce (M2)', () => {
   const nonce = 'abc123def456'

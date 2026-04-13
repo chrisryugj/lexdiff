@@ -111,18 +111,46 @@ function parseAnalysisResponse(text: string): { comparisonTable: string; highlig
 }
 
 // ── Gemini ──
-
+// 503 UNAVAILABLE(모델 과부하)은 Gemini 3 preview에서 빈번 → 지수백오프 재시도 + lite 폴백
 async function callGemini(prompt: string, ctx: AiAuthContext): Promise<string> {
   const apiKey = ctx.byokKey || process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.')
 
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const response = await ai.models.generateContent({
-    model: AI_CONFIG.gemini.standard,
-    contents: prompt,
-  })
-  return response.text || ''
+
+  const isTransient = (e: unknown): boolean => {
+    const msg = e instanceof Error ? e.message : String(e)
+    return /"code":(503|429|500)|UNAVAILABLE|RESOURCE_EXHAUSTED|INTERNAL/.test(msg)
+  }
+
+  const tryModel = async (model: string, attempts: number): Promise<string> => {
+    let lastErr: unknown
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const response = await ai.models.generateContent({ model, contents: prompt })
+        return response.text || ''
+      } catch (err) {
+        lastErr = err
+        if (!isTransient(err)) throw err
+        if (i < attempts - 1) {
+          // 지수 백오프: 1s → 2s → 4s
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)))
+        }
+      }
+    }
+    throw lastErr
+  }
+
+  try {
+    return await tryModel(AI_CONFIG.gemini.standard, 3)
+  } catch (err) {
+    if (!(err instanceof Error) || !/503|UNAVAILABLE|429|RESOURCE_EXHAUSTED/.test(err.message)) {
+      throw err
+    }
+    // 폴백: lite 모델로 1회 시도
+    return await tryModel(AI_CONFIG.gemini.lite, 1)
+  }
 }
 
 // ── 메인 핸들러 ──

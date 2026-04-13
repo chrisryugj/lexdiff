@@ -19,6 +19,7 @@ import {
 import { requireAiAuth } from "@/lib/api-auth"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
+import { logAIQueryIfConsented } from "@/lib/ai-query-logger"
 import { getClientIP } from "@/lib/get-client-ip"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
 
@@ -131,6 +132,7 @@ export async function POST(request: NextRequest) {
   // Supabase 사용자 인증 + 기능별 쿼터 (BYOK 시 스킵)
   const auth = await requireAiAuth(request, 'fc_rag')
   if ('error' in auth) return auth.error
+  const authedUserId = auth.ctx.userId
 
   const traceId = generateTraceId()
   traceLogger.startTrace(traceId, query)
@@ -157,13 +159,19 @@ export async function POST(request: NextRequest) {
       let logComplexity = ''
       let logQueryType = ''
       let logError: string | null = null
+      let logAnswerText = ''
+      const logToolCalls: Array<{ name: string; args?: unknown }> = []
 
       const sendAndLog = (data: unknown) => {
         const evt = data as Record<string, unknown>
-        if (evt.type === 'tool_call' && evt.name) logTools.push(evt.name as string)
+        if (evt.type === 'tool_call' && evt.name) {
+          logTools.push(evt.name as string)
+          logToolCalls.push({ name: evt.name as string, args: evt.args })
+        }
         if (evt.type === 'answer') {
           const d = evt.data as Record<string, unknown> | undefined
-          logAnswerLen = String(d?.answer || '').length
+          logAnswerText = String(d?.answer || '')
+          logAnswerLen = logAnswerText.length
           logCitationCount = (d?.citations as unknown[] || []).length
           logComplexity = String(d?.complexity || '')
           logQueryType = String(d?.queryType || '')
@@ -187,7 +195,10 @@ export async function POST(request: NextRequest) {
 
         // ── Hermes Primary ──
         // 사용자 자체 API 키 사용 시엔 Gemini로 직행 (Hermes 비용 도용 차단)
-        if (!userApiKey) {
+        // 🔴 HERMES 임시 비활성화 — 60s 타임아웃 이슈 해결 전까지 Gemini only
+        //    살릴 때: DISABLE_HERMES 환경변수 제거 또는 'false' 로 설정 (2026-04-13)
+        const HERMES_DISABLED = process.env.DISABLE_HERMES !== 'false'
+        if (!HERMES_DISABLED && !userApiKey) {
           try {
           traceLogger.addEvent(traceId, 'hermes_start', {})
           sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
@@ -356,6 +367,20 @@ export async function POST(request: NextRequest) {
           verifiedCount: logVerifiedCount,
           error: logError,
         })
+
+        // Supabase 로그 (opt-in 동의한 사용자만, fire-and-forget)
+        logAIQueryIfConsented({
+          userId: authedUserId,
+          query,
+          answer: logAnswerText,
+          source,
+          model: source === 'hermes' ? 'gpt-5.4' : 'gemini-flash',
+          queryType: logQueryType,
+          toolCalls: logToolCalls,
+          latencyMs: Date.now() - logStartMs,
+          citationCount: logCitationCount,
+          verifiedCount: logVerifiedCount,
+        }).catch(() => { /* already swallowed inside */ })
       } catch (error) {
         logError = error instanceof Error ? error.message : 'unknown'
         traceLogger.addEvent(traceId, 'error', { message: logError })

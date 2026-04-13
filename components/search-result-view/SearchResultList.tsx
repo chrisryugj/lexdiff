@@ -23,7 +23,9 @@ import type { LawSearchResult, OrdinanceSearchResult, RelatedSearch, SearchQuery
 function safeHref(url: string | undefined | null): string | undefined {
   if (!url) return undefined
   try {
-    const parsed = new URL(url, 'https://placeholder.invalid')
+    // 법제처 API가 `/DRF/...` 상대경로로 주는 경우 → law.go.kr 도메인 prefix
+    if (url.startsWith('/')) return `https://www.law.go.kr${url}`
+    const parsed = new URL(url)
     if (['http:', 'https:'].includes(parsed.protocol)) return url
   } catch { /* invalid URL */ }
   return undefined

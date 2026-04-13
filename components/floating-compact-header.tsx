@@ -9,12 +9,15 @@ import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { UsageGuidePopover } from "@/components/usage-guide-popover"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UserMenu } from "@/components/user-menu"
+import type { Favorite } from "@/lib/law-types"
 
 interface FloatingCompactHeaderProps {
   onBack?: () => void
   onHomeClick?: () => void // 로고 클릭 시 홈으로 이동
   onFavoritesClick?: () => void
-  onSettingsClick?: () => void
+  onLoginClick?: () => void
+  onFavoriteSelect?: (fav: Favorite) => void
   onSearchClick?: () => void // 검색 모달 열기
   onFocusModeToggle?: () => void // 포커스 모드 토글
   onHelpClick?: () => void // 도움말 Sheet 열기
@@ -29,7 +32,8 @@ export function FloatingCompactHeader({
   onBack,
   onHomeClick,
   onFavoritesClick,
-  onSettingsClick,
+  onLoginClick,
+  onFavoriteSelect,
   onSearchClick,
   onFocusModeToggle,
   onHelpClick,
@@ -168,15 +172,12 @@ export function FloatingCompactHeader({
                     <Maximize2 className="h-4 w-4" />
                   </Button> */}
 
-                  {/* 설정 */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onSettingsClick}
-                    title="설정"
-                  >
-                    <Icon name="settings" size={20} />
-                  </Button>
+                  {/* 사용자 메뉴 */}
+                  <UserMenu
+                    onLoginClick={onLoginClick || (() => {})}
+                    onFavoriteSelect={onFavoriteSelect || (() => {})}
+                    onAllFavoritesClick={onFavoritesClick}
+                  />
                 </div>
               </div>
             </div>

@@ -171,7 +171,11 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         const classification = query.classification
         const caseNumber = classification?.entities?.caseNumber
         const court = classification?.entities?.court
-        const searchQuery = caseNumber || query.lawName || query.article || ""
+        const stripPrecedentKeywords = (s: string) =>
+          s.replace(/\s*(?:판례|판결|사례|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+        const lawNameSource = classification?.entities?.lawName || query.lawName || query.article || ""
+        const searchQuery = caseNumber || stripPrecedentKeywords(lawNameSource)
+        const displayQuery = query.rawQuery || query.lawName || searchQuery
 
         if (!searchQuery) {
           toast({
@@ -185,8 +189,8 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setIsAiMode(false)
         actions.setSearchMode("basic")
         clearSecondaryResults()
-        actions.setSearchQuery(searchQuery)
-        actions.setUserQuery(searchQuery)
+        actions.setSearchQuery(displayQuery)
+        actions.setUserQuery(displayQuery)
         actions.setIsSearching(true)
         actions.setMobileView("list")
 
@@ -350,8 +354,11 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       try {
         const classification = query.classification
         const ruleType = classification?.entities?.ruleType
-        const lawName = classification?.entities?.lawName || query.lawName
-        const searchQuery = lawName || query.article || ""
+        const stripInterpKeywords = (s: string) =>
+          s.replace(/\s*(?:해석례|법령\s*해석|유권해석|행정해석|법제처\s*해석|질의회신|민원회신|예규|고시|훈령|지침|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+        const lawNameSource = classification?.entities?.lawName || query.lawName || query.article || ""
+        const searchQuery = stripInterpKeywords(lawNameSource)
+        const displayQuery = query.rawQuery || query.lawName || searchQuery
 
         if (!searchQuery) {
           toast({
@@ -365,8 +372,8 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setIsAiMode(false)
         actions.setSearchMode("basic")
         clearSecondaryResults()
-        actions.setSearchQuery(searchQuery)
-        actions.setUserQuery(searchQuery)
+        actions.setSearchQuery(displayQuery)
+        actions.setUserQuery(displayQuery)
         actions.setIsSearching(true)
         actions.setMobileView("list")
 
@@ -435,7 +442,11 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
       try {
         const classification = query.classification
         const rulingNumber = classification?.entities?.rulingNumber
-        const searchQuery = rulingNumber || query.lawName || ""
+        const stripRulingKeywords = (s: string) =>
+          s.replace(/\s*(?:재결례|심판례|행정심판\s*재결|조세심판|심판청구|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+        const lawNameSource = classification?.entities?.lawName || query.lawName || ""
+        const searchQuery = rulingNumber || stripRulingKeywords(lawNameSource)
+        const displayQuery = query.rawQuery || query.lawName || searchQuery
 
         if (!searchQuery) {
           toast({
@@ -449,8 +460,8 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setIsAiMode(false)
         actions.setSearchMode("basic")
         clearSecondaryResults()
-        actions.setSearchQuery(searchQuery)
-        actions.setUserQuery(searchQuery)
+        actions.setSearchQuery(displayQuery)
+        actions.setUserQuery(displayQuery)
         actions.setIsSearching(true)
         actions.setMobileView("list")
 

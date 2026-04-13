@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UserMenu } from "@/components/user-menu"
 import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 import { cn } from "@/lib/utils"
 import { useOrdinanceBenchmark } from "@/hooks/use-ordinance-benchmark"
@@ -243,6 +244,18 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     Array.from(checkedItems).map(k => displayResults.find(r => `${r.orgCode}-${r.ordinanceSeq || r.ordinanceName}` === k)).filter((r): r is BenchmarkOrdinanceResult => !!r),
     [checkedItems, displayResults])
 
+  // OAuth 복귀 대비 스냅샷 저장 — 뷰 mount 시 복원 훅이 읽어 자동 재실행
+  const saveRestoreSnapshot = useCallback((autoAnalyze: boolean) => {
+    try {
+      sessionStorage.setItem('lexdiff:ordinance-benchmark-restore', JSON.stringify({
+        keyword: inputValue || keyword,
+        focusInput,
+        checkedKeys: Array.from(checkedItems),
+        autoAnalyze,
+      }))
+    } catch { /* ignore */ }
+  }, [inputValue, keyword, focusInput, checkedItems])
+
   const handleAiAnalysis = useCallback(async () => {
     if (checkedResults.length < 2) return
     setAiLoading(true)
@@ -263,6 +276,19 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         headers,
         body: JSON.stringify({ keyword, ordinances: items, focus: focusInput.trim() || undefined }),
       })
+      if (res.status === 401) {
+        saveRestoreSnapshot(true)
+        window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+          detail: { returnView: { mode: 'ordinance-benchmark', keyword: inputValue } }
+        }))
+        setAiError('AI 분석은 로그인 또는 본인 API 키 등록이 필요합니다.')
+        return
+      }
+      if (res.status === 429) {
+        const body = await res.json().catch(() => ({}))
+        setAiError(body.message || '오늘 AI 분석 한도를 초과했습니다.')
+        return
+      }
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
       setAiAnalysis(await res.json())
     } catch (err: unknown) {
@@ -270,7 +296,65 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
     } finally {
       setAiLoading(false)
     }
-  }, [checkedResults, keyword, focusInput])
+  }, [checkedResults, keyword, focusInput, inputValue, saveRestoreSnapshot])
+
+  // ── OAuth 복귀 복원 ──
+  // Phase 1(mount): sessionStorage 읽고 입력/검색 복원
+  // Phase 2(결과 도착): checkedItems 복원
+  // Phase 3(체크 복원 완료): autoAnalyze면 handleAiAnalysis 재실행
+  type RestorePhase =
+    | { phase: 'idle' }
+    | { phase: 'awaiting-results'; checkedKeys: string[]; autoAnalyze: boolean }
+    | { phase: 'awaiting-analyze' }
+  const [restorePhase, setRestorePhase] = useState<RestorePhase>({ phase: 'idle' })
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('lexdiff:ordinance-benchmark-restore')
+      if (!raw) return
+      sessionStorage.removeItem('lexdiff:ordinance-benchmark-restore')
+      const data = JSON.parse(raw) as {
+        keyword?: string
+        focusInput?: string
+        checkedKeys?: string[]
+        autoAnalyze?: boolean
+      }
+      if (data.keyword) {
+        setInputValue(data.keyword)
+        setFocusInput(data.focusInput || '')
+        search(data.keyword)
+        setRestorePhase({
+          phase: 'awaiting-results',
+          checkedKeys: data.checkedKeys || [],
+          autoAnalyze: !!data.autoAnalyze,
+        })
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Phase 2: 검색 완료 → checkedItems 복원
+  useEffect(() => {
+    if (restorePhase.phase !== 'awaiting-results') return
+    if (isSearching) return
+    if (flatResults.length === 0) return
+    const available = new Set(flatResults.map(r => `${r.orgCode}-${r.ordinanceSeq || r.ordinanceName}`))
+    const valid = restorePhase.checkedKeys.filter(k => available.has(k))
+    if (valid.length > 0) setCheckedItems(new Set(valid))
+    if (restorePhase.autoAnalyze && valid.length >= 2) {
+      setRestorePhase({ phase: 'awaiting-analyze' })
+    } else {
+      setRestorePhase({ phase: 'idle' })
+    }
+  }, [restorePhase, isSearching, flatResults])
+
+  // Phase 3: 체크 복원 완료 → AI 분석 자동 재실행
+  useEffect(() => {
+    if (restorePhase.phase !== 'awaiting-analyze') return
+    if (checkedResults.length < 2) return
+    setRestorePhase({ phase: 'idle' })
+    handleAiAnalysis()
+  }, [restorePhase, checkedResults, handleAiAnalysis])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -292,6 +376,16 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
             </button>
             <div className="flex items-center gap-2 lg:gap-4">
               <ThemeToggle />
+              <UserMenu
+                onLoginClick={() => {
+                  saveRestoreSnapshot(false)
+                  window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+                    detail: { returnView: { mode: 'ordinance-benchmark', keyword: inputValue } }
+                  }))
+                }}
+                onFavoriteSelect={() => {}}
+                onAllFavoritesClick={() => {}}
+              />
               <Button variant="ghost" size="sm" onClick={onBack} title="뒤로가기">
                 <Icon name="arrow-left" size={18} className="text-gray-600 dark:text-gray-400" />
               </Button>

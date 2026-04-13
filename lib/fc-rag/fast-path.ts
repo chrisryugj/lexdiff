@@ -85,7 +85,7 @@ for (const [name, mst] of PRELOAD_LAWS) {
 
 export interface LawEntry { name: string; mst: string }
 
-export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'annex_resolve' | 'term_search' | 'law_system' | 'none'
+export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'ordinance_search' | 'annex_resolve' | 'term_search' | 'law_system' | 'none'
 
 interface FastPathDetection {
   type: FastPathType
@@ -166,6 +166,23 @@ export function detectFastPath(query: string): FastPathDetection {
     }
   }
 
+  // ── 패턴 3.5: 조례/자치법규 검색 ("광진구 복무조례", "서울시 OO조례") ──
+  // 복잡 키워드(비교/분석/개정/판례/해석례/신구/대조/처벌/벌칙/과태료) 없고 "조례" 또는 "자치법규" 포함이면 직결
+  if (/(?:조례|자치법규)/.test(query) && !/(?:비교|분석|개정|판례|해석례|신구|대조|처벌|벌칙|과태료|벌금)/.test(query)) {
+    const searchQuery = query
+      .replace(/(?:에\s*대해|에\s*대한|알려줘|알려|궁금|설명해|설명|찾아줘|찾아|보여줘|보여|검색해|검색|내용|전반|주요|이란|란\??|요약|정리)/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (searchQuery.length >= 2) {
+      return {
+        type: 'ordinance_search',
+        searchQuery,
+        toolName: 'search_ordinance',
+        toolArgs: { query: searchQuery },
+      }
+    }
+  }
+
   // ── 패턴 4: 별표 조회 ("OO법 별표 N") ──
   const annexMatch = query.match(/^(.+?(?:법|령|규칙))\s+별표\s*(\d+)?/)
   if (annexMatch && !/비교|분석|개정/.test(query)) {
@@ -191,7 +208,8 @@ export function detectFastPath(query: string): FastPathDetection {
 
   // ── 패턴 8: 법명+조문번호 ──
   // 복잡한 키워드가 있으면 full pipeline으로
-  if (/(?:비교|판례|해석례|개정|위임|시행령|시행규칙|신구|대조|이력|조례|자치법규|처벌|벌칙|과태료|면제|감면|특례|예외)/.test(query)) {
+  // (조례/자치법규는 위 패턴 3.5에서 선처리되므로 여기서 차단할 필요 없음)
+  if (/(?:비교|판례|해석례|개정|위임|시행령|시행규칙|신구|대조|이력|처벌|벌칙|과태료|면제|감면|특례|예외)/.test(query)) {
     return { type: 'none' }
   }
 

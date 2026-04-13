@@ -258,14 +258,11 @@ export const TimeMachineModal = memo(function TimeMachineModal({
           <DialogDescription>과거 특정 날짜의 법령 본문을 조회하고 현행과 비교합니다.</DialogDescription>
         </VisuallyHidden.Root>
         {/* ── Header ── */}
-        <div className="border-b border-border bg-muted/30 px-4 py-3 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Icon name="clock" size={18} className="text-brand-navy dark:text-brand-gold shrink-0" />
-              <div className="min-w-0">
-                <h3 className="font-semibold text-sm truncate">법령 타임머신</h3>
-                <p className="text-xs text-muted-foreground truncate">{meta.lawTitle}</p>
-              </div>
+        <div className="border-b border-border px-4 py-3 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm truncate">법령 타임머신</h3>
+              <p className="text-[11px] text-muted-foreground truncate">{meta.lawTitle}</p>
             </div>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose}>
               <Icon name="x" size={16} />
@@ -364,16 +361,8 @@ export const TimeMachineModal = memo(function TimeMachineModal({
 
           {/* 표시 중인 개정 정보 */}
           {selectedRevision && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
-              <Icon name="info" size={12} className="text-muted-foreground" />
-              <span className="text-muted-foreground">표시 중:</span>
-              <Badge variant="outline" className="text-xs h-5">
-                {selectedRevision.ancNo}
-              </Badge>
-              <span className="text-muted-foreground">
-                ({formatDateDisplay(selectedRevision.ancYd)} 공포,
-                {' '}{formatDateDisplay(selectedRevision.efYd)} 시행 · {selectedRevision.rrCls})
-              </span>
+            <div className="mt-2 text-[11px] text-muted-foreground truncate">
+              {selectedRevision.rrCls} · {selectedRevision.ancNo} · {formatDateDisplay(selectedRevision.efYd)} 시행
             </div>
           )}
         </div>
@@ -450,20 +439,17 @@ export const TimeMachineModal = memo(function TimeMachineModal({
             ) : hasResult ? (
               <div className="flex flex-col sm:grid sm:grid-cols-2 gap-0 h-full">
                 {/* 구조문 (좌측) */}
-                <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-rose-500/5 to-transparent">
-                  <div className="bg-gradient-to-r from-rose-500/15 via-rose-500/10 to-rose-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-rose-500/20 shrink-0">
-                    <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2">
-                      <Icon name="history" size={18} className="text-rose-500" />
-                      <span>구조문</span>
-                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
-                        개정 전
-                      </span>
-                    </h3>
+                <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full">
+                  <div className="px-4 py-2 border-b border-border shrink-0 flex items-center justify-between">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      구조문
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70">개정 전</span>
                   </div>
                   <div
                     ref={oldScrollRef}
                     onScroll={() => handleScroll("old")}
-                    className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-6"
+                    className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6"
                   >
                     <div
                       className="leading-relaxed max-w-none text-foreground whitespace-pre-wrap"
@@ -474,20 +460,19 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                 </div>
 
                 {/* 신조문 (우측) */}
-                <div className="flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-emerald-500/5 to-transparent">
-                  <div className="bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-emerald-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-emerald-500/20 shrink-0">
-                    <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2">
-                      <Icon name="sparkles" size={18} className="text-emerald-500" />
-                      <span>신조문</span>
-                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
-                        {selectedRevision && formatDateDisplay(selectedRevision.efYd)} 시행
-                      </span>
-                    </h3>
+                <div className="flex flex-col min-h-0 h-1/2 sm:h-full">
+                  <div className="px-4 py-2 border-b border-border shrink-0 flex items-center justify-between">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      신조문
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70">
+                      {selectedRevision && formatDateDisplay(selectedRevision.efYd)} 시행
+                    </span>
                   </div>
                   <div
                     ref={newScrollRef}
                     onScroll={() => handleScroll("new")}
-                    className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-6"
+                    className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6"
                   >
                     <div
                       className="leading-relaxed max-w-none text-foreground whitespace-pre-wrap"
@@ -514,42 +499,18 @@ export const TimeMachineModal = memo(function TimeMachineModal({
           </div>
         </div>
 
-        {/* ── Footer (diff 범례) ── */}
-        {hasResult && (
-          <div className="px-2 sm:px-6 py-2 border-t border-border bg-card/30 shrink-0">
-            <div className="flex items-center justify-center gap-4 sm:gap-8 text-[10px] sm:text-xs">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 sm:w-5 sm:h-5 rounded"
-                  style={{
-                    background: "linear-gradient(to right, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08))",
-                    borderLeft: "2px solid rgba(16, 185, 129, 0.4)"
-                  }}
-                />
-                <span className="text-muted-foreground font-medium">신조문 (개정 후)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 sm:w-5 sm:h-5 rounded"
-                  style={{
-                    background: "linear-gradient(to right, rgba(251, 113, 133, 0.15), rgba(251, 113, 133, 0.08))",
-                    borderLeft: "2px solid rgba(244, 63, 94, 0.4)"
-                  }}
-                />
-                <span className="text-muted-foreground font-medium">구조문 (개정 전)</span>
-              </div>
-              {versionMatch && versionMatch.betweenRevisions.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="text-xs h-6 px-2 sm:hidden"
-                >
-                  <Icon name="history" size={12} className="mr-1" />
-                  이력 {versionMatch.betweenRevisions.length}건
-                </Button>
-              )}
-            </div>
+        {/* ── Footer (mobile 이력 토글) ── */}
+        {hasResult && versionMatch && versionMatch.betweenRevisions.length > 0 && (
+          <div className="px-4 py-1.5 border-t border-border shrink-0 sm:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs h-6 px-2 w-full justify-center text-muted-foreground"
+            >
+              <Icon name="history" size={12} className="mr-1" />
+              이력 {versionMatch.betweenRevisions.length}건
+            </Button>
           </div>
         )}
       </DialogContent>

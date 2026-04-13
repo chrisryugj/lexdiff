@@ -37,7 +37,7 @@ export function useOrdinanceBenchmark() {
     return () => { abortRef.current?.abort() }
   }, [])
 
-  // ── 검색 (1페이지만) ──
+  // ── 검색 (1페이지만, 선택 광역 매칭 0건이면 자동 전체 로드) ──
   const search = useCallback(async (searchKeyword: string) => {
     if (!searchKeyword.trim()) return
 
@@ -52,9 +52,30 @@ export function useOrdinanceBenchmark() {
     setProgress(null)
 
     try {
-      const result = await searchFirstPage(searchKeyword, { signal: controller.signal })
-      if (!controller.signal.aborted) {
-        setSearchResult(result)
+      const first = await searchFirstPage(searchKeyword, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      setSearchResult(first)
+
+      // 선택된 광역에 매칭된 결과가 1페이지에 없으면 자동 전체 로드
+      // (가나다순 페이징 특성상 서울/제주 등 후순위 지역이 1페이지에 안 들어올 수 있음)
+      if (!first.isComplete && activeMetros.size > 0) {
+        const hasMatch = Array.from(first.results.values()).flat().some(r => {
+          const m = getMetroArea(r.orgName)
+          return m !== null && activeMetros.has(m)
+        })
+        if (!hasMatch) {
+          setIsSearching(false)
+          setIsLoadingMore(true)
+          const full = await loadRemainingPages(
+            searchKeyword,
+            first.results,
+            first.totalCount,
+            { signal: controller.signal, onProgress: setProgress },
+          )
+          if (!controller.signal.aborted) setSearchResult(full)
+          setIsLoadingMore(false)
+          setProgress(null)
+        }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return
@@ -62,7 +83,7 @@ export function useOrdinanceBenchmark() {
     } finally {
       setIsSearching(false)
     }
-  }, [])
+  }, [activeMetros])
 
   // ── 전체 로드 ──
   const loadAll = useCallback(async () => {

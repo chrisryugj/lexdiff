@@ -12,10 +12,8 @@ import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
-import { ApiKeyInput } from "@/components/settings/api-key-input"
 import { UserMenu } from "@/components/user-menu"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
-import { useApiKey } from "@/hooks/use-api-key"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { LawStatsFooter } from "@/components/shared/law-stats-footer"
 
@@ -51,7 +49,6 @@ export function SearchView({
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
-  const { apiKey, saveKey, clearKey } = useApiKey()
   const isHeaderVisible = useScrollDirection()  // PERF-3: 통합 훅 사용
 
   const featuresRef = useRef<HTMLElement>(null)
@@ -156,8 +153,6 @@ export function SearchView({
               <Button variant="ghost" size="sm" onClick={handleHelpClick} title="사용 가이드" className="hover:bg-gray-200 dark:hover:bg-gray-800">
                 <Icon name="help-circle" size={20} className="text-gray-600 dark:text-gray-400" />
               </Button>
-
-              <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} variant="dock" />
 
               <UserMenu
                 onLoginClick={() => setLoginDialogOpen(true)}

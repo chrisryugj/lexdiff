@@ -83,7 +83,7 @@ function getAvailableTools(
 
   // 위임 미비: 법률(Act)만 — 시행령/시행규칙은 위임 주체가 아님
   const isAct = !isOrdinance && !['시행령', '시행규칙'].includes(meta.lawType || '')
-  if (isAct && meta.mst) {
+  if (isAct && (meta.mst || meta.lawId)) {
     tools.push(LAW_TOOLS[0]) // delegation-gap
   }
 
@@ -131,10 +131,15 @@ export function LawViewerAnalysisMenu({
   if (tools.length === 0) return null
 
   const handleSelect = (toolId: AnalysisToolType) => {
-    if (!meta) return
+    console.log('[AnalysisMenu] handleSelect', { toolId, hasMeta: !!meta, mst: meta?.mst, lawId: meta?.lawId })
+    if (!meta) {
+      console.warn('[AnalysisMenu] meta 없음 — 동작 중단')
+      return
+    }
 
     switch (toolId) {
       case 'delegation-gap':
+        console.log('[AnalysisMenu] onDelegationGap 호출', { hasCallback: !!onDelegationGap })
         onDelegationGap?.(meta)
         break
       case 'time-machine':

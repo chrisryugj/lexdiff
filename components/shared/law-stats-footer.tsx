@@ -77,7 +77,7 @@ export function LawStatsFooter({ extraLinks }: LawStatsFooterProps) {
             {extraLinks}
             <span>Built with 법제처 Open API</span>
           </div>
-          <p>© 2025–2026 Chris ryu. All rights reserved.</p>
+          <p>© 2025–2026 딴짓하는 류주임 @chris_gomdori. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -251,6 +251,14 @@ export function AIAnswerContent({
     // 스트리밍 경과 시간 — PERF-7: streaming 중에는 ref만 갱신, 종료 시 한 번만 final setState
     const [streamElapsed, setStreamElapsed] = useState(0)
     const streamStartRef = useRef<number | null>(null)
+    const firstLogTsRef = useRef<number | null>(null)
+
+    // 첫 로그가 들어오면 fallback 시작점으로 기록 (mount 후 isStreaming=false 엣지 커버)
+    useEffect(() => {
+      if (firstLogTsRef.current === null && toolCallLogs.length > 0) {
+        firstLogTsRef.current = Date.now()
+      }
+    }, [toolCallLogs.length])
 
     useEffect(() => {
       if (isStreaming) {
@@ -262,8 +270,11 @@ export function AIAnswerContent({
         // 종료 시점에 final 값 한 번만 set — 표시는 LiveStreamTimer가 100ms로 별도
         setStreamElapsed((Date.now() - streamStartRef.current) / 1000)
         streamStartRef.current = null
+      } else if (streamElapsed === 0 && firstLogTsRef.current && toolCallLogs.length > 0) {
+        // 스트리밍 전환을 놓친 경우: 첫 로그 → 현재까지를 경과로 기록 (최소 0.1s)
+        setStreamElapsed(Math.max(0.1, (Date.now() - firstLogTsRef.current) / 1000))
       }
-    }, [isStreaming])
+    }, [isStreaming, toolCallLogs.length, streamElapsed])
 
     // 별표 모달 상태
     const [annexModal, setAnnexModal] = useState<{
@@ -526,14 +537,17 @@ export function AIAnswerContent({
                             {/* 헤더: 프로그레스 바 + 상태 */}
                             {isStreaming && (
                                 <>
-                                    <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center justify-between mb-2 gap-2">
                                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI 분석 진행 중</span>
-                                        <div className="flex items-center gap-2">
-                                            <LiveStreamTimer
-                                                startRef={streamStartRef}
-                                                className="text-sm font-mono tabular-nums text-muted-foreground"
-                                                suffix="초"
-                                            />
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 ring-1 ring-primary/20 text-primary shadow-sm">
+                                                <Icon name="clock" className="h-3 w-3 opacity-80" />
+                                                <LiveStreamTimer
+                                                    startRef={streamStartRef}
+                                                    className="text-[11px] font-semibold tabular-nums leading-none"
+                                                    suffix="s"
+                                                />
+                                            </span>
                                             <span className="text-sm font-medium text-gray-500 tabular-nums">{Math.round(searchProgress)}%</span>
                                         </div>
                                     </div>
@@ -555,7 +569,7 @@ export function AIAnswerContent({
                 )}
 
                 {/* 완료 후 요약 바 + 세부정보 토글 */}
-                {!isStreaming && searchStats && streamElapsed > 0 && (
+                {!isStreaming && searchStats && (
                     <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-400">
                         {/* 요약 바 */}
                         <button

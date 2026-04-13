@@ -74,37 +74,15 @@ export function useAiSearch(deps: HandlerDeps) {
     conversationId?: string | null,
     preEvidence?: string,
   ) => {
-    // AI 비밀번호 게이트 확인
-    try {
-      if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
-        // AI 모드로 전환하여 인증 안내 표시 (에러 화면 대신)
-        actions.setIsSearching(true)
-        actions.setIsAiMode(true)
-        actions.setSearchMode('rag')
-        const aiLawData: LawDataState = {
-          meta: {
-            lawId: 'ai-answer', lawTitle: 'AI 답변',
-            promulgationDate: new Date().toISOString().split('T')[0],
-            lawType: 'AI', isOrdinance: false, fetchedAt: new Date().toISOString()
-          },
-          articles: [], selectedJo: undefined, isOrdinance: false
-        }
-        actions.setLawData(aiLawData)
-        actions.setMobileView("content")
-        actions.setAiAnswerContent('AI 검색을 사용하려면 비밀번호 인증이 필요합니다. 아래 인증 후 다시 시도해 주세요.')
-        actions.setAiConfidenceLevel('low')
-        actions.setIsSearching(false)
-        actions.updateProgress('complete', 0)
-
-        // 게이트 다이얼로그 트리거 (page.tsx의 useAiGate가 수신, 인증 후 자동 재검색)
-        window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
-          detail: { query: fullQuery }
-        }))
-        return
-      }
-    } catch { /* private browsing */ }
-
-    debugLogger.success('SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
+    // Auth는 서버에서 처리 (Supabase 세션 또는 BYOK 헤더).
+    // 401 응답은 아래 fetch 후 status 체크로 잡아서 게이트 이벤트 발송.
+    const t0 = performance.now()
+    const elapsed = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`
+    let lastEventAt = t0
+    let eventCount = 0
+    let chunkCount = 0
+    let lastEventType = ''
+    debugLogger.success('[AI] SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
 
     // 이전 검색 진행 중이면 abort
     if (abortRef.current) {
@@ -170,6 +148,7 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.setAiAnswerContent('')
     actions.setAiRelatedLaws([])
     actions.setAiCitations([])
+    actions.setAiAuthRequired(false)
     actions.setFileSearchFailed(false)
     // userQuery는 handleSearchInternal에서 rawQuery로 이미 설정됨
     actions.clearToolCallLogs()
@@ -209,6 +188,7 @@ export function useAiSearch(deps: HandlerDeps) {
         actions.setConversationId(actualConvId)
       }
 
+      debugLogger.info(`[AI ${elapsed()}] POST /api/fc-rag`, { convId: actualConvId, preEvidence: !!preEvidence })
       const response = await fetch('/api/fc-rag', {
         method: 'POST',
         headers,
@@ -219,8 +199,31 @@ export function useAiSearch(deps: HandlerDeps) {
         }),
         signal: mergedSignal
       })
+      debugLogger.info(`[AI ${elapsed()}] 응답 헤더 수신`, { status: response.status })
 
       if (mergedSignal.aborted) {
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 0)
+        return
+      }
+
+      // 401: 로그인 필요 → 폴백 화면 + 게이트 다이얼로그 트리거
+      if (response.status === 401) {
+        actions.setAiAnswerContent('')
+        actions.setAiAuthRequired(true)
+        actions.setIsSearching(false)
+        actions.updateProgress('complete', 0)
+        window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+          detail: { query: fullQuery }
+        }))
+        return
+      }
+
+      // 429: 쿼터 초과
+      if (response.status === 429) {
+        const body = await response.json().catch(() => ({}))
+        actions.setAiAnswerContent(body.message || '오늘 AI 검색 한도를 초과했습니다. 본인 API 키를 등록하면 무제한으로 사용할 수 있습니다.')
+        actions.setAiConfidenceLevel('low')
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
         return
@@ -238,7 +241,17 @@ export function useAiSearch(deps: HandlerDeps) {
       while (true) {
         if (mergedSignal.aborted) break
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          debugLogger.info(`[AI ${elapsed()}] 스트림 종료 (reader done)`, { events: eventCount, chunks: chunkCount, lastType: lastEventType })
+          break
+        }
+
+        chunkCount++
+        const sinceLast = ((performance.now() - lastEventAt) / 1000).toFixed(1)
+        if (Number(sinceLast) > 5) {
+          debugLogger.warning(`[AI ${elapsed()}] 긴 대기 후 청크 수신 (+${sinceLast}s, last=${lastEventType || 'none'})`)
+        }
+        lastEventAt = performance.now()
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n\n')
@@ -248,9 +261,14 @@ export function useAiSearch(deps: HandlerDeps) {
           if (!line.startsWith('data: ')) continue
           try {
             const event = JSON.parse(line.slice(6))
+            eventCount++
+            lastEventType = event.type || 'unknown'
+            if (lastEventType !== 'answer_token') {
+              debugLogger.info(`[AI ${elapsed()}] SSE ${lastEventType}`, event.name || event.phase || event.message || '')
+            }
             handleSSEEvent(event, fullQuery)
           } catch {
-            debugLogger.error('SSE 파싱 오류', line)
+            debugLogger.error('[AI] SSE 파싱 오류', line)
           }
         }
       }
@@ -265,7 +283,7 @@ export function useAiSearch(deps: HandlerDeps) {
 
       // 안전장치: 스트림 종료 시 answer 미수신 → 에러 상태 표시
       if (!answerReceivedRef.current) {
-        debugLogger.error('SSE 스트림 종료 - answer 이벤트 미수신')
+        debugLogger.error(`[AI ${elapsed()}] SSE 스트림 종료 - answer 이벤트 미수신`, { events: eventCount, chunks: chunkCount, lastType: lastEventType })
         actions.setAiAnswerContent('죄송합니다. AI 엔진 응답을 받지 못했습니다. 다시 시도해 주세요.')
         actions.setAiConfidenceLevel('low')
       }
@@ -277,14 +295,14 @@ export function useAiSearch(deps: HandlerDeps) {
 
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        debugLogger.info('AI 검색 취소됨')
+        debugLogger.info(`[AI ${elapsed()}] 검색 취소됨`, { events: eventCount, lastType: lastEventType })
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
         actions.setIsAiMode(false)
         return
       }
 
-      debugLogger.error('FC-RAG SSE 오류', error)
+      debugLogger.error(`[AI ${elapsed()}] FC-RAG SSE 오류`, { error, events: eventCount, chunks: chunkCount, lastType: lastEventType })
       actions.setIsSearching(false)
       actions.updateProgress('complete', 0)
       // isAiMode 유지하고 에러 메시지 표시 (isAiMode=false로 하면 빈 lawData 상태의 깨진 UI 노출)

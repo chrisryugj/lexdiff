@@ -62,6 +62,18 @@ export function AISummaryDialog({
         }),
       })
 
+      if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', { detail: {} }))
+        setError("AI 요약은 로그인 또는 본인 API 키 등록이 필요합니다.")
+        return
+      }
+
+      if (response.status === 429) {
+        const body = await response.json().catch(() => ({}))
+        setError(body.message || "오늘 AI 요약 한도를 초과했습니다.")
+        return
+      }
+
       if (!response.ok) {
         throw new Error("AI 요약 생성 실패")
       }

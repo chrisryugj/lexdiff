@@ -4,6 +4,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ErrorBoundary, UnhandledRejectionWatcher } from "@/components/error-boundary"
 import { MotionProvider } from "@/components/providers/motion-provider"
+import { ConsentGate } from "@/components/consent-gate"
+import { FavoritesSync } from "@/components/favorites-sync"
+import { AiGateProvider } from "@/components/ai-gate-provider"
 import "./globals.css"
 
 export const viewport: Viewport = {
@@ -36,7 +39,11 @@ export default function RootLayout({
           <ErrorBoundary>
             <UnhandledRejectionWatcher />
             <MotionProvider>
-              {children}
+              <AiGateProvider>
+                {children}
+              </AiGateProvider>
+              <ConsentGate />
+              <FavoritesSync />
             </MotionProvider>
           </ErrorBoundary>
         </ThemeProvider>

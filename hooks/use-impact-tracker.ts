@@ -212,15 +212,6 @@ export function useImpactTracker() {
     // SSE 스트리밍 시작
     const fetchSSE = async () => {
       try {
-        // AI 비밀번호 게이트 확인
-        try {
-          if (sessionStorage.getItem('lexdiff-ai-gate') !== 'ok') {
-            setError('AI 기능을 사용하려면 비밀번호 인증이 필요합니다.')
-            setIsAnalyzing(false)
-            return
-          }
-        } catch { /* private browsing */ }
-
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         try {
           const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')
@@ -235,6 +226,32 @@ export function useImpactTracker() {
         })
 
         if (controller.signal.aborted) return
+
+        // 401: 로그인 필요 → 전역 게이트 다이얼로그 트리거 + request 스냅샷 저장
+        if (response.status === 401) {
+          try {
+            if (currentRequestRef.current) {
+              sessionStorage.setItem(
+                'lexdiff:impact-tracker-restore',
+                JSON.stringify(currentRequestRef.current)
+              )
+            }
+          } catch { /* ignore */ }
+          window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
+            detail: { returnView: { mode: 'impact-tracker' } }
+          }))
+          setError('영향 추적기는 로그인 또는 본인 API 키 등록이 필요합니다.')
+          setIsAnalyzing(false)
+          return
+        }
+
+        // 429: 쿼터 초과
+        if (response.status === 429) {
+          const body = await response.json().catch(() => ({}))
+          setError(body.message || '오늘 영향 추적기 한도를 초과했습니다.')
+          setIsAnalyzing(false)
+          return
+        }
 
         if (!response.ok) {
           const body = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))

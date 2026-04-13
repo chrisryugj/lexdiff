@@ -26,6 +26,7 @@ interface CommandSearchModalProps {
     caseNumber?: string  // ✅ 신규
     classification?: UnifiedQueryClassification  // ✅ 신규
     rawQuery?: string
+    forcedMode?: 'law' | 'ai'
   }) => void
   isAiMode?: boolean // AI 모드 여부
 }
@@ -203,6 +204,21 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         caseNumber: classification.entities.caseNumber,
         classification: classification,
         rawQuery: query,
+      })
+      onClose()
+      return
+    }
+
+    // AI 분류면 rawQuery 그대로 보내고 forcedMode='ai' 지정
+    // (parseSearchQuery가 자연어 질문을 조문 번호로 오파싱하는 사고 방지)
+    if (classification.searchType === 'ai') {
+      debugLogger.info('AI 검색 실행 (Modal 자동 감지)', { query, confidence: classification.confidence })
+      onSearch({
+        lawName: query,
+        searchType: 'ai',
+        classification,
+        rawQuery: query,
+        forcedMode: 'ai',
       })
       onClose()
       return
