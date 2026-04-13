@@ -31,7 +31,7 @@ import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-valid
  * - 실패 시 모든 citation을 verified:false + 'skipped'로 처리
  * - 결과를 `citation_verification` 이벤트로 flush
  */
-async function streamCitationVerification(
+export async function streamCitationVerification(
   citations: FCRAGCitation[],
   sendAndLog: (event: unknown) => void,
 ): Promise<void> {
@@ -90,7 +90,7 @@ function convertForVerification(fcCitations: FCRAGCitation[]): {
 }
 
 // AbortSignal.any 폴백 — Node 20.3 미만 / 일부 엣지 런타임 대비
-function combineSignals(signals: AbortSignal[]): AbortSignal {
+export function combineSignals(signals: AbortSignal[]): AbortSignal {
   if (typeof (AbortSignal as unknown as { any?: unknown }).any === 'function') {
     return (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any(signals)
   }
