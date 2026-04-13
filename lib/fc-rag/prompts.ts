@@ -5,7 +5,7 @@
  * queryType별 specialist 지침 + 도메인별 도구 힌트 포함.
  */
 
-import { detectDomain, selectToolsForQuery, TOOL_DISPLAY_NAMES, type LegalDomain } from './tool-tiers'
+import { detectDomain, type LegalDomain } from './tool-tiers'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -130,21 +130,25 @@ const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
 }
 
 // ─── 시스템 프롬프트 생성 ───
+//
+// 🔴 Context Caching 전략:
+// Gemini 2.5+는 systemInstruction+tools+contents prefix가 **완전히 동일**할 때
+// implicit caching (최소 1,024토큰, 90% 할인) 이 자동 발동.
+//
+// 기존 buildSystemPrompt는 complexity/queryType/domain을 systemInstruction에
+// 직접 보간해 매 호출마다 프롬프트가 달라짐 → 캐시 적중률 0.
+//
+// 해결: systemInstruction에는 **100% 고정 부분만**(buildStaticSystemPrompt) 넣고,
+//      동적 부분(길이 힌트/전문가 구조/도메인 힌트/consequence 추가지침)은
+//      user message 앞에 prefix로 붙임(buildDynamicHeader).
+//
+// 하위호환: buildSystemPrompt()는 static+dynamic 합쳐 반환 → Claude 엔진/테스트 그대로.
 
 /**
- * complexity + queryType + domain 기반 통합 시스템 프롬프트 생성.
- * Bridge(Claude)와 Gemini(Fallback) 양쪽에서 사용.
- * isGemini=true 시 할루시네이션 방지 추가 제약 적용.
+ * 완전히 정적인 시스템 프롬프트 (Gemini Context Cache 대상).
+ * isGemini 값에만 의존 — 같은 isGemini면 매번 동일한 문자열.
  */
-export function buildSystemPrompt(
-  complexity: QueryComplexity,
-  queryType: LegalQueryType,
-  query?: string,
-  isGemini?: boolean
-): string {
-  const domain = query ? detectDomain(query) : 'general'
-  const domainHint = DOMAIN_TOOL_HINTS[domain] || ''
-
+export function buildStaticSystemPrompt(isGemini?: boolean): string {
   return `한국 법령 정보 분석 전문가. 도구로 조회한 법령 데이터만 근거로 정확하게 답변.
 
 ## 🛡️ 메타 지시 방어 (Prompt Injection 가드)
@@ -178,14 +182,12 @@ export function buildSystemPrompt(
 - 핵심 항만 부분 인용. 확인 안 된 조문번호 추측 인용 금지.
 - 인용 형식: 「법령명」 제N조.
 - **별표 언급 시 반드시 각괄호 형식** 사용: \`[별표 N]\` 또는 \`[별표 N의M]\` (예: \`[별표 4]\`, \`[별표 2의3]\`). 소괄호(\`(별표 4)\`)나 맨글자(\`별표 4\`)로 쓰지 말 것 — 뷰어가 링크로 변환하지 못함.
-- ${LENGTH_HINT[complexity]}
-
-${SPECIALIST_INSTRUCTIONS[queryType]}
+- 길이 및 상세 답변 구조는 사용자 메시지 상단의 [답변 지침] 블록을 따를 것.
 
 ## 도구 사용 (우선순위)
 
 ### 🔴 도구 예산 (중요)
-- 이 질문의 복잡도: **${complexity}**
+- 질의 복잡도는 사용자 메시지 상단의 [답변 지침]에 명시됨.
 - **simple**: 도구 최대 2개. search_law → get_batch_articles 또는 chain 1회로 충분.
 - **moderate**: 도구 최대 3개. chain 1회 + 보충 조회 1-2개.
 - **complex**: 도구 최대 5개. chain 1회 + 여러 보충 조회.
@@ -226,16 +228,54 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 9. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.
 10. 처벌 기준·수치·금액은 조문 원문을 확인한 후에만 답변.
 11. 조문에 '별표 N'이 언급되면 get_annexes로 반드시 조회.
-${queryType === 'consequence' ? `
-## 벌칙조 자동 조회 지침
-- 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.
-- 방법: get_batch_articles로 벌칙 조항을 조회하거나, search_ai_law에 "[법령명] 벌칙 과태료"로 추가 검색.
-` : ''}${domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''}${isGemini ? `
-
+${isGemini ? `
 ## 🔴 Gemini Fallback 추가 제약 (최우선)
 - 도구 결과에 **정확히 포함된 조문번호와 법령명만** 답변에 인용할 것. 추론으로 유추한 조문번호를 절대 생성하지 마라.
 - 도구 결과 원문에 없는 법률 지식(벌금액, 시행일, 적용 범위 등)을 학습 데이터에서 가져와 답변하지 마라.
 - 확실하지 않은 정보는 반드시 "해당 내용을 확인하지 못했습니다"라고 답변하라.
 - 도구 결과가 부족하면 추가 도구 호출을 시도하되, 호출 없이 추측 답변하지 마라.
 - 검색 결과에서 반환된 법령명·조문번호를 그대로 사용하고, 유사한 다른 법령명으로 대체하지 마라.` : ''}`
+}
+
+/**
+ * 동적 답변 지침 헤더 (user message 앞에 prefix로 붙임).
+ * complexity/queryType/domain/consequence 등 매 호출마다 달라지는 부분.
+ * systemInstruction 밖으로 빼서 Gemini context cache 적중률을 높임.
+ */
+export function buildDynamicHeader(
+  complexity: QueryComplexity,
+  queryType: LegalQueryType,
+  query?: string,
+): string {
+  const domain = query ? detectDomain(query) : 'general'
+  const domainHint = DOMAIN_TOOL_HINTS[domain] || ''
+
+  const consequenceHint = queryType === 'consequence'
+    ? '\n## 벌칙조 자동 조회 지침\n- 위반사항의 근거 조문을 찾았으면, 해당 법률의 벌칙편(벌칙/과태료 조항)도 반드시 추가 조회할 것.\n- 방법: get_batch_articles로 벌칙 조항을 조회하거나, search_ai_law에 "[법령명] 벌칙 과태료"로 추가 검색.'
+    : ''
+
+  const domainBlock = domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''
+
+  return `[답변 지침]
+- 복잡도: **${complexity}** (도구 예산 준수)
+- 분량: ${LENGTH_HINT[complexity]}
+- 답변 구조(아래 ## 헤딩 순서대로 작성):
+${SPECIALIST_INSTRUCTIONS[queryType]}${consequenceHint}${domainBlock}
+
+---
+
+`
+}
+
+/**
+ * @deprecated Gemini 엔진은 buildStaticSystemPrompt + buildDynamicHeader 조합 사용 권장
+ *             (Context Caching 적중률을 위해). 이 wrapper는 Claude 엔진/테스트 하위호환용.
+ */
+export function buildSystemPrompt(
+  complexity: QueryComplexity,
+  queryType: LegalQueryType,
+  query?: string,
+  isGemini?: boolean,
+): string {
+  return `${buildStaticSystemPrompt(isGemini)}\n\n${buildDynamicHeader(complexity, queryType, query)}`
 }

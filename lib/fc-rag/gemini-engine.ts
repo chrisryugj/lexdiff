@@ -5,7 +5,8 @@
 
 import { GoogleGenAI } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
-import { buildSystemPrompt } from './prompts'
+import { buildStaticSystemPrompt, buildDynamicHeader } from './prompts'
+import { getCachedAnswer, cacheAnswer } from './answer-cache'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery, CHAIN_COVERS } from './tool-tiers'
 import { cacheMSTEntries, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
 import { buildCitations, calcConfidence } from './citations'
@@ -262,6 +263,16 @@ export async function* executeGeminiRAGStream(
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
+  // ── Answer Cache lookup (동일 질의 재호출 시 즉시 응답) ──
+  // conversationId/preEvidence 있으면 자동 스킵. TTL 6h, 품질 필터 적용.
+  const cacheOpts = { conversationId, hasPreEvidence: !!preEvidence }
+  const cached = await getCachedAnswer(query, cacheOpts)
+  if (cached) {
+    yield { type: 'status', message: '캐시된 답변 반환 중...', progress: 95 }
+    yield { type: 'answer', data: cached }
+    return
+  }
+
   // ── 대화 컨텍스트 ──
   const prevContext = await getConversationContext(conversationId)
 
@@ -306,15 +317,19 @@ export async function* executeGeminiRAGStream(
     return
   }
 
-  const systemPrompt = buildSystemPrompt(complexity, queryType, query, true /* isGemini */)
+  // 🔴 Context Cache 전략: systemInstruction은 100% 고정, 동적 부분은 user message 앞에 prefix.
+  // 같은 isGemini 값이면 매 호출마다 systemInstruction 문자열이 identical → Gemini 2.5+ implicit
+  // caching (min 1,024 tokens, 90% 할인) 자동 발동.
+  const systemPrompt = buildStaticSystemPrompt(true /* isGemini */)
+  const dynamicHeader = buildDynamicHeader(complexity, queryType, query)
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const selectedTools = new Set(selectToolsForQuery(query))
   const toolDeclarations = getToolDeclarations().filter(d => selectedTools.has(d.name!))
 
   const contextPrefix = prevContext ? `[이전 대화 맥락]\n${prevContext}\n\n---\n\n` : ''
   const userText = geminiEvidence
-    ? `${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
-    : `${contextPrefix}${query}`
+    ? `${dynamicHeader}${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
+    : `${dynamicHeader}${contextPrefix}${query}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: Array<{ role: 'user' | 'model'; parts: any[] }> = [
@@ -434,18 +449,18 @@ export async function* executeGeminiRAGStream(
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         // 대화 컨텍스트 저장
         await storeConversation(conversationId, query, answer)
-        yield {
-          type: 'answer',
-          data: {
-            answer,
-            citations: buildCitations(allToolResults, answer),
-            confidenceLevel: confidence,
-            complexity,
-            queryType,
-            isTruncated: accFinishReason === 'MAX_TOKENS',
-            warnings: warnings.length > 0 ? warnings : undefined,
-          },
+        const answerData = {
+          answer,
+          citations: buildCitations(allToolResults, answer),
+          confidenceLevel: confidence,
+          complexity,
+          queryType,
+          isTruncated: accFinishReason === 'MAX_TOKENS',
+          warnings: warnings.length > 0 ? warnings : undefined,
         }
+        // Answer Cache 저장 (warnings/low confidence/truncated는 내부 필터로 스킵)
+        await cacheAnswer(query, answerData, cacheOpts)
+        yield { type: 'answer', data: answerData }
         return
       }
 
