@@ -85,6 +85,26 @@ dc85f38 perf(fc-rag): 결정문 전문 스마트 압축 (섹션 인식 + 자연 
 
 ## 🔴 다음 세션 P0 (남은 버그)
 
+### 0. Fast-path 답변 Answer Cache 미저장 (프로덕션 실측 발견)
+**증상**: Fast-path article_resolve 경로로 처리된 답변이 Upstash에 저장되지
+않아, 동일 쿼리 재호출 시 매번 fast-path 풀 실행 (1~2초 반복 낭비).
+
+**원인**: [lib/fc-rag/engine-shared.ts](../lib/fc-rag/engine-shared.ts) 의
+`handleFastPath` 가 answer yield 하는 지점 5곳에서 `cacheAnswer()` 호출
+안 함. Phase 1b 구현 시 gemini-engine 의 normal 완료 경로에만 추가했음.
+
+**실측**: 프로덕션 `/api/fc-rag` 에 "근로기준법 제60조 연차휴가 요건"
+재호출 → fast-path 재실행 (2.1s). 반면 Upstash에 저장된 "국가공무원법
+제78조" 는 cache hit (1.6s, 이전 세션에서 full pipeline 타고 저장됨).
+
+**수정**:
+1. engine-shared 에 `import { cacheAnswer } from './answer-cache'` 추가
+2. handleFastPath 시그니처에 `cacheOpts: { conversationId?, hasPreEvidence? }` 추가
+3. 5개 answer yield 지점마다 `await cacheAnswer(query, data, cacheOpts)` 삽입
+4. gemini-engine 의 handleFastPath 호출부에서 cacheOpts 전달
+
+**예상 공수**: 10분. 재호출 성능 특히 단순 조회에서 2.1s → 0.3s 로 단축.
+
 ### 1. MST 280363 stale (반복 발생)
 **증상**: 관세법 쿼리에서 S2가 `search_law` 호출 → 결과 파싱 → `get_batch_articles(mst=280363, articles=[제119조, ...])` → 실패 `"법령 데이터를 찾을 수 없습니다 (280363)"`
 
