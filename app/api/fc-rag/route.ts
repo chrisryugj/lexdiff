@@ -13,12 +13,10 @@ import { debugLogger } from "@/lib/debug-logger"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import {
-  getUsageHeaders,
   getUsageWarningMessage,
-  isQuotaExceeded,
   recordAITokens,
-  recordAIUsage,
 } from "@/lib/usage-tracker"
+import { requireAiAuth } from "@/lib/api-auth"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
 import { getClientIP } from "@/lib/get-client-ip"
@@ -130,19 +128,9 @@ export async function POST(request: NextRequest) {
 
   const { query, conversationId, preEvidence } = validation.data
 
-  // 사용자 API 키 경로에도 quota 적용 — bypass 차단 (S2)
-  // 사용자 키가 있어도 IP 기준 별도 한도(완화)를 두어 Hermes/Gemini 비용 도용 차단
-  let usageHeaders: Record<string, string> | undefined
-  if (await isQuotaExceeded(clientIP)) {
-    return Response.json(
-      { error: "일일 AI 검색 시도를 초과했습니다. 내일 다시 시도해 주세요." },
-      { status: 429, headers: await getUsageHeaders(clientIP) }
-    )
-  }
-  await recordAIUsage(clientIP)
-  if (!userApiKey) {
-    usageHeaders = await getUsageHeaders(clientIP)
-  }
+  // Supabase 사용자 인증 + 기능별 쿼터 (BYOK 시 스킵)
+  const auth = await requireAiAuth(request, 'fc_rag')
+  if ('error' in auth) return auth.error
 
   const traceId = generateTraceId()
   traceLogger.startTrace(traceId, query)
@@ -405,12 +393,6 @@ export async function POST(request: NextRequest) {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
-  }
-
-  if (usageHeaders) {
-    for (const [key, value] of Object.entries(usageHeaders)) {
-      headers[key] = value
-    }
   }
 
   return new Response(stream, { headers })

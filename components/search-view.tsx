@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { ApiKeyInput } from "@/components/settings/api-key-input"
+import { UserMenu } from "@/components/user-menu"
+import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useApiKey } from "@/hooks/use-api-key"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { LawStatsFooter } from "@/components/shared/law-stats-footer"
@@ -47,6 +49,7 @@ export function SearchView({
 }: SearchViewProps) {
   const [favoritesDialogOpen, setFavoritesDialogOpen] = useState(false)
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const { apiKey, saveKey, clearKey } = useApiKey()
   const isHeaderVisible = useScrollDirection()  // PERF-3: 통합 훅 사용
@@ -155,6 +158,12 @@ export function SearchView({
               </Button>
 
               <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} variant="dock" />
+
+              <UserMenu
+                onLoginClick={() => setLoginDialogOpen(true)}
+                onFavoriteSelect={onFavoriteSelect}
+                onAllFavoritesClick={() => setFavoritesDialogOpen(true)}
+              />
             </div>
           </div>
         </div>
@@ -279,6 +288,10 @@ export function SearchView({
       <HelpGuideSheet
         open={helpSheetOpen}
         onOpenChange={setHelpSheetOpen}
+      />
+      <AiGateDialog
+        open={loginDialogOpen}
+        onClose={() => setLoginDialogOpen(false)}
       />
       <ErrorReportDialog />
     </div>

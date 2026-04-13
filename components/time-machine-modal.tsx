@@ -10,17 +10,44 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { sanitizeForRender } from "@/lib/sanitize-html-render"
-import type { LawMeta, LawArticle } from "@/lib/law-types"
-import { parseLawJSON } from "@/lib/law-json-parser"
-import { highlightDifferences } from "@/lib/oldnew-parser"
+import type { LawMeta } from "@/lib/law-types"
+import { parseOldNewXML, highlightDifferences } from "@/lib/oldnew-parser"
 import {
   findVersionByDate,
   formatDateDisplay,
   type HistoryItem,
   type VersionMatch,
-  getTimeMachineCacheKey,
   TIME_MACHINE_CACHE_TTL,
 } from "@/lib/time-machine/version-finder"
+
+// ── 리비전별 신구대조 캐시 (revision mst 기준) ──────────────
+interface CachedDiff {
+  oldContent: string
+  newContent: string
+  expiresAt: number
+}
+
+function getDiffCached(revMst: string): CachedDiff | null {
+  try {
+    const raw = localStorage.getItem(`time-machine-diff:${revMst}`)
+    if (!raw) return null
+    const cached: CachedDiff = JSON.parse(raw)
+    if (Date.now() > cached.expiresAt) {
+      localStorage.removeItem(`time-machine-diff:${revMst}`)
+      return null
+    }
+    return cached
+  } catch { return null }
+}
+
+function setDiffCache(revMst: string, data: Omit<CachedDiff, 'expiresAt'>): void {
+  try {
+    localStorage.setItem(`time-machine-diff:${revMst}`, JSON.stringify({
+      ...data,
+      expiresAt: Date.now() + TIME_MACHINE_CACHE_TTL,
+    }))
+  } catch { /* ignore */ }
+}
 
 // ── Props ───────────────────────────────────────────────────
 interface TimeMachineModalProps {
@@ -29,48 +56,6 @@ interface TimeMachineModalProps {
   meta: LawMeta
 }
 
-// ── 조문을 텍스트로 합치기 ──────────────────────────────────
-function articlesToText(articles: LawArticle[]): string {
-  return articles
-    .filter(a => !a.isPreamble)
-    .map(a => {
-      const header = a.joNum || ''
-      const title = a.title ? `(${a.title})` : ''
-      const content = a.content || ''
-      return `${header}${title}\n${content}`
-    })
-    .join('\n\n')
-}
-
-// ── 캐시 ────────────────────────────────────────────────────
-interface CachedResult {
-  pastText: string
-  currentText: string
-  versionMatch: VersionMatch
-  expiresAt: number
-}
-
-function getCached(mst: string, date: string): CachedResult | null {
-  try {
-    const raw = localStorage.getItem(getTimeMachineCacheKey(mst, date))
-    if (!raw) return null
-    const cached: CachedResult = JSON.parse(raw)
-    if (Date.now() > cached.expiresAt) {
-      localStorage.removeItem(getTimeMachineCacheKey(mst, date))
-      return null
-    }
-    return cached
-  } catch { return null }
-}
-
-function setCache(mst: string, date: string, data: Omit<CachedResult, 'expiresAt'>): void {
-  try {
-    localStorage.setItem(getTimeMachineCacheKey(mst, date), JSON.stringify({
-      ...data,
-      expiresAt: Date.now() + TIME_MACHINE_CACHE_TTL,
-    }))
-  } catch { /* ignore */ }
-}
 
 // ── 컴포넌트 ────────────────────────────────────────────────
 export const TimeMachineModal = memo(function TimeMachineModal({
@@ -85,8 +70,10 @@ export const TimeMachineModal = memo(function TimeMachineModal({
 
   // 결과
   const [versionMatch, setVersionMatch] = useState<VersionMatch | null>(null)
-  const [pastText, setPastText] = useState('')
-  const [currentText, setCurrentText] = useState('')
+  const [oldContent, setOldContent] = useState('')
+  const [newContent, setNewContent] = useState('')
+  const [selectedRevision, setSelectedRevision] = useState<HistoryItem | null>(null)
+  const [noRevisions, setNoRevisions] = useState(false)
 
   // UI 상태
   const [syncScroll, setSyncScroll] = useState(true)
@@ -107,28 +94,51 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       d.setFullYear(d.getFullYear() - 1)
       setTargetDate(d.toISOString().slice(0, 10))
       setVersionMatch(null)
-      setPastText('')
-      setCurrentText('')
+      setOldContent('')
+      setNewContent('')
+      setSelectedRevision(null)
+      setNoRevisions(false)
       setError(null)
       setShowHistory(false)
     }
     return () => { abortRef.current?.abort() }
   }, [isOpen])
 
+  // 특정 개정의 신구대조 XML 조회
+  const fetchRevisionDiff = useCallback(async (rev: HistoryItem, signal: AbortSignal) => {
+    const cached = getDiffCached(rev.mst)
+    if (cached) {
+      setOldContent(cached.oldContent)
+      setNewContent(cached.newContent)
+      setSelectedRevision(rev)
+      if (!cached.oldContent && !cached.newContent) {
+        throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
+      }
+      return
+    }
+
+    const res = await fetch(`/api/oldnew?mst=${encodeURIComponent(rev.mst)}`, { signal })
+    if (signal.aborted) return
+    if (!res.ok) throw new Error('신·구법 대조 조회 실패')
+
+    const xmlText = await res.text()
+    if (signal.aborted) return
+
+    const parsed = parseOldNewXML(xmlText)
+    setOldContent(parsed.oldVersion.content)
+    setNewContent(parsed.newVersion.content)
+    setSelectedRevision(rev)
+    setDiffCache(rev.mst, { oldContent: parsed.oldVersion.content, newContent: parsed.newVersion.content })
+
+    if (!parsed.oldVersion.content && !parsed.newVersion.content) {
+      throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
+    }
+  }, [])
+
   // 조회 실행
   const handleSearch = useCallback(async (overrideDate?: string) => {
     const searchDate = overrideDate || targetDate
     if (!searchDate || (!meta.mst && !meta.lawId)) return
-
-    // 캐시 체크
-    const cached = meta.mst ? getCached(meta.mst, searchDate) : null
-    if (cached) {
-      setVersionMatch(cached.versionMatch)
-      setPastText(cached.pastText)
-      setCurrentText(cached.currentText)
-      setShowHistory(true)
-      return
-    }
 
     abortRef.current?.abort()
     abortRef.current = new AbortController()
@@ -136,6 +146,10 @@ export const TimeMachineModal = memo(function TimeMachineModal({
 
     setIsLoading(true)
     setError(null)
+    setOldContent('')
+    setNewContent('')
+    setSelectedRevision(null)
+    setNoRevisions(false)
 
     try {
       // Step 1: 연혁 조회 (lawId 우선 — ID 경로만 진짜 단일 법령 연혁 반환)
@@ -163,46 +177,49 @@ export const TimeMachineModal = memo(function TimeMachineModal({
         return
       }
 
-      // Step 3: 두 버전 법령 텍스트 병렬 조회
-      const [pastRes, currentRes] = await Promise.all([
-        fetch(`/api/eflaw?mst=${match.pastVersion.mst}`, { signal }),
-        fetch(`/api/eflaw?mst=${match.currentVersion.mst}`, { signal }),
-      ])
-
-      if (signal.aborted) return
-      if (!pastRes.ok || !currentRes.ok) throw new Error('법령 텍스트 조회 실패')
-
-      const [pastData, currentData] = await Promise.all([pastRes.json(), currentRes.json()])
-      const pastLaw = parseLawJSON(pastData)
-      const currentLaw = parseLawJSON(currentData)
-      const pastArticles: LawArticle[] = pastLaw.articles
-      const currentArticles: LawArticle[] = currentLaw.articles
-
-      const pText = articlesToText(pastArticles)
-      const cText = articlesToText(currentArticles)
-
       setVersionMatch(match)
-      setPastText(pText)
-      setCurrentText(cText)
       setShowHistory(true)
 
-      // 캐싱
-      if (meta.mst) {
-        setCache(meta.mst, searchDate, { pastText: pText, currentText: cText, versionMatch: match })
+      // Step 3: 기간 내 개정이 없으면 안내만
+      if (match.betweenRevisions.length === 0) {
+        setNoRevisions(true)
+        return
       }
+
+      // Step 4: 가장 최근 개정의 신구대조 기본 표시
+      const latestRev = match.betweenRevisions[match.betweenRevisions.length - 1]
+      await fetchRevisionDiff(latestRev, signal)
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsLoading(false)
     }
-  }, [targetDate, meta])
+  }, [targetDate, meta, fetchRevisionDiff])
+
+  // 사이드바에서 특정 개정 선택
+  const handleRevisionSelect = useCallback(async (rev: HistoryItem) => {
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+    const signal = abortRef.current.signal
+
+    setIsLoading(true)
+    setError(null)
+    try {
+      await fetchRevisionDiff(rev, signal)
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [fetchRevisionDiff])
 
   // Diff 하이라이트 (메모이제이션)
   const { oldHighlighted, newHighlighted } = useMemo(() => {
-    if (!pastText || !currentText) return { oldHighlighted: '', newHighlighted: '' }
-    return highlightDifferences(pastText, currentText)
-  }, [pastText, currentText])
+    if (!oldContent || !newContent) return { oldHighlighted: '', newHighlighted: '' }
+    return highlightDifferences(oldContent, newContent)
+  }, [oldContent, newContent])
 
   // Sync scroll
   const handleScroll = useCallback((source: "old" | "new") => {
@@ -228,7 +245,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setTimeout(() => { isScrollingRef.current = false }, 50)
   }, [syncScroll])
 
-  const hasResult = versionMatch && pastText && currentText
+  const hasResult = versionMatch && oldContent && newContent && selectedRevision
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -345,17 +362,17 @@ export const TimeMachineModal = memo(function TimeMachineModal({
             })}
           </div>
 
-          {/* 적용 버전 정보 */}
-          {versionMatch && (
+          {/* 표시 중인 개정 정보 */}
+          {selectedRevision && (
             <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
               <Icon name="info" size={12} className="text-muted-foreground" />
-              <span className="text-muted-foreground">적용 버전:</span>
+              <span className="text-muted-foreground">표시 중:</span>
               <Badge variant="outline" className="text-xs h-5">
-                {versionMatch.pastVersion.ancNo}
+                {selectedRevision.ancNo}
               </Badge>
               <span className="text-muted-foreground">
-                ({formatDateDisplay(versionMatch.pastVersion.ancYd)} 공포,
-                {' '}{formatDateDisplay(versionMatch.pastVersion.efYd)} 시행)
+                ({formatDateDisplay(selectedRevision.ancYd)} 공포,
+                {' '}{formatDateDisplay(selectedRevision.efYd)} 시행 · {selectedRevision.rrCls})
               </span>
             </div>
           )}
@@ -379,13 +396,13 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                   {versionMatch.betweenRevisions.map((rev, i) => (
                     <button
                       key={`${rev.mst}-${i}`}
-                      onClick={() => {
-                        const d = rev.efYd
-                        const formatted = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`
-                        setTargetDate(formatted)
-                        handleSearch(formatted)
-                      }}
-                      className="w-full text-left p-2.5 rounded-md border border-border bg-card hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer"
+                      onClick={() => handleRevisionSelect(rev)}
+                      className={cn(
+                        "w-full text-left p-2.5 rounded-md border transition-colors cursor-pointer",
+                        selectedRevision?.mst === rev.mst
+                          ? "bg-primary/10 border-primary/50"
+                          : "bg-card border-border hover:bg-muted/50 hover:border-primary/30"
+                      )}
                     >
                       <div className="flex items-center gap-1.5 mb-1">
                         <Badge variant="outline" className="text-[10px] h-4">{rev.rrCls}</Badge>
@@ -421,16 +438,25 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                   </Button>
                 </div>
               </div>
+            ) : noRevisions ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-3 max-w-md px-4">
+                  <Icon name="check-circle" size={40} className="mx-auto text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground">
+                    {targetDate} 이후 이 법령의 개정이 없습니다.
+                  </p>
+                </div>
+              </div>
             ) : hasResult ? (
               <div className="flex flex-col sm:grid sm:grid-cols-2 gap-0 h-full">
-                {/* 과거 (좌측) */}
+                {/* 구조문 (좌측) */}
                 <div className="border-b sm:border-b-0 sm:border-r border-border flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-rose-500/5 to-transparent">
                   <div className="bg-gradient-to-r from-rose-500/15 via-rose-500/10 to-rose-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-rose-500/20 shrink-0">
                     <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2">
                       <Icon name="history" size={18} className="text-rose-500" />
-                      <span>과거</span>
+                      <span>구조문</span>
                       <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
-                        {targetDate} 기준
+                        개정 전
                       </span>
                     </h3>
                   </div>
@@ -442,19 +468,19 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                     <div
                       className="leading-relaxed max-w-none text-foreground whitespace-pre-wrap"
                       style={{ fontSize: `${fontSize}px`, fontFamily: 'Pretendard, sans-serif' }}
-                      dangerouslySetInnerHTML={{ __html: sanitizeForRender(oldHighlighted || pastText || "내용 없음") }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeForRender(oldHighlighted || "내용 없음") }}
                     />
                   </div>
                 </div>
 
-                {/* 현행 (우측) */}
+                {/* 신조문 (우측) */}
                 <div className="flex flex-col min-h-0 h-1/2 sm:h-full bg-gradient-to-b from-emerald-500/5 to-transparent">
                   <div className="bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-emerald-500/5 px-3 sm:px-4 py-2 sm:py-3 border-b-2 border-emerald-500/20 shrink-0">
                     <h3 className="font-bold text-xs sm:text-base text-foreground flex items-center gap-2">
                       <Icon name="sparkles" size={18} className="text-emerald-500" />
-                      <span>현행</span>
+                      <span>신조문</span>
                       <span className="text-[10px] sm:text-xs text-muted-foreground font-normal">
-                        최신 시행
+                        {selectedRevision && formatDateDisplay(selectedRevision.efYd)} 시행
                       </span>
                     </h3>
                   </div>
@@ -466,7 +492,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                     <div
                       className="leading-relaxed max-w-none text-foreground whitespace-pre-wrap"
                       style={{ fontSize: `${fontSize}px`, fontFamily: 'Pretendard, sans-serif' }}
-                      dangerouslySetInnerHTML={{ __html: sanitizeForRender(newHighlighted || currentText || "내용 없음") }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeForRender(newHighlighted || "내용 없음") }}
                     />
                   </div>
                 </div>
@@ -500,7 +526,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                     borderLeft: "2px solid rgba(16, 185, 129, 0.4)"
                   }}
                 />
-                <span className="text-muted-foreground font-medium">현행 추가</span>
+                <span className="text-muted-foreground font-medium">신조문 (개정 후)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div
@@ -510,7 +536,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                     borderLeft: "2px solid rgba(244, 63, 94, 0.4)"
                   }}
                 />
-                <span className="text-muted-foreground font-medium">과거 삭제</span>
+                <span className="text-muted-foreground font-medium">구조문 (개정 전)</span>
               </div>
               {versionMatch && versionMatch.betweenRevisions.length > 0 && (
                 <Button

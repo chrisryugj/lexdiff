@@ -9,16 +9,9 @@
 
 import { NextRequest } from 'next/server'
 import { executeImpactAnalysis } from '@/lib/impact-tracker/engine'
-import {
-  getUsageHeaders,
-  isQuotaExceeded,
-  recordAIUsage,
-} from '@/lib/usage-tracker'
-import { getClientIP } from '@/lib/get-client-ip'
+import { requireAiAuth } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
-  const clientIP = getClientIP(request)
-
   // Body 파싱
   let lawNames: string[]
   let dateFrom: string
@@ -55,16 +48,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 할당량 확인 + 선예약 (S5: bypass 차단 — cancel 직후 카운트되어야 도용 불가)
-  if (await isQuotaExceeded(clientIP)) {
-    return Response.json(
-      { error: '일일 AI 검색 시도를 초과했습니다. 내일 다시 시도해 주세요.' },
-      { status: 429, headers: await getUsageHeaders(clientIP) },
-    )
-  }
-  await recordAIUsage(clientIP)
-  const usageHeaders = await getUsageHeaders(clientIP)
-  const userApiKey = request.headers.get('X-User-API-Key') || undefined
+  // 인증 + 기능별 쿼터 (BYOK 시 스킵)
+  const auth = await requireAiAuth(request, 'impact')
+  if ('error' in auth) return auth.error
+  const userApiKey = auth.ctx.byokKey || undefined
   const encoder = new TextEncoder()
 
   const abortController = new AbortController()
@@ -116,10 +103,6 @@ export async function POST(request: NextRequest) {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
-  }
-
-  for (const [key, value] of Object.entries(usageHeaders)) {
-    headers[key] = value
   }
 
   return new Response(stream, { headers })

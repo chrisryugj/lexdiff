@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { SearchView } from "@/components/search-view"
 import { SearchResultView } from "@/components/search-result-view"
@@ -93,18 +93,16 @@ export default function Home() {
     mst: string
   }>({ isOpen: false, lawTitle: '', mst: '' })
 
-  // AI 비밀번호 게이트
-  const { showGate, requireAuth, handleSubmit: handleGateSubmit, handleClose: handleGateClose } = useAiGate()
-
-  // AI 게이트: 인증 후 재검색용 쿼리
-  const gateRetryQueryRef = useRef<string | null>(null)
+  // AI 인증 게이트 (Google 로그인)
+  const { showGate, requireAuth, handleClose: handleGateClose } = useAiGate()
 
   // AI 게이트 이벤트 수신 (useAiSearch에서 게이트 미인증 시 발송)
   useEffect(() => {
     const handler = (e: Event) => {
       const query = (e as CustomEvent).detail?.query as string | undefined
-      gateRetryQueryRef.current = query || null
-      requireAuth(() => { /* handleGateSuccess에서 처리 */ })
+      requireAuth(() => {
+        if (query) handleSearch({ lawName: query })
+      })
     }
     window.addEventListener('lexdiff:ai-gate-required', handler)
     return () => window.removeEventListener('lexdiff:ai-gate-required', handler)
@@ -238,19 +236,6 @@ export default function Home() {
       debugLogger.error('❌ 검색 실패', error)
       setIsSearching(false)
     }
-  }
-
-  // AI 게이트 인증 성공 래퍼 (인증 후 자동 재검색)
-  // UX-10: race 방지 — query를 클로저에 캡처하고 ref는 즉시 비움
-  const handleGateSubmitWithRetry = (pin: string): boolean => {
-    const result = handleGateSubmit(pin)
-    if (!result) return result
-    const query = gateRetryQueryRef.current
-    if (!query) return result
-    gateRetryQueryRef.current = null  // 동기 즉시 클리어 → 후속 호출 중복 차단
-    // 게이트 다이얼로그 닫힘 애니메이션 후 검색 실행
-    setTimeout(() => handleSearch({ lawName: query }), 0)
-    return result
   }
 
   // 즐겨찾기 선택 핸들러
@@ -474,10 +459,9 @@ export default function Home() {
         />
       )}
 
-      {/* AI 비밀번호 게이트 */}
+      {/* AI 인증 게이트 (Google 로그인) */}
       <AiGateDialog
         open={showGate}
-        onSubmit={handleGateSubmitWithRetry}
         onClose={handleGateClose}
       />
     </>

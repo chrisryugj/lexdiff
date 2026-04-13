@@ -8,15 +8,19 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UserMenu } from "@/components/user-menu"
+import type { Favorite } from "@/lib/law-types"
 
 interface HeaderProps {
   onReset?: () => void
   onFavoritesClick?: () => void
   onSettingsClick?: () => void
   onHelpClick?: () => void
+  onLoginClick?: () => void
+  onFavoriteSelect?: (fav: Favorite) => void
 }
 
-export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick }: HeaderProps) {
+export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick, onLoginClick, onFavoriteSelect }: HeaderProps) {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const router = useRouter()
 
@@ -94,6 +98,13 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
           >
             <Icon name="settings" size={20} className="text-muted-foreground hover:text-foreground transition-colors" />
           </Button>
+
+          {/* 사용자 메뉴 */}
+          <UserMenu
+            onLoginClick={onLoginClick || (() => {})}
+            onFavoriteSelect={onFavoriteSelect || (() => {})}
+            onAllFavoritesClick={onFavoritesClick}
+          />
         </div>
       </div>
     </header>

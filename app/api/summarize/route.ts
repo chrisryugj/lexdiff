@@ -1,9 +1,10 @@
 import { GoogleGenAI } from "@google/genai"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
-import { getUsageHeaders, isQuotaExceeded, recordAITokens, recordAIUsage } from "@/lib/usage-tracker"
+import { recordAITokens } from "@/lib/usage-tracker"
 import { getClientIP } from "@/lib/get-client-ip"
 import { AI_CONFIG } from "@/lib/ai-config"
+import { requireAiAuth, resolveGeminiKey } from "@/lib/api-auth"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -61,17 +62,11 @@ ${sanitizePromptInput(params.newContent).substring(0, 3000)}
 각 변경사항은 무엇이 어떻게 바뀌었는지 명확하게 설명하고, 원문 근거가 없는 해석은 추가하지 마세요.`
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request)
 
-  // API-10: quota 체크 + 선예약을 try 밖으로 — Redis 예외가 silent 500으로 새지 않게
-  if (await isQuotaExceeded(clientIP)) {
-    return NextResponse.json(
-      { error: "일일 AI 사용 시도를 초과했습니다." },
-      { status: 429, headers: await getUsageHeaders(clientIP) }
-    )
-  }
-  await recordAIUsage(clientIP)
+  const auth = await requireAiAuth(request, 'summarize')
+  if ('error' in auth) return auth.error
 
   try {
     const contentLength = Number(request.headers.get("content-length") || "0")
@@ -89,7 +84,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "판례 본문이 필요합니다." }, { status: 400 })
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = resolveGeminiKey(auth.ctx)
     if (!apiKey) {
       debugLogger.error("GEMINI_API_KEY is missing")
       return NextResponse.json(

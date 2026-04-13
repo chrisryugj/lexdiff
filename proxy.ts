@@ -17,6 +17,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
 // ─── CSP nonce ───
 
@@ -108,12 +109,58 @@ function applyCspNonce(request: NextRequest): NextResponse {
   return res
 }
 
-export function proxy(request: NextRequest): NextResponse {
+/**
+ * Supabase 세션 리프레시 — Supabase 공식 SSR 패턴.
+ *
+ * setAll에서 request.cookies와 새 NextResponse 양쪽에 토큰을 반영해야
+ * 동일 요청 내에서 갱신된 액세스 토큰이 누락되지 않는다. (세션 풀림 방지)
+ *
+ * 호출자는 반환된 NextResponse를 그대로 반환해야 한다. CORS/CSP 헤더는
+ * 그 위에 머지한다.
+ */
+async function refreshSupabaseSession(
+  request: NextRequest,
+  baseResponse: NextResponse
+): Promise<NextResponse> {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anon) return baseResponse
+
+  let response = baseResponse
+  try {
+    const supabase = createServerClient(url, anon, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // 새 응답 객체 생성 — 기존 헤더 복사
+          const refreshed = NextResponse.next({ request })
+          baseResponse.headers.forEach((v, k) => refreshed.headers.set(k, v))
+          baseResponse.cookies.getAll().forEach(c => refreshed.cookies.set(c))
+          cookiesToSet.forEach(({ name, value, options }) =>
+            refreshed.cookies.set(name, value, options)
+          )
+          response = refreshed
+        },
+      },
+    })
+    // 중요: createServerClient와 getUser() 사이에 다른 코드를 넣으면 안 됨
+    await supabase.auth.getUser()
+  } catch {
+    // 세션 리프레시 실패는 페이지 렌더링을 막지 않는다.
+  }
+  return response
+}
+
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname
 
   // /api/* 는 CORS 처리, 그 외는 CSP nonce 경로
   if (!pathname.startsWith('/api/')) {
-    return applyCspNonce(request)
+    const res = applyCspNonce(request)
+    return await refreshSupabaseSession(request, res)
   }
 
   const origin = request.headers.get('origin')
@@ -132,7 +179,7 @@ export function proxy(request: NextRequest): NextResponse {
     const h = buildCorsHeaders(origin)
     h.forEach((v, k) => res.headers.set(k, v))
   }
-  return res
+  return await refreshSupabaseSession(request, res)
 }
 
 // CSP nonce 경로 때문에 matcher 확장: /api/* + 그 외 페이지 요청 (static 자원 제외)

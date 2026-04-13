@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/icon"
 import { debugLogger } from "@/lib/debug-logger"
 import { CopyButton } from "@/components/ui/copy-button"
 import { formatDate } from "@/lib/revision-parser"
+import { useApiKey } from "@/hooks/use-api-key"
 
 interface AISummaryDialogProps {
   isOpen: boolean
@@ -35,6 +36,7 @@ export function AISummaryDialog({
   const [summary, setSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("small")
+  const { apiKey } = useApiKey()
 
   const generateSummary = async () => {
     setIsLoading(true)
@@ -44,9 +46,12 @@ export function AISummaryDialog({
     try {
       debugLogger.info("AI 요약 요청", { lawTitle, joNum })
 
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (apiKey) headers["x-user-api-key"] = apiKey
+
       const response = await fetch("/api/summarize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           lawTitle,
           joNum,

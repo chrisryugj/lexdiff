@@ -253,9 +253,14 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         orgShortName: r.orgShortName, orgName: r.orgName,
         ordinanceName: r.ordinanceName, ordinanceSeq: r.ordinanceSeq!,
       }))
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      try {
+        const userKey = sessionStorage.getItem('lexdiff-gemini-api-key')
+        if (userKey) headers['x-user-api-key'] = userKey
+      } catch { /* ignore */ }
       const res = await fetch('/api/benchmark-analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ keyword, ordinances: items, focus: focusInput.trim() || undefined }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)

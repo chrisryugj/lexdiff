@@ -40,10 +40,12 @@ export function StageIndicator({
 }: StageIndicatorProps) {
   const currentStageIndex = AI_STAGES.findIndex((s) => s.key === currentStage)
   const [stageElapsedTime, setStageElapsedTime] = useState(0)
+  const [totalElapsedTime, setTotalElapsedTime] = useState(0)
   const stageStartTimeRef = useRef<number | null>(null)
+  const totalStartTimeRef = useRef<number | null>(null)
   const prevStageRef = useRef<AISearchStage | null>(null)
 
-  // 단계별 타이머 - 각 단계 진입 시 0초로 리셋
+  // 단계별 + 전체 타이머
   useEffect(() => {
     // 단계 변경 감지
     if (currentStage !== prevStageRef.current) {
@@ -52,16 +54,26 @@ export function StageIndicator({
       prevStageRef.current = currentStage
     }
 
-    // 완료 시 타이머 정지
+    // 전체 타이머는 마운트 시 1회만 시작
+    if (totalStartTimeRef.current === null) {
+      totalStartTimeRef.current = Date.now()
+    }
+
+    // 완료 시 타이머 정지 (마지막 값 유지)
     if (currentStage === 'complete') {
+      if (totalStartTimeRef.current) {
+        setTotalElapsedTime((Date.now() - totalStartTimeRef.current) / 1000)
+      }
       return
     }
 
     // 타이머 업데이트
     const interval = setInterval(() => {
       if (stageStartTimeRef.current) {
-        const elapsed = (Date.now() - stageStartTimeRef.current) / 1000
-        setStageElapsedTime(elapsed)
+        setStageElapsedTime((Date.now() - stageStartTimeRef.current) / 1000)
+      }
+      if (totalStartTimeRef.current) {
+        setTotalElapsedTime((Date.now() - totalStartTimeRef.current) / 1000)
       }
     }, 100)
 
@@ -155,13 +167,21 @@ export function StageIndicator({
 
       {/* 프로그레스 바 - 개선된 디자인 */}
       <div className="space-y-2 md:space-y-3">
-        <div className="flex items-center justify-between text-xs md:text-sm">
+        <div className="flex items-center justify-between text-xs md:text-sm gap-2">
           <span className="text-muted-foreground font-medium">
             {STAGE_MESSAGES[currentStage]}
           </span>
-          <span className="font-bold text-primary tabular-nums min-w-[4ch] text-right">
-            {Math.round(progress)}%
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 ring-1 ring-primary/20 text-primary shadow-sm">
+              <Icon name="clock" className="h-3 w-3 opacity-80" />
+              <span className="text-[11px] md:text-xs font-semibold tabular-nums leading-none">
+                {totalElapsedTime.toFixed(1)}s
+              </span>
+            </span>
+            <span className="font-bold text-primary tabular-nums min-w-[4ch] text-right">
+              {Math.round(progress)}%
+            </span>
+          </div>
         </div>
         <div className="h-2.5 md:h-3 bg-muted/50 rounded-full overflow-hidden shadow-inner">
           <div

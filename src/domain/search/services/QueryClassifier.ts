@@ -176,7 +176,7 @@ export function classifySearchQuery(query: string): UnifiedQueryClassification {
   // 10. 최종 결과 반환
   return {
     searchType,
-    secondaryTypes: compoundQuery.isCompound ? compoundQuery.types.slice(1) as SearchType[] : undefined,
+    secondaryTypes: compoundQuery.isCompound ? compoundQuery.types as SearchType[] : undefined,
     confidence,
     legalQueryType: legalQuestion.type,
     domain: domainResult.domain,

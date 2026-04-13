@@ -11,9 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AI_CONFIG } from '@/lib/ai-config'
 import { safeErrorResponse } from '@/lib/api-error'
-import { getClientIP } from '@/lib/get-client-ip'
-import { isQuotaExceeded, recordAIUsage, getUsageHeaders } from '@/lib/usage-tracker'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
+import { requireAiAuth, type AiAuthContext } from '@/lib/api-auth'
 
 // ── 조례 본문 조회 ──
 
@@ -113,8 +112,8 @@ function parseAnalysisResponse(text: string): { comparisonTable: string; highlig
 
 // ── Gemini ──
 
-async function callGemini(prompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY
+async function callGemini(prompt: string, ctx: AiAuthContext): Promise<string> {
+  const apiKey = ctx.byokKey || process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.')
 
   const { GoogleGenAI } = await import('@google/genai')
@@ -129,14 +128,8 @@ async function callGemini(prompt: string): Promise<string> {
 // ── 메인 핸들러 ──
 
 export async function POST(request: NextRequest) {
-  // Rate limiting
-  const clientIP = getClientIP(request)
-  if (await isQuotaExceeded(clientIP)) {
-    return NextResponse.json(
-      { error: '일일 AI 사용량 초과. 내일 다시 시도해주세요.' },
-      { status: 429, headers: await getUsageHeaders(clientIP) },
-    )
-  }
+  const auth = await requireAiAuth(request, 'benchmark')
+  if ('error' in auth) return auth.error
 
   let keyword: string
   let focus: string | undefined
@@ -177,9 +170,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '조례 항목 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  // 사용량 선예약 (S6: bypass 차단)
-  await recordAIUsage(clientIP)
-
   // 조례 본문 병렬 조회 (상위 8개)
   const targets = ordinances.slice(0, 8)
   const texts = await Promise.all(
@@ -200,8 +190,8 @@ export async function POST(request: NextRequest) {
   const prompt = buildPrompt(keyword, validTexts, focus)
 
   try {
-    const geminiAnswer = await callGemini(prompt)
-    return NextResponse.json(parseAnalysisResponse(geminiAnswer), { headers: await getUsageHeaders(clientIP) })
+    const geminiAnswer = await callGemini(prompt, auth.ctx)
+    return NextResponse.json(parseAnalysisResponse(geminiAnswer))
   } catch (err: unknown) {
     return safeErrorResponse(err, "AI 분석 실패")
   }
