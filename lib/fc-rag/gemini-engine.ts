@@ -12,6 +12,22 @@ import { buildCitations, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { evaluateResponseQuality } from './quality-evaluator'
 import {
+  isDecisionSearchTool, isDecisionGetTool, isDecisionTool,
+  extractDomain, DOMAIN_META,
+  SEARCH_DECISIONS_TOOL, GET_DECISION_TEXT_TOOL,
+  type DecisionDomain,
+} from './decision-domains'
+
+/** 도메인 인식 displayName — unified-decisions 는 도메인별 라벨, 그 외는 TOOL_DISPLAY_NAMES */
+function displayNameFor(name: string, args?: Record<string, unknown>): string {
+  if (isDecisionTool(name)) {
+    const d = extractDomain(args)
+    const label = d ? DOMAIN_META[d].label : '결정문'
+    return isDecisionSearchTool(name) ? `${label} 검색` : `${label} 조회`
+  }
+  return TOOL_DISPLAY_NAMES[name] || name
+}
+import {
   type FCRAGStreamEvent,
   type RAGStreamOptions,
   type GeminiPart,
@@ -37,8 +53,10 @@ function buildAutoChains(
 ): Array<{ name: string; args: Record<string, unknown> }> {
   const autoChains: Array<{ name: string; args: Record<string, unknown> }> = []
 
-  // search_precedents 0건 시 키워드 단순화 재검색
-  const precedentSearches = results.filter(r => r.name === 'search_precedents' && !r.isError)
+  // search_decisions (precedent 도메인) 0건 시 키워드 단순화 재검색
+  const precedentSearches = results.filter(r =>
+    isDecisionSearchTool(r.name) && !r.isError && extractDomain(r.args) === 'precedent'
+  )
   if (precedentSearches.length > 0) {
     const hasResults = precedentSearches.some(r => /총 [1-9]\d*건/.test(r.result))
     if (!hasResults) {
@@ -51,7 +69,10 @@ function buildAutoChains(
         .filter(w => w.length >= 2)
         .slice(0, 3)
       if (coreKeywords.length >= 2) {
-        autoChains.push({ name: 'search_precedents', args: { query: coreKeywords.join(' ') } })
+        autoChains.push({
+          name: SEARCH_DECISIONS_TOOL,
+          args: { domain: 'precedent', query: coreKeywords.join(' ') },
+        })
       }
     }
   }
@@ -75,12 +96,29 @@ function buildAutoChains(
     }
   }
 
-  // search_interpretations → get_interpretation_text
-  const interpSearchOK = results.filter(r => r.name === 'search_interpretations' && !r.isError)
-  const alreadyGotInterpText = results.some(r => r.name === 'get_interpretation_text')
-  if (interpSearchOK.length > 0 && !alreadyGotInterpText) {
-    const idMatch = interpSearchOK[0].result.match(/(?:ID|id)[:\s]+(\S+)/)
-    if (idMatch) autoChains.push({ name: 'get_interpretation_text', args: { id: idMatch[1] } })
+  // search_decisions → get_decision_text (동일 도메인 자동 체인)
+  // 이미 get_decision_text 호출된 도메인은 제외. 한 턴에 최대 1개만 자동 추가.
+  const fetchedDomains = new Set<DecisionDomain>()
+  for (const r of results) {
+    if (isDecisionGetTool(r.name)) {
+      const d = extractDomain(r.args) as DecisionDomain | null
+      if (d) fetchedDomains.add(d)
+    }
+  }
+  for (const r of results) {
+    if (!isDecisionSearchTool(r.name) || r.isError) continue
+    const domain = extractDomain(r.args) as DecisionDomain | null
+    if (!domain || fetchedDomains.has(domain)) continue
+    // 해석례는 ID, 판례/헌재/행정심판은 사건번호, 조세심판은 일련번호 등 — 범용 매칭
+    const idMatch = r.result.match(/(?:ID|id|일련번호|사건번호|결정번호|회신번호)[:\s]+(\S+)/)
+    if (idMatch) {
+      autoChains.push({
+        name: GET_DECISION_TEXT_TOOL,
+        args: { domain, id: idMatch[1] },
+      })
+      fetchedDomains.add(domain)
+      break  // 한 번에 하나만
+    }
   }
 
   // search_ordinance → get_ordinance
@@ -450,7 +488,7 @@ export async function* executeGeminiRAGStream(
         yield {
           type: 'tool_call',
           name: call.name,
-          displayName: TOOL_DISPLAY_NAMES[call.name] || call.name,
+          displayName: displayNameFor(call.name, call.args),
           query: getToolCallQuery(call.name, call.args),
         }
       }
@@ -473,7 +511,7 @@ export async function* executeGeminiRAGStream(
         yield {
           type: 'tool_result',
           name: r.name,
-          displayName: TOOL_DISPLAY_NAMES[r.name] || r.name,
+          displayName: displayNameFor(r.name, r.args),
           success: !r.isError,
           summary: summarizeToolResult(r.name, r),
         }
@@ -506,7 +544,7 @@ export async function* executeGeminiRAGStream(
           yield {
             type: 'tool_call',
             name: chain.name,
-            displayName: TOOL_DISPLAY_NAMES[chain.name] || chain.name,
+            displayName: displayNameFor(chain.name, chain.args),
             query: getToolCallQuery(chain.name, chain.args),
           }
         }
@@ -518,7 +556,7 @@ export async function* executeGeminiRAGStream(
           yield {
             type: 'tool_result',
             name: autoResult.name,
-            displayName: TOOL_DISPLAY_NAMES[autoResult.name] || autoResult.name,
+            displayName: displayNameFor(autoResult.name, autoResult.args),
             success: !autoResult.isError,
             summary: summarizeToolResult(autoResult.name, autoResult),
           }

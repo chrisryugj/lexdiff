@@ -6,8 +6,8 @@
  *
  * 지원 패턴:
  * 1. 법명+조문번호 → search_law + get_batch_articles
- * 2. 판례 검색 → search_precedents (직접)
- * 3. 해석례 검색 → search_interpretations (직접)
+ * 2. 판례 검색 → search_decisions(domain=precedent) (직접)
+ * 3. 해석례 검색 → search_decisions(domain=interpretation) (직접)
  * 4. 행정규칙 검색 → search_admin_rule (직접)
  * 5. 별표 조회 → search_law + get_annexes
  */
@@ -96,6 +96,8 @@ interface FastPathDetection {
   searchQuery?: string
   /** 도구 이름 (precedent_search 등에서 사용) */
   toolName?: string
+  /** 도구 실행 시 넘길 인자 (unified-decisions 의 domain 등) */
+  toolArgs?: Record<string, unknown>
 }
 
 interface OrdinEntry { seq: string; name: string }
@@ -131,19 +133,37 @@ export function detectFastPath(query: string): FastPathDetection {
   // ── 패턴 1: 판례 검색 ("OO 판례", "OO 판결") ──
   const precedentMatch = query.match(/^(.+?)(?:\s+(?:판례|판결|사례))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
   if (precedentMatch && !/비교|분석|요약/.test(query)) {
-    return { type: 'precedent_search', searchQuery: precedentMatch[1].trim(), toolName: 'search_precedents' }
+    const q = precedentMatch[1].trim()
+    return {
+      type: 'precedent_search',
+      searchQuery: q,
+      toolName: 'search_decisions',
+      toolArgs: { domain: 'precedent', query: q },
+    }
   }
 
   // ── 패턴 2: 해석례 검색 ("OO 해석례", "OO 유권해석") ──
   const interpMatch = query.match(/^(.+?)(?:\s+(?:해석례|유권해석|질의회신))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
   if (interpMatch && !/비교|분석/.test(query)) {
-    return { type: 'interpretation_search', searchQuery: interpMatch[1].trim(), toolName: 'search_interpretations' }
+    const q = interpMatch[1].trim()
+    return {
+      type: 'interpretation_search',
+      searchQuery: q,
+      toolName: 'search_decisions',
+      toolArgs: { domain: 'interpretation', query: q },
+    }
   }
 
   // ── 패턴 3: 행정규칙 검색 ("OO 훈령/예규/고시") ──
   const adminRuleMatch = query.match(/^(.+?)(?:\s+(?:훈령|예규|고시|행정규칙))(?:\s*(?:검색|찾아|알려|보여))?[\s?]*$/)
   if (adminRuleMatch && !/비교|분석/.test(query)) {
-    return { type: 'admin_rule_search', searchQuery: adminRuleMatch[1].trim(), toolName: 'search_admin_rule' }
+    const q = adminRuleMatch[1].trim()
+    return {
+      type: 'admin_rule_search',
+      searchQuery: q,
+      toolName: 'search_admin_rule',
+      toolArgs: { query: q },
+    }
   }
 
   // ── 패턴 4: 별표 조회 ("OO법 별표 N") ──

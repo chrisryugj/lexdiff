@@ -264,11 +264,17 @@ export async function* handleFastPath(
   // ── 패턴 A: 판례/해석례/행정규칙 검색 ──
   if (fastPath.type === 'precedent_search' || fastPath.type === 'interpretation_search' || fastPath.type === 'admin_rule_search') {
     const toolName = fastPath.toolName!
-    const displayName = TOOL_DISPLAY_NAMES[toolName] || toolName
+    const toolArgs = fastPath.toolArgs || { query: fastPath.searchQuery }
+    // 판례/해석례는 search_decisions — 도메인별 라벨
+    const displayName = fastPath.type === 'precedent_search'
+      ? '판례 검색'
+      : fastPath.type === 'interpretation_search'
+        ? '법령해석례 검색'
+        : TOOL_DISPLAY_NAMES[toolName] || toolName
     yield { type: 'tool_call', name: toolName, displayName, query: fastPath.searchQuery }
     yield { type: 'status', message: '검색 중...', progress: 40 }
-    const searchResult = await executeTool(toolName, { query: fastPath.searchQuery }, signal)
-    yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult) }
+    const searchResult = await executeTool(toolName, toolArgs, signal)
+    yield { type: 'tool_result', name: toolName, displayName, success: !searchResult.isError, summary: summarizeToolResult(toolName, searchResult, toolArgs) }
     if (!searchResult.isError) {
       yield { type: 'status', message: '완료', progress: 100 }
       yield {

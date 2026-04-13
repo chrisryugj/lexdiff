@@ -1,6 +1,137 @@
 # Active Context
 
-**마지막 업데이트**: 2026-04-12 (FC-RAG Primary 경로 문서 정정 — Hermes Gateway/GPT-5.4로 현행화, Claude CLI subprocess 흔적 제거)
+**마지막 업데이트**: 2026-04-13 (베타 출시 전략 확정 + MCP 도구 리팩토링 계획 수립)
+
+## 🎯 진행 중 대형 작업 (2026-04-13 세션에서 결정)
+
+### 배경
+5천 팔로워 대상 베타 출시 준비. Hermes(Codex OAuth 기반)는 외부 배포 불가 → **서버 공용 Gemini 유료키** 방식으로 결정. Gemini 경로 품질을 Hermes 근접 수준으로 끌어올려야 함.
+
+### 의사결정 기록
+1. **BYOK 탈락**: Gemini 무료티어 10 RPM, 복잡 쿼리 1건에 턴 8회 → 바로 429. 사용자 경험 파탄
+2. **Hermes 클라우드화 탈락**: Codex OAuth = 개인 ChatGPT 구독 묶임 → 상업 재판매 ToS 위반 리스크. 클라우드 전환하면 Hermes 존재 이유(구독 활용) 상실
+3. **Lite Engine 신규 설계 탈락**: CAG(Cache-Augmented Generation) + Plan-Fetch-Answer 2콜 아키텍처를 설계했다가 자기검증 후 폐기
+   - Gemini Context Cache **저장료 $1/M/hour** → Top 50 영구 캐시 시 월 $540 폭탄
+   - 1 request = 1 cachedContent 제약 → 다중 법령 쿼리에서 복수 캐시 동시 참조 불가
+   - CAG 히트율 80% 는 근거 없는 낙관 (실제 20~35% 추정)
+   - 법제처 변경 웹훅 **존재 안 함** (내가 지어낸 허구 — 폴링만 가능)
+   - Plan-Fetch는 Re-plan 루프 없으면 회복 불가능
+4. **최종 방향**: 기존 `gemini-engine.ts` **본격 튜닝** + 그 전에 **MCP 도구 리팩토링 선행**
+
+### MCP 도구 인벤토리 결과 (2026-04-13)
+
+| 버전/위치 | 버전 | 상태 |
+|---|---|---|
+| npm latest | 3.2.1 | 공개 최신 |
+| lexdiff node_modules | 3.2.1 | 이미 최신 |
+| d:/AI_Project/korean-law-mcp 로컬 레포 | 3.2.2 (pull 완료) | 미배포 (이 세션에서 pull) |
+
+**중요 사실**:
+- lexdiff는 **korean-law-mcp의 TypeScript 핸들러 직접 import** (MCP 프로토콜 안 탐). [lib/fc-rag/tool-registry.ts](lib/fc-rag/tool-registry.ts), [tool-adapter.ts:154](lib/fc-rag/tool-adapter.ts#L154)
+- v3.2.2 변경(expose get_annexes / refund auto-fetch / http trust proxy)은 **MCP 서버 측 개선** → lexdiff에 실질 이득 0
+- 진짜 이득은 **설치본(3.2.1)에 이미 있는데 lexdiff가 등록 안 한 도구들**
+
+**발견된 미등록 핵심 도구**:
+1. **`unified-decisions.ts`** ⭐⭐⭐⭐ — `search_decisions` + `get_decision_text` 2개로 **17개 도메인 통합** (34 tools → 2, "51KB → 3KB" 주석)
+   - lexdiff가 현재 개별 등록한 14개 도구(precedent/interpretation/constitutional/admin_appeal/tax_tribunal/customs/ftc/pipc/nlrc + get 쌍)를 대체
+   - **lexdiff가 아예 놓친 8개 도메인**: acr(권익위), appeal_review(소청), acr_special, school(학칙), public_corp(공사공단), public_inst(공공기관), treaty(조약), english_law(영문법령)
+   - `SEARCH_HANDLERS[domain]` dispatch로 기존 핸들러 pass-through → **결과 구조 100% 동일** = citations 파싱 로직 그대로 재사용 가능
+2. **`article-detail.ts`** ⭐⭐⭐ — `get_article_detail`: 조항호목 단위 정밀 조회 (jo + hang + ho + mok). 벌칙/처분기준 쿼리 토큰 대폭 절약
+3. **`scenarios/`** — 이미 chain 도구 내부에서 `runScenario/detectScenario` 자동 호출 (chains.js:265 등). 별도 등록 불필요. 단 chain 스키마에 `scenario?` optional param 노출돼 있어 명시 지정도 가능
+4. **law-linkage** — 보류. 기존 three_tier/chain_ordinance_compare와 중복 + "응답 구조 미확정" 주석 → 불안정
+
+### 🔴 리팩토링 난이도 — lexdiff 하드코딩 의존 8개 파일
+
+도구 이름 문자열 하드코딩 위치 (A안 전면 제거 시 수정 필요):
+| 파일 | 라인 | 내용 |
+|---|---|---|
+| [citations.ts](lib/fc-rag/citations.ts) | 84, 94 | 인용 검증 `result.name === 'search_precedents'` 분기 |
+| [fast-path.ts](lib/fc-rag/fast-path.ts) | 134, 140 | preEvidence LLM 우회 경로 `toolName: 'search_precedents'` |
+| [gemini-engine.ts](lib/fc-rag/gemini-engine.ts) | 41, 54, 79-83 | 자동체인: search 0건 재검색, search → get_text 연쇄 |
+| [prompts.ts](lib/fc-rag/prompts.ts) | 115-121, 204-206, 221 | 도메인별 가이드 + chain 중복 금지 규칙 |
+| [quality-evaluator.ts](lib/fc-rag/quality-evaluator.ts) | 22-34 | SEARCH_TOOLS/EVIDENCE_TOOLS 하드코딩 리스트 |
+| [result-utils.ts](lib/fc-rag/result-utils.ts) | 40-168 | compactToolResult switch + extractSearchQuery |
+| [tool-cache.ts](lib/fc-rag/tool-cache.ts) | 18-158 | 도구별 TTL + size limit 테이블 |
+| [tool-registry.ts](lib/fc-rag/tool-registry.ts) | 12-55, 125-173 | import + TOOLS 배열 등록 |
+
+**사용자 지시**: 나중에 실측 안 할 거니까 B안(병행 등록) 금지. **A안(전면 리팩토링)** 으로 근본 해결.
+
+### 해결 설계: Indirection Layer 도입
+
+**핵심 아이디어**: `decision-domains.ts` 신규 파일을 단일 진실 소스로 도입. 8개 파일은 하드코딩된 문자열 비교 대신 이 헬퍼 사용.
+
+**신규 파일 `lib/fc-rag/decision-domains.ts` 골격**:
+```typescript
+export const DECISION_DOMAINS = [
+  'precedent', 'interpretation', 'tax_tribunal', 'customs',
+  'constitutional', 'admin_appeal', 'ftc', 'pipc', 'nlrc',
+  'acr', 'appeal_review', 'acr_special',
+  'school', 'public_corp', 'public_inst',
+  'treaty', 'english_law',
+] as const
+export type DecisionDomain = typeof DECISION_DOMAINS[number]
+
+interface DomainMeta {
+  label: string; searchTTL: number; textTTL: number
+  searchSizeLimit: number; textSizeLimit: number
+  promptHint: string; isPrimary: boolean
+}
+export const DOMAIN_META: Record<DecisionDomain, DomainMeta> = { ... }
+
+// 헬퍼 API
+export function isDecisionSearchTool(name: string): boolean
+export function isDecisionGetTool(name: string): boolean
+export function isDecisionTool(name: string): boolean
+export function extractDomain(args): DecisionDomain | null
+export function getResultDomain(result): DecisionDomain | null
+export function filterByDomain(results, domain, kind): ...
+export function getDomainTTL(name, args): number | null
+export function buildDomainPromptSection(): string
+```
+
+### 📋 다음 세션 착수 순서 (엄격히 준수)
+
+**선행 확인 3건**:
+1. [tool-tiers.ts](lib/fc-rag/tool-tiers.ts) 전체 구조 (14개 제거+3개 추가 반영)
+2. fast-path 결과 소비자 (toolArgs 머지 경로) — [gemini-engine.ts](lib/fc-rag/gemini-engine.ts) 또는 [route.ts](app/api/ai-search/route.ts)
+3. `SearchDecisionsSchema.options: z.record(z.string(), z.unknown())` 가 Gemini structured schema 변환 시 깨지지 않는지 — [tool-adapter.ts:25-61](lib/fc-rag/tool-adapter.ts#L25) `zodToJsonSchema` 경로 검증
+
+**실행 단계**:
+1. `decision-domains.ts` 신규 생성 (독립, 영향 0)
+2. `tool-registry.ts` 수정 — 14개 제거 + 3개 추가. 이 시점부터 빌드 깨짐 (의도된 드라이버)
+3. 빌드 에러 따라 순차 수정: result-utils → tool-cache → citations → gemini-engine → fast-path → prompts → quality-evaluator → tool-tiers
+4. `npm run build` + `npm run lint` 통과
+5. 수동 E2E 10쿼리 (각 도메인 1개) — 판례/해석례/헌재/행정심판/조세/관세/공정위/개인정보/노동 + 신규 권익위·조약
+6. `scripts/e2e-fcrag-test.mjs`, `e2e-civil-servant-50.mjs` 하드코딩 업데이트 (grep으로 범위 파악 선행)
+7. CLAUDE.md 수치 정정 (현재 "15 노출/91 내부" 부정확 → 실제 등록 수 기재. 네이밍도 현행화)
+8. **그 다음에야** Gemini 튜닝 Phase 0~5 진입
+
+### Gemini 튜닝 Phase 0~5 (리팩토링 후 진행)
+
+정확한 파라미터 위치는 [engine-shared.ts:66-77, 233-238](lib/fc-rag/engine-shared.ts) 확인됨.
+
+| Phase | 작업 | 파일 | 핵심 변경 |
+|---|---|---|---|
+| 0 | 베이스라인 측정 | gemini-engine.ts:214 | perf 객체 추가, 평가셋 20건(simple 5/mod 10/complex 5) |
+| 1 | 파라미터 튜닝 | engine-shared.ts | maxToolTurns 2/3/4 → 3/6/8, TIMEOUT 30/45/60 → 45/90/150s, MAX_TOKENS 3K/4K/6K → 3K/5K/8K |
+| 2 | **Tool Result Compaction** ⭐ | 신규 tool-result-compactor.ts + gemini-engine.ts:319, 538 | turnAge 기반 요약 (turn 0 raw / turn 1+ 축약). 핵심 개선 |
+| 3 | 사전 도구 호출 포팅 | gemini-engine.ts:242-251 | claude-engine.ts:66-127의 consequence/scope/procedure 특화 사전검색 이식 |
+| 4 | isGemini 프롬프트 강화 | prompts.ts:232-238 | chain 우선, "제N조" 포맷 강제, 병렬 호출 지시 |
+| 5 | A/B 플래그 + 평가 | .env.local + engine-shared.ts | GEMINI_TUNING_ENABLED 토글, eval 스크립트 |
+
+**선행 확인**: Vercel `maxDuration` 설정 (route.ts 상단). Hobby면 60s 한계 → Phase 1 타임아웃 튜닝 의미 축소
+
+### ⚠️ 이번 세션에서 내가 잘못 말한 것들 (정정 기록)
+
+1. **"Gemini는 토큰 스트리밍 불가"** — 틀림. [gemini-engine.ts:368](lib/fc-rag/gemini-engine.ts#L368) `yield { type: 'answer_token', ... }` 이미 구현됨
+2. **"Gemini는 MCP 못 씀"** — 틀림. lexdiff는 MCP 프로토콜 안 타고 TypeScript 직접 import → 57개 도구 모두 사용 가능
+3. **CAG 히트율 80%** — 근거 없는 낙관
+4. **"법제처 변경 웹훅"** — 존재 안 함 (폴링만)
+5. **Gemini Context Cache 다중 참조 가능** — 틀림. 1 request = 1 cachedContent
+
+---
+
+
 
 ## 현재 상태
 

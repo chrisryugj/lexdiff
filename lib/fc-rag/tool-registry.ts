@@ -1,6 +1,6 @@
 /**
  * korean-law-mcp 도구 레지스트리
- * 57개 도구의 import, 정의, API 클라이언트 싱글턴
+ * 46개 도구 (17개 결정문 도메인은 search_decisions/get_decision_text 2개로 통합)
  */
 
 import { LawApiClient } from 'korean-law-mcp/lib/api-client'
@@ -9,10 +9,17 @@ import { debugLogger } from '../debug-logger'
 // ── Tier 0: Core search & retrieval ──
 import { searchLaw, SearchLawSchema } from 'korean-law-mcp/tools/search'
 import { getLawText, GetLawTextSchema } from 'korean-law-mcp/tools/law-text'
-import { searchPrecedents, searchPrecedentsSchema, getPrecedentText, getPrecedentTextSchema } from 'korean-law-mcp/tools/precedents'
-import { searchInterpretations, searchInterpretationsSchema, getInterpretationText, getInterpretationTextSchema } from 'korean-law-mcp/tools/interpretations'
 import { searchAiLaw, searchAiLawSchema } from 'korean-law-mcp/tools/life-law'
 import { getBatchArticles, GetBatchArticlesSchema } from 'korean-law-mcp/tools/batch-articles'
+
+// ── Unified decisions (판례/해석례/헌재/행정심판/조세심판/관세/공정위/개인정보위/노동위/권익위/소청/학칙/공사공단/공공기관/조약/영문법령 17개 도메인 통합) ──
+import {
+  searchDecisions, SearchDecisionsSchema,
+  getDecisionText, GetDecisionTextSchema,
+} from 'korean-law-mcp/tools/unified-decisions'
+
+// ── Article detail (조항호목 정밀 조회) ──
+import { getArticleDetail, GetArticleDetailSchema } from 'korean-law-mcp/tools/article-detail'
 
 // ── Tier 1-2: Comparison / Structure / History ──
 import { getThreeTier, GetThreeTierSchema } from 'korean-law-mcp/tools/three-tier'
@@ -42,17 +49,6 @@ import {
   chainAmendmentTrack, chainAmendmentTrackSchema,
   chainOrdinanceCompare, chainOrdinanceCompareSchema,
 } from 'korean-law-mcp/tools/chains'
-
-// ── Domain specialist tools ──
-import { searchAdminAppeals, searchAdminAppealsSchema, getAdminAppealText, getAdminAppealTextSchema } from 'korean-law-mcp/tools/admin-appeals'
-import { searchConstitutionalDecisions, searchConstitutionalDecisionsSchema, getConstitutionalDecisionText, getConstitutionalDecisionTextSchema } from 'korean-law-mcp/tools/constitutional-decisions'
-import { searchTaxTribunalDecisions, searchTaxTribunalDecisionsSchema, getTaxTribunalDecisionText, getTaxTribunalDecisionTextSchema } from 'korean-law-mcp/tools/tax-tribunal-decisions'
-import { searchCustomsInterpretations, searchCustomsInterpretationsSchema, getCustomsInterpretationText, getCustomsInterpretationTextSchema } from 'korean-law-mcp/tools/customs-interpretations'
-import {
-  searchFtcDecisions, searchFtcDecisionsSchema, getFtcDecisionText, getFtcDecisionTextSchema,
-  searchPipcDecisions, searchPipcDecisionsSchema, getPipcDecisionText, getPipcDecisionTextSchema,
-  searchNlrcDecisions, searchNlrcDecisionsSchema, getNlrcDecisionText, getNlrcDecisionTextSchema,
-} from 'korean-law-mcp/tools/committee-decisions'
 
 // ── Historical ──
 import { getLawHistory, LawHistorySchema } from 'korean-law-mcp/tools/law-history'
@@ -122,10 +118,11 @@ export const TOOLS: ToolDef[] = [
   { name: 'get_law_text', description: '법령 조문 조회. mst+jo 지정. jo 없으면 전문.', schema: GetLawTextSchema, handler: getLawText },
   { name: 'get_batch_articles', description: '여러 조문 일괄 조회. mst+articles 배열.', schema: GetBatchArticlesSchema, handler: getBatchArticles },
   { name: 'get_article_with_precedents', description: '조문+관련판례 한번에 조회. mst/lawId+jo.', schema: GetArticleWithPrecedentsSchema, handler: getArticleWithPrecedents },
-  { name: 'search_precedents', description: '판례 키워드검색. 결과에 id 포함.', schema: searchPrecedentsSchema, handler: searchPrecedents },
-  { name: 'get_precedent_text', description: '판례 전문 조회. id 필요.', schema: getPrecedentTextSchema, handler: getPrecedentText },
-  { name: 'search_interpretations', description: '법령해석례 키워드검색. 결과에 id 포함.', schema: searchInterpretationsSchema, handler: searchInterpretations },
-  { name: 'get_interpretation_text', description: '해석례 전문 조회. id 필요.', schema: getInterpretationTextSchema, handler: getInterpretationText },
+  { name: 'get_article_detail', description: '조항호목 단위 정밀 조회. mst+jo 필수, hang/ho/mok 선택. 벌칙/처분기준 등 특정 항·호·목만 필요할 때.', schema: GetArticleDetailSchema, handler: getArticleDetail },
+
+  // ══ Unified decisions (17개 도메인 통합) ══
+  { name: 'search_decisions', description: '결정문 통합검색. domain 필수: precedent(판례)/interpretation(해석례)/tax_tribunal(조세심판)/customs(관세해석)/constitutional(헌재)/admin_appeal(행정심판)/ftc(공정위)/pipc(개인정보위)/nlrc(노동위)/acr(권익위)/appeal_review(소청)/acr_special/school(학칙)/public_corp/public_inst/treaty(조약)/english_law. 결과에 id 포함.', schema: SearchDecisionsSchema, handler: searchDecisions },
+  { name: 'get_decision_text', description: '결정문 전문 조회. domain+id 필수. search_decisions 와 동일 domain 세트.', schema: GetDecisionTextSchema, handler: getDecisionText },
 
   // ══ Structure / Comparison / History ══
   { name: 'get_three_tier', description: '법률→시행령→시행규칙 3단비교. mst+knd.', schema: GetThreeTierSchema, handler: getThreeTier },
@@ -155,22 +152,6 @@ export const TOOLS: ToolDef[] = [
   { name: 'chain_law_system', description: '⛓️ 법체계 파악. 법령검색+3단비교+조문+별표 연쇄. 법 구조 질문 시.', schema: chainLawSystemSchema, handler: chainLawSystem },
   { name: 'chain_amendment_track', description: '⛓️ 개정 추적. 신구대조+조문이력 연쇄. 개정/변경 질문 시.', schema: chainAmendmentTrackSchema, handler: chainAmendmentTrack },
   { name: 'chain_ordinance_compare', description: '⛓️ 조례 비교. 상위법령+위임체계+전국 조례검색. 자치법규 질문 시.', schema: chainOrdinanceCompareSchema, handler: chainOrdinanceCompare },
-
-  // ══ Domain specialist ══
-  { name: 'search_admin_appeals', description: '행정심판례 검색. 결과에 id 포함.', schema: searchAdminAppealsSchema, handler: searchAdminAppeals },
-  { name: 'get_admin_appeal_text', description: '행정심판례 전문 조회. id 필요.', schema: getAdminAppealTextSchema, handler: getAdminAppealText },
-  { name: 'search_constitutional_decisions', description: '헌법재판소 결정 검색. 위헌/헌법소원 시.', schema: searchConstitutionalDecisionsSchema, handler: searchConstitutionalDecisions },
-  { name: 'get_constitutional_decision_text', description: '헌재 결정 전문 조회. id 필요.', schema: getConstitutionalDecisionTextSchema, handler: getConstitutionalDecisionText },
-  { name: 'search_tax_tribunal_decisions', description: '조세심판원 재결례 검색. 세무 쟁송 시.', schema: searchTaxTribunalDecisionsSchema, handler: searchTaxTribunalDecisions },
-  { name: 'get_tax_tribunal_decision_text', description: '조세심판 재결 전문 조회. id 필요.', schema: getTaxTribunalDecisionTextSchema, handler: getTaxTribunalDecisionText },
-  { name: 'search_customs_interpretations', description: '관세청 법령해석 검색. 관세/통관 질문 시.', schema: searchCustomsInterpretationsSchema, handler: searchCustomsInterpretations },
-  { name: 'get_customs_interpretation_text', description: '관세 해석 전문 조회. id 필요.', schema: getCustomsInterpretationTextSchema, handler: getCustomsInterpretationText },
-  { name: 'search_ftc_decisions', description: '공정위 결정 검색. 공정거래/하도급 시.', schema: searchFtcDecisionsSchema, handler: searchFtcDecisions },
-  { name: 'get_ftc_decision_text', description: '공정위 결정 전문 조회. id 필요.', schema: getFtcDecisionTextSchema, handler: getFtcDecisionText },
-  { name: 'search_pipc_decisions', description: '개인정보위 결정 검색. 개인정보 질문 시.', schema: searchPipcDecisionsSchema, handler: searchPipcDecisions },
-  { name: 'get_pipc_decision_text', description: '개인정보위 결정 전문 조회. id 필요.', schema: getPipcDecisionTextSchema, handler: getPipcDecisionText },
-  { name: 'search_nlrc_decisions', description: '노동위 결정 검색. 부당해고/노동 시.', schema: searchNlrcDecisionsSchema, handler: searchNlrcDecisions },
-  { name: 'get_nlrc_decision_text', description: '노동위 결정 전문 조회. id 필요.', schema: getNlrcDecisionTextSchema, handler: getNlrcDecisionText },
 
   // ══ Structural / Historical ══
   { name: 'get_law_system_tree', description: '법령 체계 분류(소관부처별 법령 트리) 조회.', schema: getLawSystemTreeSchema, handler: getLawSystemTree },

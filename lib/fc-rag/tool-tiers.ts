@@ -1,23 +1,22 @@
-// Tier 0: Always loaded (9 tools) — every query
-// search_all은 Tier 1 general로 이동 (도메인 불명확 시만)
-// get_article_with_precedents는 유용하지만 Tier 0이면 과다 → Tier 1
+// Tier 0: Always loaded (7 tools) — every query
+// 판례/해석례는 search_decisions(domain) 로 통합 — LLM이 domain 지정으로 접근
 export const TIER_0 = [
   'search_ai_law', 'search_law', 'get_law_text',
-  'get_batch_articles',
-  'search_precedents', 'get_precedent_text',
-  'search_interpretations', 'get_interpretation_text',
+  'get_batch_articles', 'get_article_detail',
+  'search_decisions', 'get_decision_text',
   'get_annexes',
 ] as const
 
-// Tier 1: Domain-activated (15 tools) — based on query classification
+// Tier 1: Domain-activated — based on query classification
+// search_decisions/get_decision_text 는 TIER_0 에 이미 있으므로 각 도메인은 chain + 보조 도구만 지정
 export const TIER_1: Record<string, readonly string[]> = {
-  tax: ['search_tax_tribunal_decisions', 'get_tax_tribunal_decision_text', 'chain_law_system', 'chain_dispute_prep', 'chain_procedure_detail'],
-  customs: ['search_customs_interpretations', 'get_customs_interpretation_text', 'chain_law_system', 'chain_action_basis', 'chain_procedure_detail'],
-  labor: ['search_nlrc_decisions', 'get_nlrc_decision_text', 'chain_law_system', 'chain_dispute_prep', 'chain_full_research'],
-  privacy: ['search_pipc_decisions', 'get_pipc_decision_text', 'chain_law_system', 'chain_dispute_prep', 'chain_full_research'],
-  competition: ['search_ftc_decisions', 'get_ftc_decision_text'],
-  constitutional: ['search_constitutional_decisions', 'get_constitutional_decision_text'],
-  admin: ['search_admin_appeals', 'get_admin_appeal_text', 'search_admin_rule', 'get_admin_rule'],
+  tax: ['chain_law_system', 'chain_dispute_prep', 'chain_procedure_detail'],
+  customs: ['chain_law_system', 'chain_action_basis', 'chain_procedure_detail'],
+  labor: ['chain_law_system', 'chain_dispute_prep', 'chain_full_research'],
+  privacy: ['chain_law_system', 'chain_dispute_prep', 'chain_full_research'],
+  competition: [],
+  constitutional: [],
+  admin: ['search_admin_rule', 'get_admin_rule'],
   public_servant: ['search_admin_rule', 'get_admin_rule', 'get_annexes', 'search_ordinance', 'get_ordinance'],
   housing: ['search_ordinance', 'get_ordinance', 'chain_ordinance_compare', 'chain_action_basis', 'chain_procedure_detail'],
   environment: ['search_ordinance', 'search_admin_rule', 'chain_law_system', 'chain_action_basis', 'chain_amendment_track'],
@@ -43,10 +42,9 @@ export const TIER_3 = [
   'find_similar_precedents', 'advanced_search', 'suggest_law_names',
   'get_daily_term', 'get_daily_to_legal', 'get_legal_to_daily',
   'get_term_articles', 'get_related_laws', 'get_law_statistics',
-  'parse_article_links', 'parse_jo_code', 'get_english_law_text',
-  'search_english_law', 'compare_articles', 'summarize_precedent',
+  'parse_article_links', 'parse_jo_code',
+  'compare_articles', 'summarize_precedent',
   'extract_precedent_keywords',
-  'get_life_law_categories', 'get_life_law_detail', 'get_life_law_faq', 'search_life_law_content',
 ] as const
 
 // Domain detection for query classification
@@ -136,7 +134,7 @@ export function selectToolsForQuery(query: string): string[] {
     }
   }
 
-  // search_interpretations, get_interpretation_text are already in TIER_0 — no need to add again
+  // search_decisions/get_decision_text are already in TIER_0 — always available
 
   // ── Chain-aware deduplication ──
   // chain 도구가 포함되면, 해당 chain이 내부에서 호출하는 기본 도구를 제거하여
@@ -157,38 +155,32 @@ export function selectToolsForQuery(query: string): string[] {
 }
 
 // Chain 도구가 내부에서 커버하는 기본 도구 매핑 (engine.ts에서 런타임 중복 방지에도 사용)
+// search_decisions 는 도메인 구분 없이 제거 대상으로 다뤄짐 — chain 호출 시 LLM 이 동일 도메인 search_decisions 를 추가 호출하지 못하도록 프롬프트에서 강제
 export const CHAIN_COVERS: Record<string, string[]> = {
-    chain_full_research: ['search_ai_law', 'search_precedents', 'search_interpretations'],
-    chain_dispute_prep: ['search_precedents', 'search_admin_appeals', 'search_tax_tribunal_decisions', 'search_nlrc_decisions', 'search_pipc_decisions'],
-    chain_action_basis: ['get_three_tier', 'search_interpretations', 'search_precedents', 'search_admin_appeals'],
+    chain_full_research: ['search_ai_law', 'search_decisions'],
+    chain_dispute_prep: ['search_decisions'],
+    chain_action_basis: ['get_three_tier', 'search_decisions'],
     chain_procedure_detail: ['get_three_tier', 'get_annexes', 'search_ai_law'],
     chain_law_system: ['get_three_tier', 'get_annexes'],
     chain_amendment_track: ['compare_old_new', 'get_article_history'],
-    chain_ordinance_compare: ['get_three_tier'],  // search_ordinance는 제거하지 않음 (단독 조례 검색 필요)
+    chain_ordinance_compare: ['get_three_tier'],
 }
 
-// Display names for ALL 69 tools (62 base + 7 chain)
+// Display names (unified-decisions 는 displayNameFor() 헬퍼가 도메인별 라벨 생성)
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   search_ai_law: '지능형 법령 검색',
   search_law: '법령 검색',
   get_law_text: '법령 본문 조회',
   get_batch_articles: '조문 일괄 조회',
+  get_article_detail: '조항호목 정밀 조회',
   get_article_with_precedents: '조문+판례 조회',
-  search_precedents: '판례 검색',
-  get_precedent_text: '판례 본문 조회',
-  search_interpretations: '해석례 검색',
-  get_interpretation_text: '해석례 본문 조회',
+  search_decisions: '결정문 검색',
+  get_decision_text: '결정문 본문 조회',
   get_three_tier: '위임법령 조회',
   compare_old_new: '신구법 대조',
   get_article_history: '조문 이력 조회',
   search_ordinance: '자치법규 검색',
   get_ordinance: '자치법규 조회',
-  search_customs_interpretations: '관세청 법령해석 검색',
-  get_customs_interpretation_text: '관세 해석 본문 조회',
-  search_tax_tribunal_decisions: '조세심판원 재결례 검색',
-  get_tax_tribunal_decision_text: '조세심판 재결 본문 조회',
-  search_admin_appeals: '행정심판례 검색',
-  get_admin_appeal_text: '행정심판 본문 조회',
   get_legal_term_kb: '법령용어 검색',
   get_legal_term_detail: '법령용어 상세',
   get_annexes: '별표/서식 조회',
@@ -196,14 +188,6 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_admin_rule: '행정규칙 조회',
   search_all: '통합 검색',
   advanced_search: '고급 법령 검색',
-  search_constitutional_decisions: '헌법재판소 결정 검색',
-  get_constitutional_decision_text: '헌재 결정 본문 조회',
-  search_nlrc_decisions: '노동위 결정 검색',
-  get_nlrc_decision_text: '노동위 결정 본문 조회',
-  search_pipc_decisions: '개인정보위 결정 검색',
-  get_pipc_decision_text: '개인정보위 결정 본문 조회',
-  search_ftc_decisions: '공정위 결정 검색',
-  get_ftc_decision_text: '공정위 결정 본문 조회',
   find_similar_precedents: '유사 판례 검색',
   get_law_tree: '법령 체계도 조회',
   get_law_system_tree: '법령 체계 분류 조회',
@@ -221,15 +205,9 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_related_laws: '관련 법령 조회',
   parse_article_links: '조문 참조 분석',
   parse_jo_code: '조문번호 변환',
-  get_english_law_text: '영문 법령 조회',
-  search_english_law: '영문 법령 검색',
   compare_articles: '조문 비교',
   summarize_precedent: '판례 요약',
   extract_precedent_keywords: '판례 키워드 추출',
-  get_life_law_categories: '생활법령 카테고리',
-  get_life_law_detail: '생활법령 상세',
-  get_life_law_faq: '생활법령 FAQ',
-  search_life_law_content: '생활법령 검색',
   // Chain tools (7)
   chain_law_system: '법체계 파악',
   chain_action_basis: '처분근거 확인',

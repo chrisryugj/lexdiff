@@ -112,13 +112,13 @@ A 유리한 경우 / B 유리한 경우
 // ─── 도메인별 도구 힌트 ───
 
 const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
-  customs: '- 관세 도메인: chain_action_basis 1회로 법체계+관세해석+판례 수집. 개별 조회 시 search_customs_interpretations.',
-  labor: '- 노동 도메인: chain_dispute_prep 1회로 판례+노동위 결정 수집. 개별 조회 시 search_nlrc_decisions.',
-  tax: '- 세무 도메인: chain_dispute_prep 1회로 판례+조세심판 재결 수집. 개별 조회 시 search_tax_tribunal_decisions.',
-  privacy: '- 개인정보 도메인: chain_dispute_prep 1회로 판례+개인정보위 결정 수집. 개별 조회 시 search_pipc_decisions.',
-  competition: '- 공정거래 도메인: search_ftc_decisions 로 공정위 결정 확인.',
-  constitutional: '- 헌법 도메인: search_constitutional_decisions 로 헌재 결정 확인.',
-  admin: '- 행정 도메인: chain_action_basis 1회로 법체계+행정심판례+해석례 수집. 개별: search_admin_appeals, search_admin_rule.',
+  customs: '- 관세 도메인: chain_action_basis 1회로 법체계+관세해석+판례 수집. 개별 조회 시 search_decisions(domain="customs").',
+  labor: '- 노동 도메인: chain_dispute_prep 1회로 판례+노동위 결정 수집. 개별 조회 시 search_decisions(domain="nlrc").',
+  tax: '- 세무 도메인: chain_dispute_prep 1회로 판례+조세심판 재결 수집. 개별 조회 시 search_decisions(domain="tax_tribunal").',
+  privacy: '- 개인정보 도메인: chain_dispute_prep 1회로 판례+개인정보위 결정 수집. 개별 조회 시 search_decisions(domain="pipc").',
+  competition: '- 공정거래 도메인: search_decisions(domain="ftc") 로 공정위 결정 확인.',
+  constitutional: '- 헌법 도메인: search_decisions(domain="constitutional") 로 헌재 결정 확인.',
+  admin: '- 행정 도메인: chain_action_basis 1회로 법체계+행정심판례+해석례 수집. 개별: search_decisions(domain="admin_appeal"), search_admin_rule.',
   public_servant: '- 공무원 도메인: search_admin_rule(훈령/예규/고시)이 핵심 근거. 금액/수당은 get_annexes(별표) 필수.',
   housing: '- 주택·임대차 도메인: chain_ordinance_compare 로 조례 비교. 개별: search_ordinance.',
   construction: '- 건설 도메인: chain_procedure_detail 로 절차/비용 확인. 개별: search_admin_rule, get_three_tier.',
@@ -201,10 +201,11 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 - **chain_ordinance_compare**: 조례 비교 연구
 
 ### 🔴 중복 호출 금지
-- chain_full_research를 호출했으면 search_ai_law, search_precedents, search_interpretations를 별도 호출하지 말 것 (chain이 내부에서 이미 호출함).
-- chain_dispute_prep를 호출했으면 search_precedents, search_admin_appeals를 별도 호출하지 말 것.
-- chain_action_basis를 호출했으면 get_three_tier, search_interpretations를 별도 호출하지 말 것.
+- chain_full_research를 호출했으면 search_ai_law, search_decisions(precedent/interpretation)를 별도 호출하지 말 것 (chain이 내부에서 이미 호출함).
+- chain_dispute_prep를 호출했으면 search_decisions(precedent/admin_appeal/도메인별 결정문)를 별도 호출하지 말 것.
+- chain_action_basis를 호출했으면 get_three_tier, search_decisions(interpretation/admin_appeal)를 별도 호출하지 말 것.
 - chain_procedure_detail를 호출했으면 get_three_tier, get_annexes를 별도 호출하지 말 것.
+- **동일 도메인**에 대해 search_decisions 를 연속 호출하지 말 것 (쿼리 조정 외 중복 금지).
 
 ### 🔴 속도 최적화 (응답 지연 방지)
 - **첫 도구 호출은 1초 이내에 결정**할 것. 분석을 길게 하지 말고 즉시 도구 호출.
@@ -218,7 +219,7 @@ ${SPECIALIST_INSTRUCTIONS[queryType]}
 3. **search_law**: 법령명을 정확히 알 때 MST 확인용.
 4. **get_batch_articles**: 여러 조문 한번에 조회. articles=["제38조", "제39조"].
 5. **get_law_text(jo 지정)**: 단일 조문 조회. jo 없이 전체를 가져오지 말 것.
-6. 판례 필요 시 search_precedents. 조례 질문 시 search_ordinance (지역명 필수).
+6. 판례 필요 시 search_decisions(domain="precedent"). 해석례는 domain="interpretation". 조례 질문 시 search_ordinance (지역명 필수).
 7. 공무원/행정규칙 관련 시 search_admin_rule (훈령/예규/고시).
 8. 검색 결과 여러 건이면 질문 의도에 가장 부합하는 법령 하나에 집중.
 9. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.

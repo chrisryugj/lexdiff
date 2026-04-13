@@ -14,7 +14,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { FunctionDeclaration } from '@google/genai'
 import { TOOLS, apiClient } from './tool-registry'
 import {
-  apiCache, CACHE_TTL, evictOldest, stableStringify,
+  apiCache, getToolTTL, evictOldest, stableStringify,
   truncateForContext, compressSearchResult, compressAiSearchResult, isEmptySearchResult,
 } from './tool-cache'
 
@@ -107,6 +107,8 @@ export interface ToolCallResult {
   name: string
   result: string
   isError: boolean
+  /** 파싱된 입력 인자 (decision-domains 기반 도메인 필터/라벨링용) */
+  args?: Record<string, unknown>
 }
 
 export async function executeTool(
@@ -158,7 +160,7 @@ export async function executeTool(
       clearTimeout(timer)
     }
     const text = response.content.map(c => c.text).join('\n')
-    const truncated = truncateForContext(text, name)
+    const truncated = truncateForContext(text, name, parsedArgs)
     const result: ToolCallResult = {
       name,
       result: name === 'search_law'
@@ -167,10 +169,11 @@ export async function executeTool(
           ? compressAiSearchResult(truncated)
           : truncated,
       isError: response.isError || false,
+      args: parsedArgs as Record<string, unknown>,
     }
 
     // 성공 시 캐시 저장 (빈 검색 결과는 캐시하지 않음)
-    const ttl = CACHE_TTL[name]
+    const ttl = getToolTTL(name, parsedArgs)
     if (ttl && !result.isError) {
       const isEmptySearch = name.startsWith('search_') && isEmptySearchResult(result.result)
       if (!isEmptySearch) {

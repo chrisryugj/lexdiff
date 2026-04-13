@@ -1,101 +1,144 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import { checkDistributedRateLimit } from "@/lib/server/traffic-control"
-import { getClientIP } from "@/lib/get-client-ip"
+/**
+ * H-SEC3: CORS origin 화이트리스트 echo
+ * M2: CSP nonce (플래그 `LEXDIFF_CSP_NONCE=true` 시 활성)
+ *
+ * ── CORS ──
+ * next.config.mjs의 정적 Access-Control-Allow-Origin 헤더는 단일 origin만 허용해
+ * 프리뷰 배포 / 커스텀 도메인을 동적으로 다루지 못함. 이를 대체해 middleware에서
+ * 요청 Origin을 화이트리스트와 매칭 후 반사(echo)한다.
+ *
+ * ── CSP nonce ──
+ * next.config.mjs의 정적 `script-src 'self' 'unsafe-inline'`은 XSS 방어가 약하다.
+ * 요청별 base64 nonce를 생성해 `'nonce-...'` 지시어로 교체한다. 플래그가 off이면
+ * 기존 정적 CSP(next.config.mjs) 경로를 그대로 사용 — 회귀 위험 0.
+ *
+ * Next 15/16 App Router는 middleware가 request header에 `x-nonce`를 세팅하면
+ * RSC가 `headers()` API로 읽어 자동으로 inline script에 nonce를 주입한다.
+ */
 
-const RATE_LIMITS = {
-  default: { requests: Number(process.env.API_RATE_LIMIT_PER_MINUTE ?? 100), windowMs: 60 * 1000 },
-  ai: { requests: Number(process.env.AI_RATE_LIMIT_PER_MINUTE ?? 20), windowMs: 60 * 1000 },
+import { NextResponse, type NextRequest } from 'next/server'
+
+// ─── CSP nonce ───
+
+const CSP_NONCE_FLAG = process.env.LEXDIFF_CSP_NONCE === 'true'
+
+function generateNonce(): string {
+  // Edge runtime은 crypto.getRandomValues를 제공. Node.js에도 globalThis.crypto 존재.
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  // base64url (padding 제거) — CSP에 그대로 사용 가능
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-const AI_ENDPOINTS = ["/api/fc-rag", "/api/summarize", "/api/annex-to-markdown"]
-
-// 보안 응답 헤더
-const SECURITY_HEADERS: Record<string, string> = {
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "X-DNS-Prefetch-Control": "off",
+/**
+ * 요청별 CSP 헤더 빌드. next.config.mjs의 정적 CSP와 동일한 도메인 허용 목록 유지하되
+ * `'unsafe-inline'`을 nonce로 교체. strict-dynamic을 함께 두어 번들 스크립트가
+ * 파생한 script에도 신뢰를 전파한다.
+ */
+export function buildCspWithNonce(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "img-src 'self' https://www.law.go.kr data: blob:",
+    "connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com",
+    "frame-ancestors 'self'",
+    "font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:",
+    // CSP violation 수집은 별도 endpoint 미구현 — 프로덕션 배포 시 추가 검토
+  ].join('; ')
 }
 
-// POST body 크기 제한 (Content-Length 기반 사전 검증)
-const MAX_BODY_SIZE: Record<string, number> = {
-  "/api/hwp-to-html": 20 * 1024 * 1024,
-  "/api/annex-to-markdown": 10 * 1024 * 1024,
-  "/api/fc-rag": 50 * 1024,
-  "/api/benchmark-analyze": 1024 * 1024,
-  "/api/impact-tracker": 512 * 1024,
-  "/api/summarize": 200 * 1024,
+// 정적 허용 목록 + 정규식(프리뷰) 결합.
+const ALLOWED_ORIGINS: Array<string | RegExp> = [
+  'https://lexdiff.vercel.app',
+  // Vercel 프리뷰 URL: https://lexdiff-<hash>-<team>.vercel.app
+  /^https:\/\/lexdiff-[a-z0-9-]+\.vercel\.app$/,
+  // 로컬 개발
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]
+
+// NEXT_PUBLIC_SITE_URL이 설정된 커스텀 프로덕션 도메인도 동적 허용
+const extraOrigin = process.env.NEXT_PUBLIC_SITE_URL
+if (extraOrigin && /^https?:\/\//.test(extraOrigin)) {
+  ALLOWED_ORIGINS.push(extraOrigin.replace(/\/$/, ''))
 }
-const DEFAULT_MAX_BODY = 1024 * 1024
 
-export default async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  if (!pathname.startsWith("/api/")) {
-    return NextResponse.next()
-  }
-
-  if (pathname === "/api/health" || pathname.startsWith("/api/_")) {
-    return NextResponse.next()
-  }
-
-  // POST body 크기 사전 검증
-  if (request.method === "POST") {
-    const contentLength = Number(request.headers.get("content-length") || "0")
-    const maxSize = MAX_BODY_SIZE[pathname] ?? DEFAULT_MAX_BODY
-    if (contentLength > maxSize) {
-      return NextResponse.json(
-        { error: "요청 본문이 너무 큽니다." },
-        { status: 413, headers: SECURITY_HEADERS },
-      )
+export function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false
+  for (const entry of ALLOWED_ORIGINS) {
+    if (typeof entry === 'string') {
+      if (entry === origin) return true
+    } else if (entry.test(origin)) {
+      return true
     }
   }
-
-  const isAIEndpoint = AI_ENDPOINTS.some((endpoint) => pathname.startsWith(endpoint))
-  const limit = isAIEndpoint ? RATE_LIMITS.ai : RATE_LIMITS.default
-  const ip = getClientIP(request)
-
-  const { allowed, remaining, resetTime } = await checkDistributedRateLimit({
-    namespace: "api-rate-limit",
-    identifier: `${isAIEndpoint ? "ai" : "default"}:${ip}`,
-    limit: limit.requests,
-    windowMs: limit.windowMs,
-  })
-
-  if (!allowed) {
-    const retryAfter = Math.max(Math.ceil((resetTime - Date.now()) / 1000), 1)
-
-    return NextResponse.json(
-      {
-        error: "Too Many Requests",
-        message: "요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.",
-        retryAfter,
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(limit.requests),
-          "X-RateLimit-Remaining": "0",
-          "X-RateLimit-Reset": String(Math.ceil(resetTime / 1000)),
-        },
-      }
-    )
-  }
-
-  const response = NextResponse.next()
-  // 레이트리밋 헤더
-  response.headers.set("X-RateLimit-Limit", String(limit.requests))
-  response.headers.set("X-RateLimit-Remaining", String(remaining))
-  response.headers.set("X-RateLimit-Reset", String(Math.ceil(resetTime / 1000)))
-  // 보안 헤더
-  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
-    response.headers.set(key, value)
-  }
-  return response
+  return false
 }
 
+function buildCorsHeaders(origin: string): Headers {
+  const h = new Headers()
+  h.set('Access-Control-Allow-Origin', origin)
+  h.set('Vary', 'Origin')
+  h.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  h.set('Access-Control-Allow-Headers', 'Content-Type, X-User-API-Key')
+  h.set('Access-Control-Max-Age', '600')
+  return h
+}
+
+/**
+ * CSP nonce 경로 — /api/* 외 모든 페이지 요청에 적용.
+ * 플래그 off일 때는 NextResponse.next() 그대로 (next.config.mjs CSP 유지).
+ */
+function applyCspNonce(request: NextRequest): NextResponse {
+  if (!CSP_NONCE_FLAG) return NextResponse.next()
+
+  const nonce = generateNonce()
+  const csp = buildCspWithNonce(nonce)
+
+  // RSC가 읽을 수 있도록 request header에 nonce를 주입 (NextResponse.next 옵션)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  const res = NextResponse.next({ request: { headers: requestHeaders } })
+  // 응답 헤더에 동적 CSP 설정 (next.config.mjs의 정적 CSP를 덮어씀)
+  res.headers.set('Content-Security-Policy', csp)
+  return res
+}
+
+export function middleware(request: NextRequest): NextResponse {
+  const pathname = request.nextUrl.pathname
+
+  // /api/* 는 CORS 처리, 그 외는 CSP nonce 경로
+  if (!pathname.startsWith('/api/')) {
+    return applyCspNonce(request)
+  }
+
+  const origin = request.headers.get('origin')
+
+  // Preflight
+  if (request.method === 'OPTIONS') {
+    if (origin && isAllowedOrigin(origin)) {
+      return new NextResponse(null, { status: 204, headers: buildCorsHeaders(origin) })
+    }
+    // 허용 안 된 origin의 preflight는 헤더 없이 204 → 브라우저가 차단
+    return new NextResponse(null, { status: 204 })
+  }
+
+  const res = NextResponse.next()
+  if (origin && isAllowedOrigin(origin)) {
+    const h = buildCorsHeaders(origin)
+    h.forEach((v, k) => res.headers.set(k, v))
+  }
+  return res
+}
+
+// CSP nonce 경로 때문에 matcher 확장: /api/* + 그 외 페이지 요청 (static 자원 제외)
+// Next.js 권장 패턴: /_next/static, /_next/image, favicon, 기타 정적 파일 제외
 export const config = {
-  matcher: "/api/:path*",
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?)$).*)',
+  ],
 }

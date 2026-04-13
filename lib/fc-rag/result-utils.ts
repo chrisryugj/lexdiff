@@ -6,13 +6,37 @@ import type { ToolCallResult } from './tool-adapter'
 import { executeTool } from './tool-adapter'
 import { TOOL_DISPLAY_NAMES } from './tool-tiers'
 import { parseLawEntries, findBestMST, type LawEntry } from './fast-path'
+import {
+  isDecisionSearchTool, isDecisionGetTool,
+  extractDomain, DOMAIN_META,
+} from './decision-domains'
 
 // ─── 도구 결과 요약 유틸 (SSE용) ───
 
-export function summarizeToolResult(name: string, result: ToolCallResult): string {
+export function summarizeToolResult(
+  name: string,
+  result: ToolCallResult,
+  args?: Record<string, unknown>,
+): string {
   if (result.isError) return `오류: ${result.result.slice(0, 60)}`
 
   const text = result.result
+  // args 명시 없으면 result.args (executeTool이 저장한 값)로 폴백
+  const effArgs = args ?? result.args
+
+  // Unified decisions — 도메인별 라벨 + 건수
+  if (isDecisionSearchTool(name)) {
+    const domain = extractDomain(effArgs)
+    const label = domain ? DOMAIN_META[domain].shortLabel : '결정문'
+    const count = text.match(/총 (\d+)건/)?.[1]
+    return count ? `${label} ${count}건` : `${label} 검색 완료`
+  }
+  if (isDecisionGetTool(name)) {
+    const domain = extractDomain(effArgs)
+    const label = domain ? DOMAIN_META[domain].shortLabel : '결정문'
+    return `${label} 전문 조회 완료`
+  }
+
   switch (name) {
     case 'search_ai_law': {
       const countMatch = text.match(/(\d+)건/)
@@ -37,16 +61,11 @@ export function summarizeToolResult(name: string, result: ToolCallResult): strin
       const lawName = text.match(/(?:##\s+|법령명:\s*)(.+?)(?:\n|$)/)?.[1]?.trim()
       return lawName ? `${lawName} ${articleCount}개 조문` : `${articleCount}개 조문 조회`
     }
-    case 'search_precedents': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `${count}건 검색됨` : '판례 검색 완료'
+    case 'get_article_detail': {
+      const jo = effArgs?.jo as string | undefined
+      const parts = [jo, effArgs?.hang && `제${effArgs.hang}항`, effArgs?.ho && `제${effArgs.ho}호`, effArgs?.mok && `${effArgs.mok}목`].filter(Boolean)
+      return parts.length ? `${parts.join(' ')} 조회` : '조문 정밀 조회 완료'
     }
-    case 'get_precedent_text': return '판례 전문 조회 완료'
-    case 'search_interpretations': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `${count}건 검색됨` : '해석례 검색 완료'
-    }
-    case 'get_interpretation_text': return '해석례 전문 조회 완료'
     case 'get_three_tier': return '위임법령 구조 조회 완료'
     case 'compare_old_new': return '신구법 대조표 조회 완료'
     case 'get_article_history': return '조문 이력 조회 완료'
@@ -73,33 +92,6 @@ export function summarizeToolResult(name: string, result: ToolCallResult): strin
     case 'chain_law_system': return '법체계 파악 완료'
     case 'chain_amendment_track': return '개정 추적 완료'
     case 'chain_ordinance_compare': return '조례 비교 완료'
-    // Domain specialists
-    case 'search_admin_appeals': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `행정심판례 ${count}건` : '행정심판례 검색 완료'
-    }
-    case 'get_admin_appeal_text': return '행정심판례 조회 완료'
-    case 'search_constitutional_decisions': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `헌재 결정 ${count}건` : '헌재 결정 검색 완료'
-    }
-    case 'get_constitutional_decision_text': return '헌재 결정 조회 완료'
-    case 'search_tax_tribunal_decisions': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `조세심판 ${count}건` : '조세심판 검색 완료'
-    }
-    case 'get_tax_tribunal_decision_text': return '조세심판 재결 조회 완료'
-    case 'search_customs_interpretations': {
-      const count = text.match(/총 (\d+)건/)?.[1]
-      return count ? `관세 해석 ${count}건` : '관세 해석 검색 완료'
-    }
-    case 'get_customs_interpretation_text': return '관세 해석 조회 완료'
-    case 'search_ftc_decisions': return '공정위 결정 검색 완료'
-    case 'get_ftc_decision_text': return '공정위 결정 조회 완료'
-    case 'search_pipc_decisions': return '개인정보위 결정 검색 완료'
-    case 'get_pipc_decision_text': return '개인정보위 결정 조회 완료'
-    case 'search_nlrc_decisions': return '노동위 결정 검색 완료'
-    case 'get_nlrc_decision_text': return '노동위 결정 조회 완료'
     case 'get_article_with_precedents': {
       const lawName = text.match(/법령명: (.+?)\n/)?.[1]?.trim()
       return lawName ? `${lawName} 조문+판례` : '조문+판례 조회 완료'
@@ -135,6 +127,19 @@ export function summarizeToolResult(name: string, result: ToolCallResult): strin
 }
 
 export function getToolCallQuery(name: string, args: Record<string, unknown>): string | undefined {
+  // Unified decisions — domain 힌트 + query
+  if (isDecisionSearchTool(name)) {
+    const domain = extractDomain(args)
+    const label = domain ? DOMAIN_META[domain].shortLabel : '결정문'
+    const q = args.query as string | undefined
+    return q ? `[${label}] ${q}` : `[${label}]`
+  }
+  if (isDecisionGetTool(name)) {
+    const domain = extractDomain(args)
+    const label = domain ? DOMAIN_META[domain].shortLabel : '결정문'
+    return args.id ? `${label} #${args.id}` : label
+  }
+
   switch (name) {
     case 'search_ai_law': return args.query as string
     case 'search_law': return args.query as string
@@ -143,8 +148,10 @@ export function getToolCallQuery(name: string, args: Record<string, unknown>): s
       const articles = args.articles as string[] | undefined
       return articles?.join(', ')
     }
-    case 'search_precedents': return args.query as string
-    case 'search_interpretations': return args.query as string
+    case 'get_article_detail': {
+      const parts = [args.jo, args.hang && `제${args.hang}항`, args.ho && `제${args.ho}호`, args.mok && `${args.mok}목`].filter(Boolean)
+      return parts.length ? parts.join(' ') : undefined
+    }
     case 'search_ordinance': return args.query as string
     case 'get_ordinance': return args.ordinSeq ? `#${args.ordinSeq}` : undefined
     // Admin rules
@@ -158,14 +165,6 @@ export function getToolCallQuery(name: string, args: Record<string, unknown>): s
     case 'chain_law_system': return args.query as string
     case 'chain_amendment_track': return args.query as string
     case 'chain_ordinance_compare': return args.query as string
-    // Domain specialists
-    case 'search_admin_appeals': return args.query as string
-    case 'search_constitutional_decisions': return args.query as string
-    case 'search_tax_tribunal_decisions': return args.query as string
-    case 'search_customs_interpretations': return args.query as string
-    case 'search_ftc_decisions': return args.query as string
-    case 'search_pipc_decisions': return args.query as string
-    case 'search_nlrc_decisions': return args.query as string
     default: return undefined
   }
 }

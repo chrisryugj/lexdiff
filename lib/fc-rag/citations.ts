@@ -4,6 +4,10 @@
 
 import type { ToolCallResult } from './tool-adapter'
 import type { FCRAGCitation } from './engine'
+import {
+  isDecisionSearchTool, isDecisionGetTool,
+  extractDomain, DOMAIN_META, type DecisionDomain,
+} from './decision-domains'
 
 /**
  * 답변 텍스트에서 문맥 인식 조문 참조 추출.
@@ -81,22 +85,27 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
       }
     }
 
-    if (result.name === 'search_precedents' || result.name === 'get_precedent_text') {
-      for (const match of Array.from(text.matchAll(/사건번호[:\s]+(\S+)/g))) {
-        const caseNo = match[1]
-        if (!seen.has(caseNo)) {
-          seen.add(caseNo)
-          citations.push({ lawName: '판례', articleNumber: caseNo, chunkText: text.slice(0, 200), source: result.name })
-        }
-      }
-    }
-
-    if (result.name === 'search_interpretations' || result.name === 'get_interpretation_text') {
-      for (const match of Array.from(text.matchAll(/(?:해석례|회신번호|ID)[:\s]+(\S+)/g))) {
-        const interpNo = match[1]
-        if (!seen.has(interpNo)) {
-          seen.add(interpNo)
-          citations.push({ lawName: '법령해석례', articleNumber: interpNo, chunkText: text.slice(0, 200), source: result.name })
+    // ═══ Unified decisions (search_decisions / get_decision_text) ═══
+    // 도메인별로 다른 필드/정규식으로 식별자 추출.
+    if (isDecisionSearchTool(result.name) || isDecisionGetTool(result.name)) {
+      const domain = extractDomain(result.args) as DecisionDomain | null
+      const label = domain ? DOMAIN_META[domain].label : '결정문'
+      // precedent/constitutional/admin_appeal: 사건번호
+      // interpretation: 회신번호/ID
+      // tax_tribunal/ftc/pipc/nlrc/acr/appeal_review: 결정번호/재결번호
+      // 통합 정규식: 여러 후보 필드 중 첫 매칭
+      const idRegex = /(?:사건번호|회신번호|결정번호|재결번호|안건번호|ID|일련번호)[:\s]+(\S+)/g
+      for (const match of Array.from(text.matchAll(idRegex))) {
+        const decisionId = match[1]
+        const key = `${domain ?? 'decision'}:${decisionId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          citations.push({
+            lawName: label,
+            articleNumber: decisionId,
+            chunkText: text.slice(0, 200),
+            source: result.name,
+          })
         }
       }
     }
@@ -172,27 +181,6 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
         if (!seen.has(key)) {
           seen.add(key)
           citations.push({ lawName: ruleName, articleNumber: '행정규칙', chunkText: text.slice(0, 200), source: 'get_admin_rule' })
-        }
-      }
-    }
-
-    // Domain specialist decisions (행정심판/헌재/조세심판/관세/공정위/개인정보위/노동위)
-    if (/^(?:get_admin_appeal|get_constitutional_decision|get_tax_tribunal_decision|get_customs_interpretation|get_ftc_decision|get_pipc_decision|get_nlrc_decision)_text$/.test(result.name)) {
-      const nameMatch = text.match(/(?:사건명|사건번호|결정번호|재결번호)[:\s]+(.+?)(?:\n|$)/)
-      if (nameMatch) {
-        const decisionId = nameMatch[1].trim()
-        if (!seen.has(decisionId)) {
-          seen.add(decisionId)
-          const sourceLabels: Record<string, string> = {
-            get_admin_appeal_text: '행정심판',
-            get_constitutional_decision_text: '헌법재판소',
-            get_tax_tribunal_decision_text: '조세심판',
-            get_customs_interpretation_text: '관세해석',
-            get_ftc_decision_text: '공정위',
-            get_pipc_decision_text: '개인정보위',
-            get_nlrc_decision_text: '노동위',
-          }
-          citations.push({ lawName: sourceLabels[result.name] || '결정례', articleNumber: decisionId, chunkText: text.slice(0, 200), source: result.name })
         }
       }
     }
