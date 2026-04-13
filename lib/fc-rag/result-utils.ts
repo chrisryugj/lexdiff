@@ -180,7 +180,38 @@ export async function correctToolArgs(
 ) {
   for (const call of calls) {
     // get_law_text / get_batch_articles / get_three_tier / compare_old_new / get_article_history: MST 보정
-    if (['get_law_text', 'get_batch_articles', 'get_three_tier', 'compare_old_new', 'get_article_history'].includes(call.name)) {
+    // 🔴 P0-1: lawId 도 동일하게 검증. LLM 이 get_batch_articles 에 환각 lawId 를 넣는 사고 방지.
+    //         스키마가 mst/lawId 양쪽 allow 이므로 엔진 레이어에서 강제 교정.
+    const MST_TOOLS = ['get_law_text', 'get_batch_articles', 'get_three_tier', 'compare_old_new', 'get_article_history']
+    if (MST_TOOLS.includes(call.name)) {
+      // lawId 만 있고 mst 없음 → mst 로 전환 시도 (단, get_article_history 는 lawId 가 정상 파라미터이므로 제외)
+      if (call.args.lawId && !call.args.mst && call.name !== 'get_article_history') {
+        if (latestSearchEntries.length > 0) {
+          // entries 에서 쿼리에 가장 맞는 MST 선택
+          const corrected = findBestMST(latestSearchEntries, query)
+          if (corrected) {
+            call.args.mst = corrected
+            delete call.args.lawId
+          }
+        } else {
+          // known 없음 → search_law 폴백
+          const lawNameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+법)/)
+          const searchQuery = lawNameMatch?.[1] || query.slice(0, 30)
+          const searchResult = await executeTool('search_law', { query: searchQuery })
+          if (!searchResult.isError) {
+            const entries = parseLawEntries(searchResult.result)
+            if (entries.length > 0) {
+              latestSearchEntries.push(...entries)
+              onSearchFallback?.(entries, searchResult)
+              const corrected = findBestMST(entries, query)
+              if (corrected) {
+                call.args.mst = corrected
+                delete call.args.lawId
+              }
+            }
+          }
+        }
+      }
       if (call.args.mst) {
         if (latestSearchEntries.length > 0) {
           // 빠른 경로: known MST에서 보정

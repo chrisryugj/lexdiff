@@ -207,15 +207,17 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   let retryFinishReason: string | undefined
   let retryInputTokens = totalInputTokens
   let retryOutputTokens = totalOutputTokens
+  let retryCachedTokens = 0
 
   for await (const chunk of retryStream) {
     if (signal?.aborted) break
     const retryCandidate = chunk.candidates?.[0]
     if (retryCandidate?.finishReason) retryFinishReason = retryCandidate.finishReason
-    const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+    const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number } }).usageMetadata
     if (chunkUsage) {
       retryInputTokens = totalInputTokens + (chunkUsage.promptTokenCount || 0)
       retryOutputTokens = totalOutputTokens + (chunkUsage.candidatesTokenCount || 0)
+      retryCachedTokens = chunkUsage.cachedContentTokenCount || 0
     }
 
     if (retryCandidate?.content?.parts) {
@@ -229,7 +231,11 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   }
 
   if (retryInputTokens > totalInputTokens || retryOutputTokens > totalOutputTokens) {
-    yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens }
+    if (retryCachedTokens > 0) {
+      const rate = ((retryCachedTokens / (retryInputTokens - totalInputTokens)) * 100).toFixed(1)
+      console.log(`[context-cache] forceLastTurn: cached=${retryCachedTokens} (${rate}%)`)
+    }
+    yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens, cachedTokens: retryCachedTokens }
   }
   yield {
     type: 'answer',
@@ -263,6 +269,9 @@ export async function* executeGeminiRAGStream(
   let maxToolTurns = getMaxToolTurns(complexity)
   let complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
   let routerPlan: RouterPlan | null = null
+  // 🔴 Router 경로와 메인 루프가 공유해야 함 (MST 교정 + chain 중복 방지)
+  let latestSearchEntries: LawEntry[] = []
+  const chainCoveredTools = new Set<string>()
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
@@ -329,10 +338,22 @@ export async function* executeGeminiRAGStream(
           }
         }
 
-        const planResults = await executeToolsParallel(
-          routerPlan.toolPlan.map(c => ({ name: c.name, args: c.args })),
-          signal,
-        )
+        // 🔴 MST 환각 방지: Router 경로에서도 법령명이 있으면 search_law 를 병렬 prefetch.
+        // chain 도구들은 본체 법령 MST 를 주지 않아 LLM 이 환각 lawId 로 get_batch_articles 를
+        // 부르는 사고(P0-1) 재발 방지.
+        const lawNameMatch = query.match(/「([^」]+)」/) || query.match(/([가-힣]+법(?:\s*시행(?:령|규칙))?)/)
+        const hasSearchLawInPlan = routerPlan.toolPlan.some(c => c.name === 'search_law')
+        const extraSearchLaw = (lawNameMatch && !hasSearchLawInPlan)
+          ? executeTool('search_law', { query: (lawNameMatch[1] || lawNameMatch[0]).trim() }, signal)
+          : Promise.resolve(null)
+
+        const [planResults, prefetchSearch] = await Promise.all([
+          executeToolsParallel(
+            routerPlan.toolPlan.map(c => ({ name: c.name, args: c.args })),
+            signal,
+          ),
+          extraSearchLaw,
+        ])
 
         // tool_result 이벤트 발행
         for (const r of planResults) {
@@ -342,6 +363,31 @@ export async function* executeGeminiRAGStream(
             displayName: displayNameFor(r.name, r.args),
             success: !r.isError,
             summary: summarizeToolResult(r.name, r),
+          }
+        }
+
+        // Router 플랜 내 search_law 결과에서 MST 추출
+        for (const r of planResults) {
+          if (r.name === 'search_law' && !r.isError) {
+            latestSearchEntries = parseLawEntries(r.result)
+            cacheMSTEntries(latestSearchEntries)
+          }
+        }
+        // 별도 prefetch 결과 반영 (plan 에 search_law 없을 때)
+        if (prefetchSearch && !prefetchSearch.isError) {
+          const entries = parseLawEntries(prefetchSearch.result)
+          if (entries.length > 0) {
+            latestSearchEntries = entries
+            cacheMSTEntries(entries)
+          }
+        }
+
+        // 🔴 CHAIN_COVERS 병합: Router 가 실행한 chain 이 커버하는 하위 도구는 S2 가 중복 호출하지 않도록.
+        for (const call of routerPlan.toolPlan) {
+          if (CHAIN_COVERS[call.name]) {
+            for (const covered of CHAIN_COVERS[call.name]) {
+              chainCoveredTools.add(covered)
+            }
           }
         }
 
@@ -431,11 +477,10 @@ export async function* executeGeminiRAGStream(
     }
   }
   let turnCount = 0
-  let latestSearchEntries: LawEntry[] = []
   const failureCount = new Map<string, number>()
   let totalInputTokens = 0
   let totalOutputTokens = 0
-  const chainCoveredTools = new Set<string>()
+  let totalCachedTokens = 0
 
   const progressRange = 80
   const progressPerTurn = progressRange / (maxToolTurns + 1)
@@ -475,14 +520,14 @@ export async function* executeGeminiRAGStream(
 
       const accParts: GeminiPart[] = []
       let accFinishReason: string | undefined
-      let accUsage: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined
+      let accUsage: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number } | undefined
       let hasFunctionCall = false
 
       for await (const chunk of stream) {
         if (signal?.aborted) break
         const chunkCandidate = chunk.candidates?.[0]
         if (chunkCandidate?.finishReason) accFinishReason = chunkCandidate.finishReason
-        const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+        const chunkUsage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number } }).usageMetadata
         if (chunkUsage) accUsage = chunkUsage
 
         if (chunkCandidate?.content?.parts) {
@@ -499,7 +544,15 @@ export async function* executeGeminiRAGStream(
       if (accUsage) {
         totalInputTokens += accUsage.promptTokenCount || 0
         totalOutputTokens += accUsage.candidatesTokenCount || 0
-        yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens }
+        const turnCached = accUsage.cachedContentTokenCount || 0
+        totalCachedTokens += turnCached
+        // 🔴 Context Cache 적중 관측용. Gemini 2.5+ implicit cache (systemInstruction 고정) 검증.
+        // cachedContentTokenCount 는 promptTokenCount 에 포함된 cached 부분 → 90% 할인 대상.
+        if (turnCached > 0) {
+          const hitRate = accUsage.promptTokenCount ? (turnCached / accUsage.promptTokenCount * 100).toFixed(1) : '0'
+          console.log(`[context-cache] turn ${turnCount}: cached=${turnCached}/${accUsage.promptTokenCount} (${hitRate}%)`)
+        }
+        yield { type: 'token_usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens, cachedTokens: totalCachedTokens }
       }
 
       if (accParts.length === 0) {

@@ -38,7 +38,7 @@ export type FCRAGStreamEvent =
   | { type: 'status'; message: string; progress: number }
   | { type: 'tool_call'; name: string; displayName: string; query?: string }
   | { type: 'tool_result'; name: string; displayName: string; success: boolean; summary: string }
-  | { type: 'token_usage'; inputTokens: number; outputTokens: number; totalTokens: number }
+  | { type: 'token_usage'; inputTokens: number; outputTokens: number; totalTokens: number; cachedTokens?: number }
   | { type: 'answer'; data: FCRAGResult }
   | { type: 'answer_token'; data: { text: string } }
   | { type: 'citation_verification'; citations: Array<{ lawName: string; articleNum: string; text: string; source: string; verified: boolean; verificationMethod: string }> }
