@@ -73,6 +73,23 @@ function extractArticleHtml($: CheerioAPI, joLabel?: string) {
   return nodes.join("\n")
 }
 
+// M11: img src host 화이트리스트 — 법령 본문의 외부 추적 픽셀 차단
+const ALLOWED_IMG_HOSTS_LAW_HTML = new Set([
+  'www.law.go.kr', 'law.go.kr',
+  'www.scourt.go.kr', 'scourt.go.kr',
+  'www.moleg.go.kr', 'moleg.go.kr',
+])
+function isAllowedLawImgSrc(src: string): boolean {
+  if (!src) return false
+  try {
+    const u = new URL(src, 'https://www.law.go.kr')
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false
+    return ALLOWED_IMG_HOSTS_LAW_HTML.has(u.hostname)
+  } catch {
+    return false
+  }
+}
+
 function sanitizeKeepAnchors(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: Array.from(new Set([
@@ -83,6 +100,15 @@ function sanitizeKeepAnchors(html: string): string {
       a: ["href", "title", "class", "id", "data-href", "target", "rel"],
       img: ["src", "alt"],
       '*': ["class", "id"],
+    },
+    transformTags: {
+      img: (tagName, attribs) => {
+        const src = String(attribs.src || '')
+        if (!isAllowedLawImgSrc(src)) {
+          return { tagName, attribs: {} }
+        }
+        return { tagName, attribs }
+      },
     },
   })
 }

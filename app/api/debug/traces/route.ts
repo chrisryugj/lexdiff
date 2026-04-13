@@ -21,10 +21,23 @@ export async function GET(request: NextRequest) {
   if (!debugToken) {
     return Response.json({ error: 'Not available' }, { status: 404 })
   }
+  // M10: timingSafeEqual은 buffer 길이 불일치 시 throw.
+  // 멀티바이트 문자열/잘못된 길이로 500 유발 가능 → try/catch로 감싸 401 반환.
   const authHeader = request.headers.get('authorization')
   const expected = `Bearer ${debugToken}`
-  if (!authHeader || authHeader.length !== expected.length ||
-      !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))) {
+  let authOk = false
+  try {
+    if (authHeader && authHeader.length === expected.length) {
+      const a = Buffer.from(authHeader)
+      const b = Buffer.from(expected)
+      if (a.length === b.length) {
+        authOk = timingSafeEqual(a, b)
+      }
+    }
+  } catch {
+    authOk = false
+  }
+  if (!authOk) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

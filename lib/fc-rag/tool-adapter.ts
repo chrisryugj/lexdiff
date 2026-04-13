@@ -123,11 +123,15 @@ export async function executeTool(
     return { name, result: `알 수 없는 도구: ${name}`, isError: true }
   }
 
-  // 캐시 조회
+  // 캐시 조회 (M12: 만료된 항목은 즉시 delete하여 메모리 누수 방지)
   const cacheKey = `${name}:${stableStringify(args)}`
   const cached = apiCache.get(cacheKey)
-  if (cached && Date.now() < cached.expiry) {
-    return cached.result
+  if (cached) {
+    if (Date.now() < cached.expiry) {
+      return cached.result
+    }
+    // 만료 — evictOldest가 처리하기 전에 즉시 삭제
+    apiCache.delete(cacheKey)
   }
 
   try {

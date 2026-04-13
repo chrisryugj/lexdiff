@@ -28,6 +28,8 @@ interface AISearchLoadingProps {
   userQuery?: string
   /** 추가 클래스명 */
   className?: string
+  /** M8: 현재까지 SSE로 수신한 tool_call 횟수 */
+  toolCallCount?: number
 }
 
 const QUERY_TYPE_LABELS: Record<string, string> = {
@@ -48,6 +50,7 @@ export function AISearchLoading({
   meta,
   userQuery,
   className,
+  toolCallCount = 0,
 }: AISearchLoadingProps) {
 
   // 스트리밍 시작 전 로딩 상태
@@ -91,6 +94,17 @@ export function AISearchLoading({
               <Icon name="zap" className="h-3.5 w-3.5" />
               {meta.keywords.slice(0, 3).join(", ")}
               {meta.keywords.length > 3 && ` +${meta.keywords.length - 3}`}
+            </span>
+          )}
+          {/* M8: 실시간 도구 호출 카운터 */}
+          {toolCallCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-700 rounded-full"
+              aria-label={`도구 호출 ${toolCallCount}회`}
+              aria-live="polite"
+            >
+              <Icon name="search" className="h-3.5 w-3.5" />
+              도구 호출 {toolCallCount}회
             </span>
           )}
         </div>
