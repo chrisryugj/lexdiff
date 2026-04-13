@@ -2,6 +2,8 @@
  * FC-RAG 도구 결과 캐시 및 압축 유틸
  */
 
+import { isDecisionTool, getDomainTTL, getDomainSizeLimit } from './decision-domains'
+
 // ─── 캐시 인프라 ───
 
 export interface CacheEntry {
@@ -15,8 +17,7 @@ export const CACHE_TTL: Record<string, number> = {
   // 조회 결과 (24시간)
   get_law_text: 24 * 3600_000,
   get_batch_articles: 24 * 3600_000,
-  get_precedent_text: 24 * 3600_000,
-  get_interpretation_text: 24 * 3600_000,
+  get_article_detail: 24 * 3600_000,
   get_ordinance: 24 * 3600_000,
   get_three_tier: 24 * 3600_000,
   compare_old_new: 24 * 3600_000,
@@ -25,30 +26,14 @@ export const CACHE_TTL: Record<string, number> = {
   get_law_tree: 24 * 3600_000,
   get_article_with_precedents: 12 * 3600_000,
   get_admin_rule: 24 * 3600_000,
-  get_admin_appeal_text: 24 * 3600_000,
-  get_constitutional_decision_text: 24 * 3600_000,
-  get_tax_tribunal_decision_text: 24 * 3600_000,
-  get_customs_interpretation_text: 24 * 3600_000,
-  get_ftc_decision_text: 24 * 3600_000,
-  get_pipc_decision_text: 24 * 3600_000,
-  get_nlrc_decision_text: 24 * 3600_000,
   // 검색 결과 (6-12시간)
   search_law: 6 * 3600_000,
-  search_precedents: 12 * 3600_000,
-  search_interpretations: 12 * 3600_000,
   search_ordinance: 12 * 3600_000,
   search_ai_law: 12 * 3600_000,
   advanced_search: 6 * 3600_000,
   search_all: 6 * 3600_000,
   find_similar_precedents: 12 * 3600_000,
   search_admin_rule: 6 * 3600_000,
-  search_admin_appeals: 12 * 3600_000,
-  search_constitutional_decisions: 12 * 3600_000,
-  search_tax_tribunal_decisions: 12 * 3600_000,
-  search_customs_interpretations: 12 * 3600_000,
-  search_ftc_decisions: 12 * 3600_000,
-  search_pipc_decisions: 12 * 3600_000,
-  search_nlrc_decisions: 12 * 3600_000,
   get_law_history: 12 * 3600_000,
   // Chain tools
   chain_full_research: 6 * 3600_000,
@@ -92,6 +77,18 @@ export const CACHE_TTL: Record<string, number> = {
 
 const CACHE_MAX_SIZE = 2000
 
+/**
+ * 도구 이름 + 인자로부터 TTL 결정. unified-decisions 는 도메인별 TTL 사용,
+ * 나머지는 CACHE_TTL 테이블 폴백. 등록 안 된 도구는 undefined → 캐시 미사용.
+ */
+export function getToolTTL(name: string, args?: unknown): number | undefined {
+  if (isDecisionTool(name)) {
+    const ttl = getDomainTTL(name, args)
+    if (ttl != null) return ttl
+  }
+  return CACHE_TTL[name]
+}
+
 export function evictOldest() {
   while (apiCache.size > CACHE_MAX_SIZE) {
     let oldestKey: string | null = null
@@ -121,14 +118,11 @@ export function stableStringify(obj: unknown): string {
 const TOOL_RESULT_LIMITS: Record<string, number> = {
   get_batch_articles: 10000,
   get_law_text: 8000,
-  get_precedent_text: 8000,
-  get_interpretation_text: 6000,
+  get_article_detail: 6000,
   get_ordinance: 8000,
   get_article_with_precedents: 10000,
   get_admin_rule: 8000,
   search_ai_law: 6000,
-  search_precedents: 4000,
-  search_interpretations: 4000,
   get_three_tier: 6000,
   compare_old_new: 6000,
   get_article_history: 4000,
@@ -142,25 +136,16 @@ const TOOL_RESULT_LIMITS: Record<string, number> = {
   chain_law_system: 8000,
   chain_amendment_track: 8000,
   chain_ordinance_compare: 8000,
-  get_admin_appeal_text: 6000,
-  get_constitutional_decision_text: 6000,
-  get_tax_tribunal_decision_text: 6000,
-  get_customs_interpretation_text: 6000,
-  get_ftc_decision_text: 6000,
-  get_pipc_decision_text: 6000,
-  get_nlrc_decision_text: 6000,
-  search_admin_appeals: 4000,
-  search_constitutional_decisions: 4000,
-  search_tax_tribunal_decisions: 4000,
-  search_customs_interpretations: 4000,
-  search_ftc_decisions: 4000,
-  search_pipc_decisions: 4000,
-  search_nlrc_decisions: 4000,
 }
 const DEFAULT_RESULT_LIMIT = 3000
 
-export function truncateForContext(text: string, toolName?: string): string {
-  const limit = (toolName && TOOL_RESULT_LIMITS[toolName]) || DEFAULT_RESULT_LIMIT
+export function truncateForContext(text: string, toolName?: string, args?: unknown): string {
+  let limit: number | undefined
+  if (toolName && isDecisionTool(toolName)) {
+    limit = getDomainSizeLimit(toolName, args) ?? undefined
+  }
+  if (limit == null && toolName) limit = TOOL_RESULT_LIMITS[toolName]
+  if (limit == null) limit = DEFAULT_RESULT_LIMIT
   if (text.length <= limit) return text
   return text.slice(0, limit) + '\n\n... (결과가 너무 길어 일부만 표시)'
 }

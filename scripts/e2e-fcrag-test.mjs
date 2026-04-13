@@ -21,12 +21,12 @@ const skipExtended = process.argv.includes('--fast')
 const fcragScenarios = [
   {
     id: 'customs', query: '수입물품 과세가격 결정방법',
-    expectedTools: ['search_ai_law', 'chain_action_basis', 'search_customs_interpretations'],
+    expectedTools: ['search_ai_law', 'chain_action_basis', 'search_decisions'],
     expectedCitations: ['관세법', '제30조'],
   },
   {
     id: 'labor', query: '해고예고수당 미지급 시 벌칙',
-    expectedTools: ['search_ai_law', 'search_precedents', 'get_batch_articles'],
+    expectedTools: ['search_ai_law', 'search_decisions', 'get_batch_articles'],
     expectedCitations: ['근로기준법', '제26조', '제110조'],
   },
   {

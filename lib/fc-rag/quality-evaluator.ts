@@ -19,19 +19,17 @@ export interface QualityResult {
 
 const EVIDENCE_TOOLS = new Set([
   // Retrieval
-  'get_law_text', 'get_batch_articles', 'get_three_tier', 'get_precedent_text',
-  'get_interpretation_text', 'get_ordinance', 'get_article_with_precedents',
+  'get_law_text', 'get_batch_articles', 'get_article_detail', 'get_three_tier',
+  'get_ordinance', 'get_article_with_precedents',
   'get_admin_rule', 'get_annexes', 'get_article_history', 'get_law_tree',
-  'get_law_history', 'get_admin_appeal_text', 'get_constitutional_decision_text',
-  'get_tax_tribunal_decision_text', 'get_customs_interpretation_text',
-  'get_ftc_decision_text', 'get_pipc_decision_text', 'get_nlrc_decision_text',
+  'get_law_history',
   'compare_old_new',
   // Search
-  'search_law', 'search_precedents', 'search_interpretations', 'search_ordinance',
+  'search_law', 'search_ordinance',
   'search_ai_law', 'search_all', 'advanced_search', 'find_similar_precedents',
-  'search_admin_rule', 'search_admin_appeals', 'search_constitutional_decisions',
-  'search_tax_tribunal_decisions', 'search_customs_interpretations',
-  'search_ftc_decisions', 'search_pipc_decisions', 'search_nlrc_decisions',
+  'search_admin_rule',
+  // Unified decisions (17 domains)
+  'search_decisions', 'get_decision_text',
   // Chain
   'chain_full_research', 'chain_dispute_prep', 'chain_procedure_detail',
   'chain_action_basis', 'chain_law_system', 'chain_amendment_track',
