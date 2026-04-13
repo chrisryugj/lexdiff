@@ -1,0 +1,110 @@
+name: RAG Eval (Weekly)
+
+# 매주 월요일 03:00 UTC (KST 12:00) 자동 실행 + 수동 트리거
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      skip_ragas:
+        description: 'RAGAS 평가 건너뛰기 (legal_metrics만)'
+        required: false
+        default: 'false'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Node deps
+        run: pnpm install
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r evaluation/requirements.txt
+
+      - name: Start dev server
+        run: |
+          pnpm dev > server.log 2>&1 &
+          echo "DEV_PID=$!" >> $GITHUB_ENV
+          # 서버 부팅 대기 (최대 60초)
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000 > /dev/null; then
+              echo "✅ dev server up"
+              break
+            fi
+            sleep 2
+          done
+        env:
+          LAW_OC: ${{ secrets.LAW_OC }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HERMES_API_URL: ${{ secrets.HERMES_API_URL }}
+          NODE_ENV: production
+
+      - name: Run weekly RAG evaluation
+        id: eval
+        run: |
+          if [ "${{ github.event.inputs.skip_ragas }}" = "true" ]; then
+            python evaluation/run_weekly.py --skip-ragas
+          else
+            python evaluation/run_weekly.py
+          fi
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        continue-on-error: true
+
+      - name: Upload history artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-eval-${{ github.run_number }}
+          path: evaluation/history/
+          retention-days: 90
+
+      - name: Upload server log on failure
+        if: failure() || steps.eval.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log-${{ github.run_number }}
+          path: server.log
+          retention-days: 14
+
+      - name: Stop dev server
+        if: always()
+        run: |
+          if [ -n "${DEV_PID:-}" ]; then kill $DEV_PID || true; fi
+
+      - name: Commit history (main only)
+        if: github.ref == 'refs/heads/main' && steps.eval.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add evaluation/history/
+          if git diff --staged --quiet; then
+            echo "No history changes"
+          else
+            git commit -m "chore: weekly RAG eval $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Fail on regression
+        if: steps.eval.outcome != 'success'
+        run: |
+          echo "❌ 회귀 또는 평가 실패 — history 아티팩트 확인 필요"
+          exit 1
