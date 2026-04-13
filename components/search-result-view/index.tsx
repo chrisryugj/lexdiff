@@ -20,6 +20,7 @@ import { LawViewerSkeleton } from "@/components/law-viewer-skeleton"
 import { Icon } from "@/components/ui/icon"
 import { formatJO } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
+import { toast } from "@/hooks/use-toast"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import type { LawMeta } from "@/lib/law-types"
 import type { PrecedentSearchResult } from "@/lib/precedent-parser"
@@ -154,6 +155,12 @@ function SearchResultViewComponent({
           actions.updateProgress('parsing', 95)
           restoreData()
           actions.updateProgress('complete', 100)
+          // M9: 캐시 히트 토스트로 사용자에게 명시적 피드백 제공
+          toast({
+            title: '캐시에서 불러옴',
+            description: `${label} — 즉시 복원됨`,
+            duration: 2000,
+          })
           setTimeout(() => {
             actions.setIsCacheHit(false)
             actions.setIsSearching(false)

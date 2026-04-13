@@ -52,8 +52,42 @@ export async function POST(request: Request) {
       throw new Error(`HWP 파일 다운로드 실패: ${response.status}`)
     }
 
+    // M1: Content-Length / Content-Type + magic bytes 검증
+    const MAX_HWP_BYTES = 20 * 1024 * 1024 // 20MB
+    const contentLength = Number(response.headers.get('content-length') || '0')
+    if (contentLength > MAX_HWP_BYTES) {
+      return NextResponse.json(
+        { error: 'HWP 파일이 너무 큽니다 (20MB 초과)', success: false },
+        { status: 413 },
+      )
+    }
+
     const arrayBuffer = await response.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+
+    // 스트리밍 없이 다운로드 완료 후 크기 재검증 (CL 헤더 누락 대비)
+    if (buffer.byteLength > MAX_HWP_BYTES) {
+      return NextResponse.json(
+        { error: 'HWP 파일이 너무 큽니다 (20MB 초과)', success: false },
+        { status: 413 },
+      )
+    }
+
+    // Magic bytes 검증:
+    //  - HWP 5.0 (OLE compound document): D0 CF 11 E0 A1 B1 1A E1
+    //  - HWPX (ZIP container):            50 4B 03 04
+    const magic = buffer.subarray(0, 8)
+    const isHwp5 = magic.length >= 8
+      && magic[0] === 0xD0 && magic[1] === 0xCF && magic[2] === 0x11 && magic[3] === 0xE0
+      && magic[4] === 0xA1 && magic[5] === 0xB1 && magic[6] === 0x1A && magic[7] === 0xE1
+    const isHwpx = magic.length >= 4
+      && magic[0] === 0x50 && magic[1] === 0x4B && magic[2] === 0x03 && magic[3] === 0x04
+    if (!isHwp5 && !isHwpx) {
+      return NextResponse.json(
+        { error: 'HWP/HWPX 형식이 아닙니다 (magic bytes 불일치)', success: false },
+        { status: 415 },
+      )
+    }
 
     // 2. hwp.js로 파싱 (서버사이드)
     // eslint-disable-next-line @typescript-eslint/no-require-imports

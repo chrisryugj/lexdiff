@@ -33,12 +33,45 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
 
 const ALLOWED_SCHEMES = ['http', 'https']
 
+// M11: img src host 화이트리스트. 법제처/대법원 공식 도메인만 허용.
+// 외부 제3자 이미지(추적 픽셀 등) 차단 — sanitize-html의 allowedSchemesByTag는
+// scheme만 제한하므로 host는 transformTags로 직접 검사.
+const ALLOWED_IMG_HOSTS = new Set([
+  'www.law.go.kr',
+  'law.go.kr',
+  'www.scourt.go.kr',
+  'scourt.go.kr',
+  'www.moleg.go.kr',
+  'moleg.go.kr',
+])
+
+function isAllowedImgSrc(src: string): boolean {
+  if (!src) return false
+  try {
+    const u = new URL(src, 'https://www.law.go.kr')
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false
+    return ALLOWED_IMG_HOSTS.has(u.hostname)
+  } catch {
+    return false
+  }
+}
+
 const sanitizeOptions: Parameters<typeof sanitizeHtml>[1] = {
   allowedTags: ALLOWED_TAGS,
   allowedAttributes: ALLOWED_ATTRIBUTES,
   allowedSchemes: ALLOWED_SCHEMES,
   allowedSchemesByTag: { a: ALLOWED_SCHEMES },
   allowProtocolRelative: false,
+  transformTags: {
+    img: (tagName, attribs) => {
+      const src = String(attribs.src || '')
+      if (!isAllowedImgSrc(src)) {
+        // src 제거 → 허용되지 않은 host는 빈 img로 전락 → sanitize-html이 렌더 제거
+        return { tagName, attribs: {} }
+      }
+      return { tagName, attribs }
+    },
+  },
 }
 
 /**

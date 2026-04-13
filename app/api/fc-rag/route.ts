@@ -24,6 +24,40 @@ import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
 import { getClientIP } from "@/lib/get-client-ip"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
 
+/**
+ * M5: citation 검증 블록 공통화.
+ * Hermes/Gemini 양쪽 경로에서 20줄 중복이었던 로직을 한 곳에 모음.
+ * - 10초 timeout
+ * - 실패 시 모든 citation을 verified:false + 'skipped'로 처리
+ * - 결과를 `citation_verification` 이벤트로 flush
+ */
+async function streamCitationVerification(
+  citations: FCRAGCitation[],
+  sendAndLog: (event: unknown) => void,
+): Promise<void> {
+  if (citations.length === 0) return
+  try {
+    const { verifiable, skipped } = convertForVerification(citations)
+    if (verifiable.length === 0) return
+    sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
+    const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
+      verifyAllCitations(verifiable),
+      new Promise<VerifiedCitation[]>((_, reject) =>
+        setTimeout(() => reject(new Error('citation verification timeout')), 10_000),
+      ),
+    ]).catch(() =>
+      verifiable.map<VerifiedCitation>((c) => ({
+        ...c,
+        verified: false,
+        verificationMethod: 'skipped',
+      })),
+    )
+    sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
+  } catch (error) {
+    debugLogger.error("[FC-RAG] Citation verification failed:", error)
+  }
+}
+
 function convertForVerification(fcCitations: FCRAGCitation[]): {
   verifiable: Citation[]
   skipped: VerifiedCitation[]
@@ -243,31 +277,8 @@ export async function POST(request: NextRequest) {
 
           if (!cliSuccess) throw new Error('Hermes API failed after retries')
 
-          // Citation 검증 (양쪽 경로 공통)
-          if (lastAnswerCitations.length > 0) {
-            try {
-              const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
-              if (verifiable.length > 0) {
-                sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
-                // P1-AI-7: 검증 timeout (10s) — 법제처 hang 방지
-                const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
-                  verifyAllCitations(verifiable),
-                  new Promise<VerifiedCitation[]>((_, reject) =>
-                    setTimeout(() => reject(new Error('citation verification timeout')), 10_000)
-                  ),
-                ]).catch(() =>
-                  verifiable.map<VerifiedCitation>((c) => ({
-                    ...c,
-                    verified: false,
-                    verificationMethod: 'skipped',
-                  }))
-                )
-                sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
-              }
-            } catch (error) {
-              debugLogger.error("[FC-RAG] Citation verification failed:", error)
-            }
-          }
+          // M5: Citation 검증 (양쪽 경로 공통 헬퍼)
+          await streamCitationVerification(lastAnswerCitations, sendAndLog)
 
           handled = true
           source = 'hermes'
@@ -331,30 +342,8 @@ export async function POST(request: NextRequest) {
             })
           }
 
-          if (lastAnswerCitations.length > 0) {
-            try {
-              const { verifiable, skipped } = convertForVerification(lastAnswerCitations)
-              if (verifiable.length > 0) {
-                sendAndLog({ type: "status", message: "인용 법조문 검증 중...", progress: 95 })
-                // P1-AI-7: 검증 timeout (10s) — 법제처 hang 방지
-                const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
-                  verifyAllCitations(verifiable),
-                  new Promise<VerifiedCitation[]>((_, reject) =>
-                    setTimeout(() => reject(new Error('citation verification timeout')), 10_000)
-                  ),
-                ]).catch(() =>
-                  verifiable.map<VerifiedCitation>((c) => ({
-                    ...c,
-                    verified: false,
-                    verificationMethod: 'skipped',
-                  }))
-                )
-                sendAndLog({ type: "citation_verification", citations: [...verified, ...skipped] })
-              }
-            } catch (error) {
-              debugLogger.error("[FC-RAG] Citation verification failed:", error)
-            }
-          }
+          // M5: Citation 검증 (헬퍼 재사용)
+          await streamCitationVerification(lastAnswerCitations, sendAndLog)
 
           source = 'gemini'
           traceLogger.completeTrace(traceId, 'gemini')

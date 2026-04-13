@@ -371,12 +371,23 @@ export async function* handleFastPath(
 
 // ─── 질의 분류 ───
 
+// M6: inferComplexity magic number 상수화 — 튜닝 포인트를 한 곳에 모음.
+export const COMPLEXITY_THRESHOLDS = {
+  COMPLEX_QUERY_LEN: 100,
+  COMPLEX_LAW_MATCHES: 1,        // > 이 값
+  COMPLEX_ARTICLE_MATCHES: 2,    // > 이 값
+  COMPLEX_SOURCE_TYPES: 2,       // >= 이 값
+
+  MODERATE_QUERY_LEN: 50,
+  MODERATE_SOURCE_TYPES: 1,      // >= 이 값
+} as const
+
+const COMPLEX_PATTERNS = /(?:하고|와\s*함께|판례|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
+const MODERATE_PATTERNS = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조|절차|방법|벌칙|처벌|과태료|벌금|영업정지|허가취소|감면|면제|비과세|특례|요건)/
+
 export function inferComplexity(query: string): QueryComplexity {
   const lawMatches = query.match(/「([^」]+)」/g) || []
   const articleMatches = query.match(/제\d+조(?:의\d+)?/g) || []
-
-  const complexPatterns = /(?:하고|와\s*함께|판례|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
-  const moderatePatterns = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조|절차|방법|벌칙|처벌|과태료|벌금|영업정지|허가취소|감면|면제|비과세|특례|요건)/
 
   const sourceTypes = [
     /판례|판결/.test(query),
@@ -386,11 +397,21 @@ export function inferComplexity(query: string): QueryComplexity {
     /비교|대조|신구/.test(query),
   ].filter(Boolean).length
 
-  if (lawMatches.length > 1 || articleMatches.length > 2 || query.length > 100
-    || complexPatterns.test(query) || sourceTypes >= 2) {
+  if (
+    lawMatches.length > COMPLEXITY_THRESHOLDS.COMPLEX_LAW_MATCHES
+    || articleMatches.length > COMPLEXITY_THRESHOLDS.COMPLEX_ARTICLE_MATCHES
+    || query.length > COMPLEXITY_THRESHOLDS.COMPLEX_QUERY_LEN
+    || COMPLEX_PATTERNS.test(query)
+    || sourceTypes >= COMPLEXITY_THRESHOLDS.COMPLEX_SOURCE_TYPES
+  ) {
     return 'complex'
   }
-  if (query.length > 50 || articleMatches.length > 0 || moderatePatterns.test(query) || sourceTypes >= 1) {
+  if (
+    query.length > COMPLEXITY_THRESHOLDS.MODERATE_QUERY_LEN
+    || articleMatches.length > 0
+    || MODERATE_PATTERNS.test(query)
+    || sourceTypes >= COMPLEXITY_THRESHOLDS.MODERATE_SOURCE_TYPES
+  ) {
     return 'moderate'
   }
   return 'simple'
