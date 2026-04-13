@@ -138,10 +138,13 @@ export function StageIndicator({
                   {stage.label}
                 </span>
 
-                {/* 타이머 - 활성 단계만 */}
+                {/* 타이머 뱃지 - 활성 단계만 */}
                 {isCurrent && currentStage !== 'complete' && (
-                  <span className="text-[10px] md:text-xs text-muted-foreground/70 tabular-nums min-w-[4.5ch] text-center">
-                    {stageElapsedTime.toFixed(1)}초
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 ring-1 ring-primary/20 text-primary shadow-sm backdrop-blur-sm">
+                    <Icon name="clock" className="h-2.5 w-2.5 md:h-3 md:w-3 opacity-80" />
+                    <span className="text-[10px] md:text-[11px] font-semibold tabular-nums leading-none tracking-tight">
+                      {stageElapsedTime.toFixed(1)}s
+                    </span>
                   </span>
                 )}
               </div>
