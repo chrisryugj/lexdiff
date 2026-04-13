@@ -53,12 +53,11 @@ const ROUTER_MAX_TOOLS_IN_PLAN = 3
  * args 는 validateAndNormalize 에서 강제로 {query: originalQuery}로 덮어써짐 (할루시네이션 방어).
  */
 const ROUTER_TOOL_CATALOG: Array<{ name: string; hint: string }> = [
-  // 핵심 검색 (모두 {query}만)
+  // 핵심 자연어 검색 (모두 {query}만, 자유형 질의 OK)
   { name: 'search_ai_law', hint: '자연어 법령·조문 의미 검색 (첫 도구로 권장, 가장 범용)' },
-  { name: 'search_law', hint: '법령명을 정확히 알 때 MST 확인용' },
-  { name: 'search_ordinance', hint: '자치법규 검색 (지역명이 query에 포함되어야 효과)' },
-  { name: 'search_admin_rule', hint: '훈령/예규/고시 검색' },
-  // Chain — 복합 질문용 (모두 {query}만)
+  { name: 'search_ordinance', hint: '자치법규 검색 (지역명 포함 자유 질의)' },
+  { name: 'search_admin_rule', hint: '훈령/예규/고시 자유 질의 검색' },
+  // Chain — 복합 질문용 (모두 {query}만, 자유형 질의 OK)
   { name: 'chain_full_research', hint: '종합 리서치 (AI검색+법령+판례+해석례 병렬)' },
   { name: 'chain_dispute_prep', hint: '쟁송/불복 질문 (판례+행정심판+도메인 결정)' },
   { name: 'chain_procedure_detail', hint: '절차/비용/신청 질문 (법령+3단+별표)' },
@@ -67,6 +66,9 @@ const ROUTER_TOOL_CATALOG: Array<{ name: string; hint: string }> = [
   { name: 'chain_amendment_track', hint: '개정/변경 추적 (신구대조+이력)' },
   { name: 'chain_ordinance_compare', hint: '조례 비교 연구' },
 ]
+// ⚠️ search_law 는 의도적으로 제외 — 법령명 정확한 매칭만 되므로
+//    자연어 질의를 넣으면 API 가 실패한다. 라우터는 search_ai_law 만 쓰고,
+//    S2 가 필요 시 search_law → get_batch_articles 체인으로 MST 확인.
 
 const ALLOWED_TOOL_NAMES = new Set(ROUTER_TOOL_CATALOG.map(t => t.name))
 
@@ -98,8 +100,7 @@ const ROUTER_SYSTEM_PROMPT = `당신은 한국 법령 질의를 경량 모델로
 - 🔴 **args 필드는 출력하지 말 것** — 시스템이 자동으로 원 질의를 args 로 주입한다.
 - 🔴 **tool name만 선택**. 카탈로그에 없는 이름 금지.
 - 복합 질문 → chain_* 1개로 시작. chain 호출 시 중복 커버되는 다른 도구 넣지 말 것.
-- 단순 정의/조문 질문 → search_ai_law 1개면 충분.
-- 법령명이 명확하고 조문번호가 있으면 search_law 1개.
+- 단순 정의/조문 질문 → **search_ai_law 1개**면 충분 (자연어로 법령명/조문 모두 검색됨).
 - 조례 관련이면 search_ordinance, 훈령/예규면 search_admin_rule.
 - 확신 없으면 toolPlan 빈 배열 + expectedTurns=3 으로 S2 에 위임.
 
