@@ -15,8 +15,10 @@ import type { FunctionDeclaration } from '@google/genai'
 import { TOOLS, apiClient } from './tool-registry'
 import {
   apiCache, getToolTTL, evictOldest, stableStringify,
-  truncateForContext, compressSearchResult, compressAiSearchResult, isEmptySearchResult,
+  truncateForContext, compressSearchResult, compressAiSearchResult,
+  compressDecisionText, isEmptySearchResult,
 } from './tool-cache'
+import { isDecisionGetTool } from './decision-domains'
 
 // ─── Gemini FunctionDeclaration 변환 ───
 
@@ -161,13 +163,21 @@ export async function executeTool(
     }
     const text = response.content.map(c => c.text).join('\n')
     const truncated = truncateForContext(text, name, parsedArgs)
+    // 도구별 후처리 압축: search 계열은 리스트 압축, 결정문 전문 계열은 섹션 기반 압축.
+    // 결정문 압축은 판시사항/판결요지는 보존하고 전문/참조판례만 축약 (-60% 토큰).
+    let compressed: string
+    if (name === 'search_law') {
+      compressed = compressSearchResult(truncated)
+    } else if (name === 'search_ai_law') {
+      compressed = compressAiSearchResult(truncated)
+    } else if (isDecisionGetTool(name)) {
+      compressed = compressDecisionText(truncated)
+    } else {
+      compressed = truncated
+    }
     const result: ToolCallResult = {
       name,
-      result: name === 'search_law'
-        ? compressSearchResult(truncated)
-        : name === 'search_ai_law'
-          ? compressAiSearchResult(truncated)
-          : truncated,
+      result: compressed,
       isError: response.isError || false,
       args: parsedArgs as Record<string, unknown>,
     }

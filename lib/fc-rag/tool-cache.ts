@@ -188,6 +188,112 @@ export function compressAiSearchResult(text: string): string {
   return header + compressed.join('\n\n') + suffix
 }
 
+// ─── 결정문 전문(판례/해석례 등) 섹션 기반 압축 ───
+//
+// korean-law-mcp 의 getPrecedentText 등은 고정된 섹션 헤더로 포맷됨:
+//   === {판례명} ===
+//   기본 정보: ...
+//   판시사항: ...       ← 🔴 절대 자르지 않음 (대법원 공식 요약)
+//   판결요지: ...       ← 🔴 절대 자르지 않음 (공식 syllabus)
+//   참조조문: ...       ← 유지 (짧음)
+//   참조판례: ...       ← 길면 자연 경계에서 자름
+//   전문: ...           ← 자연 경계에서 자름 (판시사항 존재 여부에 따라 길이 조절)
+//
+// 🛡️ 할루시네이션 방지 원칙:
+//   1. 문장 중간에서 절대 자르지 않음 — 단락(\n\n) → 문장 끝(다.) → 줄바꿈 순으로
+//      자연 경계 찾아서 그 전에서 자름.
+//   2. 판시사항/판결요지는 이미 대법원이 확정한 공식 요약 → 절대 손대지 않음.
+//   3. 전문 자를 때 **명시적 truncation 마커** 삽입 → LLM이 "여기 뒤 내용은
+//      확인 불가, 인용 금지"를 인지하도록 유도.
+//   4. 판시사항이 존재하면 전문은 짧게(보조용), 없으면 더 길게 유지.
+
+const DECISION_FULLTEXT_WITH_HEADNOTE = 1200   // 판시사항 있으면 전문은 짧게
+const DECISION_FULLTEXT_NO_HEADNOTE = 3000     // 판시사항 없으면 전문을 길게 유지
+const DECISION_REFCASE_KEEP = 500              // 참조판례는 짧게
+
+/**
+ * 자연 경계에서 자르기. target 이하 길이로 자르되, 문장/단락 중간을 피함.
+ * 우선순위: 단락 경계(\n\n) > 문장 끝(다./요./임.) > 줄바꿈 > 하드 컷(최후수단)
+ * 경계를 target의 60% 이전에서도 못 찾으면 할루시네이션 위험 회피 위해 하드 컷.
+ */
+function cutAtNaturalBoundary(text: string, target: number): string {
+  if (text.length <= target) return text
+  const minAcceptable = Math.floor(target * 0.6)  // 너무 일찍 자르면 내용 부족
+  const window = text.slice(0, target)
+
+  // 1. 단락 경계 (\n\n) — 가장 안전
+  const paraIdx = window.lastIndexOf('\n\n')
+  if (paraIdx >= minAcceptable) return text.slice(0, paraIdx)
+
+  // 2. 한국어 문장 끝 패턴 — "~다." 뒤 공백/줄바꿈
+  const sentRegex = /(?:다|요|임|함|음)\.(?:\s|$)/g
+  let lastSentEnd = -1
+  let sm: RegExpExecArray | null
+  while ((sm = sentRegex.exec(window)) !== null) {
+    lastSentEnd = sm.index + sm[0].length
+  }
+  if (lastSentEnd >= minAcceptable) return text.slice(0, lastSentEnd).trimEnd()
+
+  // 3. 줄바꿈
+  const nlIdx = window.lastIndexOf('\n')
+  if (nlIdx >= minAcceptable) return text.slice(0, nlIdx)
+
+  // 4. 마침표 단독
+  const dotIdx = window.lastIndexOf('. ')
+  if (dotIdx >= minAcceptable) return text.slice(0, dotIdx + 1)
+
+  // 5. 최후수단 — 하드 컷 (자연 경계 탐색 모두 실패)
+  return text.slice(0, target)
+}
+
+const TRUNCATION_MARKER = '\n\n⚠️ [이후 생략 — 이 뒤 내용은 LLM에 전달되지 않음. 인용 시 위 내용만 사용]'
+
+/**
+ * 판례/해석례 상세 결과를 섹션 인식 + 자연 경계 기반으로 압축.
+ * 이미 TOOL_RESULT_LIMITS 로 1차 head-truncation 된 텍스트를 추가 압축.
+ * 섹션 마커를 찾지 못하면 원본 반환 (안전).
+ */
+export function compressDecisionText(text: string): string {
+  // 섹션 마커가 하나도 없으면 포맷을 모르는 것 → 건드리지 않음
+  if (!/(?:판시사항|판결요지|전문|판례내용):/.test(text)) return text
+
+  const sectionRegex = /\n(기본 정보|판시사항|판결요지|참조조문|참조판례|전문|판례내용):\n/g
+  const matches: Array<{ name: string; idx: number; headerEnd: number }> = []
+  let m: RegExpExecArray | null
+  while ((m = sectionRegex.exec(text)) !== null) {
+    matches.push({ name: m[1], idx: m.index + 1, headerEnd: sectionRegex.lastIndex })
+  }
+  if (matches.length === 0) return text
+
+  // 판시사항/판결요지 존재 여부 — 존재하면 전문은 짧게 (판시사항이 이미 공식 요약)
+  const hasHeadnote = matches.some(m => m.name === '판시사항' || m.name === '판결요지')
+  const fulltextKeep = hasHeadnote ? DECISION_FULLTEXT_WITH_HEADNOTE : DECISION_FULLTEXT_NO_HEADNOTE
+
+  // 헤더(=== 판례명 ===) + matches 이전 prelude 보존
+  const prelude = text.slice(0, matches[0].idx).trimEnd()
+
+  const parts: string[] = [prelude]
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i]
+    const next = matches[i + 1]
+    const rawBody = text.slice(cur.headerEnd, next ? next.idx : text.length).trimEnd()
+
+    let body = rawBody
+    // 🔴 판시사항/판결요지/기본정보/참조조문은 절대 자르지 않음 (공식 요약 or 짧음)
+    if (cur.name === '전문' || cur.name === '판례내용') {
+      if (rawBody.length > fulltextKeep) {
+        body = cutAtNaturalBoundary(rawBody, fulltextKeep) + TRUNCATION_MARKER
+      }
+    } else if (cur.name === '참조판례') {
+      if (rawBody.length > DECISION_REFCASE_KEEP) {
+        body = cutAtNaturalBoundary(rawBody, DECISION_REFCASE_KEEP) + '\n... (참조판례 일부 생략)'
+      }
+    }
+    parts.push(`\n${cur.name}:\n${body}`)
+  }
+  return parts.join('\n').replace(/\n{3,}/g, '\n\n')
+}
+
 export function isEmptySearchResult(text: string): boolean {
   if (!text || text.trim().length === 0) return true
   if (/검색 결과가 없|결과 없음|0건|데이터가 없|찾을 수 없/.test(text)) return true
