@@ -7,6 +7,7 @@ import { GoogleGenAI } from '@google/genai'
 import { getToolDeclarations, executeTool, executeToolsParallel, type ToolCallResult } from './tool-adapter'
 import { buildStaticSystemPrompt, buildDynamicHeader } from './prompts'
 import { getCachedAnswer, cacheAnswer } from './answer-cache'
+import { routeQuery, shouldUseRouter, type RouterPlan } from './router-engine'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery, CHAIN_COVERS } from './tool-tiers'
 import { cacheMSTEntries, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
 import { buildCitations, calcConfidence } from './citations'
@@ -256,10 +257,12 @@ export async function* executeGeminiRAGStream(
 ): AsyncGenerator<FCRAGStreamEvent> {
   const { apiKey: geminiApiKey, signal, preEvidence, conversationId } = options || {}
   const warnings: string[] = []
-  const complexity = inferComplexity(query)
-  const queryType = inferQueryType(query)
-  const maxToolTurns = getMaxToolTurns(complexity)
-  const complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
+  // complexity/queryType/maxToolTurns는 S1 Router가 덮어쓸 수 있도록 let
+  let complexity = inferComplexity(query)
+  let queryType = inferQueryType(query)
+  let maxToolTurns = getMaxToolTurns(complexity)
+  let complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
+  let routerPlan: RouterPlan | null = null
 
   yield { type: 'status', message: `질문 분석 완료 (${complexityLabel})`, progress: 8 }
 
@@ -288,7 +291,76 @@ export async function* executeGeminiRAGStream(
     if (fastPathNext.value === true) return
   }
 
+  // ── S1 Router (Flash-Lite) — 옵션, 해시 기반 점진 롤아웃 ──
+  // 환경변수: FC_RAG_S1_ROUTER_ENABLED=true, FC_RAG_S1_ROUTER_ROLLOUT_PCT=20 (기본 20%)
+  // conversationId / preEvidence 있으면 스킵 (맥락 의존). 실패 시 조용히 regex로 폴백.
+  const routerEnabled = process.env.FC_RAG_S1_ROUTER_ENABLED === 'true'
+  const rolloutPct = parseInt(process.env.FC_RAG_S1_ROUTER_ROLLOUT_PCT || '20', 10)
+  const canUseRouter = routerEnabled
+    && !preEvidence
+    && !conversationId
+    && !geminiEvidence
+    && shouldUseRouter(query, rolloutPct)
+
+  if (canUseRouter) {
+    yield { type: 'status', message: 'S1 라우터 분석 중...', progress: 10 }
+    const routerKey = process.env.GEMINI_ROUTER_API_KEY || geminiApiKey || process.env.GEMINI_API_KEY
+    if (routerKey) {
+      routerPlan = await routeQuery(query, routerKey, signal)
+    }
+    if (routerPlan) {
+      // 라우터 결과로 분류 재설정 (regex 결과보다 정확도 높음 가정)
+      complexity = routerPlan.complexity
+      queryType = routerPlan.queryType
+      maxToolTurns = routerPlan.expectedTurns  // 🔴 동적 maxTurns — 핵심 효과
+      complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
+
+      // 플랜이 있으면 선제 실행 (pre-fetch) → geminiEvidence 로 구성
+      if (routerPlan.toolPlan.length > 0) {
+        yield { type: 'status', message: `S1 플랜 실행 (${routerPlan.toolPlan.length}개 도구)`, progress: 14 }
+
+        // tool_call 이벤트 발행
+        for (const call of routerPlan.toolPlan) {
+          yield {
+            type: 'tool_call',
+            name: call.name,
+            displayName: displayNameFor(call.name, call.args),
+            query: getToolCallQuery(call.name, call.args),
+          }
+        }
+
+        const planResults = await executeToolsParallel(
+          routerPlan.toolPlan.map(c => ({ name: c.name, args: c.args })),
+          signal,
+        )
+
+        // tool_result 이벤트 발행
+        for (const r of planResults) {
+          yield {
+            type: 'tool_result',
+            name: r.name,
+            displayName: displayNameFor(r.name, r.args),
+            success: !r.isError,
+            summary: summarizeToolResult(r.name, r),
+          }
+        }
+
+        // 성공한 결과만 evidence 로 연결 (실패는 S2 가 보충하도록 맡김)
+        const successResults = planResults.filter(r => !r.isError && r.result.length > 100)
+        if (successResults.length > 0) {
+          geminiEvidence = successResults
+            .map(r => `[${displayNameFor(r.name, r.args)}]\n${r.result}`)
+            .join('\n\n---\n\n')
+        }
+      }
+    } else {
+      // 라우터 실패 → 조용히 regex 경로로 폴백 (사용자는 인지 못 함)
+      yield { type: 'status', message: '질문 분석 중...', progress: 10 }
+    }
+  }
+
   // ── 분류기 기반 Pre-evidence (Gemini도 동일 전략) ──
+  // 라우터가 evidence 를 구성했으면 이 블록은 자동 스킵됨 (geminiEvidence 존재)
   if (!geminiEvidence && (complexity === 'simple' || complexity === 'moderate')) {
     yield { type: 'status', message: '관련 법령 사전 검색 중...', progress: 12 }
     const aiSearch = await executeTool('search_ai_law', { query }, signal)
