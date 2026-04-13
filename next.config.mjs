@@ -10,38 +10,32 @@ const nextConfig = {
 
   // 보안 헤더
   async headers() {
+    // M2: LEXDIFF_CSP_NONCE=true 이면 middleware가 요청별 nonce CSP를 설정하므로
+    // 정적 CSP는 제외 (중복 설정 방지). 그 외 보안 헤더는 유지.
+    const cspNonceEnabled = process.env.LEXDIFF_CSP_NONCE === 'true'
+
+    const baseHeaders = [
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'X-XSS-Protection', value: '1; mode=block' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ]
+
+    if (!cspNonceEnabled) {
+      baseHeaders.push({
+        key: 'Content-Security-Policy',
+        value:
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:;",
+      })
+    }
+
     return [
       {
         source: '/:path*',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.law.go.kr data: blob:; connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com; frame-ancestors 'self'; font-src 'self' https://cdn.jsdelivr.net https://hangeul.pstatic.net data:;",
-          },
-        ],
+        headers: baseHeaders,
       },
       // H-SEC3: CORS는 middleware.ts에서 origin 화이트리스트 echo 방식으로 처리.
-      // 정적 헤더 방식은 단일 origin만 허용해 프리뷰/멀티 도메인 대응 불가.
     ]
   },
 }
