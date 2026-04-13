@@ -108,7 +108,7 @@ function applyCspNonce(request: NextRequest): NextResponse {
   return res
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname
 
   // /api/* 는 CORS 처리, 그 외는 CSP nonce 경로

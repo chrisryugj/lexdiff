@@ -115,7 +115,7 @@ export function FeatureCards({ revealed = false, onToolClick }: FeatureCardsProp
           <h2 className="text-sm font-bold tracking-[0.2em] text-brand-gold uppercase mb-4">
             Core Competence
           </h2>
-          <h3 className="text-3xl lg:text-5xl font-black text-brand-navy dark:text-foreground mb-6" style={{ fontFamily: "'RIDIBatang', serif" }}>
+          <h3 className="text-3xl lg:text-5xl font-black text-brand-navy dark:text-foreground mb-6 leading-[1.35]" style={{ fontFamily: "'RIDIBatang', serif" }}>
             법령에서 찾고,<br/>근거로 답합니다.
           </h3>
           <p className="text-lg text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
