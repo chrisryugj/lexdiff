@@ -35,6 +35,26 @@ REPORT_PATH = BASE_DIR / "RAGAS_REPORT.md"
 
 API_URL = "http://localhost:3000/api/fc-rag"
 
+
+def _normalize_question(item: dict) -> dict:
+    """dataset_v2.json (query/ground_truth_answer/...) → 내부 포맷.
+
+    기존 test_dataset.json은 그대로, v2는 필드 매핑.
+    """
+    if "query" in item and "question" not in item:
+        return {
+            "id": item.get("id"),
+            "question": item["query"],
+            "query_type": item.get("category", "unknown"),
+            "ground_truth": item.get("ground_truth_answer", ""),
+        }
+    return {
+        "id": item.get("id"),
+        "question": item["question"],
+        "query_type": item.get("query_type", item.get("category", "unknown")),
+        "ground_truth": item.get("ground_truth", item.get("ground_truth_answer", "")),
+    }
+
 # .env.local에서 GEMINI_API_KEY 읽기
 def load_env():
     env_path = BASE_DIR.parent / ".env.local"
@@ -107,8 +127,11 @@ def parse_sse_response(response_text: str) -> dict:
 
 
 # ─── 데이터 수집 ───
-def collect_data():
-    """API에서 테스트 질문들의 응답 수집"""
+def collect_data(dataset_path: Path | None = None):
+    """API에서 테스트 질문들의 응답 수집.
+
+    dataset_path가 dataset_v2.json 이면 query/ground_truth_answer 형식을 자동 매핑.
+    """
     print("=" * 60)
     print("📥 RAG 응답 데이터 수집 시작")
     print("=" * 60)
@@ -121,10 +144,14 @@ def collect_data():
         print("❌ 서버가 실행 중이지 않습니다. npm run dev를 먼저 실행하세요.")
         sys.exit(1)
 
-    with open(DATASET_PATH, encoding="utf-8") as f:
+    path = dataset_path or DATASET_PATH
+    print(f"📋 데이터셋: {path.name}")
+    with open(path, encoding="utf-8") as f:
         dataset = json.load(f)
 
-    questions = dataset["questions"]
+    raw_questions = dataset["questions"]
+    # adversarial은 평가 본 흐름에서 분리 — 별도 collect는 그대로 진행하되 매핑 normalize
+    questions = [_normalize_question(q) for q in raw_questions]
     collected = []
 
     for i, item in enumerate(questions, 1):
@@ -594,16 +621,24 @@ def main():
         sys.exit(1)
 
     cmd = sys.argv[1].lower()
+    # --dataset 인자 파싱 (선택)
+    dataset_arg: Path | None = None
+    for i, a in enumerate(sys.argv):
+        if a == "--dataset" and i + 1 < len(sys.argv):
+            dataset_arg = Path(sys.argv[i + 1])
+            if not dataset_arg.is_absolute():
+                dataset_arg = BASE_DIR / dataset_arg
+            break
 
     if cmd == "collect":
-        collect_data()
+        collect_data(dataset_arg)
 
     elif cmd == "evaluate":
         results = evaluate_with_ragas()
         generate_report(results)
 
     elif cmd == "run":
-        collected = collect_data()
+        collected = collect_data(dataset_arg)
         results = evaluate_with_ragas()
         generate_report(results, collected)
 
