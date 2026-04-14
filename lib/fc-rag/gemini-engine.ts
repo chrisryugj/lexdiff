@@ -10,7 +10,7 @@ import { getCachedAnswer, cacheAnswer } from './answer-cache'
 import { routeQuery, shouldUseRouter, type RouterPlan } from './router-engine'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery, CHAIN_COVERS } from './tool-tiers'
 import { cacheMSTEntries, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
-import { buildCitations, calcConfidence } from './citations'
+import { buildCitationsWithAnswerFallback, calcConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { evaluateResponseQuality } from './quality-evaluator'
 import {
@@ -172,7 +172,7 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
       type: 'answer',
       data: {
         answer,
-        citations: buildCitations(allToolResults, answer),
+        citations: buildCitationsWithAnswerFallback(allToolResults, answer),
         confidenceLevel: calcConfidence(allToolResults),
         complexity,
         queryType,
@@ -241,7 +241,7 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
     type: 'answer',
     data: {
       answer: retryText || '답변 생성에 실패했습니다.',
-      citations: buildCitations(allToolResults, retryText),
+      citations: buildCitationsWithAnswerFallback(allToolResults, retryText),
       confidenceLevel: calcConfidence(allToolResults),
       complexity,
       queryType,
@@ -568,7 +568,14 @@ export async function* executeGeminiRAGStream(
         const answer = parts.filter((p: GeminiPart) => p.text).map((p: GeminiPart) => p.text).join('')
         const quality = evaluateResponseQuality(allToolResults, answer)
         if (quality.warnings.length > 0) warnings.push(...quality.warnings)
-        const confidence = quality.level === 'fail' ? 'low' as const
+        // 🔴 도구 호출 0회 가드: 근거 없는 환각 답변 방지. confidence=low 강제 + 캐시 저장 금지.
+        //    과거 영문/모호 쿼리에서 LLM 이 도구 없이 엉뚱한 답변을 생성해 캐시를 오염시킨 이슈 대응.
+        const noToolsCalled = allToolResults.length === 0
+        if (noToolsCalled) {
+          warnings.push('도구 호출 없이 생성된 답변 — 근거 검증 불가')
+        }
+        const confidence = noToolsCalled ? 'low' as const
+          : quality.level === 'fail' ? 'low' as const
           : quality.level === 'marginal' ? 'medium' as const
           : calcConfidence(allToolResults)
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
@@ -576,7 +583,7 @@ export async function* executeGeminiRAGStream(
         await storeConversation(conversationId, query, answer)
         const answerData = {
           answer,
-          citations: buildCitations(allToolResults, answer),
+          citations: buildCitationsWithAnswerFallback(allToolResults, answer),
           confidenceLevel: confidence,
           complexity,
           queryType,

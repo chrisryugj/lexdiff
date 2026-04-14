@@ -23,7 +23,7 @@
 import { createHash } from 'crypto'
 import type { FCRAGResult } from './engine-shared'
 
-const CACHE_KEY_VERSION = 'v1'
+const CACHE_KEY_VERSION = 'v2'
 const CACHE_TTL_S = 6 * 60 * 60 // 6h
 const CACHE_TTL_MS = CACHE_TTL_S * 1000
 const MAP_MAX_SIZE = 500

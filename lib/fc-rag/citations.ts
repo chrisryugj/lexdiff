@@ -157,6 +157,8 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
       // 법령명 + 조문번호 패턴 추출
       for (const match of Array.from(text.matchAll(/(?:법령명|법률명|법령)[:\s]+(.+?)(?:\n|$)/g))) {
         const chainLawName = match[1].trim()
+        // 실패/빈 결과 문구가 lawName 으로 새는 것 차단 (chain_full_research 내부 에러 포매팅 대응)
+        if (/(조회\s*실패|검색\s*결과가\s*없|결과\s*없음|에러|오류|찾을\s*수\s*없)/.test(chainLawName)) continue
         const key = `chain:${chainLawName}`
         if (chainLawName && !seen.has(key)) {
           seen.add(key)
@@ -240,6 +242,35 @@ export function calcConfidence(toolResults: ToolCallResult[]): 'high' | 'medium'
  * 답변 텍스트에서 「법령명」 제N조 패턴으로 citation 추출.
  * Claude CLI가 도구를 직접 호출하므로 tool result 없이 텍스트 기반으로 파싱.
  */
+/**
+ * buildCitations 결과에 답변 본문의 「법령명」 제N조 패턴을 fallback 으로 merge.
+ * tool result 형식 파싱이 실패하거나 chain_* 결과에서 조문을 못 뽑아낸 경우에도
+ * 답변 본문에 명시된 근거 조문을 citation 으로 노출한다. tool-result 기반 citation 이
+ * 이미 있는 (lawName, articleNumber) 조합은 유지(정확한 chunkText 보존).
+ */
+export function buildCitationsWithAnswerFallback(
+  toolResults: ToolCallResult[],
+  answerText: string,
+): FCRAGCitation[] {
+  const primary = buildCitations(toolResults, answerText)
+  if (!answerText) return primary
+
+  const fallback = parseCitationsFromAnswer(answerText)
+  if (fallback.length === 0) return primary
+
+  const seen = new Set(primary.map(c => `${c.lawName}:${c.articleNumber}`))
+  const merged = [...primary]
+  for (const fb of fallback) {
+    const key = `${fb.lawName}:${fb.articleNumber}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      merged.push({ ...fb, source: 'answer-fallback' })
+    }
+    if (merged.length >= MAX_CITATIONS) break
+  }
+  return merged
+}
+
 export function parseCitationsFromAnswer(answer: string): FCRAGCitation[] {
   const citations: FCRAGCitation[] = []
   const seen = new Set<string>()

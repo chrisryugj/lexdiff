@@ -129,6 +129,55 @@ const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
   military: '- 병역 도메인: chain_law_system 또는 chain_full_research 로 병역법+군인사법 등 법체계 수집.',
 }
 
+// ─── 특수 결정문 도메인 키워드 감지 ───
+//
+// detectDomain() 의 LegalDomain 은 Tier 1 도구 선택용이라 pipc/nlrc 같은
+// 결정문 도메인과 1:1 매칭이 아님. 사용자 질의에 특정 기관/결정 키워드가
+//보이면 LLM 이 search_decisions(domain=해당값) 를 직접 호출하도록 동적
+// 헤더에 명시적 힌트를 주입한다.
+//
+// 매핑 기준: 기관 이름 / 특유 용어 / 결정 유형 (false positive 를 피하기 위해
+// 일반적인 단어는 배제).
+
+const DECISION_DOMAIN_KEYWORDS: Array<{
+  domain: string
+  label: string
+  pattern: RegExp
+}> = [
+  { domain: 'nlrc',           label: '노동위원회 결정문',      pattern: /노동위|지노위|중노위|부당해고\s*구제|부당노동행위|노동위원회/ },
+  { domain: 'pipc',           label: '개인정보보호위원회 결정문', pattern: /개인정보보호위|개인정보위|pipc|개인정보\s*과징금|개인정보\s*의결|개인정보\s*처분/ },
+  { domain: 'ftc',            label: '공정거래위원회 결정문',  pattern: /공정거래위|공정위|ftc|공정거래\s*의결|공정거래\s*과징금|하도급\s*의결|가맹\s*불공정/ },
+  { domain: 'tax_tribunal',   label: '조세심판원 재결례',      pattern: /조세심판|심판원|국세심판|조세\s*재결|조세\s*불복/ },
+  { domain: 'customs',        label: '관세청 법령해석',        pattern: /관세청\s*해석|관세\s*해석|fta\s*원산지|hs코드|hs\s*코드|통관\s*해석/ },
+  { domain: 'constitutional', label: '헌법재판소 결정례',      pattern: /헌법재판소|헌재|위헌|헌법소원|권한쟁의|기본권\s*침해/ },
+  { domain: 'admin_appeal',   label: '행정심판례',            pattern: /행정심판|중앙행정심판위|행심위\b|시도행정심판/ },
+  { domain: 'acr',            label: '국민권익위원회 결정문',  pattern: /권익위|국민권익|고충민원|청렴|부패방지\s*결정/ },
+  { domain: 'appeal_review',  label: '소청심사 재결례',        pattern: /소청심사|소청위원회|공무원\s*징계\s*소청|소청\s*재결/ },
+  { domain: 'acr_special',    label: '권익위 특별행정심판',    pattern: /특별행정심판|특별심판/ },
+  { domain: 'school',         label: '학칙',                  pattern: /학칙|학사규정|대학\s*졸업요건|학교\s*규정/ },
+  { domain: 'public_corp',    label: '공사공단 규정',          pattern: /한국전력공사|한국수자원공사|도로공사|철도공사|공사공단|공단\s*규정|공사\s*내부규정|공사\s*인사/ },
+  { domain: 'public_inst',    label: '공공기관 규정',          pattern: /한국연구재단|공공기관\s*규정|공공기관\s*내부규정|연구재단|\b기관\s*내부규정/ },
+  { domain: 'treaty',         label: '조약',                  pattern: /조약|협정문|fta\b|자유무역협정|양자협정|다자협정|한미\s*fta|한\s*eu\s*fta/i },
+  { domain: 'english_law',    label: '영문법령',              pattern: /english\s*translation|english\s*law|english\s*version|영문번역|영문\s*법령/i },
+  { domain: 'interpretation', label: '법령해석례',            pattern: /법제처\s*해석|유권해석|질의회신|법령해석례|인허가\s*의제/ },
+]
+
+/**
+ * 쿼리에서 특수 결정문 도메인 키워드를 감지. 여러 개 매칭될 수 있음.
+ * @internal 테스트용 export
+ */
+export function detectDecisionDomains(query: string): Array<{ domain: string; label: string }> {
+  const hits: Array<{ domain: string; label: string }> = []
+  const seen = new Set<string>()
+  for (const { domain, label, pattern } of DECISION_DOMAIN_KEYWORDS) {
+    if (pattern.test(query) && !seen.has(domain)) {
+      seen.add(domain)
+      hits.push({ domain, label })
+    }
+  }
+  return hits
+}
+
 // ─── 시스템 프롬프트 생성 ───
 //
 // 🔴 Context Caching 전략:
@@ -171,6 +220,12 @@ export function buildStaticSystemPrompt(isGemini?: boolean): string {
 - 기억이나 학습 데이터에 기반한 법률 지식으로 답변하지 말 것. 반드시 도구 결과 원문에 근거.
 - 조문을 인용할 때는 도구 결과의 원문을 최대한 그대로 옮기고, 임의로 재해석하지 말 것.
 
+## 💀 도구 호출 필수 (NON-NEGOTIABLE)
+- **모든 답변은 도구를 최소 1회 이상 호출한 후에만 작성** 할 수 있다. 도구 호출 없이 직접 답변하는 것은 절대 금지.
+- 질의가 영문/외국어/모호/비법률적으로 보여도, 반드시 search_ai_law 또는 적절한 도구를 먼저 호출한 후 결과에 근거해 답변할 것.
+- 영문 법령명으로 질의가 오면 search_decisions(domain="english_law") 를 호출한 후 답변.
+- 도구 호출 없이 생성된 답변은 검증 불가능한 환각으로 간주되어 전면 거부된다.
+
 ## 독자
 법률 비전문가도 이해할 수 있게. 법률용어 첫 등장 시 괄호 풀이 필수
 (예: "경정청구(세액 과다 납부 시 환급 요청하는 것)").
@@ -204,11 +259,12 @@ export function buildStaticSystemPrompt(isGemini?: boolean): string {
 - **chain_ordinance_compare**: 조례 비교 연구
 
 ### 🔴 중복 호출 금지
-- chain_full_research를 호출했으면 search_ai_law, search_decisions(precedent/interpretation)를 별도 호출하지 말 것 (chain이 내부에서 이미 호출함).
-- chain_dispute_prep를 호출했으면 search_decisions(precedent/admin_appeal/도메인별 결정문)를 별도 호출하지 말 것.
-- chain_action_basis를 호출했으면 get_three_tier, search_decisions(interpretation/admin_appeal)를 별도 호출하지 말 것.
+- chain_full_research를 호출했으면 search_ai_law, search_decisions(domain="precedent"/"interpretation")를 별도 호출하지 말 것 (chain이 내부에서 이미 호출함).
+- chain_dispute_prep를 호출했으면 search_decisions(domain="precedent"/"admin_appeal")를 별도 호출하지 말 것.
+  단, 질의가 **nlrc(노동위)/pipc(개인정보위)/ftc(공정위)/tax_tribunal(조세심판)/customs(관세해석)/acr(권익위)/appeal_review(소청)/acr_special(특별행정심판)/constitutional(헌재)/treaty(조약)/english_law(영문법령)/public_corp(공사공단)/public_inst(공공기관)/school(학칙)** 같은 **특수 결정문 도메인**을 요구하면 chain 호출 후에도 해당 domain으로 search_decisions를 **반드시 1회 추가 호출**할 것.
+- chain_action_basis를 호출했으면 get_three_tier, search_decisions(domain="interpretation"/"admin_appeal")를 별도 호출하지 말 것. (위 특수 도메인은 예외)
 - chain_procedure_detail를 호출했으면 get_three_tier, get_annexes를 별도 호출하지 말 것.
-- **동일 도메인**에 대해 search_decisions 를 연속 호출하지 말 것 (쿼리 조정 외 중복 금지).
+- **동일 (name, domain) 조합**에 대해 search_decisions 를 연속 호출하지 말 것 (쿼리 조정 외 중복 금지).
 
 ### 🔴 속도 최적화 (응답 지연 방지)
 - **첫 도구 호출은 1초 이내에 결정**할 것. 분석을 길게 하지 말고 즉시 도구 호출.
@@ -256,11 +312,17 @@ export function buildDynamicHeader(
 
   const domainBlock = domainHint ? `\n## 질의 도메인 힌트\n${domainHint}` : ''
 
+  // 특수 결정문 도메인 감지 → LLM 에 search_decisions 도메인 명시적 지시
+  const decisionHits = query ? detectDecisionDomains(query) : []
+  const decisionBlock = decisionHits.length > 0
+    ? `\n## 🎯 결정문 도메인 강제 지시\n- 질의에서 다음 결정문 도메인이 감지됨. 반드시 해당 domain 으로 search_decisions 를 **각 1회 호출**하여 근거를 확보할 것:\n${decisionHits.map(h => `  - \`search_decisions(domain="${h.domain}", query=...)\` — ${h.label}`).join('\n')}\n- chain_* 도구를 호출한 경우에도 위 도메인은 **추가로 반드시** 호출. chain 도구가 자동 커버하지 않음.\n- 결과가 0건이면 핵심 키워드만 남겨 재검색 1회 허용.`
+    : ''
+
   return `[답변 지침]
 - 복잡도: **${complexity}** (도구 예산 준수)
 - 분량: ${LENGTH_HINT[complexity]}
 - 답변 구조(아래 ## 헤딩 순서대로 작성):
-${SPECIALIST_INSTRUCTIONS[queryType]}${consequenceHint}${domainBlock}
+${SPECIALIST_INSTRUCTIONS[queryType]}${consequenceHint}${domainBlock}${decisionBlock}
 
 ---
 
