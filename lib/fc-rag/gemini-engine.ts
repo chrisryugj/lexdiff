@@ -308,7 +308,16 @@ export async function* executeGeminiRAGStream(
     const fastPathGen = handleFastPath(query, queryType, signal)
     let fastPathNext = await fastPathGen.next()
     while (!fastPathNext.done) {
-      yield fastPathNext.value
+      const ev = fastPathNext.value
+      yield ev
+      // P0-0 (프로덕션 실측): Fast-path 답변도 Upstash 에 저장.
+      //   Phase 1b 구현 시 normal 완료 경로에만 cacheAnswer 넣어서 fast-path
+      //   재호출 시 매번 풀 실행 (2.1s) 반복. fire-and-forget 이라 응답 지연 없음.
+      //   cacheAnswer 내부에서 conversationId/hasPreEvidence/warnings/low/truncated/
+      //   짧은 답변 필터링 수행 → 여기서는 그냥 넘기면 됨.
+      if (ev.type === 'answer' && ev.data) {
+        void cacheAnswer(query, ev.data, cacheOpts).catch(() => {})
+      }
       fastPathNext = await fastPathGen.next()
     }
     if (fastPathNext.value === true) return

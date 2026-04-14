@@ -143,10 +143,12 @@ export async function cacheAnswer(
   if (opts?.hasPreEvidence) return
 
   // 품질 필터: 경고 있거나 confidence 낮으면 저장 금지
-  if (result.warnings && result.warnings.length > 0) return
-  if (result.confidenceLevel === 'low') return
-  if (result.isTruncated) return
-  if (!result.answer || result.answer.length < 50) return
+  const dbg = process.env.NODE_ENV !== 'production'
+  if (result.warnings && result.warnings.length > 0) { if (dbg) console.log('[answer-cache] skip: warnings'); return }
+  if (result.confidenceLevel === 'low') { if (dbg) console.log('[answer-cache] skip: low conf'); return }
+  if (result.isTruncated) { if (dbg) console.log('[answer-cache] skip: truncated'); return }
+  if (!result.answer || result.answer.length < 50) { if (dbg) console.log(`[answer-cache] skip: short (${result.answer?.length ?? 0})`); return }
+  if (dbg) console.log(`[answer-cache] store: "${query.slice(0, 30)}" (${result.answer.length}자, ${result.confidenceLevel})`)
 
   const key = buildCacheKey(query)
   const redis = getRedis()
