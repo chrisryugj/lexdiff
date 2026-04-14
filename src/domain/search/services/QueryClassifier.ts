@@ -95,26 +95,28 @@ export function classifySearchQuery(query: string): UnifiedQueryClassification {
     reason = '재결번호 패턴 감지'
     matchedPatterns.push('ruling')
   }
-  // 우선순위 3: 해석례
+  // 우선순위 3: 행정규칙명 (고시/훈령/예규/지침으로 끝남)
+  // 해석례 패턴이 "(예규|고시|훈령|지침)" 을 광역 매칭하므로 admrul이 먼저 체크되어야 함
+  // ("국가공무원 복무·징계 관련 예규" → interpretation 으로 잘못 잡히는 문제 방지)
+  else if (isAdminRuleName(trimmedQuery)) {
+    searchType = 'admrul'
+    confidence = 0.95
+    reason = '행정규칙명 감지'
+    matchedPatterns.push('admrul')
+  }
+  // 우선순위 4: 해석례
   else if (interpretationPattern.matched) {
     searchType = 'interpretation'
     confidence = 0.95
     reason = '해석례 키워드 감지'
     matchedPatterns.push('interpretation')
   }
-  // 우선순위 4: 복합 쿼리
+  // 우선순위 5: 복합 쿼리
   else if (compoundQuery.isCompound) {
     searchType = 'multi'
     confidence = 0.85
     reason = '복합 쿼리 감지'
     matchedPatterns.push('multi')
-  }
-  // 우선순위 5: 행정규칙 (고시/훈령/예규/지침)
-  else if (isAdminRuleName(trimmedQuery)) {
-    searchType = 'admrul'
-    confidence = 0.95
-    reason = '행정규칙명 감지'
-    matchedPatterns.push('admrul')
   }
   // 우선순위 6: 법령/조례 (구조화 검색)
   else if (basicDetection.type === 'structured' && basicDetection.confidence >= 0.9) {

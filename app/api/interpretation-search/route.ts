@@ -59,7 +59,12 @@ function parseInterpretationSearchXML(xml: string): {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const query = searchParams.get("query")
+  const rawQuery = searchParams.get("query")
+  // 카테고리 키워드 제거 — "공무원 법령해석례" → "공무원"
+  // (법제처 API가 "법령해석례" 문자열 자체를 검색해 0건 반환하는 문제)
+  const query = rawQuery
+    ? (rawQuery.replace(/\s*(법령\s*해석례|법령\s*해석|해석례)\s*/g, ' ').trim() || rawQuery.trim())
+    : null
   const display = String(Math.min(Math.max(parseInt(searchParams.get("display") || "20") || 20, 1), 100))
   const page = String(Math.min(Math.max(parseInt(searchParams.get("page") || "1") || 1, 1), 1000))
   const sort = searchParams.get("sort")

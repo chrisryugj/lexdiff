@@ -112,10 +112,12 @@ const TEST_CASES: TestCase[] = [
   // ─────────────────────────────────────────────────────
   // E. 행정규칙 — 예규/고시/훈령/지침 → interpretation 분류
   // ─────────────────────────────────────────────────────
-  { query: '관세법 예규', expectedType: 'interpretation', description: '예규', minConfidence: 0.9 },
-  { query: '관세 고시', expectedType: 'interpretation', description: '고시' },
-  { query: '관세 훈령', expectedType: 'interpretation', description: '훈령' },
-  { query: '관세 지침', expectedType: 'interpretation', description: '지침' },
+  // 예규/고시/훈령/지침은 법제처 API 상 행정규칙(admrul) target이며, 해석례(expc)와 구분됨
+  // "법령해석례/법령해석" 키워드가 있어야만 interpretation으로 분류
+  { query: '관세법 예규', expectedType: 'admrul', description: '예규 → 행정규칙', minConfidence: 0.9 },
+  { query: '관세 고시', expectedType: 'admrul', description: '고시 → 행정규칙' },
+  { query: '관세 훈령', expectedType: 'admrul', description: '훈령 → 행정규칙' },
+  { query: '관세 지침', expectedType: 'admrul', description: '지침 → 행정규칙' },
   { query: '행정해석', expectedType: 'interpretation', description: '행정해석 키워드' },
   { query: '법제처 해석', expectedType: 'interpretation', description: '법제처 해석' },
   { query: '유권해석', expectedType: 'interpretation', description: '유권해석' },

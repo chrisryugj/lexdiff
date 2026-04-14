@@ -61,7 +61,12 @@ function parseRulingXML(xml: string): {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const query = searchParams.get("query")
+  const rawQuery = searchParams.get("query")
+  // 카테고리 키워드 제거 — "양도소득세 재결례" → "양도소득세"
+  // (법제처 API가 "재결례" 문자열까지 포함 검색해 0건 반환하는 문제)
+  const query = rawQuery
+    ? (rawQuery.replace(/\s*(재결례|재결|특별행정심판)\s*/g, ' ').trim() || rawQuery.trim())
+    : null
   const display = searchParams.get("display") || "20"
   const page = searchParams.get("page") || "1"
 
