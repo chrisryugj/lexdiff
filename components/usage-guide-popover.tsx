@@ -21,33 +21,17 @@ const STORAGE_KEY_PREFIX = 'lexdiff-guide-seen-'
 
 export function UsageGuidePopover({
   type,
-  showOnFirstVisit = true,
+  showOnFirstVisit: _showOnFirstVisit = false,
   onDetailClick,
 }: UsageGuidePopoverProps) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  // 첫 방문 자동 오픈은 OnboardingTour(홈 화면)로 일원화.
+  // 이 팝오버는 수동 클릭 트리거만 유지.
   useEffect(() => {
     setMounted(true)
-
-    if (showOnFirstVisit) {
-      // 모바일에서는 SwipeTutorial과 충돌하므로 자동 오픈 비활성화
-      const isMobile = window.innerWidth < 768
-      if (isMobile) return
-
-      const storageKey = `${STORAGE_KEY_PREFIX}${type}`
-      const hasSeen = localStorage.getItem(storageKey)
-
-      if (!hasSeen) {
-        const timer = setTimeout(() => {
-          setOpen(true)
-          localStorage.setItem(storageKey, 'true')
-        }, 1000)
-
-        return () => clearTimeout(timer)
-      }
-    }
-  }, [type, showOnFirstVisit])
+  }, [type])
 
   if (!mounted) {
     return (

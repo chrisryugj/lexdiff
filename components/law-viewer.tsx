@@ -310,29 +310,33 @@ function LawViewerComponent({
     closeAnnexModal,
   } = useLawViewerModals(meta, activeArticle)
 
-  // Sync selectedJo → activeJo and reset related states
+  // Sync selectedJo → activeJo ONLY when selectedJo prop changes.
+  // ⚠️ 이전 버전은 deps에 activeJo를 두어, 사이드바 클릭으로 activeJo가 바뀌면
+  // 이펙트가 재실행되며 다시 selectedJo로 덮어씌우는 버그가 있었음.
+  // selectedJo 변화만 추적하려고 prev ref 패턴 사용.
+  const prevSelectedJoRef = useRef<string | undefined>(undefined)
   useEffect(() => {
+    if (!selectedJo) return
+    if (selectedJo === prevSelectedJoRef.current) return
+    prevSelectedJoRef.current = selectedJo
 
-    // Only update activeJo if selectedJo is different from current activeJo
-    // This prevents overriding user clicks from the sidebar
-    if (selectedJo && selectedJo !== activeJo) {
-      setActiveJo(selectedJo)
+    setActiveJo(selectedJo)
 
-      // Reset admin rules when changing articles to prevent unnecessary searches
-      setShowAdminRules(false)
-      setAdminRuleViewMode("list")
-      setAdminRuleHtml(null)
+    // Reset admin rules when changing articles to prevent unnecessary searches
+    setShowAdminRules(false)
+    setAdminRuleViewMode("list")
+    setAdminRuleHtml(null)
 
-      // Reset tier view mode to 1-tier when changing articles
-      setTierViewMode("1-tier")
+    // Reset tier view mode to 1-tier when changing articles
+    setTierViewMode("1-tier")
 
-      if (!isFullView && contentRef.current) {
-        safeSetTimeout(() => {
-          contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-        }, 100)
-      }
+    if (!isFullView && contentRef.current) {
+      safeSetTimeout(() => {
+        contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+      }, 100)
     }
-  }, [selectedJo, isFullView, activeJo, safeSetTimeout])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJo])
 
   // Reset admin rules state when law changes
   useEffect(() => {

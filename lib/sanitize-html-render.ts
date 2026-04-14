@@ -79,7 +79,9 @@ const sanitizeOptions: Parameters<typeof sanitizeHtml>[1] = {
  * 모달 히스토리 뒤로가기 시 동일 html을 재방문하는 패턴이 많아서
  * 같은 html 재처리하는 수백ms 비용을 0으로 만듦
  */
-const SANITIZE_CACHE_MAX = 32
+// 관세법(330조+) 같은 대용량 법령 전체조문 모드에서 32로는 매 스크롤마다
+// 캐시 미스 → sanitize-html 재실행(수십 ms/건) → 본문 랙. 넉넉히 확장.
+const SANITIZE_CACHE_MAX = 1024
 const sanitizeCache = new Map<string, string>()
 
 /**

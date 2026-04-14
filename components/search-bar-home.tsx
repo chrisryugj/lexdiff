@@ -61,10 +61,11 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
   return (
     <>
       <form onSubmit={handleSubmit} className="w-full relative shadow-2xl">
-        <div className="flex bg-white dark:bg-[#1f2937] border border-gray-300 dark:border-gray-700">
+        <div data-tour="search-input" className="flex bg-white dark:bg-[#1f2937] border border-gray-300 dark:border-gray-700">
           <Button
             type="button"
             variant="ghost"
+            data-tour="ai-toggle"
             onClick={() => actions.setForceAiMode(!forceAiMode)}
             className={cn(
               "h-16 w-16 !rounded-none border-r border-gray-300 dark:border-gray-700 transition-colors hidden sm:flex",

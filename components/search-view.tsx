@@ -16,6 +16,7 @@ import { UserMenu } from "@/components/user-menu"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { LawStatsFooter } from "@/components/shared/law-stats-footer"
+import { OnboardingTour, type TourStep } from "@/components/onboarding-tour"
 
 const FavoritesDialog = dynamic(
   () => import("@/components/favorites-dialog").then(m => m.FavoritesDialog),
@@ -49,7 +50,79 @@ export function SearchView({
   const [helpSheetOpen, setHelpSheetOpen] = useState(false)
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
+  const [tourRunKey, setTourRunKey] = useState(0)
   const isHeaderVisible = useScrollDirection()  // PERF-3: 통합 훅 사용
+
+  const tourSteps: TourStep[] = [
+    {
+      selector: '[data-tour="search-input"]',
+      title: "법령을 바로 검색하세요",
+      body: (
+        <>
+          법령명이나 조문 번호를 입력하시면 해당 조문으로 바로 이동합니다.
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/5 rounded text-[11px] text-slate-700 dark:text-slate-300">
+              관세법 38조
+            </code>
+            <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/5 rounded text-[11px] text-slate-700 dark:text-slate-300">
+              민법 제750조
+            </code>
+            <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/5 rounded text-[11px] text-slate-700 dark:text-slate-300">
+              근로기준법
+            </code>
+          </div>
+        </>
+      ),
+      placement: "bottom",
+      padding: 8,
+    },
+    {
+      selector: '[data-tour="ai-toggle"]',
+      title: "AI 모드로 자연어 질문",
+      body: (
+        <>
+          왼쪽 뇌 아이콘을 누르시면 AI 검색으로 전환됩니다. "수출통관 절차는?",
+          "연차휴가 발생 요건"과 같이 일상 언어로 질문하실 수 있습니다.
+        </>
+      ),
+      placement: "bottom",
+      padding: 6,
+    },
+    {
+      selector: '[data-tour="quick-actions"]',
+      title: "분석 도구 바로가기",
+      body: (
+        <>
+          변경 영향 분석, 조례 미반영 탐지, 조례 벤치마킹 도구를 여기서 바로 여실 수 있습니다.
+        </>
+      ),
+      placement: "bottom",
+      padding: 8,
+    },
+    {
+      selector: '[data-tour="features"]',
+      title: "주요 기능 한눈에",
+      body: (
+        <>
+          LexDiff가 제공하는 핵심 기능들을 카드로 확인하실 수 있습니다. 원하시는 카드를
+          누르면 바로 실행됩니다.
+        </>
+      ),
+      placement: "top",
+      padding: 12,
+    },
+    {
+      selector: '[data-tour="help-button"]',
+      title: "언제든 다시 보실 수 있습니다",
+      body: (
+        <>
+          사용 가이드는 상단의 <Icon name="help-circle" size={12} className="inline mx-0.5 align-[-1px]" /> 아이콘에서 언제든 다시 여실 수 있습니다. 가이드 안에서 이 투어도 재시작하실 수 있습니다.
+        </>
+      ),
+      placement: "bottom",
+      padding: 6,
+    },
+  ]
 
   const featuresRef = useRef<HTMLElement>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)
@@ -158,7 +231,7 @@ export function SearchView({
                 </Button>
               )}
 
-              <Button variant="ghost" size="sm" onClick={handleHelpClick} title="사용 가이드" className="hover:bg-gray-200 dark:hover:bg-gray-800">
+              <Button variant="ghost" size="sm" onClick={handleHelpClick} data-tour="help-button" title="사용 가이드" className="hover:bg-gray-200 dark:hover:bg-gray-800">
                 <Icon name="help-circle" size={20} className="text-gray-600 dark:text-gray-400" />
               </Button>
 
@@ -223,7 +296,7 @@ export function SearchView({
                 searchMode={searchMode}
               />
               {(onImpactTracker || onToolClick) && (
-                <div className="flex justify-center mt-5 gap-1.5 sm:gap-2 flex-wrap">
+                <div data-tour="quick-actions" className="flex justify-center mt-5 gap-1.5 sm:gap-2 flex-wrap">
                   {onImpactTracker && (
                     <button
                       onClick={onImpactTracker}
@@ -265,6 +338,7 @@ export function SearchView({
       <main className="flex-1 bg-white dark:bg-[#121620] border-t border-gray-200 dark:border-gray-800">
         <section
           ref={featuresRef}
+          data-tour="features"
           className={`py-10 lg:py-16 transition-opacity duration-1000 ${featuresRevealed ? 'opacity-100' : 'opacity-0'}`}
         >
           <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -302,6 +376,16 @@ export function SearchView({
       <HelpGuideSheet
         open={helpSheetOpen}
         onOpenChange={setHelpSheetOpen}
+        onRestartTour={() => {
+          setHelpSheetOpen(false)
+          setTourRunKey((k) => k + 1)
+        }}
+      />
+      <OnboardingTour
+        steps={tourSteps}
+        storageKey="lexdiff-home-tour-v1"
+        autoStart
+        runKey={tourRunKey}
       />
       <AiGateDialog
         open={loginDialogOpen}

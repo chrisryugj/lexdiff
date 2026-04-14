@@ -18,12 +18,14 @@ interface HelpGuideSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   defaultTab?: TabType
+  onRestartTour?: () => void
 }
 
 export function HelpGuideSheet({
   open,
   onOpenChange,
   defaultTab = 'law',
+  onRestartTour,
 }: HelpGuideSheetProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab)
 
@@ -76,6 +78,15 @@ export function HelpGuideSheet({
         </SheetHeader>
 
         <div className="p-4">
+          {onRestartTour && (
+            <button
+              onClick={onRestartTour}
+              className="w-full mb-4 flex items-center justify-center gap-2 px-3 py-2.5 border border-brand-navy/20 bg-brand-navy/5 hover:bg-brand-navy/10 text-brand-navy dark:text-foreground rounded-sm text-sm font-medium transition-colors"
+            >
+              <Icon name="play" size={16} />
+              기능 투어 다시 보기
+            </button>
+          )}
           {activeTab === 'law' ? <LawGuideContent /> : <AIGuideContent />}
         </div>
       </SheetContent>
