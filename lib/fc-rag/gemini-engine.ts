@@ -10,7 +10,7 @@ import { getCachedAnswer, cacheAnswer } from './answer-cache'
 import { routeQuery, shouldUseRouter, type RouterPlan } from './router-engine'
 import { TOOL_DISPLAY_NAMES, selectToolsForQuery, CHAIN_COVERS } from './tool-tiers'
 import { cacheMSTEntries, parseLawEntries, findBestMST, findBestOrdinanceSeq, type LawEntry } from './fast-path'
-import { buildCitationsWithAnswerFallback, calcConfidence } from './citations'
+import { buildCitationsWithAnswerFallback, calcConfidence, calcConfidenceDetailed } from './citations'
 import { summarizeToolResult, getToolCallQuery, correctToolArgs, rerankAiSearchResult } from './result-utils'
 import { evaluateResponseQuality } from './quality-evaluator'
 import {
@@ -167,13 +167,14 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   const textParts = parts.filter((p: GeminiPart) => p.text)
   if (textParts.length > 0) {
     const answer = textParts.map((p: GeminiPart) => p.text).join('')
+    const citations = buildCitationsWithAnswerFallback(allToolResults, answer)
     yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
     yield {
       type: 'answer',
       data: {
         answer,
-        citations: buildCitationsWithAnswerFallback(allToolResults, answer),
-        confidenceLevel: calcConfidence(allToolResults),
+        citations,
+        confidenceLevel: calcConfidence(allToolResults, answer, citations),
         complexity,
         queryType,
         isTruncated: accFinishReason === 'MAX_TOKENS',
@@ -237,12 +238,13 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
     }
     yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens, cachedTokens: retryCachedTokens }
   }
+  const retryCitations = buildCitationsWithAnswerFallback(allToolResults, retryText)
   yield {
     type: 'answer',
     data: {
       answer: retryText || '답변 생성에 실패했습니다.',
-      citations: buildCitationsWithAnswerFallback(allToolResults, retryText),
-      confidenceLevel: calcConfidence(allToolResults),
+      citations: retryCitations,
+      confidenceLevel: calcConfidence(allToolResults, retryText, retryCitations),
       complexity,
       queryType,
       isTruncated: retryFinishReason === 'MAX_TOKENS',
@@ -574,16 +576,23 @@ export async function* executeGeminiRAGStream(
         if (noToolsCalled) {
           warnings.push('도구 호출 없이 생성된 답변 — 근거 검증 불가')
         }
+        // citations 를 confidence 계산에 활용하기 위해 먼저 구성.
+        const citations = buildCitationsWithAnswerFallback(allToolResults, answer)
+        const confDetail = calcConfidenceDetailed(allToolResults, answer, citations)
         const confidence = noToolsCalled ? 'low' as const
           : quality.level === 'fail' ? 'low' as const
           : quality.level === 'marginal' ? 'medium' as const
-          : calcConfidence(allToolResults)
+          : confDetail.level
+        // 디버그 로그 — calibration 참고용
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[confidence] score=${confDetail.score} level=${confidence} breakdown=`, confDetail.breakdown)
+        }
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         // 대화 컨텍스트 저장
         await storeConversation(conversationId, query, answer)
         const answerData = {
           answer,
-          citations: buildCitationsWithAnswerFallback(allToolResults, answer),
+          citations,
           confidenceLevel: confidence,
           complexity,
           queryType,

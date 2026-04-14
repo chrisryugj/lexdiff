@@ -229,13 +229,77 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
   return citations
 }
 
-export function calcConfidence(toolResults: ToolCallResult[]): 'high' | 'medium' | 'low' {
+/**
+ * 답변 신뢰도 산정 — 0-120 점수 기반 4신호 균형 합산.
+ *
+ *  1. Evidence (0-30):  성공 tool 수 + chain 가중치 (chain ≈ regular×2)
+ *  2. Citation (0-30):  답변에 등장한 법령·조문 인용 개수
+ *  3. Length (0-30):    답변 길이 (정보량 지표, 1500자 만점)
+ *  4. Structure (0-30): "## 근거 법령" 섹션 유무 (프롬프트 지침 준수 + 검증 가능성)
+ *
+ * 판정: ≥80 high / ≥48 medium / else low (실측 calibration, 130622 run 기준)
+ *
+ * 이전 로직(`substantive ≥ 3`) 은 tool result 수에만 의존해서 citation/
+ * 답변 품질을 놓쳤다. 4신호 합산으로 E2E run-to-run 분산을 흡수.
+ *
+ * @returns { level, score, breakdown } — breakdown 은 디버깅/관측 용. UI 에서
+ *          confidence level 만 표시하고 breakdown 은 로그/개발자 도구용.
+ */
+export interface ConfidenceResult {
+  level: 'high' | 'medium' | 'low'
+  score: number
+  breakdown: {
+    evidence: number
+    citation: number
+    length: number
+    structure: number
+    weightedEvidence: number
+    citCount: number
+    ansLen: number
+    hasGroundsSection: boolean
+  }
+}
+
+export function calcConfidenceDetailed(
+  toolResults: ToolCallResult[],
+  answerText?: string,
+  citations?: FCRAGCitation[],
+): ConfidenceResult {
   const successful = toolResults.filter(r => !r.isError)
-  // 성공 도구 수 + 실질적 결과 길이로 판단 (빈 결과는 실질 기여 없음)
   const substantive = successful.filter(r => r.result.length > 100)
-  if (substantive.length >= 3) return 'high'
-  if (substantive.length >= 1 || successful.length >= 2) return 'medium'
-  return 'low'
+  const chainCount = successful.filter(r => r.name?.startsWith('chain_')).length
+  const weightedEvidence = substantive.length + chainCount
+
+  const citCount = citations?.length ?? 0
+  const ansLen = answerText?.length ?? 0
+  const hasGroundsSection = !!answerText && /##\s*근거\s*법령/.test(answerText)
+
+  const evidence = Math.min(weightedEvidence * 5, 30)
+  const citation = Math.min(citCount * 5, 30)
+  const length = Math.min(Math.floor(ansLen / 50), 30)
+  const structure = hasGroundsSection ? 30 : 0
+  const score = evidence + citation + length + structure
+
+  const level: 'high' | 'medium' | 'low' =
+    score >= 80 ? 'high' : score >= 48 ? 'medium' : 'low'
+
+  return {
+    level,
+    score,
+    breakdown: {
+      evidence, citation, length, structure,
+      weightedEvidence, citCount, ansLen, hasGroundsSection,
+    },
+  }
+}
+
+/** 하위호환: level 만 필요한 경우. */
+export function calcConfidence(
+  toolResults: ToolCallResult[],
+  answerText?: string,
+  citations?: FCRAGCitation[],
+): 'high' | 'medium' | 'low' {
+  return calcConfidenceDetailed(toolResults, answerText, citations).level
 }
 
 /**
