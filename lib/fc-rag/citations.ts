@@ -51,6 +51,9 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
     if (result.name === 'get_law_text' || result.name === 'get_batch_articles') {
       const lawNameMatch = text.match(/(?:##\s+|법령명:\s*)(.+?)(?:\n|$)/)
       const lawName = lawNameMatch?.[1]?.trim() || ''
+      // lawName 추출 실패 시 citation 생성 스킵 — 사용자가 "제N조"만 보고
+      // 어느 법령인지 검증 불가능한 환각성 인용 방지.
+      if (!lawName) continue
 
       for (const match of Array.from(text.matchAll(/제(\d+)조(?:의(\d+))?(?:의(\d+))?(?:\(([^)]+)\))?/g))) {
         const articleNum = match[3] ? `제${match[1]}조의${match[2]}의${match[3]}`
@@ -190,6 +193,7 @@ export function buildCitations(toolResults: ToolCallResult[], answerText?: strin
     // get_article_with_precedents — 법령 조문 + 판례 모두 추출
     if (result.name === 'get_article_with_precedents') {
       const awpLawName = text.match(/법령명: (.+?)\n/)?.[1]?.trim() || ''
+      if (!awpLawName) continue  // 법령명 없으면 스킵 (환각 방지)
       for (const match of Array.from(text.matchAll(/제(\d+)조(?:의(\d+))?(?:의(\d+))?/g))) {
         const articleNum = match[3] ? `제${match[1]}조의${match[2]}의${match[3]}`
           : match[2] ? `제${match[1]}조의${match[2]}`

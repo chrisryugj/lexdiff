@@ -21,7 +21,7 @@ import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-valid
 /**
  * M5: citation 검증 블록 공통화.
  * Hermes/Gemini 양쪽 경로에서 20줄 중복이었던 로직을 한 곳에 모음.
- * - 10초 timeout
+ * - 15초 timeout
  * - 실패 시 모든 citation을 verified:false + 'skipped'로 처리
  * - 결과를 `citation_verification` 이벤트로 flush
  */
@@ -423,8 +423,12 @@ export async function POST(request: NextRequest) {
         }).catch(() => { /* already swallowed inside */ })
       } catch (error) {
         logError = error instanceof Error ? error.message : 'unknown'
-        console.error('[fc-rag route] engine error:', error instanceof Error ? error.stack : error)
-        traceLogger.addEvent(traceId, 'error', { message: logError })
+        // 보안: 스택 대신 메시지만 console에, 전체 스택은 traceLogger 로만 기록.
+        console.error('[fc-rag route] engine error:', logError)
+        traceLogger.addEvent(traceId, 'error', {
+          message: logError,
+          stack: error instanceof Error ? error.stack : undefined,
+        })
         const friendly = classifyEngineError(logError)
         sendAndLog({
           type: "error",
@@ -455,10 +459,24 @@ export async function POST(request: NextRequest) {
         // - 스트림 도중 throw: answerDelivered 상태 그대로 판단
         // BYOK 경로는 refundAiQuota 내부에서 no-op.
         if (!answerDelivered) {
-          try {
-            await refundAiQuota(authCtx)
-          } catch {
-            /* 보상 실패는 원 응답 흐름에 영향 주지 않음 */
+          // 1회 재시도 (Supabase 일시 오류 대응). 계속 실패하면 traceLogger에만 남기고
+          // 응답 흐름엔 영향 주지 않음 — 사용자가 답변 못 받았는데 쿼터도 못 돌려준
+          // 케이스는 운영 모니터링으로 추적 가능해야 한다.
+          let refunded = false
+          for (let i = 0; i < 2 && !refunded; i++) {
+            try {
+              await refundAiQuota(authCtx)
+              refunded = true
+            } catch (refundErr) {
+              if (i === 1) {
+                traceLogger.addEvent(traceId, 'quota_refund_failed', {
+                  message: refundErr instanceof Error ? refundErr.message : 'unknown',
+                  userId: authedUserId,
+                })
+              } else {
+                await new Promise((r) => setTimeout(r, 150))
+              }
+            }
           }
         }
         controller.close()
