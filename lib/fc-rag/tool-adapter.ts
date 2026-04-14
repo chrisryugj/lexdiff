@@ -175,10 +175,26 @@ export async function executeTool(
     } else {
       compressed = truncated
     }
+    let finalResult = compressed
+    let finalIsError = response.isError || false
+
+    // P1: MST 불일치 방어 — get_batch_articles 가 "요청한 조문을 찾을 수 없습니다"
+    //     를 success 로 반환하면 LLM 이 빈 데이터를 환각으로 메운다(여권법 시행령 제40조
+    //     사건 참조). 소리 없는 실패를 명시적 에러로 재분류해 LLM 이 MST 재선택 또는
+    //     답변에서 배제하도록 강제한다.
+    if (name === 'get_batch_articles' && /요청한 조문을 찾을 수 없습니다/.test(finalResult)) {
+      const lawName = finalResult.split('\n').find(l => l.trim() && !l.includes('요청한 조문'))?.trim() || '조회 법령'
+      const reqArticles = Array.isArray((parsedArgs as { articles?: unknown }).articles)
+        ? ((parsedArgs as { articles: string[] }).articles).join(', ')
+        : '요청 조문'
+      finalResult = `[MST_MISMATCH] "${lawName}"에 요청 조문(${reqArticles})이 존재하지 않습니다. search_law 결과에서 정확한 법령의 MST를 확인한 뒤 다시 조회하세요. 해당 조문이 실제 존재하지 않으면 답변에서 인용하지 말 것.`
+      finalIsError = true
+    }
+
     const result: ToolCallResult = {
       name,
-      result: compressed,
-      isError: response.isError || false,
+      result: finalResult,
+      isError: finalIsError,
       args: parsedArgs as Record<string, unknown>,
     }
 

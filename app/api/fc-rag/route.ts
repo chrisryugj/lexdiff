@@ -322,6 +322,22 @@ export async function POST(request: NextRequest) {
               answerDelivered = true
               lastAnswerCitations = event.data.citations || []
             }
+            // 진단: tool_call(args) / tool_result(summary) 를 trace 파일에 기록해
+            //       환각 원인 분석을 가능하게 한다 (P1: 여권법 시행령 제40조 환각 사건).
+            if (event.type === 'tool_call') {
+              traceLogger.addEvent(traceId, 'tool_call', {
+                name: (event as { name?: string }).name,
+                args: (event as { args?: unknown }).args,
+                query: (event as { query?: string }).query,
+              })
+            } else if (event.type === 'tool_result') {
+              const e = event as { name?: string; success?: boolean; summary?: string }
+              traceLogger.addEvent(traceId, 'tool_result', {
+                name: e.name,
+                success: e.success,
+                summary: e.summary,
+              })
+            }
             sendAndLog(event)
           }
 
