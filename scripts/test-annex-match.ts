@@ -1,4 +1,4 @@
-import { linkifyMarkdownLegalRefs } from '../lib/link-specialized.ts'
+import { linkifyMarkdownLegalRefs } from '../lib/link-specialized'
 
 const cases = [
   {

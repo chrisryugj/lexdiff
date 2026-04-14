@@ -53,7 +53,7 @@ export interface FCRAGResult {
 
 export type FCRAGStreamEvent =
   | { type: 'status'; message: string; progress: number }
-  | { type: 'tool_call'; name: string; displayName: string; query?: string }
+  | { type: 'tool_call'; name: string; displayName: string; query?: string; args?: Record<string, unknown> }
   | { type: 'tool_result'; name: string; displayName: string; success: boolean; summary: string }
   | { type: 'token_usage'; inputTokens: number; outputTokens: number; totalTokens: number; cachedTokens?: number }
   | { type: 'answer'; data: FCRAGResult }

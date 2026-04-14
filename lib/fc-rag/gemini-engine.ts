@@ -732,6 +732,7 @@ export async function* executeGeminiRAGStream(
           name: call.name,
           displayName: displayNameFor(call.name, call.args),
           query: getToolCallQuery(call.name, call.args),
+          args: call.args,
         }
       }
 
@@ -795,6 +796,7 @@ export async function* executeGeminiRAGStream(
             name: chain.name,
             displayName: displayNameFor(chain.name, chain.args),
             query: getToolCallQuery(chain.name, chain.args),
+            args: chain.args,
           }
         }
 
