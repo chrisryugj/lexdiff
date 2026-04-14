@@ -555,6 +555,7 @@ function SearchResultViewComponent({
               conversationHistory={state.conversationHistory}
               onFollowUp={handlers.handleAiFollowUp}
               onNewConversation={handlers.handleNewConversation}
+              onStopAiStream={handlers.stopAiSearch}
             />
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */

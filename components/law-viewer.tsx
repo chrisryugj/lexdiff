@@ -78,6 +78,7 @@ interface LawViewerAIProps {
   conversationHistory?: import("@/components/search-result-view/types").ConversationEntry[]
   onFollowUp?: (query: string) => void
   onNewConversation?: () => void
+  onStopAiStream?: () => void
 }
 
 interface LawViewerAnalysisProps {
@@ -117,6 +118,7 @@ function LawViewerComponent({
   conversationHistory = EMPTY_ARRAY,
   onFollowUp,
   onNewConversation,
+  onStopAiStream,
   isPrecedent = false,
   onRefresh,
   onDelegationGap,
@@ -666,7 +668,8 @@ function LawViewerComponent({
     conversationHistory,
     onFollowUp,
     onNewConversation,
-  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress, toolCallLogs, conversationHistory, onFollowUp, onNewConversation])
+    onStop: onStopAiStream,
+  }), [aiAnswerContent, userQuery, aiConfidenceLevel, fileSearchFailed, aiCitations, aiQueryType, aiIsTruncated, onAiRefresh, isStreaming, searchProgress, toolCallLogs, conversationHistory, onFollowUp, onNewConversation, onStopAiStream])
 
   const delegationPropsGroup = useMemo(() => ({
     validDelegations,
