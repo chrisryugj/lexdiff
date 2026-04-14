@@ -178,13 +178,27 @@ export function LegalMarkdownRenderer({
     return content
       .replace(/\(Mermaid 미지원 시 텍스트 화살표로 대체:.*?\)/g, '')
       .replace(/\(Mermaid 미지원 시.*?\)/g, '')
+      // AI가 [별표]/[별지]만 들어있는 코드 펜스를 실수로 출력하는 경우 → 펜스 해제
+      // (bullet 라인이 쪼개져 조문제목이 소실되는 부작용까지 함께 차단)
+      .replace(/```[a-zA-Z]*\s*\n\s*(\[별[표지][^\n\]]{0,30}\])\s*\n```/g, '$1')
+      // 인라인 백틱으로 감싼 [별표] → 해제 (링크 변환 대상이 되도록)
+      .replace(/`(\[별[표지][^\n`\]]{0,30}\])`/g, '$1')
   }, [content])
 
   // 2. Generate Linkified Content
   const linkedContent = useMemo(() => {
     if (!cleanedContent) return ''
     if (disabledLink) return cleanedContent
-    return linkifyMarkdownLegalRefs(cleanedContent)
+    const linked = linkifyMarkdownLegalRefs(cleanedContent)
+    // 별표 링크 주변에 고립되어 남은 따옴표/인용부호 제거
+    // 예: 'ORIG `'별표'` → 링크 후 `'[별표](annex://...)'` → 양쪽 인용부호 제거
+    return linked.replace(
+      /(['"\u2018\u2019\u201C\u201D])?(\[별[표지][^\]]*\]\(annex:\/\/[^)]+\))(['"\u2018\u2019\u201C\u201D])?/g,
+      (_m, open, link, close) => {
+        const pair = (open && close) || (!open && close) || (open && !close)
+        return pair ? link : (open || '') + link + (close || '')
+      }
+    )
   }, [cleanedContent, disabledLink])
 
   const sanitizedContent = useMemo(() => {
@@ -231,7 +245,7 @@ export function LegalMarkdownRenderer({
         }
       `}</style>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
+        remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
         urlTransform={(url) => {
           if (url?.startsWith('law://')) return url

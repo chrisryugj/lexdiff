@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
@@ -38,15 +38,17 @@ export function LawSelectionDialog({
   const [isSearching, setIsSearching] = useState(false)
   const [searched, setSearched] = useState(false)
 
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return
+  const abortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const runSearch = useCallback(async (q: string, signal: AbortSignal) => {
     setIsSearching(true)
     setSearched(true)
-
     try {
-      const res = await fetch(`/api/law-search?query=${encodeURIComponent(query.trim())}`)
+      const res = await fetch(`/api/law-search?query=${encodeURIComponent(q)}`, { signal })
       if (!res.ok) throw new Error('검색 실패')
       const xml = await res.text()
+      if (signal.aborted) return
       const parsed = parseLawSearchXML(xml)
       setResults(parsed.map(item => ({
         lawName: item.lawName,
@@ -55,15 +57,39 @@ export function LawSelectionDialog({
         lawType: item.lawType || '',
         effectiveDate: item.effectiveDate || '',
       })))
-    } catch {
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return
       setResults([])
     } finally {
-      setIsSearching(false)
+      if (!signal.aborted) setIsSearching(false)
     }
-  }, [query])
+  }, [])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (abortRef.current) abortRef.current.abort()
+
+    const q = query.trim()
+    if (q.length < 2) {
+      setResults([])
+      setSearched(false)
+      setIsSearching(false)
+      return
+    }
+
+    debounceRef.current = setTimeout(() => {
+      const controller = new AbortController()
+      abortRef.current = controller
+      runSearch(q, controller.signal)
+    }, 250)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query, runSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch()
+    if (e.key === 'Enter' && results.length > 0) handleSelect(results[0])
   }
 
   const handleSelect = (law: LawSearchResult) => {
@@ -95,24 +121,29 @@ export function LawSelectionDialog({
           </Button>
         </div>
 
-        {/* 검색 입력 */}
+        {/* 검색 입력 (실시간 자동 검색) */}
         <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
+          <div className="relative">
+            <Icon
+              name="search"
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
             <Input
-              placeholder="법령명 입력 (예: 건축법, 국토계획법)"
+              placeholder="법령명 입력 (2글자 이상, 자동 검색)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 h-9"
+              className="flex-1 h-9 pl-8 pr-8"
               autoFocus
             />
-            <Button size="sm" onClick={handleSearch} disabled={isSearching || !query.trim()} className="h-9 px-3">
-              {isSearching ? (
-                <Icon name="loader" size={14} className="animate-spin" />
-              ) : (
-                <Icon name="search" size={14} />
-              )}
-            </Button>
+            {isSearching && (
+              <Icon
+                name="loader"
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin"
+              />
+            )}
           </div>
         </div>
 

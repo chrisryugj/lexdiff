@@ -83,6 +83,23 @@ function convertForVerification(fcCitations: FCRAGCitation[]): {
   return { verifiable, skipped }
 }
 
+/**
+ * Gemini/Hermes 과부하 · 레이트리밋 에러를 사용자 친화 메시지로 변환.
+ * 503/429/UNAVAILABLE/RESOURCE_EXHAUSTED/overloaded/"high demand" 패턴 감지.
+ * 비매칭이면 null → 호출부에서 generic 메시지 사용.
+ */
+export function classifyEngineError(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  const msg = String(raw)
+  if (/\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overload(ed)?|rate.?limit|high demand|currently experiencing/i.test(msg)) {
+    return 'AI 모델이 현재 과부하 상태입니다 (Google 측 일시적 용량 부족). 잠시 후 다시 시도해 주세요.'
+  }
+  if (/timeout|ETIMEDOUT|deadline/i.test(msg)) {
+    return 'AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+  }
+  return null
+}
+
 // AbortSignal.any 폴백 — Node 20.3 미만 / 일부 엣지 런타임 대비
 export function combineSignals(signals: AbortSignal[]): AbortSignal {
   if (typeof (AbortSignal as unknown as { any?: unknown }).any === 'function') {
@@ -310,6 +327,7 @@ export async function POST(request: NextRequest) {
 
           let lastAnswerCitations: FCRAGCitation[] = []
           let geminiAnswerSent = false
+          let lastEngineErrorMsg: string | null = null
 
           for await (const event of executeGeminiRAGStream(query, {
             apiKey: authCtx.byokKey ?? undefined,
@@ -317,6 +335,9 @@ export async function POST(request: NextRequest) {
             conversationId,
             preEvidence,
           })) {
+            if (event.type === "error") {
+              lastEngineErrorMsg = (event as { message?: string }).message || null
+            }
             if (event.type === "answer") {
               geminiAnswerSent = true
               answerDelivered = true
@@ -343,15 +364,19 @@ export async function POST(request: NextRequest) {
 
           // 안전장치: Hermes+Gemini 모두 answer를 보내지 못한 경우
           if (!geminiAnswerSent) {
+            const friendly = classifyEngineError(lastEngineErrorMsg)
+            const isOverload = friendly?.includes('과부하')
             sendAndLog({
               type: "answer",
               data: {
-                answer: "죄송합니다. AI 엔진에 일시적 문제가 발생하여 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                answer: friendly
+                  ? `⚠️ **${isOverload ? 'AI 모델 과부하' : '일시적 오류'}**\n\n${friendly}\n\n> 이 오류는 서비스 자체 문제가 아니라 Google Gemini API 측 일시적 이슈입니다. 보통 1~2분 내 복구됩니다.`
+                  : "죄송합니다. AI 엔진에 일시적 문제가 발생하여 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
                 citations: [],
                 confidenceLevel: "low",
                 complexity: "simple",
                 queryType: "application",
-                warnings: ["Hermes 및 Gemini 엔진 모두 응답 실패"],
+                warnings: [friendly ?? "Hermes 및 Gemini 엔진 모두 응답 실패"],
               },
             })
           }
@@ -400,9 +425,11 @@ export async function POST(request: NextRequest) {
         logError = error instanceof Error ? error.message : 'unknown'
         console.error('[fc-rag route] engine error:', error instanceof Error ? error.stack : error)
         traceLogger.addEvent(traceId, 'error', { message: logError })
+        const friendly = classifyEngineError(logError)
         sendAndLog({
           type: "error",
-          message: "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
+          message: friendly ?? "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
+          retryable: Boolean(friendly),
         })
         // 에러 시에도 로그 기록
         appendQueryLog({

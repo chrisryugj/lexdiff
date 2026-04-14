@@ -84,6 +84,24 @@ export function useAiSearch(deps: HandlerDeps) {
     let lastEventType = ''
     debugLogger.success('[AI] SSE FC-RAG 검색 시작', { query: fullQuery, skipCache, conversationId })
 
+    // ★ 새 AI 검색 진입 즉시 이전 답변 화면을 와이프 + SSE 로딩 UI로 전환
+    // - 모든 진입 경로 커버: handleSearchInternal / handleAiQuery / handleFollowUp / handleAiRefresh
+    // - isSearching/isAiMode 를 같은 tick에 set → 본문은 비우고 SSE 로그만 뜨는 상태 유지
+    //   (이게 없으면 aiAnswerContent='' && !isStreaming 의 짧은 gap 동안 "결과 없음" 배너가 번쩍임)
+    actions.setIsSearching(true)
+    actions.setIsAiMode(true)
+    actions.setSearchMode('rag')
+    actions.setAiAnswerContent('')
+    actions.setAiRelatedLaws([])
+    actions.setAiCitations([])
+    actions.clearToolCallLogs()
+    actions.setFileSearchFailed(false)
+    actions.setAiAuthRequired(false)
+    actions.updateProgress('analyzing', 5)
+    streamBufferRef.current = ''
+    answerReceivedRef.current = false
+    answerTokenStartedRef.current = false
+
     // 이전 검색 진행 중이면 abort
     if (abortRef.current) {
       abortRef.current.abort()

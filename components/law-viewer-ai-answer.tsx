@@ -310,6 +310,13 @@ export function AIAnswerContent({
     }
 
     useEffect(() => {
+        // ★ aiAnswerContent가 비워지면(재조회/새 쿼리) displayedContent도 즉시 리셋
+        //   이게 없으면 타이핑 이펙트용 로컬 state가 옛 답변을 계속 렌더함
+        if (!aiAnswerContent) {
+            setDisplayedContent('')
+            setIsTyping(false)
+            return
+        }
         if (!isStreaming && aiAnswerContent) {
             setIsTyping(true)
             setDisplayedContent('')

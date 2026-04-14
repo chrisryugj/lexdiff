@@ -70,8 +70,14 @@ export function useSearchHandlers({
     actions.setUserQuery(query.rawQuery || fullQuery)
     debugLogger.info('🔍 검색 쿼리 업데이트', { fullQuery, forcedMode: effectiveForcedMode })
 
-    // 새 검색 시작 시 이전 AI 답변/도구 로그 즉시 클리어
-    // (in-flight 응답을 기다리는 동안 이전 결과가 화면에 남는 UX 혼란 방지)
+    // 새 검색 시작 시 이전 결과 화면을 완전히 와이프
+    // (AI 필드만 비우면 lawData/판례/해석례/재결례 리스트 잔류 → 구 결과가 보이는 UX 혼란)
+    actions.setLawData(null)
+    actions.setPrecedentResults(null)
+    actions.setInterpretationResults(null)
+    actions.setRulingResults(null)
+    actions.setLawSelectionState(null)
+    actions.setOrdinanceSelectionState(null)
     actions.setAiAnswerContent('')
     actions.setAiRelatedLaws([])
     actions.setAiCitations([])

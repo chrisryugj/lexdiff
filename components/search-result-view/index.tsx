@@ -118,6 +118,16 @@ function SearchResultViewComponent({
     onPrecedentSelect,
   })
 
+  // 뒤로가기/언마운트 시 진행 중인 AI 스트리밍 즉시 중단
+  // (fetch abort → 서버 SSE 핸들러의 signal.aborted 로 FC-RAG 루프 종료)
+  const stopAiSearchRef = useRef(handlers.stopAiSearch)
+  stopAiSearchRef.current = handlers.stopAiSearch
+  useEffect(() => {
+    return () => {
+      stopAiSearchRef.current?.()
+    }
+  }, [])
+
   // ============================================================
   // searchId로부터 데이터 복원
   // ============================================================

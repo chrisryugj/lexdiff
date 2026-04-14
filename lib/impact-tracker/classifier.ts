@@ -8,6 +8,7 @@
 import { GoogleGenAI } from '@google/genai'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import { AI_CONFIG } from '@/lib/ai-config'
+import { debugLogger } from '@/lib/debug-logger'
 import {
   buildClassificationQuery,
   buildClassificationSystemPrompt,
@@ -55,7 +56,12 @@ async function classifyWithGemini(
     })
     const text = response.text || ''
     return parseClassificationJSON(text) || []
-  } catch {
+  } catch (error) {
+    debugLogger.error('[impact-tracker] classifyWithGemini failed', {
+      model: AI_CONFIG.gemini.lite,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return []
   }
 }
@@ -81,20 +87,50 @@ async function summarizeWithGemini(
   const key = apiKey || process.env.GEMINI_API_KEY
   if (!key) return '요약을 생성할 수 없습니다 (API 키 미설정).'
 
-  try {
-    const ai = new GoogleGenAI({ apiKey: key })
-    const response = await ai.models.generateContent({
-      model: AI_CONFIG.gemini.lite,
-      contents: query,
-      config: {
-        systemInstruction: buildSummarySystemPrompt(),
-        temperature: 0.3,
-      },
-    })
-    return response.text?.trim() || '요약을 생성할 수 없습니다.'
-  } catch {
-    return '요약 생성 중 오류가 발생했습니다.'
+  const ai = new GoogleGenAI({ apiKey: key })
+  // lite(preview) 과부하/gating 대비: standard 로 fallback.
+  // 503/429 는 짧은 백오프로 재시도 (최대 2회).
+  const models = [AI_CONFIG.gemini.lite, AI_CONFIG.gemini.standard]
+  let lastError: unknown = null
+
+  const isRetryable = (msg: string) => /"code":\s*(503|429)|UNAVAILABLE|RESOURCE_EXHAUSTED/i.test(msg)
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+  for (const model of models) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: query,
+          config: {
+            systemInstruction: buildSummarySystemPrompt(),
+            temperature: 0.3,
+          },
+        })
+        const text = response.text?.trim()
+        if (!text) {
+          const finishReason = (response as { candidates?: Array<{ finishReason?: string }> })
+            .candidates?.[0]?.finishReason
+          debugLogger.error('[impact-tracker] summarizeWithGemini empty response', { model, finishReason })
+          lastError = new Error(`empty response (finishReason=${finishReason ?? 'unknown'})`)
+          break // 빈 응답은 재시도해도 동일 → 다음 모델로
+        }
+        return text
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        debugLogger.error('[impact-tracker] summarizeWithGemini failed', { model, attempt, message: msg })
+        lastError = error
+        if (attempt < 2 && isRetryable(msg)) {
+          await sleep(600 * (attempt + 1)) // 600ms → 1200ms
+          continue
+        }
+        break // 다음 모델로
+      }
+    }
   }
+
+  const msg = lastError instanceof Error ? lastError.message : '알 수 없는 오류'
+  return `요약 생성 중 오류가 발생했습니다: ${msg}`
 }
 
 // ── JSON 파싱 유틸 ──
