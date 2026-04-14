@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server'
 import { executeImpactAnalysis } from '@/lib/impact-tracker/engine'
-import { requireAiAuth } from '@/lib/api-auth'
+import { requireAiAuth, refundAiQuota } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   // Body 파싱
@@ -48,10 +48,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 인증 + 기능별 쿼터 (BYOK 시 스킵)
+  // 인증 + 기능별 쿼터 (BYOK 시 스킵). 응답 실패 시 finally에서 refund.
   const auth = await requireAiAuth(request, 'impact')
   if ('error' in auth) return auth.error
-  const userApiKey = auth.ctx.byokKey || undefined
+  const authCtx = auth.ctx
+  const userApiKey = authCtx.byokKey || undefined
   const encoder = new TextEncoder()
 
   const abortController = new AbortController()
@@ -80,11 +81,13 @@ export async function POST(request: NextRequest) {
         } catch { /* closed */ }
       }
 
+      let produced = false
       try {
         for await (const event of executeImpactAnalysis(
           { lawNames, dateFrom, dateTo, mode, region },
           { signal: combineSignals([request.signal, abortController.signal]), apiKey: userApiKey },
         )) {
+          produced = true
           send(event)
         }
       } catch {
@@ -94,6 +97,9 @@ export async function POST(request: NextRequest) {
           recoverable: false,
         })
       } finally {
+        if (!produced) {
+          try { await refundAiQuota(authCtx) } catch { /* swallow */ }
+        }
         controller.close()
       }
     },

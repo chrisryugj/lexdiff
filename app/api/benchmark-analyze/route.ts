@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { AI_CONFIG } from '@/lib/ai-config'
 import { safeErrorResponse } from '@/lib/api-error'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
-import { requireAiAuth, type AiAuthContext } from '@/lib/api-auth'
+import { requireAiAuth, refundAiQuota, type AiAuthContext } from '@/lib/api-auth'
 
 // ── 조례 본문 조회 ──
 
@@ -158,69 +158,78 @@ async function callGemini(prompt: string, ctx: AiAuthContext): Promise<string> {
 export async function POST(request: NextRequest) {
   const auth = await requireAiAuth(request, 'benchmark')
   if ('error' in auth) return auth.error
+  const authCtx = auth.ctx
 
-  let keyword: string
-  let focus: string | undefined
-  let ordinances: Array<{ orgShortName: string; orgName?: string; ordinanceName: string; ordinanceSeq: string }>
-
+  let succeeded = false
   try {
-    const body = await request.json()
-    keyword = body.keyword
-    focus = body.focus || undefined
-    ordinances = body.ordinances
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
-  }
+    let keyword: string
+    let focus: string | undefined
+    let ordinances: Array<{ orgShortName: string; orgName?: string; ordinanceName: string; ordinanceSeq: string }>
 
-  if (!keyword || !ordinances?.length || ordinances.length < 2 || ordinances.length > 8) {
-    return NextResponse.json({ error: '비교할 조례는 2~8개여야 합니다.' }, { status: 400 })
-  }
+    try {
+      const body = await request.json()
+      keyword = body.keyword
+      focus = body.focus || undefined
+      ordinances = body.ordinances
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
 
-  if (typeof keyword !== 'string' || keyword.length > 200) {
-    return NextResponse.json({ error: 'keyword는 200자 이하 문자열이어야 합니다.' }, { status: 400 })
-  }
-  if (focus !== undefined && (typeof focus !== 'string' || focus.length > 500)) {
-    return NextResponse.json({ error: 'focus는 500자 이하 문자열이어야 합니다.' }, { status: 400 })
-  }
+    if (!keyword || !ordinances?.length || ordinances.length < 2 || ordinances.length > 8) {
+      return NextResponse.json({ error: '비교할 조례는 2~8개여야 합니다.' }, { status: 400 })
+    }
 
-  // 각 ordinance 필드 strict 검증
-  const isValidOrd = (o: unknown): boolean => {
-    if (!o || typeof o !== 'object') return false
-    const x = o as Record<string, unknown>
-    return (
-      typeof x.ordinanceSeq === 'string' && /^\d{1,12}$/.test(x.ordinanceSeq) &&
-      typeof x.orgShortName === 'string' && x.orgShortName.length > 0 && x.orgShortName.length <= 60 &&
-      (x.orgName === undefined || (typeof x.orgName === 'string' && x.orgName.length <= 60)) &&
-      typeof x.ordinanceName === 'string' && x.ordinanceName.length > 0 && x.ordinanceName.length <= 200
+    if (typeof keyword !== 'string' || keyword.length > 200) {
+      return NextResponse.json({ error: 'keyword는 200자 이하 문자열이어야 합니다.' }, { status: 400 })
+    }
+    if (focus !== undefined && (typeof focus !== 'string' || focus.length > 500)) {
+      return NextResponse.json({ error: 'focus는 500자 이하 문자열이어야 합니다.' }, { status: 400 })
+    }
+
+    // 각 ordinance 필드 strict 검증
+    const isValidOrd = (o: unknown): boolean => {
+      if (!o || typeof o !== 'object') return false
+      const x = o as Record<string, unknown>
+      return (
+        typeof x.ordinanceSeq === 'string' && /^\d{1,12}$/.test(x.ordinanceSeq) &&
+        typeof x.orgShortName === 'string' && x.orgShortName.length > 0 && x.orgShortName.length <= 60 &&
+        (x.orgName === undefined || (typeof x.orgName === 'string' && x.orgName.length <= 60)) &&
+        typeof x.ordinanceName === 'string' && x.ordinanceName.length > 0 && x.ordinanceName.length <= 200
+      )
+    }
+    if (!ordinances.every(isValidOrd)) {
+      return NextResponse.json({ error: '조례 항목 형식이 올바르지 않습니다.' }, { status: 400 })
+    }
+
+    // 조례 본문 병렬 조회 (상위 8개)
+    const targets = ordinances.slice(0, 8)
+    const texts = await Promise.all(
+      targets.map(async (o) => {
+        const text = await fetchOrdinanceText(o.ordinanceSeq)
+        return { orgName: o.orgName || o.orgShortName, ordinanceName: o.ordinanceName, text }
+      })
     )
-  }
-  if (!ordinances.every(isValidOrd)) {
-    return NextResponse.json({ error: '조례 항목 형식이 올바르지 않습니다.' }, { status: 400 })
-  }
 
-  // 조례 본문 병렬 조회 (상위 8개)
-  const targets = ordinances.slice(0, 8)
-  const texts = await Promise.all(
-    targets.map(async (o) => {
-      const text = await fetchOrdinanceText(o.ordinanceSeq)
-      return { orgName: o.orgName || o.orgShortName, ordinanceName: o.ordinanceName, text }
-    })
-  )
+    const validTexts = texts.filter(t => t.text.length > 50)
+    if (validTexts.length < 2) {
+      return NextResponse.json({
+        comparisonTable: '비교 가능한 조례 본문이 부족합니다 (조례 본문 조회 실패).',
+        highlights: '',
+      })
+    }
 
-  const validTexts = texts.filter(t => t.text.length > 50)
-  if (validTexts.length < 2) {
-    return NextResponse.json({
-      comparisonTable: '비교 가능한 조례 본문이 부족합니다 (조례 본문 조회 실패).',
-      highlights: '',
-    })
-  }
+    const prompt = buildPrompt(keyword, validTexts, focus)
 
-  const prompt = buildPrompt(keyword, validTexts, focus)
-
-  try {
-    const geminiAnswer = await callGemini(prompt, auth.ctx)
-    return NextResponse.json(parseAnalysisResponse(geminiAnswer))
-  } catch (err: unknown) {
-    return safeErrorResponse(err, "AI 분석 실패")
+    try {
+      const geminiAnswer = await callGemini(prompt, authCtx)
+      succeeded = true
+      return NextResponse.json(parseAnalysisResponse(geminiAnswer))
+    } catch (err: unknown) {
+      return safeErrorResponse(err, "AI 분석 실패")
+    }
+  } finally {
+    if (!succeeded) {
+      await refundAiQuota(authCtx)
+    }
   }
 }

@@ -37,3 +37,21 @@ export async function checkAndIncrementQuota(
   }
   return data as QuotaResult
 }
+
+/**
+ * 사전 차감한 쿼터 카운트를 1 되돌린다. 요청이 실패했을 때 보상용.
+ * Supabase RPC `decrement_quota` 가 없으면 조용히 실패하도록 caller 가 try/catch 로 감싼다.
+ */
+export async function decrementQuota(
+  userId: string,
+  feature: QuotaFeature
+): Promise<void> {
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase.rpc('decrement_quota', {
+    p_user_id: userId,
+    p_feature: feature,
+  })
+  if (error) {
+    throw new Error(`Quota decrement failed: ${error.message}`)
+  }
+}

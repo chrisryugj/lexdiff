@@ -1,10 +1,8 @@
 import { GoogleGenAI } from "@google/genai"
 import { NextResponse, type NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
-import { recordAITokens } from "@/lib/usage-tracker"
-import { getClientIP } from "@/lib/get-client-ip"
 import { AI_CONFIG } from "@/lib/ai-config"
-import { requireAiAuth, resolveGeminiKey } from "@/lib/api-auth"
+import { requireAiAuth, refundAiQuota, resolveGeminiKey } from "@/lib/api-auth"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -63,11 +61,12 @@ ${sanitizePromptInput(params.newContent).substring(0, 3000)}
 }
 
 export async function POST(request: NextRequest) {
-  const clientIP = getClientIP(request)
-
+  // 쿼터 사전 차감 (BYOK 시 no-op). 실패 시 finally에서 refund.
   const auth = await requireAiAuth(request, 'summarize')
   if ('error' in auth) return auth.error
+  const authCtx = auth.ctx
 
+  let succeeded = false
   try {
     const contentLength = Number(request.headers.get("content-length") || "0")
     if (contentLength > 200_000) {
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "판례 본문이 필요합니다." }, { status: 400 })
     }
 
-    const apiKey = resolveGeminiKey(auth.ctx)
+    const apiKey = resolveGeminiKey(authCtx)
     if (!apiKey) {
       debugLogger.error("GEMINI_API_KEY is missing")
       return NextResponse.json(
@@ -111,15 +110,23 @@ export async function POST(request: NextRequest) {
     })
 
     const summary = response.text
-    await recordAITokens(clientIP, summary?.length ?? 0)
+    if (!summary) {
+      throw new Error('empty summary response')
+    }
 
-    debugLogger.success("AI summary complete (Gemini)", { length: summary?.length ?? 0 })
+    succeeded = true
+    debugLogger.success("AI summary complete (Gemini)", { length: summary.length })
     return NextResponse.json({ summary })
   } catch (error) {
+    // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 원문 메시지는 서버 로그로만.
     debugLogger.error("AI summary failed", error)
     return NextResponse.json(
       { error: "AI 요약 생성 중 오류가 발생했습니다." },
       { status: 500 }
     )
+  } finally {
+    if (!succeeded) {
+      await refundAiQuota(authCtx)
+    }
   }
 }

@@ -12,15 +12,10 @@ import { NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
-import {
-  getUsageWarningMessage,
-  recordAITokens,
-} from "@/lib/usage-tracker"
-import { requireAiAuth } from "@/lib/api-auth"
+import { requireAiAuth, refundAiQuota } from "@/lib/api-auth"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
 import { logAIQueryIfConsented } from "@/lib/ai-query-logger"
-import { getClientIP } from "@/lib/get-client-ip"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
 
 /**
@@ -108,13 +103,6 @@ export function combineSignals(signals: AbortSignal[]): AbortSignal {
 }
 
 export async function POST(request: NextRequest) {
-  const clientIP = getClientIP(request)
-  const userApiKey = request.headers.get("X-User-API-Key") || undefined
-
-  if (userApiKey && !/^AIzaSy[A-Za-z0-9_-]{33}$/.test(userApiKey)) {
-    return Response.json({ error: "API key format is invalid." }, { status: 400 })
-  }
-
   let body: unknown
   try {
     body = await request.json()
@@ -130,9 +118,12 @@ export async function POST(request: NextRequest) {
   const { query, conversationId, preEvidence } = validation.data
 
   // Supabase 사용자 인증 + 기능별 쿼터 (BYOK 시 스킵)
+  // 주의: 이 시점에 이미 쿼터 1건이 사전 차감됨. 엔진이 응답을 주지 못하면
+  //       finally 블록에서 refundAiQuota로 보상한다.
   const auth = await requireAiAuth(request, 'fc_rag')
   if ('error' in auth) return auth.error
-  const authedUserId = auth.ctx.userId
+  const authCtx = auth.ctx
+  const authedUserId = authCtx.userId
 
   const traceId = generateTraceId()
   traceLogger.startTrace(traceId, query)
@@ -186,8 +177,24 @@ export async function POST(request: NextRequest) {
 
       // request.signal + cancel() 양쪽 모두 반응하는 합성 signal (E1: 폴백 적용)
       const combinedSignal = combineSignals([request.signal, abortController.signal])
-      // E2: 동일 응답 안에서 token 이중 차감 방지
-      let tokensRecorded = false
+      // 엔진이 실제 답변을 1회라도 전달했는지 — finally에서 쿼터 refund 판단에 사용.
+      // Hermes+Gemini 모두 실패 시 fallback 더미 답변은 '실답변 아님'으로 간주 → refund 대상.
+      let answerDelivered = false
+
+      // 스트림 시작 직후 쿼터 상태를 1회 emit (BYOK는 null).
+      // 이로써 UI는 Supabase 기반 단일 진실 소스만 바라보면 된다.
+      if (authCtx.quota) {
+        sendAndLog({
+          type: 'quota_status',
+          feature: 'fc_rag',
+          current: authCtx.quota.current,
+          limit: authCtx.quota.limit,
+          resetAt: authCtx.quota.reset_at,
+          byok: false,
+        })
+      } else if (authCtx.isByok) {
+        sendAndLog({ type: 'quota_status', feature: 'fc_rag', byok: true })
+      }
 
       try {
         let handled = false
@@ -198,7 +205,7 @@ export async function POST(request: NextRequest) {
         // 🔴 HERMES 임시 비활성화 — 60s 타임아웃 이슈 해결 전까지 Gemini only
         //    살릴 때: DISABLE_HERMES 환경변수 제거 또는 'false' 로 설정 (2026-04-13)
         const HERMES_DISABLED = process.env.DISABLE_HERMES !== 'false'
-        if (!HERMES_DISABLED && !userApiKey) {
+        if (!HERMES_DISABLED && !authCtx.isByok) {
           try {
           traceLogger.addEvent(traceId, 'hermes_start', {})
           sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
@@ -246,16 +253,7 @@ export async function POST(request: NextRequest) {
 
               if (event.type === "answer") {
                 lastAnswerCitations = event.data.citations || []
-                if (!tokensRecorded) {
-                  tokensRecorded = true
-                  const usageStats = await recordAITokens(clientIP, event.data.answer.length)
-                  const warningMessage = getUsageWarningMessage(usageStats)
-                  if (warningMessage) {
-                    const warnings = [...(event.data.warnings || []), warningMessage]
-                    emit({ ...event, data: { ...event.data, warnings } })
-                    continue
-                  }
-                }
+                answerDelivered = true
               }
 
               emit(event)
@@ -301,28 +299,16 @@ export async function POST(request: NextRequest) {
           let geminiAnswerSent = false
 
           for await (const event of executeGeminiRAGStream(query, {
-            apiKey: userApiKey,
+            apiKey: authCtx.byokKey ?? undefined,
             signal: combinedSignal,
             conversationId,
             preEvidence,
           })) {
             if (event.type === "answer") {
               geminiAnswerSent = true
+              answerDelivered = true
               lastAnswerCitations = event.data.citations || []
-
-              if (!userApiKey && !tokensRecorded) {
-                tokensRecorded = true
-                const usageStats = await recordAITokens(clientIP, event.data.answer.length)
-                const warningMessage = getUsageWarningMessage(usageStats)
-
-                if (warningMessage) {
-                  const warnings = [...(event.data.warnings || []), warningMessage]
-                  sendAndLog({ ...event, data: { ...event.data, warnings } })
-                  continue
-                }
-              }
             }
-
             sendAndLog(event)
           }
 
@@ -383,6 +369,7 @@ export async function POST(request: NextRequest) {
         }).catch(() => { /* already swallowed inside */ })
       } catch (error) {
         logError = error instanceof Error ? error.message : 'unknown'
+        console.error('[fc-rag route] engine error:', error instanceof Error ? error.stack : error)
         traceLogger.addEvent(traceId, 'error', { message: logError })
         sendAndLog({
           type: "error",
@@ -406,6 +393,18 @@ export async function POST(request: NextRequest) {
           error: logError,
         })
       } finally {
+        // 사전 차감된 쿼터 보상: 실답변을 한 번도 전달하지 못했을 때만.
+        // - 정상 응답: answerDelivered=true → no-op
+        // - Hermes/Gemini 모두 실패(안전장치 더미 답변): answerDelivered=false → refund
+        // - 스트림 도중 throw: answerDelivered 상태 그대로 판단
+        // BYOK 경로는 refundAiQuota 내부에서 no-op.
+        if (!answerDelivered) {
+          try {
+            await refundAiQuota(authCtx)
+          } catch {
+            /* 보상 실패는 원 응답 흐름에 영향 주지 않음 */
+          }
+        }
         controller.close()
       }
     },
