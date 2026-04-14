@@ -11,7 +11,7 @@
 
 **선행 확인**:
 - Vercel `GEMINI_API_KEY` 새 키 반영됐는지 (이번 세션에서 production 교체 + redeploy 완료, https://lexdiff-420chjdia-ryuseungin-8474s-projects.vercel.app, status Ready)
-- 로컬 dev `.env.local` 도 새 키 (`***REDACTED***`)
+- 로컬 dev `.env.local` 도 새 키 교체 완료
 - dev 서버 살아있는지 (`curl -s http://localhost:3000/`)
 
 **실행**:
