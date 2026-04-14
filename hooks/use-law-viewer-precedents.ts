@@ -54,7 +54,8 @@ export function useLawViewerPrecedents(articleNumber: string, meta: LawMeta) {
     }
   }, [showPrecedents])
 
-  // 판례 데이터 조회
+  // 판례 데이터 조회 — 버튼 숫자 배지를 위해 article 진입 시 백그라운드 prefetch
+  // (IndexedDB 캐시 + lastQueryRef 중복 방지로 과호출 없음)
   const {
     precedents,
     totalCount,
@@ -64,7 +65,7 @@ export function useLawViewerPrecedents(articleNumber: string, meta: LawMeta) {
   } = usePrecedents(
     meta.lawTitle,
     articleNumber,
-    showPrecedents,
+    true,
     20 // 기본 20건 조회 (관련 심급 필터링용)
   )
 
