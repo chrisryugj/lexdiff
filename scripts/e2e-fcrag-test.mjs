@@ -12,6 +12,9 @@ const BASE = 'http://localhost:3000'
 const FC_RAG_URL = `${BASE}/api/fc-rag`
 const IMPACT_URL = `${BASE}/api/impact-tracker`
 const BENCHMARK_URL = `${BASE}/api/benchmark-analyze`
+const BYOK_HEADER = process.env.GEMINI_API_KEY
+  ? { 'x-user-api-key': process.env.GEMINI_API_KEY }
+  : {}
 
 const isParallel = process.argv.includes('--parallel')
 const skipExtended = process.argv.includes('--fast')
@@ -67,13 +70,14 @@ async function runFCRAG(scenario) {
     id: scenario.id, query: scenario.query,
     tools: [], answer: null, citations: [], citationVerification: null,
     source: null, errors: [], tokenUsage: null,
-    quality: {}, durationMs: 0,
+    quality: { toolMatch: false, toolHits: [], citationMatch: false, citationHits: [], answerQuality: 'no_answer', verificationRate: null },
+    durationMs: 0,
   }
   const start = Date.now()
   try {
     const res = await fetch(FC_RAG_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...BYOK_HEADER },
       body: JSON.stringify({ query: scenario.query }),
       signal: AbortSignal.timeout(120_000),
     })

@@ -1,8 +1,112 @@
 # FC-RAG 파이프라인 최적화 — 세션 핸드오프
 
-**작성일**: 2026-04-14
-**세션 범위**: Phase 1a ~ Phase 2 완료 + 실측 검증
-**다음 세션**: P0 버그 분석 + P1~P2 튜닝
+**작성일**: 2026-04-14 (세션 2 — P0 수정 완료)
+**세션 범위**: Phase 1a ~ Phase 2 완료 + 실측 검증 + **P0 버그 수정 + E2E 회귀 검증**
+**다음 세션**: 실전 쿼리 10종 품질 분석 + P1 Context Cache 원인 규명
+
+---
+
+## 🆕 세션 2 완료 요약 (2026-04-14)
+
+### ✅ P0 버그 수정 (commit 856a1f3)
+
+**P0-1 — MST 환각 차단** (근본 원인 + 2중 수정)
+- **증상**: Router 경로에서 LLM 이 `get_batch_articles` 에 환각 `lawId:"001164"` 주입 → "법령 데이터를 찾을 수 없습니다" 에러
+- **근본 원인**:
+  1. Router 가 chain 도구만 선제 실행, `search_law` 를 돌리지 않음 → `latestSearchEntries` 가 비어있음
+  2. LLM 이 `chain_action_basis` 결과 텍스트에서 주운 숫자를 본체 MST 로 오인
+  3. `correctToolArgs` 가 `call.args.mst` 만 검증, `lawId` 는 통째로 블라인드스팟
+  4. `get_batch_articles` 스키마가 `mst/lawId` 둘 다 optional 허용해서 validation 통과
+- **수정 A (교정)**: [result-utils.ts](../lib/fc-rag/result-utils.ts) `correctToolArgs` 에 `lawId` 케이스 추가 — knownMSTs 없으면 `findBestMST` → `delete lawId; args.mst = corrected`. `get_article_history` 는 lawId 필수라 제외.
+- **수정 B (예방)**: [gemini-engine.ts](../lib/fc-rag/gemini-engine.ts) Router 블록에서 쿼리의 법령명 추출 → `executeTool('search_law', ...)` 를 `Promise.all` 로 plan 과 병렬 prefetch → `latestSearchEntries` 사전 채움. 환각 표면적 자체 제거.
+- **검증**: 관세법 복합 쿼리 `get_batch_articles` success, stale 에러 0건. E2E 5/5 PASS.
+
+**P0-2 — Router 경로 CHAIN_COVERS 병합 누락**
+- `latestSearchEntries` / `chainCoveredTools` 선언을 Router 블록 위로 이동
+- Router `toolPlan` 선제 실행 후 `CHAIN_COVERS[call.name]` 을 `chainCoveredTools` 에 병합 → S2 가 같은 체인을 다시 호출하는 낭비 차단
+
+**P0-3 — Context Cache 적중 관측**
+- [engine-shared.ts](../lib/fc-rag/engine-shared.ts) `token_usage` 이벤트에 `cachedTokens?: number` 추가
+- [gemini-engine.ts](../lib/fc-rag/gemini-engine.ts): `usageMetadata.cachedContentTokenCount` 수집 → `totalCachedTokens` 누적 → 이벤트 방출 + dev 로그 출력 `[context-cache] turn N: cached=X/Y (Z%)`
+- **관측 결과: hit rate = 0%**. 복합 쿼리 4턴 모두 `cachedTokens:0`. **Phase 1a (8df5dc1) 가 실제로는 효과 없음.** → P1 우선 과제.
+
+### ✅ 회귀 방지 개선 (별도 커밋 예정)
+
+**`api-auth.ts` graceful downgrade**
+- 새로 풀된 [lib/api-auth.ts](../lib/api-auth.ts) 의 `requireAiAuth` 가 Supabase env 없을 때 `createSupabaseServerClient()` throw → **500 으로 새는 버그**
+- 로컬 dev 환경은 Supabase 미설정이 정상인데 모든 API 요청이 500
+- 수정: `try/catch` 로 감싸서 env 없으면 401 로 내림 (401 = "로그인 필요 또는 BYOK 등록")
+- `x-user-api-key` (BYOK) 헤더는 여전히 Supabase 전혀 거치지 않음
+
+**E2E 스크립트 수정** [scripts/e2e-fcrag-test.mjs](../scripts/e2e-fcrag-test.mjs)
+- BYOK 헤더 주입 (`process.env.GEMINI_API_KEY` → `x-user-api-key`)
+- `result.quality` 기본값 세팅 (HTTP 실패 early-return 시 `toolHits.join` 터지던 버그 수정)
+- 실행 시: `export GEMINI_API_KEY=...` 후 `node scripts/e2e-fcrag-test.mjs [--parallel] [--fast]`
+
+### 📊 E2E 회귀 검증 결과 (sequential, fast 모드)
+
+| 시나리오 | Time | Tools | Cite | Quality |
+|---|---|---|---|---|
+| customs (수입과세가격) | 55.7s | ✅ | ✅ | medium |
+| labor (해고예고수당) | 31.9s | ✅ | ❌ | medium |
+| tax (양도소득세) | 20.4s | ✅ | ✅ | low |
+| public_servant (휴직) | 20.5s | ✅ | ✅ | medium |
+| construction (주차장) | 26.5s | ✅ | ✅ | medium |
+
+- **Overall PASS** | Tools 5/5 | Cite 4/5 | High 0/5 | stale MST 에러 0건
+- **Parallel vs Sequential**: 41s vs 155s (parallel 3.8× 빠름, 품질 동등). parallel 에서는 일부 SSE stream 연결이 끊겨 `fetch failed` 2건 — **서버 응답은 200**, Node fetch 쪽 경합 문제.
+- **High confidence 0건**: `calcConfidence` 또는 `citation_verification` 경로 이슈. `verify:-` 전원이라 citation_verification 이벤트가 아예 안 발행되는 중일 가능성.
+
+---
+
+## 🎯 다음 세션 우선순위 (세션 3)
+
+### 🔴 최우선: 실전 쿼리 10종 품질 분석
+
+다양한 실사용자 페르소나 10개 쿼리를 sequential 로 돌려 결과를 JSON 로 덤프 → 품질/지연/토큰/hit rate 분석 → 저품질 패턴 식별 → 점진적 수정.
+
+**페르소나 × 쿼리 제안** (E2E 스크립트에 `realQueries` 배열로 추가):
+
+| # | 페르소나 | 쿼리 | 기대 tool/citation |
+|---|---|---|---|
+| 1 | 일반 직장인 | "해고예고수당 못 받으면 어떻게 해야 하나요?" | search_ai_law / 근로기준법 제26조, 제110조 |
+| 2 | 건축가 | "대지면적 산정 시 도로에 접한 부분은 어떻게 처리하나요?" | search_ai_law, get_batch_articles / 건축법 시행령 제3조 |
+| 3 | 세무사 | "상속세 신고 기한 놓쳤을 때 가산세와 불복 절차" | chain_dispute_prep, search_decisions(tax_tribunal) / 상속세및증여세법 |
+| 4 | 공무원 (인사) | "육아휴직 중 승진심사 제외가 적법한지" | search_ai_law, search_decisions(precedent) / 국가공무원법 제71조, 제45조의2 |
+| 5 | 자영업자 | "종합소득세 기장의무와 단순경비율 적용 기준" | search_ai_law / 소득세법 제160조 |
+| 6 | 법조인 | "민법 제839조의2 재산분할청구권의 제척기간 기산점 판례" | search_decisions(precedent), get_decision_text |
+| 7 | 중소기업 대표 | "52시간 근로시간제 위반 시 처벌과 유예조항" | search_ai_law, get_batch_articles / 근로기준법 제53조, 제110조 |
+| 8 | 임대인 | "임차인이 월세 3개월 연체 시 계약 해지 방법과 절차" | search_ai_law, search_decisions(precedent) / 주택임대차보호법 |
+| 9 | 지자체 담당 | "서울시 조례로 주차장 설치 완화 가능 범위" | search_ordinance, chain_ordinance_compare / 주차장법 + 서울시 조례 |
+| 10 | 개인사업자 (개인정보) | "고객 개인정보 유출 시 신고 의무와 과태료" | search_ai_law, search_decisions(pipc) / 개인정보보호법 제34조 |
+
+**로깅 항목** (쿼리당 한 줄 JSONL):
+- query, persona, durationMs
+- tools (호출 순서), toolCount
+- inputTokens, outputTokens, cachedTokens (cache hit 관측)
+- answerLength, confidenceLevel, isTruncated
+- citationsExpected, citationsFound, citationMatch (precision/recall)
+- warnings, errors
+- router 적중 여부 (`[S1 라우터]` 로그 검출)
+- MST 환각 재발 체크 (`법령 데이터를 찾을 수 없습니다` 패턴 매칭)
+
+**출력**: `logs/e2e-real-queries-{timestamp}.jsonl` + 콘솔 요약표
+
+### 🟡 P1 — Context Cache hit=0 원인 규명
+원인 후보:
+1. **`gemini-3-flash-preview` preview 모델이 implicit cache 미지원** (가장 유력) — 공식은 `gemini-2.5-flash`/`2.5-pro` 부터
+2. systemInstruction 이 1,024 토큰 미달 (확인 필요: `buildStaticSystemPrompt(true)` 토큰 카운트)
+3. 프롬프트에 숨은 variation (timestamp, random, etc.)
+
+**시도 순서**:
+- a) `GEMINI_MODEL=gemini-2.5-flash` 환경변수 오버라이드 → 실전 쿼리 10종 재돌려 cache hit rate 측정
+- b) 히트 안 나면 `ai.caches.create()` explicit cache 로 전환 (Phase 1a 고도화). systemInstruction 을 명시 캐시로 만들어 100% 보장.
+- c) `usageMetadata` 필드 전체 덤프해서 cachedContent 가 정말 0 인지 vs 필드 자체가 빠진 건지 확인
+
+### 🟢 P2 — 품질 지표 로직 점검
+- `calcConfidence` 가 왜 high 를 안 주는지 ([citations.ts](../lib/fc-rag/citations.ts) 또는 result-utils)
+- `citation_verification` 이벤트가 왜 전원 발행 안 되는지 (verify:- 전원)
+- labor 시나리오의 citation 누락 패턴 확인 (제26조/제110조)
 
 ---
 

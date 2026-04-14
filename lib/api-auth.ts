@@ -29,7 +29,19 @@ export async function requireAiAuth(
     return { ctx: { userId: null, byokKey, isByok: true } }
   }
 
-  const supabase = await createSupabaseServerClient()
+  // Supabase 미설정 (로컬 dev 등) → 401 로 graceful downgrade.
+  // env 없을 때 createServerClient 가 throw 해서 500 으로 새는 것 방지.
+  let supabase
+  try {
+    supabase = await createSupabaseServerClient()
+  } catch {
+    return {
+      error: NextResponse.json(
+        { error: 'unauthorized', message: '로그인이 필요합니다. (또는 본인 API 키 등록)' },
+        { status: 401 }
+      ),
+    }
+  }
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
