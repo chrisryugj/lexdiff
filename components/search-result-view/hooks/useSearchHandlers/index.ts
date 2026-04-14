@@ -49,7 +49,7 @@ export function useSearchHandlers({
   const { fetchLawContent } = useFetchLawContent(deps)
 
   // 2. AI 검색 + 연속 대화
-  const { handleAiSearch, handleFollowUp, handleNewConversation } = useAiSearch(deps)
+  const { handleAiSearch, handleFollowUp, handleNewConversation, stopAiSearch } = useAiSearch(deps)
 
   // 3. 기본 구조화 검색
   const { handleBasicSearch } = useBasicSearch({ ...deps, fetchLawContent })
@@ -232,6 +232,7 @@ export function useSearchHandlers({
     // AI 연속 대화
     handleAiFollowUp: handleFollowUp,
     handleNewConversation,
+    stopAiSearch,
 
     // 조문 화면에서 AI 질의 시작 (추천 질의 칩 / 직접 입력)
     // preEvidence: 이미 가진 조문 데이터 → FC-RAG에 전달 → 도구 호출 0회 즉답

@@ -593,5 +593,10 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.setFileSearchFailed(false)
   }, [actions])
 
-  return { handleAiSearch, handleFollowUp, handleNewConversation }
+  /** 진행 중인 AI 스트리밍 중지 (UI 버튼용) */
+  const stopAiSearch = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
+
+  return { handleAiSearch, handleFollowUp, handleNewConversation, stopAiSearch }
 }

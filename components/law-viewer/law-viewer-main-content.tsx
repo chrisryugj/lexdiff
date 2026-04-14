@@ -32,6 +32,7 @@ interface AIAnswerProps {
   conversationHistory?: ConversationEntry[]
   onFollowUp?: (query: string) => void
   onNewConversation?: () => void
+  onStop?: () => void
 }
 
 type DelegationTabType = "law" | "decree" | "rule" | "admin"
@@ -180,6 +181,7 @@ export function LawViewerMainContent({
                 conversationHistory={aiAnswerProps.conversationHistory}
                 onFollowUp={aiAnswerProps.onFollowUp}
                 onNewConversation={aiAnswerProps.onNewConversation}
+                onStop={aiAnswerProps.onStop}
               />
             </AISearchErrorBoundary>
           </div>

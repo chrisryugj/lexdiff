@@ -193,6 +193,7 @@ interface AIAnswerContentProps {
     conversationHistory?: ConversationEntry[]
     onFollowUp?: (query: string) => void
     onNewConversation?: () => void
+    onStop?: () => void  // ✅ 스트리밍 중지
 }
 
 
@@ -216,6 +217,7 @@ export function AIAnswerContent({
     conversationHistory = [],
     onFollowUp,
     onNewConversation,
+    onStop,
 }: AIAnswerContentProps) {
     // 어절 단위 타이핑 효과
     const [displayedContent, setDisplayedContent] = useState('')
@@ -549,6 +551,17 @@ export function AIAnswerContent({
                                                 />
                                             </span>
                                             <span className="text-sm font-medium text-gray-500 tabular-nums">{Math.round(searchProgress)}%</span>
+                                            {onStop && (
+                                                <button
+                                                    type="button"
+                                                    onClick={onStop}
+                                                    aria-label="AI 답변 생성 중지"
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 ring-1 ring-rose-200/70 dark:ring-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors"
+                                                >
+                                                    <Icon name="x" className="h-3 w-3" />
+                                                    중지
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-4">

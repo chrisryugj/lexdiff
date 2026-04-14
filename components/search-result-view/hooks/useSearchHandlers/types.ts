@@ -43,6 +43,7 @@ export interface SearchHandlers {
   handleAiRefresh: () => void  // AI 답변 강제 새로고침 (캐시 무시)
   handleAiFollowUp: (followUpQuery: string) => void  // 연속 대화 추가 질문
   handleNewConversation: () => void  // 새 대화 시작
+  stopAiSearch: () => void  // AI 스트리밍 중지
   handleAiQuery: (query: string, preEvidence?: string) => void  // 조문 화면에서 AI 질의 시작
   handleRefresh: () => void  // 법령/판례 강제 새로고침 (캐시 무시)
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery, skipCache?: boolean) => Promise<void>
