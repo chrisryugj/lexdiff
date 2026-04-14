@@ -154,12 +154,16 @@ export function selectToolsForQuery(query: string): string[] {
   return Array.from(tools).slice(0, 25)
 }
 
-// Chain 도구가 내부에서 커버하는 기본 도구 매핑 (engine.ts에서 런타임 중복 방지에도 사용)
-// search_decisions 는 도메인 구분 없이 제거 대상으로 다뤄짐 — chain 호출 시 LLM 이 동일 도메인 search_decisions 를 추가 호출하지 못하도록 프롬프트에서 강제
+// Chain 도구가 내부에서 커버하는 기본 도구 매핑 (engine.ts 런타임 중복 방지에도 사용).
+//
+// 🔴 search_decisions 는 의도적으로 제외 — prompts.ts:263-264 의 특수 도메인 규칙
+// (precedent/nlrc/pipc/ftc/tax_tribunal/customs/acr/... 는 chain 후에도 반드시 1회 추가
+// 호출) 과 충돌해서 chain 후 특수 도메인 결정문 조회가 막히는 품질 문제 발생.
+// 대신 gemini-engine.ts 의 callCount 기반 max-call-per-tool 제한으로 중복 차단.
 export const CHAIN_COVERS: Record<string, string[]> = {
-    chain_full_research: ['search_ai_law', 'search_decisions'],
-    chain_dispute_prep: ['search_decisions'],
-    chain_action_basis: ['get_three_tier', 'search_decisions'],
+    chain_full_research: ['search_ai_law'],
+    chain_dispute_prep: [],
+    chain_action_basis: ['get_three_tier'],
     chain_procedure_detail: ['get_three_tier', 'get_annexes', 'search_ai_law'],
     chain_law_system: ['get_three_tier', 'get_annexes'],
     chain_amendment_track: ['compare_old_new', 'get_article_history'],

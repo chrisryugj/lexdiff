@@ -274,19 +274,35 @@ export function calcConfidenceDetailed(
   const ansLen = answerText?.length ?? 0
   const hasGroundsSection = !!answerText && /##\s*근거\s*법령/.test(answerText)
 
-  const evidence = Math.min(weightedEvidence * 5, 30)
-  const citation = Math.min(citCount * 5, 30)
-  const length = Math.min(Math.floor(ansLen / 50), 30)
-  const structure = hasGroundsSection ? 30 : 0
-  const score = evidence + citation + length + structure
+  // 🔴 재설계 (2026-04-14, 3-run flakiness 분석 후):
+  //    이전 공식은 "길고 인용 많은 답변=high" 편향 → 자영업자/건축가처럼
+  //    간결한 정확한 답이 3/3 medium. 법률 답변 본질은 정확성이지 분량 아님.
+  //    CORRECTNESS(45) + GROUNDEDNESS(35) + COMPLETENESS(20) 로 재구성.
+  //    ansLen<200 hard floor 로 실패 답변(공무원 run2 193자) 은 medium 이하 강제.
 
-  // 🔴 임계 재calibration (140053/141331 run 관측):
-  //    pass quality + 1000자+ 답변 + cite 4+ + 근거섹션 case 가 72-78 score 로 관측되어
-  //    80 임계에서 medium 으로 떨어졌다. evidence 신호는 tool result ≥100자 컷이 엄격해
-  //    substantive=1 → 5점에 머무르는 반면 나머지 3신호는 만점 근처 → 구조적으로 80 도달 곤란.
-  //    #1/#2 (score 72,75) high 복구 + #6 (score 10) low 유지가 목표. 임계 72/40 로 하향.
+  // CORRECTNESS (45점): 인용 존재와 다양성
+  const citBase = citCount >= 1 ? 25 : 0
+  const citTier = Math.min(citCount, 3) * 5               // 3개면 cap — 간결 친화
+  const citBonus = citCount >= 5 ? 5 : 0                   // 다수 인용 soft bonus
+  const citation = citBase + citTier + citBonus            // 0~45
+
+  // GROUNDEDNESS (35점): tool 이 실제 법령 fetch 했는가
+  const evBase = weightedEvidence >= 1 ? 20 : 0
+  const evTier = Math.min(weightedEvidence, 5) * 3         // 5개면 cap
+  const evidence = evBase + evTier                         // 0~35
+
+  // COMPLETENESS (20점): 답변 완결성 — 약한 신호 (분량 편향 완화)
+  const length = ansLen >= 400 ? 15 : ansLen >= 200 ? 10 : 0
+  const structure = hasGroundsSection ? 5 : 0              // binary 30 → soft 5
+
+  let score = citation + evidence + length + structure
+
+  // HARD FLOOR: 답변 자체가 짧으면 (< 200자) medium 이상 불가
+  if (ansLen < 200) score = Math.min(score, 40)
+
+  // Thresholds: 3-run 재측정 calibration (자영업자 76~81, 건축가 83, 법조인 85~100)
   const level: 'high' | 'medium' | 'low' =
-    score >= 72 ? 'high' : score >= 40 ? 'medium' : 'low'
+    score >= 70 ? 'high' : score >= 45 ? 'medium' : 'low'
 
   return {
     level,

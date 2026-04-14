@@ -15,7 +15,7 @@ import { expandQuery } from '../lib/query-expansion'
 // Types
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-type SearchType = 'law' | 'ordinance' | 'ai' | 'precedent' | 'interpretation' | 'ruling' | 'multi'
+type SearchType = 'law' | 'ordinance' | 'ai' | 'precedent' | 'interpretation' | 'ruling' | 'multi' | 'admrul'
 
 interface TestCase {
   query: string

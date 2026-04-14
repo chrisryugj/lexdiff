@@ -324,8 +324,8 @@ export async function* executeGeminiRAGStream(
   }
 
   // 🔴 allToolResults 는 router 경로(S1 plan)와 pre-evidence 경로에서도 push 되므로
-  //    선언을 S1 Router 블록보다 앞에 둔다. TDZ 회피.
-  let allToolResults: ToolCallResult[] = []
+  //    선언을 S1 Router 블록보다 앞에 둔다. TDZ 회피 (Next 16 turbo HMR stale 재발 방지).
+  const allToolResults: ToolCallResult[] = []
 
   // ── S1 Router (Flash-Lite) — 옵션, 해시 기반 점진 롤아웃 ──
   // 환경변수: FC_RAG_S1_ROUTER_ENABLED=true, FC_RAG_S1_ROUTER_ROLLOUT_PCT=20 (기본 20%)
@@ -514,6 +514,14 @@ export async function* executeGeminiRAGStream(
   }
   let turnCount = 0
   const failureCount = new Map<string, number>()
+  // 🔴 검색 도구 중복 호출 제한 — Gemini 가 declarations 에 없는 도구를 환각 호출하는 현상 방지.
+  // chainCoveredTools 필터는 declarations 에서 빼는 hint 일 뿐, LLM 은 프롬프트 히스토리의
+  // function name 을 기억해 재호출함 (실측으로 확인). runtime 차단이 필수.
+  const callCount = new Map<string, number>()
+  const SEARCH_TOOLS_FOR_DEDUP = new Set([
+    'search_ai_law', 'search_decisions', 'search_law', 'search_ordinance', 'search_admin_rule',
+  ])
+  const MAX_CALLS_PER_SEARCH_TOOL = 2
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let totalCachedTokens = 0
@@ -532,6 +540,12 @@ export async function* executeGeminiRAGStream(
       const activeDeclarations = toolDeclarations.filter(
         d => (failureCount.get(d.name!) || 0) < 2 && !chainCoveredTools.has(d.name!)
       )
+      if (process.env.NODE_ENV !== 'production') {
+        const blockedSet = Array.from(chainCoveredTools)
+        const hasSD = activeDeclarations.some(d => d.name === 'search_decisions')
+        const hasSA = activeDeclarations.some(d => d.name === 'search_ai_law')
+        console.log(`[chain-filter] turn=${turnCount} blocked=[${blockedSet.join(',')}] activeCount=${activeDeclarations.length} search_decisions_active=${hasSD} search_ai_law_active=${hasSA}`)
+      }
 
       if (signal?.aborted) {
         yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
@@ -661,10 +675,38 @@ export async function* executeGeminiRAGStream(
       }
 
       // ── Function Call 실행 ──
-      const calls = functionCalls.map((p: GeminiPart) => ({
+      const rawCalls = functionCalls.map((p: GeminiPart) => ({
         name: (p.functionCall!.name || '') as string,
         args: (p.functionCall!.args || {}) as Record<string, unknown>,
       }))
+
+      // 🔴 Runtime 차단: Gemini 가 declarations 에서 제거된 도구를 환각 호출 또는
+      //    검색 도구를 3회 이상 중복 호출하는 케이스를 서버측에서 거절.
+      //    차단된 호출은 실행하지 않고 더미 functionResponse 로 LLM 에 피드백.
+      //    같은 turn 안에 동일 도구 병렬 호출도 in-flight tally 로 누적 차단.
+      const blockedCalls: typeof rawCalls = []
+      const turnCallTally = new Map<string, number>()
+      const calls = rawCalls.filter(c => {
+        // chain 이 커버한 도구 (search_ai_law 등) 는 무조건 차단
+        if (chainCoveredTools.has(c.name)) {
+          blockedCalls.push(c)
+          return false
+        }
+        // 검색 도구 max 호출 횟수 초과 시 차단 (이전 turn 누적 + 현재 turn in-flight)
+        if (SEARCH_TOOLS_FOR_DEDUP.has(c.name)) {
+          const cumulative = (callCount.get(c.name) || 0) + (turnCallTally.get(c.name) || 0)
+          if (cumulative >= MAX_CALLS_PER_SEARCH_TOOL) {
+            blockedCalls.push(c)
+            return false
+          }
+          turnCallTally.set(c.name, (turnCallTally.get(c.name) || 0) + 1)
+        }
+        return true
+      })
+
+      if (process.env.NODE_ENV !== 'production' && blockedCalls.length > 0) {
+        console.log(`[runtime-block] turn=${turnCount} blocked=${blockedCalls.map(c => c.name).join(',')}`)
+      }
 
       // MST 보정
       const fallbackEvents: FCRAGStreamEvent[] = []
@@ -705,6 +747,13 @@ export async function* executeGeminiRAGStream(
       }
 
       allToolResults.push(...results)
+
+      // 검색 도구 호출 횟수 누적 (runtime 차단 판단용)
+      for (const r of results) {
+        if (SEARCH_TOOLS_FOR_DEDUP.has(r.name)) {
+          callCount.set(r.name, (callCount.get(r.name) || 0) + 1)
+        }
+      }
 
       enforceToolResultsCap()
 
@@ -780,6 +829,19 @@ export async function* executeGeminiRAGStream(
       const responseParts: any[] = results.slice(0, results.length - autoChains.length).map(r => ({
         functionResponse: { name: r.name, response: { result: r.result } },
       }))
+      // 🔴 차단된 호출에 대해 더미 functionResponse 주입 — LLM 이 "이 도구 호출은 실패/
+      //    차단됨" 을 학습하고 현재 맥락으로 답변을 마무리하도록 유도.
+      for (const b of blockedCalls) {
+        const reason = chainCoveredTools.has(b.name)
+          ? `이 도구는 chain 도구가 이미 커버했습니다. 추가 호출 금지.`
+          : `이 도구는 이미 ${MAX_CALLS_PER_SEARCH_TOOL}회 호출되었습니다. 현재 수집된 자료만으로 답변을 작성하세요.`
+        responseParts.push({
+          functionResponse: {
+            name: b.name,
+            response: { result: `[차단] ${reason}` },
+          },
+        })
+      }
       if (autoChains.length > 0) {
         const autoTexts = results.slice(results.length - autoChains.length)
           .map(r => `[보충 조회: ${TOOL_DISPLAY_NAMES[r.name] || r.name}]\n${r.result}`)
