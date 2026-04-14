@@ -540,12 +540,6 @@ export async function* executeGeminiRAGStream(
       const activeDeclarations = toolDeclarations.filter(
         d => (failureCount.get(d.name!) || 0) < 2 && !chainCoveredTools.has(d.name!)
       )
-      if (process.env.NODE_ENV !== 'production') {
-        const blockedSet = Array.from(chainCoveredTools)
-        const hasSD = activeDeclarations.some(d => d.name === 'search_decisions')
-        const hasSA = activeDeclarations.some(d => d.name === 'search_ai_law')
-        console.log(`[chain-filter] turn=${turnCount} blocked=[${blockedSet.join(',')}] activeCount=${activeDeclarations.length} search_decisions_active=${hasSD} search_ai_law_active=${hasSA}`)
-      }
 
       if (signal?.aborted) {
         yield { type: 'status', message: '검색이 취소되었습니다.', progress: 0 }
@@ -703,10 +697,6 @@ export async function* executeGeminiRAGStream(
         }
         return true
       })
-
-      if (process.env.NODE_ENV !== 'production' && blockedCalls.length > 0) {
-        console.log(`[runtime-block] turn=${turnCount} blocked=${blockedCalls.map(c => c.name).join(',')}`)
-      }
 
       // MST 보정
       const fallbackEvents: FCRAGStreamEvent[] = []
