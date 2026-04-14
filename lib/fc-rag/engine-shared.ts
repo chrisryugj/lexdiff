@@ -246,6 +246,49 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
   })
 }
 
+/**
+ * Gemini API 429/503/overloaded 지수 백오프 래퍼.
+ *
+ * generateContentStream 의 **초기 연결 단계 실패만** 재시도한다 (iteration 중
+ * chunk 실패는 부분 답변이 이미 스트리밍됐을 수 있으므로 상위에서 처리).
+ *
+ * - 최대 3회 시도, 지연: 700ms → 1400ms → 2800ms + jitter(0-300ms)
+ * - retryable: HTTP 429/500/503, `RESOURCE_EXHAUSTED`, `UNAVAILABLE`,
+ *   `overloaded`, `rate.?limit` 메시지
+ * - 그 외 에러(4xx 클라이언트 에러 등)는 즉시 throw
+ *
+ * 베타 운영 모델: 로그인 유저별 일 쿼터가 1차 rate-limit, 이 래퍼가 2차 방어
+ * (동시 다발 유저의 순간 RPM 피크 대응).
+ */
+export async function callGeminiWithRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+): Promise<T> {
+  const MAX_ATTEMPTS = 3
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      const err = e as { status?: number; code?: number; message?: string }
+      const status = err.status ?? err.code ?? 0
+      const msg = String(err.message || '')
+      const retryable =
+        status === 429 || status === 500 || status === 503 ||
+        /\b(429|500|503)\b/.test(msg) ||
+        /(overloaded|RESOURCE_EXHAUSTED|UNAVAILABLE|rate.?limit)/i.test(msg)
+      if (attempt >= MAX_ATTEMPTS || !retryable) throw e
+      const base = 700 * Math.pow(2, attempt - 1)
+      const delay = base + Math.random() * 300
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[gemini-retry] ${label} attempt ${attempt}/${MAX_ATTEMPTS} failed (${status || 'transient'}): ${msg.slice(0, 120)} — retrying in ${Math.round(delay)}ms`,
+      )
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw new Error(`${label}: retry exhausted (unreachable)`)
+}
+
 /** Gemini: complexity 기반 최대 도구 턴 수.
  *
  * 🔴 131901 run 에서 10/10 쿼리가 모두 forceLastTurn 재요청 경로를 타서 쿼리당

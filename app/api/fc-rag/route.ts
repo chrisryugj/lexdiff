@@ -37,7 +37,7 @@ export async function streamCitationVerification(
     const verified: VerifiedCitation[] = await Promise.race<VerifiedCitation[]>([
       verifyAllCitations(verifiable),
       new Promise<VerifiedCitation[]>((_, reject) =>
-        setTimeout(() => reject(new Error('citation verification timeout')), 10_000),
+        setTimeout(() => reject(new Error('citation verification timeout')), 15_000),
       ),
     ]).catch(() =>
       verifiable.map<VerifiedCitation>((c) => ({
@@ -153,6 +153,11 @@ export async function POST(request: NextRequest) {
       let logAnswerText = ''
       const logToolCalls: Array<{ name: string; args?: unknown }> = []
 
+      // 법적 안전 면책 — 모든 answer 이벤트에 자동 주입 (변호사법/소비자 보호).
+      // 주의: 엔진 내부의 cacheAnswer/storeConversation 는 원본 객체를 받으므로
+      //       원본을 mutate 하지 않고 전송 단계에서 복제본에만 주입한다.
+      const LEGAL_DISCLAIMER = '본 답변은 법령 정보 제공 목적이며, 법률 자문이 아닙니다. 중요한 법적 결정 전에는 반드시 변호사·법무사 등 전문가 상담이 필요합니다.'
+
       const sendAndLog = (data: unknown) => {
         const evt = data as Record<string, unknown>
         if (evt.type === 'tool_call' && evt.name) {
@@ -166,6 +171,14 @@ export async function POST(request: NextRequest) {
           logCitationCount = (d?.citations as unknown[] || []).length
           logComplexity = String(d?.complexity || '')
           logQueryType = String(d?.queryType || '')
+          // 면책 주입 (중복 방지) — 원본 보존, 전송용 복제본만 변형
+          if (d) {
+            const existing = (d.warnings as string[] | undefined) || []
+            if (!existing.some((w) => typeof w === 'string' && w.includes('법률 자문'))) {
+              send({ ...evt, data: { ...d, warnings: [LEGAL_DISCLAIMER, ...existing] } })
+              return
+            }
+          }
         }
         if (evt.type === 'citation_verification') {
           const cits = (evt.citations as Array<{ verified?: boolean }> | undefined) || []

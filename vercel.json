@@ -1,3 +1,9 @@
 {
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "functions": {
+    "app/api/fc-rag/route.ts": { "maxDuration": 120 },
+    "app/api/summarize/route.ts": { "maxDuration": 60 },
+    "app/api/benchmark-analyze/route.ts": { "maxDuration": 60 },
+    "app/api/impact-tracker/route.ts": { "maxDuration": 90 }
+  }
 }

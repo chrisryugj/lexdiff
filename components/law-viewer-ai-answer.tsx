@@ -660,6 +660,10 @@ export function AIAnswerContent({
                     P1-1: 두 렌더러 wrapper에 동일 leading 클래스 + 짧은 fade로 전환 점프 완화 */}
                 {displayedContent && (
                     <div
+                        role="region"
+                        aria-label="AI 법률 답변"
+                        aria-live="polite"
+                        aria-busy={isStreaming || isTyping}
                         style={{ fontSize: `${fontSize}px` }}
                         className="animate-in fade-in duration-200 leading-relaxed text-foreground"
                     >

@@ -137,6 +137,14 @@ export function SearchView({
               >
                 LexDiff
               </span>
+              {/* 작은 베타 표시 — 구석에 조용히 */}
+              <span
+                aria-label="베타 버전"
+                className="ml-1 self-start mt-0.5 px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-brand-gold/90 border border-brand-gold/40 rounded-sm leading-tight"
+                style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', fontStyle: 'normal' }}
+              >
+                beta
+              </span>
             </button>
 
             {/* Actions */}
@@ -206,6 +214,16 @@ export function SearchView({
               어려운 법률 용어 대신 일상 언어로,<br/>
               공직자를 위한 가장 쉬운 지능형 법령 검색 플랫폼
             </m.p>
+
+            {/* 법적 안전 고지 — 베타 단계에서 반드시 노출 */}
+            <m.div
+              variants={itemVariants}
+              role="note"
+              aria-label="법적 고지"
+              className="mb-6 lg:mb-8 max-w-2xl px-4 py-2.5 border border-amber-400/40 bg-amber-50/60 dark:bg-amber-900/10 rounded-md text-[11px] lg:text-xs text-amber-900 dark:text-amber-200 leading-relaxed break-keep text-center"
+            >
+              <span className="font-semibold">⚖️ 법적 고지</span> · 본 서비스는 법령 정보 제공을 위한 <span className="font-semibold">참고용 도구</span>이며, 법률 자문을 대체하지 않습니다. 중요한 법적 판단 전에는 반드시 변호사·법무사 상담을 권장합니다.
+            </m.div>
 
             {/* Search Bar */}
             <m.div variants={itemVariants} className="w-full max-w-3xl relative z-40">

@@ -44,6 +44,7 @@ import {
   inferQueryType,
   getMaxToolTurns,
   withTimeout,
+  callGeminiWithRetry,
 } from './engine-shared'
 
 // ─── Auto-chain 로직 (도구 결과 기반 자동 후속 호출) ───
@@ -200,11 +201,14 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   })
 
   const retryStream = await withTimeout(
-    ai.models.generateContentStream({
-      model: MODEL,
-      contents: messages,
-      config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
-    }),
+    callGeminiWithRetry(
+      () => ai.models.generateContentStream({
+        model: MODEL,
+        contents: messages,
+        config: { systemInstruction: systemPrompt, temperature: 0, maxOutputTokens: MAX_TOKENS[complexity] },
+      }),
+      'Gemini forceLastTurn',
+    ),
     GEMINI_TIMEOUT[complexity],
     'Gemini API (마지막 턴)',
   )
@@ -547,17 +551,21 @@ export async function* executeGeminiRAGStream(
       }
 
       // ── Gemini 스트리밍 ──
+      // callGeminiWithRetry: 429/503/overloaded 초기 연결 실패에 지수 백오프 (최대 3회)
       const stream = await withTimeout(
-        ai.models.generateContentStream({
-          model: MODEL,
-          contents: messages,
-          config: {
-            systemInstruction: systemPrompt,
-            tools: [{ functionDeclarations: activeDeclarations }],
-            temperature: 0,
-            maxOutputTokens: MAX_TOKENS[complexity],
-          },
-        }),
+        callGeminiWithRetry(
+          () => ai.models.generateContentStream({
+            model: MODEL,
+            contents: messages,
+            config: {
+              systemInstruction: systemPrompt,
+              tools: [{ functionDeclarations: activeDeclarations }],
+              temperature: 0,
+              maxOutputTokens: MAX_TOKENS[complexity],
+            },
+          }),
+          `Gemini turn${turnCount}`,
+        ),
         GEMINI_TIMEOUT[complexity],
         'Gemini API',
       )
