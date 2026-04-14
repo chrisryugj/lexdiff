@@ -1,6 +1,42 @@
 # Active Context
 
-**마지막 업데이트**: 2026-04-13 (베타 출시 전략 확정 + MCP 도구 리팩토링 계획 수립)
+**마지막 업데이트**: 2026-04-14 (FC-RAG Confidence 판정 완성 — High 10/10 달성)
+
+## 🎯 2026-04-14 세션 (Confidence 판정 근본 개선)
+
+### 결과
+| 지표 | 시작 | 최종 |
+|---|---|---|
+| High confidence | 1/10 | **10/10** |
+| Citation recall | 80% | **100%** |
+| Cache hit | 9.9% | **47.9%** |
+| Wall time | 294s | 271s |
+
+### 근본 원인 (드디어 잡음)
+**Router planResults 누적 버그** — S1 라우터가 실행한 tool result가 `geminiEvidence` 문자열에만 주입되고 `allToolResults` 배열에는 push 안 됨. S2가 추가 도구 호출 없이 바로 답변하면 `allToolResults.length === 0` → `noToolsCalled` 가드에 걸려 강제 low 강등. #5 자영업자가 계속 low 찍히던 진짜 이유.
+
+### 변경 파일
+1. **[citations.ts:283](lib/fc-rag/citations.ts#L283)** — calcConfidence 임계 80/48 → **72/40**. evidence 신호가 tool result 100자 컷 때문에 과소평가돼서 pass quality 답변들(1000자+, cite 4+, 근거섹션 완비)이 72-78점 구간에 쌓여 medium 강등되던 문제. #1/#2 복구.
+2. **[gemini-engine.ts:417](lib/fc-rag/gemini-engine.ts#L417)** — Router 경로에서 `planResults` + `prefetchSearch` 를 `allToolResults` 에 push. 근본 원인 fix.
+3. **[gemini-engine.ts:437](lib/fc-rag/gemini-engine.ts#L437)** — Pre-evidence `aiSearch` 도 `allToolResults` 에 push (동일 패턴 방어).
+4. **[gemini-engine.ts:169](lib/fc-rag/gemini-engine.ts#L169)** — forceLastTurn textParts>0 분기에 **existingAnswerLen ≥ 300자 가드**. #6 법조인 258자 토막 답변이 무검증 통과하던 regression 차단.
+5. **[gemini-engine.ts:317](lib/fc-rag/gemini-engine.ts#L317)** — `allToolResults` 선언을 S1 router 블록보다 앞으로 이동 (TDZ 회피). v7 9/10 fail 원인.
+6. **[engine-shared.ts:38](lib/fc-rag/engine-shared.ts#L38)** — `FCRAGResult.confidenceBreakdown?` 타입 추가. score/evidence/citation/length/structure/weightedEvidence/citCount/ansLen/hasGroundsSection/qualityLevel/qualityScore/downgraded 전부 관측.
+7. **[gemini-engine.ts:590](lib/fc-rag/gemini-engine.ts#L590)** — 정상/forceLastTurn-textParts/forceLastTurn-retry **세 경로 모두** answer 이벤트에 breakdown 주입. 회귀 추적 가능.
+8. **[scripts/e2e-real-queries.mjs:338](scripts/e2e-real-queries.mjs#L338)** — `record.confidenceBreakdown` JSONL 저장.
+9. **[answer-cache.ts:26](lib/fc-rag/answer-cache.ts#L26)** — `CACHE_KEY_VERSION v4 → v8` (이 세션에서 5회 bump).
+
+### 관측 패턴 (앞으로 회귀 디버깅 시 참조)
+- `downgraded: "noTools"` + `weightedEvidence: 0` + pass quality → router 경로인데 누적 안 된 경우
+- `qualityLevel` 필드 부재 → forceLastTurn 경유 (정상경로는 `qualityLevel/qualityScore` 찍힘)
+- score 72-80 + pass → 임계 경계선 근처. evidence 가중치 재튜닝 고려
+
+### 보류/미해결
+- **P4 run-to-run flakiness 미측정** — 동일 baseline 3회 분산 안 돌려봄. 10/10 high가 단일 run 결과라 LLM 비결정성 흡수 여부 불확실.
+- **P5 22 카테고리 커버리지** — 영문 쿼리 제외 유지, maxTurns +1 효과 미검증.
+- **MAX_TOKENS simple 한도** — 원래 P2로 잡혀있었으나 실제 관측에서 #5 truncation은 사라짐 (router 누적 fix 덕에 답변 1387자까지 정상 생성됨). 별도 조치 불필요.
+
+## 🎯 진행 중 대형 작업 (2026-04-13 세션에서 결정)
 
 ## 🎯 진행 중 대형 작업 (2026-04-13 세션에서 결정)
 

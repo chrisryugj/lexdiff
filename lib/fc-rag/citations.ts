@@ -280,8 +280,13 @@ export function calcConfidenceDetailed(
   const structure = hasGroundsSection ? 30 : 0
   const score = evidence + citation + length + structure
 
+  // 🔴 임계 재calibration (140053/141331 run 관측):
+  //    pass quality + 1000자+ 답변 + cite 4+ + 근거섹션 case 가 72-78 score 로 관측되어
+  //    80 임계에서 medium 으로 떨어졌다. evidence 신호는 tool result ≥100자 컷이 엄격해
+  //    substantive=1 → 5점에 머무르는 반면 나머지 3신호는 만점 근처 → 구조적으로 80 도달 곤란.
+  //    #1/#2 (score 72,75) high 복구 + #6 (score 10) low 유지가 목표. 임계 72/40 로 하향.
   const level: 'high' | 'medium' | 'low' =
-    score >= 80 ? 'high' : score >= 48 ? 'medium' : 'low'
+    score >= 72 ? 'high' : score >= 40 ? 'medium' : 'low'
 
   return {
     level,

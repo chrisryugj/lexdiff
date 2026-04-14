@@ -335,6 +335,7 @@ async function runQuery(q) {
           record.answerSnippet = text.slice(0, 4000)
           record.answerCitationsRaw = Array.isArray(data.citations) ? data.citations.slice(0, 20) : []
           record.confidenceLevel = data.confidenceLevel || null
+          record.confidenceBreakdown = data.confidenceBreakdown || null
           record.isTruncated = !!data.isTruncated
           record.fromCache = !!data.fromCache
           record.source = data.source || record.source

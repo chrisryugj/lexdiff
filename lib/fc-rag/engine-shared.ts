@@ -34,6 +34,21 @@ export interface FCRAGResult {
   warnings?: string[]
   /** answer-cache hit 여부. 관측/테스트용 — 캐시 hit 시에만 true. */
   fromCache?: boolean
+  /** calcConfidenceDetailed 4신호 breakdown. 관측/디버깅용 — E2E JSONL 기록 대상. */
+  confidenceBreakdown?: {
+    score: number
+    evidence: number
+    citation: number
+    length: number
+    structure: number
+    weightedEvidence: number
+    citCount: number
+    ansLen: number
+    hasGroundsSection: boolean
+    qualityLevel?: 'pass' | 'marginal' | 'fail'
+    qualityScore?: number
+    downgraded?: 'noTools' | 'fail' | 'marginal'
+  }
 }
 
 export type FCRAGStreamEvent =

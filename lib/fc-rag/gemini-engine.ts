@@ -164,22 +164,26 @@ interface ForceLastTurnOptions {
 async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<FCRAGStreamEvent> {
   const { ai, messages, parts, systemPrompt, complexity, queryType, allToolResults, warnings, accFinishReason, totalInputTokens, totalOutputTokens, totalCachedTokens = 0, signal } = opts
 
-  // 텍스트 답변이 이미 있으면 사용
+  // 텍스트 답변이 이미 있으면 사용. 단 너무 짧으면(< 300자) 토막 답변일 가능성이 커
+  // forceLastTurn retry 경로로 넘긴다. #6 법조인 258자 regression 방지 (141331 run).
   const textParts = parts.filter((p: GeminiPart) => p.text)
-  if (textParts.length > 0) {
+  const existingAnswerLen = textParts.reduce((n, p) => n + (p.text?.length ?? 0), 0)
+  if (textParts.length > 0 && existingAnswerLen >= 300) {
     const answer = textParts.map((p: GeminiPart) => p.text).join('')
     const citations = buildCitationsWithAnswerFallback(allToolResults, answer)
+    const flt1Conf = calcConfidenceDetailed(allToolResults, answer, citations)
     yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
     yield {
       type: 'answer',
       data: {
         answer,
         citations,
-        confidenceLevel: calcConfidence(allToolResults, answer, citations),
+        confidenceLevel: flt1Conf.level,
         complexity,
         queryType,
         isTruncated: accFinishReason === 'MAX_TOKENS',
         warnings: warnings.length > 0 ? warnings : undefined,
+        confidenceBreakdown: { score: flt1Conf.score, ...flt1Conf.breakdown },
       },
     }
     return
@@ -245,16 +249,18 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
     yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens, cachedTokens: cumulativeCached }
   }
   const retryCitations = buildCitationsWithAnswerFallback(allToolResults, retryText)
+  const retryConf = calcConfidenceDetailed(allToolResults, retryText, retryCitations)
   yield {
     type: 'answer',
     data: {
       answer: retryText || '답변 생성에 실패했습니다.',
       citations: retryCitations,
-      confidenceLevel: calcConfidence(allToolResults, retryText, retryCitations),
+      confidenceLevel: retryConf.level,
       complexity,
       queryType,
       isTruncated: retryFinishReason === 'MAX_TOKENS',
       warnings: warnings.length > 0 ? warnings : undefined,
+      confidenceBreakdown: { score: retryConf.score, ...retryConf.breakdown },
     },
   }
 }
@@ -307,6 +313,10 @@ export async function* executeGeminiRAGStream(
     }
     if (fastPathNext.value === true) return
   }
+
+  // 🔴 allToolResults 는 router 경로(S1 plan)와 pre-evidence 경로에서도 push 되므로
+  //    선언을 S1 Router 블록보다 앞에 둔다. TDZ 회피.
+  let allToolResults: ToolCallResult[] = []
 
   // ── S1 Router (Flash-Lite) — 옵션, 해시 기반 점진 롤아웃 ──
   // 환경변수: FC_RAG_S1_ROUTER_ENABLED=true, FC_RAG_S1_ROUTER_ROLLOUT_PCT=20 (기본 20%)
@@ -409,6 +419,12 @@ export async function* executeGeminiRAGStream(
             .map(r => `[${displayNameFor(r.name, r.args)}]\n${r.result}`)
             .join('\n\n---\n\n')
         }
+        // 🔴 Router 플랜/prefetch 결과를 allToolResults 에 누적.
+        //    이전 버그: router 경유 + S2 무툴 답변 시 allToolResults=[] → noToolsCalled
+        //    가드에 걸려 low 강등 (141946 run #5 자영업자 263자 답변이 아닌 1198자 pass
+        //    답변도 low 로 찍힘). planResults/prefetchSearch 모두 증거로 counting.
+        allToolResults.push(...planResults)
+        if (prefetchSearch) allToolResults.push(prefetchSearch)
       }
     } else {
       // 라우터 실패 → 조용히 regex 경로로 폴백 (사용자는 인지 못 함)
@@ -425,6 +441,7 @@ export async function* executeGeminiRAGStream(
       yield { type: 'tool_call', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], query }
       yield { type: 'tool_result', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], success: true, summary: summarizeToolResult('search_ai_law', aiSearch) }
       geminiEvidence = aiSearch.result
+      allToolResults.push(aiSearch)
     }
   }
 
@@ -465,7 +482,6 @@ export async function* executeGeminiRAGStream(
     { role: 'user', parts: [{ text: userText }] },
   ]
 
-  let allToolResults: ToolCallResult[] = []
   const MAX_TOOL_RESULTS = 30
 
   /** 메모리 캡 유지: 에러 → 최단 → 최오래된 순서로 퇴거 (index 0 보호) */
@@ -588,13 +604,18 @@ export async function* executeGeminiRAGStream(
         // citations 를 confidence 계산에 활용하기 위해 먼저 구성.
         const citations = buildCitationsWithAnswerFallback(allToolResults, answer)
         const confDetail = calcConfidenceDetailed(allToolResults, answer, citations)
-        const confidence = noToolsCalled ? 'low' as const
-          : quality.level === 'fail' ? 'low' as const
-          : quality.level === 'marginal' ? 'medium' as const
+        const downgraded: 'noTools' | 'fail' | 'marginal' | undefined =
+          noToolsCalled ? 'noTools'
+          : quality.level === 'fail' ? 'fail'
+          : quality.level === 'marginal' ? 'marginal'
+          : undefined
+        const confidence = downgraded === 'noTools' ? 'low' as const
+          : downgraded === 'fail' ? 'low' as const
+          : downgraded === 'marginal' ? 'medium' as const
           : confDetail.level
         // 디버그 로그 — calibration 참고용
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`[confidence] score=${confDetail.score} level=${confidence} breakdown=`, confDetail.breakdown)
+          console.log(`[confidence] score=${confDetail.score} level=${confidence} quality=${quality.level}/${quality.score} downgraded=${downgraded ?? '-'} breakdown=`, confDetail.breakdown)
         }
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         // 대화 컨텍스트 저장
@@ -607,6 +628,13 @@ export async function* executeGeminiRAGStream(
           queryType,
           isTruncated: accFinishReason === 'MAX_TOKENS',
           warnings: warnings.length > 0 ? warnings : undefined,
+          confidenceBreakdown: {
+            score: confDetail.score,
+            ...confDetail.breakdown,
+            qualityLevel: quality.level,
+            qualityScore: quality.score,
+            downgraded,
+          },
         }
         // Answer Cache 저장 (warnings/low confidence/truncated는 내부 필터로 스킵)
         await cacheAnswer(query, answerData, cacheOpts)
