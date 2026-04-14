@@ -170,6 +170,62 @@ export function collectPrecedentMatches(text: string, matches: LinkMatch[]): voi
  *
  * react-markdown에서 사용하기 위한 전처리 함수
  */
+/**
+ * 별표의 소속 법령 추론 (AI 답변 Markdown용)
+ *
+ * 1순위: beforeText에서 뒤→앞 순으로 「법령명」 스캔. 각 후보에 대해
+ *        "법령명과 별표 사이(between)"에 아래 단절 신호가 있으면 건너뜀:
+ *        - `.` + 공백/줄바꿈  (문장 끝)
+ *        - 항 번호 ①②③...  (다음 항으로 이동)
+ *        - `제\d+조`  (해당 법령을 *인용*만 한 경우, 별표는 현재 법령 소속)
+ *        - 중간에 다른 「」가 등장하는 경우 (해당 후보는 덮임)
+ *        통과한 첫 후보(=가장 가까운 유효 후보) 반환.
+ *
+ * 2순위: beforeText에 유효 후보가 없고, 문서 전체(fullString)에 「...조례」/
+ *        「...규칙」처럼 자치법규/규칙류 이름이 있으면 그걸 사용 (조회된 조례 우선).
+ */
+function pickContextLawForAnnex(
+  beforeText: string,
+  fullString: string,
+  offset: number
+): string | undefined {
+  const allMatches: Array<{ name: string; end: number }> = []
+  const lawNamePattern = /「([^」]+)」/g
+  let m: RegExpExecArray | null
+  while ((m = lawNamePattern.exec(beforeText)) !== null) {
+    allMatches.push({ name: m[1], end: m.index + m[0].length })
+  }
+
+  // 뒤에서부터(가장 가까운 것부터) 가드 검사
+  for (let i = allMatches.length - 1; i >= 0; i--) {
+    const cand = allMatches[i]
+    const between = beforeText.substring(cand.end)
+    // 중간에 다른 「」가 끼면 이 후보는 덮인 것 — 어차피 다음(더 가까운) 후보가 우선
+    if (between.includes('「')) continue
+    // 문장/항/조문 경계 감지 → 별표는 이 후보 소속 아님
+    if (/\.\s|\n|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(between)) continue
+    if (/제\s*\d+\s*조/.test(between)) continue
+    return cand.name
+  }
+
+  // 2순위: 마크다운 헤딩 중 조례/규칙으로 끝나는 이름 (AI 답변이 해당 자치법규를 제시한 경우)
+  const docBefore = fullString.substring(0, offset)
+  const headingPattern = /(?:^|\n)#{1,6}\s+([^\n]+?(?:조례|규칙))\s*(?:\n|$)/g
+  let lastHeading: string | undefined
+  while ((m = headingPattern.exec(docBefore)) !== null) {
+    lastHeading = m[1].trim()
+  }
+  if (lastHeading) return lastHeading
+
+  // 3순위: 본문 내 「...조례」/「...규칙」 인용
+  const ordinancePattern = /「([^」]*(?:조례|규칙))」/g
+  let lastOrdinance: string | undefined
+  while ((m = ordinancePattern.exec(docBefore)) !== null) {
+    lastOrdinance = m[1]
+  }
+  return lastOrdinance
+}
+
 export function linkifyMarkdownLegalRefs(markdown: string): string {
   if (!markdown) return ''
 
@@ -269,7 +325,7 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
   )
 
   // 패턴 3a: [별표] 또는 [별표 N] 단독 (대괄호 포함, 문맥 추론)
-  // 가장 가까운 「법령명」을 찾아서 링크 생성
+  // 가장 가까운 「법령명」을 찾아서 링크 생성 (가드 통과 시)
   result = result.replace(
     /\[(별표)\s*(\d+)?(?:의(\d+))?\]/g,
     (match, _type, num1, num2, offset: number, fullString: string) => {
@@ -277,12 +333,7 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
       const beforeText = fullString.substring(Math.max(0, offset - 500), offset)
       if (beforeText.includes('](annex://')) return match
 
-      const lawNamePattern = /「([^」]+)」/g
-      let lawName: string | undefined
-      let lastMatch: RegExpExecArray | null = null
-      while ((lastMatch = lawNamePattern.exec(beforeText)) !== null) {
-        lawName = lastMatch[1]
-      }
+      const lawName = pickContextLawForAnnex(beforeText, fullString, offset)
       if (!lawName) return match
 
       const encodedLaw = encodeURIComponent(lawName.trim())
@@ -306,18 +357,11 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
     /(?<!\[)(별표|별지)(?:\s*제\s*(\d+)\s*호\s*서식|\s*(\d+)(?:의(\d+))?)?(?:\s*(?:에|을|를|과|와|의|이|가)\s*(?:따르|정하는|같다|해당|따른))?/g,
     (match, type, formNum, num1, num2, offset, fullString) => {
       // 이미 링크로 변환된 부분 제외 (「법령명」 패턴)
-      const beforeText = fullString.substring(Math.max(0, offset - 150), offset)
+      const beforeText = fullString.substring(Math.max(0, offset - 200), offset)
       if (beforeText.includes('](annex://')) return match
 
-      // 가장 가까운 「법령명」 찾기 (뒤에서부터 검색)
-      const lawNamePattern = /「([^」]+)」/g
-      let lawName: string | undefined
-      let lastMatch: RegExpExecArray | null = null
-
-      while ((lastMatch = lawNamePattern.exec(beforeText)) !== null) {
-        lawName = lastMatch[1]
-      }
-
+      // 가드 적용: 문장 경계/제X조 인용은 건너뛰고, 조례/규칙 우선
+      const lawName = pickContextLawForAnnex(beforeText, fullString, offset)
       if (!lawName) return match // 법령명을 찾을 수 없으면 링크 안 걸기
 
       const encodedLaw = encodeURIComponent(lawName.trim())
