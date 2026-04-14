@@ -329,7 +329,10 @@ export async function* executeGeminiRAGStream(
       // 라우터 결과로 분류 재설정 (regex 결과보다 정확도 높음 가정)
       complexity = routerPlan.complexity
       queryType = routerPlan.queryType
-      maxToolTurns = routerPlan.expectedTurns  // 🔴 동적 maxTurns — 핵심 효과
+      // 🔴 expectedTurns 는 "도구 턴 수" 이고 +1 은 답변 턴 확보.
+      //    131901 run 에서 LLM 이 마지막 도구 턴까지 tool_call 만 반환하여 10/10
+      //    쿼리가 forceLastTurn 재요청 경로를 타며 각 5-10초 loss 발생 → 버퍼 추가.
+      maxToolTurns = routerPlan.expectedTurns + 1
       complexityLabel = complexity === 'simple' ? '단순' : complexity === 'moderate' ? '보통' : '복합'
 
       // 플랜이 있으면 선제 실행 (pre-fetch) → geminiEvidence 로 구성

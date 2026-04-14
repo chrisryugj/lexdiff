@@ -231,12 +231,19 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
   })
 }
 
-/** Gemini: complexity 기반 최대 도구 턴 수 */
+/** Gemini: complexity 기반 최대 도구 턴 수.
+ *
+ * 🔴 131901 run 에서 10/10 쿼리가 모두 forceLastTurn 재요청 경로를 타서 쿼리당
+ *    5-10초 loss 발생을 확인. LLM 이 maxTurns 마지막 턴에서도 tool_call 만
+ *    반환하고 text 를 생성하지 않아 force 재요청으로 추가 round trip 이
+ *    일어남. 값을 +1 씩 여유 두어 마지막 턴에 text 답변이 나오도록 완화.
+ *    (simple 2→3 / moderate 3→4 / complex 4→5)
+ */
 export function getMaxToolTurns(complexity: QueryComplexity): number {
   switch (complexity) {
-    case 'simple': return 2
-    case 'moderate': return 3
-    case 'complex': return 4
+    case 'simple': return 3
+    case 'moderate': return 4
+    case 'complex': return 5
   }
 }
 

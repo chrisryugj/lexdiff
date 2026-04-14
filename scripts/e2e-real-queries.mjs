@@ -18,6 +18,20 @@
 import { mkdirSync, createWriteStream, existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Agent, setGlobalDispatcher } from 'undici'
+
+// 🔴 Node undici 의 기본 keep-alive Agent 가 Next dev 서버의 장시간 SSE stream
+//    (20-40s) 을 끝까지 drain 하지 못하고 "SocketError: other side closed" 로
+//    fetch failed 를 터뜨리는 경합이 있어, pipelining=0 + keepAlive OFF 로
+//    매 요청마다 새 소켓을 쓰도록 강제. E2E 안정화 핵심.
+setGlobalDispatcher(new Agent({
+  pipelining: 0,
+  keepAliveTimeout: 1,
+  keepAliveMaxTimeout: 1,
+  connect: { timeout: 30_000 },
+  bodyTimeout: 200_000,
+  headersTimeout: 30_000,
+}))
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = join(__dirname, '..')
