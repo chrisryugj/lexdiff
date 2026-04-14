@@ -217,8 +217,9 @@ export function ArticleBottomSheet({
         </div>
 
         {/* Content - Only render when open */}
+        {/* flex 컨테이너로 제공: 자식이 flex-1 min-h-0로 자체 스크롤 담당 (이중 스크롤 방지) */}
         {isOpen && (
-          <div className="h-[calc(100%-4rem)] overflow-y-auto px-4 pb-4">
+          <div className="flex flex-col h-[calc(100%-4rem)] px-4 pb-4 min-h-0">
             {children}
           </div>
         )}

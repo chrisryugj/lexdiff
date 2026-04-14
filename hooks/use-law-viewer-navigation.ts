@@ -46,8 +46,8 @@ export function useLawViewerNavigation({
     onSwipeLeft: handleSwipeLeft,
     onSwipeRight: handleSwipeRight,
   }, {
-    threshold: 80,
-    timeThreshold: 400,
+    threshold: 60,
+    timeThreshold: 500,
   })
 
   // Keyboard navigation

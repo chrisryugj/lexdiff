@@ -219,13 +219,15 @@ export function LawViewerSidebar({
         snapPoints={BOTTOM_SHEET_SNAP_POINTS}
       >
         {aiAnswerMode ? (
-          <AIAnswerSidebar
-            relatedArticles={mergedRelatedArticles}
-            onRelatedArticleClick={openExternalLawArticleModal}
-            onCloseSidebar={() => setIsArticleListExpanded(false)}
-            showHeader={false}
-            isStreaming={isStreaming}
-          />
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <AIAnswerSidebar
+              relatedArticles={mergedRelatedArticles}
+              onRelatedArticleClick={openExternalLawArticleModal}
+              onCloseSidebar={() => setIsArticleListExpanded(false)}
+              showHeader={false}
+              isStreaming={isStreaming}
+            />
+          </div>
         ) : (
           // 일반 모드: 조문 목록
           <>
@@ -236,7 +238,7 @@ export function LawViewerSidebar({
               </Badge>
             </div>
 
-            <div className="h-[60vh]">
+            <div className="flex-1 min-h-0">
               <VirtualizedArticleList
                 articles={actualArticles}
                 activeJo={activeJo}
