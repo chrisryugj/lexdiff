@@ -56,6 +56,7 @@ export function buildCspWithNonce(nonce: string): string {
 
 // 정적 허용 목록 + 정규식(프리뷰) 결합.
 const ALLOWED_ORIGINS: Array<string | RegExp> = [
+  'https://lexdiff.gomdori.app',
   'https://lexdiff.vercel.app',
   // Vercel 프리뷰 URL: https://lexdiff-<hash>-<team>.vercel.app
   /^https:\/\/lexdiff-[a-z0-9-]+\.vercel\.app$/,

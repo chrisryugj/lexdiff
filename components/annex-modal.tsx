@@ -550,7 +550,7 @@ export function AnnexModal({
           </div>
         ) : markdown ? (
           // 마크다운 뷰 (텍스트만 표시)
-          <ScrollArea className="h-[65vh]">
+          <ScrollArea className="max-h-[65vh]">
             <div
               ref={contentRef}
               className="p-4 sm:p-6"

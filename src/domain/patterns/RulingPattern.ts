@@ -22,4 +22,6 @@ export const RULING_PATTERNS: RegExp[] = [
   /재결례/,
   /심판례/,
   /행정심판\s*재결/,
+  // bare "행정심판" 키워드 — "관세 행정심판"
+  /행정심판(?![가-힣])/,
 ]

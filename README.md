@@ -1,12 +1,13 @@
 # LexDiff
 
-**법령을 쉽게. AI로 똑똑하게.**
+**법령을 쉽게. AI로 똑똑하게. 공공 Legal AI의 시작.**
 
-[![Live](https://img.shields.io/badge/Live-lexdiff.vercel.app-1a2b4c)](https://lexdiff.vercel.app)
+[![Live](https://img.shields.io/badge/Live-lexdiff.gomdori.app-1a2b4c)](https://lexdiff.gomdori.app)
+[![Version](https://img.shields.io/badge/version-2.1.0--beta-b08d57)](CHANGELOG.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
-[![Claude Sonnet 4.6](https://img.shields.io/badge/Claude-Sonnet_4.6-cc785c?logo=anthropic)](https://anthropic.com)
-[![667 Tests](https://img.shields.io/badge/Tests-667-green)](https://vitest.dev)
+[![Gemini](https://img.shields.io/badge/AI-Gemini_3_Flash-4285F4?logo=google)](https://deepmind.google/technologies/gemini/)
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue)](LICENSE)
 
 > *"관세법 38조가 뭐야?" — 이런 질문을 검색창에 치면, AI가 법령·판례를 직접 찾아서 근거와 함께 답합니다.*
 
@@ -15,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="https://lexdiff.vercel.app"><strong>lexdiff.vercel.app</strong></a>
+  <a href="https://lexdiff.gomdori.app"><strong>lexdiff.gomdori.app</strong></a>
 </p>
 
 ---
@@ -24,7 +25,7 @@
 
 일상 언어로 법률을 질문하면 AI가 **법령 원문과 판례를 근거로** 답합니다. 단순 검색이 아닙니다.
 
-* **🧠 AI 법률 검색** — "퇴직금 못 받았는데 어떻게 해야 하나요?" → Claude가 법제처 API에서 법령·판례를 직접 조회하고, 근거와 함께 실시간 스트리밍 답변. 후속 질문도 맥락을 기억합니다.
+* **🧠 AI 법률 검색** — "퇴직금 못 받았는데 어떻게 해야 하나요?" → Gemini가 법제처 API에서 법령·판례를 직접 조회하고, 근거와 함께 실시간 스트리밍 답변. 후속 질문도 맥락을 기억합니다.
 * **⚡ 신구조문 비교** — 개정 전후 변경점을 색깔로 하이라이팅. AI가 "뭐가 바뀌었는지" 한 줄로 요약해줍니다.
 * **📋 3단 위임법령 비교** — 법률 → 시행령 → 시행규칙을 한 화면에서 나란히 대조. 위임 조항끼리 자동 연결.
 * **🔍 법령 영향 추적기** — 법이 바뀌면 어디까지 영향이 가는지 자동 분석. 상위법 → 시행령 → 시행규칙 → 관련 조례까지 연쇄 영향을 추적하고, AI가 심각도(위험/검토/참고)를 분류해줍니다.
@@ -37,30 +38,41 @@
 
 ---
 
-## v2.0.0 변경사항
+## 🧪 베타 안내 (v2.1.0)
 
-- **AI 엔진 전환** — Claude CLI subprocess + stream-json 기반 실시간 SSE 스트리밍. 중간 도구 호출 과정이 UI에 실시간 표시.
-- **멀티턴 대화** — 이전 질문 맥락을 기억하는 후속 질문 지원. pre-evidence 즉답으로 응답 속도 개선.
-- **법령 관계 그래프** — Supabase PostgreSQL 기반 법령 간 관계 시각화 + 영향 분석.
-- **메타답변 가드** — "법률 상담은 변호사에게" 같은 무의미 답변 차단. 60개 공무원·법률자문 E2E 테스트.
-- **별표 직접 파싱** — kordoc 연동으로 HWP/HWPX/PDF 별표를 Gemini Vision 없이 순수 파싱. 비용 제로.
-- **쿼리 확장 엔진** — 법령 검색 자동 확장 + 머징/리랭킹 + 자동완성 연동.
-- **벤치마킹 도구** — 지자체 간 조례 비교 분석 + AI 요약 + 권역 선택 UI.
-- **7차 프로덕션 리뷰** — SSRF 방지, XSS 방어, AbortController, 타입 안전성, 입력 검증 전면 강화. 총 -5,600줄 데드코드 제거.
-- **667개 테스트** — Vitest 기반 단위·통합·E2E 테스트.
+LexDiff는 현재 **공개 베타**입니다. Google 계정 로그인 후 누구나 무료로 사용할 수 있습니다.
 
-<details>
-<summary>v1.x 주요 기능</summary>
+### 무료 사용 쿼터 (로그인 사용자 기준, 일일)
 
-- **Anthropic SDK 직접 호출** — Gateway 제거, tool_use 멀티턴 파이프라인.
-- **Claude CLI 스트리밍** — stream-json 전환으로 중간 도구 호출 실시간 전달.
-- **PDF 별표 파싱** — pdfjs-dist 포팅, 선 기반 테이블 감지.
-- **별표 파서 업그레이드** — 구형 HWP 지원 + HWPX 개선.
-- **AI 비교분석** — 포커스 입력 + 지자체 다중선택 벤치마킹.
-- **검색 UX** — 자동완성, 약칭 인식, 검색바 도구 바로가기.
-- **질의 로그 시스템** — 환경별 분기 + 사용 패턴 분석.
+| 기능 | 무료 한도 |
+|------|----------|
+| AI 법률 검색 (`fc_rag`) | **10회/일** |
+| AI 요약 (`summarize`) | 30회/일 |
+| 법령 영향 추적 (`impact`) | 5회/일 |
+| 조례 벤치마킹 (`benchmark`) | 3회/일 |
 
-</details>
+한도 초과 시 자정(KST) 리셋까지 대기하거나 **BYOK**로 무제한 사용 가능합니다.
+
+### 🔑 BYOK (Bring Your Own Key)
+
+본인 **Google AI Studio API 키**를 등록하면 쿼터 제한 없이 사용할 수 있습니다. 호출 비용은 본인 Google 계정에서 직접 청구됩니다.
+
+- 등록 방법: 설정 → API 키 → Gemini API Key 입력
+- 키 형식: `AIzaSy...` (39자, Google AI Studio 발급)
+- 저장 위치: **브라우저 로컬 스토리지** — 서버 DB에 저장하지 않습니다. 요청 헤더(`x-user-api-key`)로만 전달
+- 발급: [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (무료)
+
+### 📊 로그 수집 안내
+
+베타 품질 개선을 위해 **익명화된 쿼리 로그**를 수집합니다.
+
+- **수집 항목**: 질문 텍스트, AI 답변, 호출된 도구 목록, 응답 시간, confidence 점수, 에러 발생 여부
+- **수집하지 않는 항목**: Google 계정 정보, 이메일, 실명, BYOK API 키, 브라우저 핑거프린팅
+- **저장 위치**: `logs/fc-rag-queries.jsonl` (서버 로컬 + 관리자 대시보드)
+- **용도**: RAG 파이프라인 튜닝, 환각 탐지, 도구 호출 실패 원인 분석
+- **보존**: 베타 기간 중 무기한, 정식 출시 후 정책 재공지
+
+민감한 개인정보가 포함된 질문은 피해주시고, 수집을 원치 않으시면 BYOK 모드로 사용하세요 (BYOK 사용 시에도 품질 로그는 수집되나, 식별자 연결은 이루어지지 않습니다).
 
 ---
 
@@ -69,6 +81,8 @@
 - **공무원·지자체 담당자** — 상위법령-조례 위임 관계 추적, 조례 개정 시 상위법 변경사항 확인
 - **관세사·무역 전문가** — 관세법 3단 비교, 관세청 해석례, HS코드 분류 기준
 - **세무사·변호사** — 세법 개정 영향 분석, 조세심판원 재결례, 법령해석례
+
+> ⚖️ **법적 고지** — LexDiff는 법령 정보 제공을 위한 **참고용 도구**이며, 법률 자문을 대체하지 않습니다. 중요한 법적 판단 전에는 반드시 변호사·법무사 상담을 권장합니다.
 
 ---
 
@@ -82,15 +96,18 @@ cp .env.local.example .env.local   # API 키 설정
 pnpm dev                            # http://localhost:3000
 ```
 
-**필수**: Node.js 20+, pnpm
+**필수**: Node.js 20+, pnpm 10+
 
 ### 환경 변수
 
 ```bash
-ANTHROPIC_API_KEY=       # Claude Sonnet 4.6
+GEMINI_API_KEY=          # Google AI Studio (Gemini 3 Flash) — 필수
+GEMINI_ROUTER_API_KEY=   # S1 Router 전용 분리 키 (Gemini 3.1 Flash-Lite)
 LAW_OC=                  # 법제처 Open API 키 (무료)
 SUPABASE_URL=            # Supabase 프로젝트 URL
-SUPABASE_ANON_KEY=       # Supabase 익명 키
+SUPABASE_ANON_KEY=       # Supabase 익명 키 (쿼터 관리용)
+UPSTASH_REDIS_REST_URL=  # 캐시/rate-limit
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
 ---
@@ -100,31 +117,44 @@ SUPABASE_ANON_KEY=       # Supabase 익명 키
 ```
 사용자 질문
   ↓
-Claude Sonnet 4.6 (CLI subprocess, stream-json)
-  ↓ MCP 도구 호출
-법제처 API (73개 엔드포인트)  ←→  korean-law MCP
+Google OAuth + Supabase 일일 쿼터 체크 (BYOK면 skip)
   ↓
-실시간 SSE 스트리밍 → UI
+S1 Router (Gemini 3.1 Flash-Lite) — 20% 해시 롤아웃
+  ↓
+Gemini 3 Flash — Function Calling RAG 루프 (멀티턴)
+  ↓ 도구 호출 (TypeScript 직접 import, MCP 래핑 없음)
+법제처 Open API + 17개 결정문 도메인 + Supabase 법령 그래프
+  ↓
+실시간 SSE 스트리밍 (tool_call/tool_result/answer) → UI
+  ↓
+citation verify (15s) + confidence 판정 (4신호) + answer cache
 ```
 
 | 레이어 | 스택 |
 |--------|------|
 | **프론트엔드** | React 19, Tailwind v4, shadcn/ui, Framer Motion |
-| **백엔드** | Next.js 16 API Routes, Zod validation |
-| **AI** | Claude Sonnet 4.6 (primary), Gemini Flash (fallback), MCP tool use |
-| **데이터** | 법제처 Open API, Supabase PostgreSQL, IndexedDB cache |
-| **테스트** | Vitest, 667 tests |
+| **백엔드** | Next.js 16 (proxy.ts), Zod validation, SSE 스트리밍 |
+| **AI (primary)** | Gemini 3 Flash (Function Calling) — 46개 등록 도구 |
+| **AI (router)** | Gemini 3.1 Flash-Lite (S1 쿼리 분류) |
+| **데이터** | 법제처 Open API, Supabase PostgreSQL, Upstash Redis, IndexedDB |
+| **테스트** | Vitest, 단위·통합·E2E |
+
+> **참고**: 내부적으로 Hermes Agent API(GPT-5.4) 경로도 구현되어 있으나, **베타에서는 의도적으로 비활성**(`DISABLE_HERMES=true`)되어 Gemini 단일 엔진으로 운영됩니다.
 
 ---
 
 ## 프로젝트 구조
 
 ```
-app/api/          73개 API 라우트 (법령, 판례, AI RAG, 비교...)
+app/api/          API 라우트 (법령, 판례, AI RAG, 비교...)
 components/       법령 뷰어, 검색, 모달, 판례 패널
-lib/              핵심 로직 (링크 생성, 법령 파서, AI 엔진)
+lib/              핵심 로직 (링크 생성, 법령 파서, FC-RAG 엔진)
+  fc-rag/         Function Calling RAG — tool-registry, engine, confidence
+  quota.ts        일일 쿼터 체크 (Supabase RPC)
+  api-auth.ts     Google OAuth + 쿼터 게이트 + BYOK 분기
 hooks/            React 훅 (법령 뷰어, 검색, 판례)
 demo/             Remotion 인트로 영상 소스
+important-docs/   아키텍처·RAG·시스템 현황 상세 문서
 ```
 
 ---
@@ -132,8 +162,8 @@ demo/             Remotion 인트로 영상 소스
 ## 기술 스택
 
 Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS v4 · shadcn/ui · Radix UI ·
-Claude Sonnet 4.6 · Gemini 2.5 Flash · korean-law MCP · Supabase · Turso/LibSQL ·
-IndexedDB · Vitest · Framer Motion
+**Gemini 3 Flash** · **Gemini 3.1 Flash-Lite** · Supabase · Upstash Redis ·
+IndexedDB · Vitest · Framer Motion · Remotion
 
 ## 라이선스
 

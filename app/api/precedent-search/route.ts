@@ -13,7 +13,11 @@ import { storeRelationsAsync } from "@/lib/relation-graph/relation-db"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const query = searchParams.get("query")
+  const rawQuery = searchParams.get("query")
+  // 카테고리/조사 제거 — "관세 관련 판례" → "관세"
+  const query = rawQuery
+    ? (rawQuery.replace(/\s*(판례|판결|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, ' ').replace(/\s+/g, ' ').trim() || rawQuery.trim())
+    : null
   const court = searchParams.get("court")
   const caseNumber = searchParams.get("caseNumber")
   const display = String(Math.min(Math.max(parseInt(searchParams.get("display") || "20") || 20, 1), 100))

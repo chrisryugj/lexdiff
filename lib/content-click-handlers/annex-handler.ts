@@ -47,27 +47,13 @@ export async function handleAnnexRef(
   const hasValidCurrentLaw = currentLaw && currentLaw !== 'AI 답변' && currentLaw.trim() !== ''
 
   let lawName: string | undefined
-  if (hasValidCurrentLaw && dataLaw && dataLaw !== currentLaw) {
-    // data-law가 currentLaw와 유사한 법령이면 currentLaw 우선
-    // (예: "광진구의회 복무 조례" vs "광진구 복무 조례" → currentLaw 사용)
-    if (isSimilarLawName(dataLaw, currentLaw)) {
-      debugLogger.info('[annex-handler] 유사 법령 → currentLaw 우선', { dataLaw, currentLaw })
-      lawName = currentLaw
-    } else {
-      // 시행령/시행규칙에서 모법명이 data-law로 잡힌 경우 보정
-      const isCurrentDecree = /\s*(시행령|시행규칙)/.test(currentLaw)
-      const parentLawName = currentLaw.replace(/\s*(시행령|시행규칙)$/, '')
-      if (isCurrentDecree && dataLaw === parentLawName) {
-        debugLogger.info('[annex-handler] 모법 → 시행령 보정', { dataLaw, currentLaw })
-        lawName = currentLaw
-      } else {
-        // 명백히 다른 법령의 별표 참조 (예: 「관세법」 별표 1)
-        lawName = dataLaw
-      }
-    }
-  } else if (hasValidCurrentLaw) {
-    // data-law 없음 → currentLaw 사용
+  if (hasValidCurrentLaw) {
+    // 법령 뷰어에서 보고 있는 법령이 있으면 → 별표는 무조건 현재 법령 소속
+    // (본문 내 「다른법령」 인용 뒤에 오는 별표도 현재 법령의 별표임)
     lawName = currentLaw
+    if (dataLaw && dataLaw !== currentLaw) {
+      debugLogger.info('[annex-handler] data-law 무시 → currentLaw 우선', { dataLaw, currentLaw })
+    }
   } else {
     // currentLaw 없음 (AI 답변 등) → data-law 사용
     lawName = dataLaw || currentLaw

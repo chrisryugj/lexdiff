@@ -139,6 +139,12 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     actions.setRulingResults(null)
     actions.setOrdinancePage(1)
     actions.setOrdinanceTotalCount(0)
+    actions.setAiAnswerContent('')
+    actions.setAiRelatedLaws([])
+    actions.setAiCitations([])
+    actions.clearToolCallLogs()
+    actions.setFileSearchFailed(false)
+    actions.clearConversation()
   }, [actions])
 
   const persistSearchCache = useCallback(
@@ -172,7 +178,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         const caseNumber = classification?.entities?.caseNumber
         const court = classification?.entities?.court
         const stripPrecedentKeywords = (s: string) =>
-          s.replace(/\s*(?:판례|판결|사례|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+          s.replace(/\s*(?:판례|판결|사례|검색|찾아|알려|보여|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, " ").replace(/\s+/g, " ").trim()
         const lawNameSource = classification?.entities?.lawName || query.lawName || query.article || ""
         const searchQuery = caseNumber || stripPrecedentKeywords(lawNameSource)
         const displayQuery = query.rawQuery || query.lawName || searchQuery
@@ -355,7 +361,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         const classification = query.classification
         const ruleType = classification?.entities?.ruleType
         const stripInterpKeywords = (s: string) =>
-          s.replace(/\s*(?:해석례|법령\s*해석|유권해석|행정해석|법제처\s*해석|질의회신|민원회신|예규|고시|훈령|지침|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+          s.replace(/\s*(?:해석례|법령\s*해석|유권해석|행정해석|법제처\s*해석|질의회신|민원회신|예규|고시|훈령|지침|검색|찾아|알려|보여|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, " ").replace(/\s+/g, " ").trim()
         const lawNameSource = classification?.entities?.lawName || query.lawName || query.article || ""
         const searchQuery = stripInterpKeywords(lawNameSource)
         const displayQuery = query.rawQuery || query.lawName || searchQuery
@@ -443,7 +449,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         const classification = query.classification
         const rulingNumber = classification?.entities?.rulingNumber
         const stripRulingKeywords = (s: string) =>
-          s.replace(/\s*(?:재결례|심판례|행정심판\s*재결|조세심판|심판청구|검색|찾아|알려|보여)\s*/g, " ").replace(/\s+/g, " ").trim()
+          s.replace(/\s*(?:재결례|심판례|행정심판\s*재결|행정심판|조세심판|심판청구|검색|찾아|알려|보여|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, " ").replace(/\s+/g, " ").trim()
         const lawNameSource = classification?.entities?.lawName || query.lawName || ""
         const searchQuery = rulingNumber || stripRulingKeywords(lawNameSource)
         const displayQuery = query.rawQuery || query.lawName || searchQuery

@@ -8,7 +8,7 @@ import {
   spring,
 } from "remotion";
 
-// ── Design Tokens (lexdiff.vercel.app) ─────────────────────
+// ── Design Tokens (lexdiff.gomdori.app) ────────────────────
 const BG = "#fafaf8";
 const CARD_BG = "#ffffff";
 const CARD_BORDER = "#e5e5e0";
@@ -356,8 +356,12 @@ const FeatureCTAScene: React.FC = () => {
             fontSize: 20, fontFamily: FONT_SERIF, color: TEXT_MUTED,
             fontWeight: 500, letterSpacing: "0.05em",
             opacity: interpolate(ctaFrame, [10, 18], [0, 1], CLAMP),
+            textAlign: "center", lineHeight: 1.5,
           }}>
             법령을 쉽게. AI로 똑똑하게.
+            <div style={{ fontSize: 15, color: GOLD, fontWeight: 600, marginTop: 6, letterSpacing: "0.1em" }}>
+              공공 Legal AI의 시작
+            </div>
           </div>
 
           {/* URL */}
@@ -365,7 +369,7 @@ const FeatureCTAScene: React.FC = () => {
             marginTop: 24, fontSize: 15, color: TEXT_LIGHT, fontWeight: 500,
             opacity: interpolate(ctaFrame, [16, 24], [0, 1], CLAMP),
           }}>
-            lexdiff.vercel.app
+            lexdiff.gomdori.app
           </div>
         </AbsoluteFill>
       )}

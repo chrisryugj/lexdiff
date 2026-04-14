@@ -77,6 +77,7 @@ export function useSearchHandlers({
     actions.setAiCitations([])
     actions.clearToolCallLogs()
     actions.setFileSearchFailed(false)
+    actions.clearConversation()
 
     // 통합검색: classification이 있으면 재감지 스킵
     const classification = query.classification
