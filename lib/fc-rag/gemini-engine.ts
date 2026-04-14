@@ -157,11 +157,12 @@ interface ForceLastTurnOptions {
   accFinishReason?: string
   totalInputTokens: number
   totalOutputTokens: number
+  totalCachedTokens?: number
   signal?: AbortSignal
 }
 
 async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<FCRAGStreamEvent> {
-  const { ai, messages, parts, systemPrompt, complexity, queryType, allToolResults, warnings, accFinishReason, totalInputTokens, totalOutputTokens, signal } = opts
+  const { ai, messages, parts, systemPrompt, complexity, queryType, allToolResults, warnings, accFinishReason, totalInputTokens, totalOutputTokens, totalCachedTokens = 0, signal } = opts
 
   // 텍스트 답변이 이미 있으면 사용
   const textParts = parts.filter((p: GeminiPart) => p.text)
@@ -208,7 +209,8 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   let retryFinishReason: string | undefined
   let retryInputTokens = totalInputTokens
   let retryOutputTokens = totalOutputTokens
-  let retryCachedTokens = 0
+  // 현재 retry turn 에서만 cached (누적 아님)
+  let retryTurnCached = 0
 
   for await (const chunk of retryStream) {
     if (signal?.aborted) break
@@ -218,7 +220,7 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
     if (chunkUsage) {
       retryInputTokens = totalInputTokens + (chunkUsage.promptTokenCount || 0)
       retryOutputTokens = totalOutputTokens + (chunkUsage.candidatesTokenCount || 0)
-      retryCachedTokens = chunkUsage.cachedContentTokenCount || 0
+      retryTurnCached = chunkUsage.cachedContentTokenCount || 0
     }
 
     if (retryCandidate?.content?.parts) {
@@ -231,12 +233,16 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
     }
   }
 
+  // 🔴 cachedTokens 는 이전 loop 누적값(totalCachedTokens) + 현재 retry turn 값 합산해야
+  //    스크립트/UI 에서 전체 요청의 cache hit 비율이 정확히 나온다. 이전 버그: retry
+  //    turn 1회분만 yield 하면서 loop 누적값이 덮여 사라져 E2E 집계가 10% 로 과소.
+  const cumulativeCached = totalCachedTokens + retryTurnCached
   if (retryInputTokens > totalInputTokens || retryOutputTokens > totalOutputTokens) {
-    if (retryCachedTokens > 0) {
-      const rate = ((retryCachedTokens / (retryInputTokens - totalInputTokens)) * 100).toFixed(1)
-      console.log(`[context-cache] forceLastTurn: cached=${retryCachedTokens} (${rate}%)`)
+    if (retryTurnCached > 0) {
+      const rate = ((retryTurnCached / (retryInputTokens - totalInputTokens)) * 100).toFixed(1)
+      console.log(`[context-cache] forceLastTurn: cached=${retryTurnCached} (${rate}%)`)
     }
-    yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens, cachedTokens: retryCachedTokens }
+    yield { type: 'token_usage', inputTokens: retryInputTokens, outputTokens: retryOutputTokens, totalTokens: retryInputTokens + retryOutputTokens, cachedTokens: cumulativeCached }
   }
   const retryCitations = buildCitationsWithAnswerFallback(allToolResults, retryText)
   yield {
@@ -609,7 +615,7 @@ export async function* executeGeminiRAGStream(
       if (isLastTurn) {
         yield* forceLastTurnAnswer({
           ai, messages, parts, systemPrompt, complexity, queryType,
-          allToolResults, warnings, accFinishReason, totalInputTokens, totalOutputTokens, signal,
+          allToolResults, warnings, accFinishReason, totalInputTokens, totalOutputTokens, totalCachedTokens, signal,
         })
         return
       }
