@@ -172,6 +172,27 @@ function LawGuideContent() {
         </div>
       </GuideSection>
 
+      {/* 법령 체계 조회 */}
+      <GuideSection title="법령 체계 조회" icon="file-search">
+        <p className="text-muted-foreground text-sm mb-2">
+          법률·시행령·시행규칙의 3단 구조와 위임 관계를 한 번에 확인하실 수 있습니다.
+        </p>
+        <GuideItem title="법령 뷰어에서 직접 조회">
+          <p className="text-muted-foreground text-sm">
+            조문을 연 상태에서 상단 <span className="font-medium text-foreground">"위임법령"</span> 버튼을 누르시면
+            해당 조문이 위임한 시행령·시행규칙 조문이 함께 표시됩니다.
+          </p>
+        </GuideItem>
+        <GuideItem title="검색으로 체계 파악">
+          <Example input="관세법" result="법률 본문 + 하위법령 목록" />
+          <Example input="근로기준법 시행령" result="시행령 본문 + 상위 법률 연결" />
+        </GuideItem>
+        <GuideItem title="AI 검색으로 질문">
+          <ExampleQuestion>관세법 제38조와 관련된 시행령·시행규칙은?</ExampleQuestion>
+          <ExampleQuestion>근로기준법 연차휴가 조문 체계를 정리해줘</ExampleQuestion>
+        </GuideItem>
+      </GuideSection>
+
       {/* 비교 기능 */}
       <GuideSection title="비교 기능" icon="git-compare">
         <GuideItem title="개정 전후 비교">
@@ -264,6 +285,32 @@ function AIGuideContent() {
             title="관련 법령"
             desc="탭하면 해당 법령으로 이동"
           />
+        </div>
+      </GuideSection>
+
+      {/* 판례·해석례 조회 */}
+      <GuideSection title="판례·해석례·심판례 조회" icon="gavel">
+        <p className="text-muted-foreground text-sm mb-3">
+          질문에 <span className="font-medium text-foreground">도메인명</span>을 함께 적으시면
+          법제처·대법원·헌재·각 위원회의 결정문을 바로 찾아 인용합니다.
+        </p>
+
+        <DomainExample category="대법원 판례" query="관세법 제38조 대법원 판례" />
+        <DomainExample category="법제처 해석례" query="근로기준법 연차휴가 법제처 유권해석" />
+        <DomainExample category="조세심판원" query="양도소득세 1세대 1주택 조세심판원 결정례" />
+        <DomainExample category="관세청 해석" query="FTA 원산지 증명서 관세청 해석" />
+        <DomainExample category="헌법재판소" query="집회시위법 헌법재판소 결정례" />
+        <DomainExample category="행정심판" query="영업정지 처분 중앙행정심판위원회 재결" />
+        <DomainExample category="공정거래위" query="하도급법 위반 공정거래위원회 의결서" />
+        <DomainExample category="개인정보위" query="개인정보 유출 개인정보보호위원회 결정" />
+        <DomainExample category="노동위원회" query="부당해고 구제신청 노동위원회 판정" />
+        <DomainExample category="국민권익위" query="공익신고자 보호 권익위 결정" />
+
+        <div className="mt-3 pt-2 border-t border-border/50">
+          <Tip emoji="💡">
+            여러 도메인을 섞어서 질문하실 수도 있습니다 —
+            "연차휴가 관련 판례와 법제처 해석례를 함께"
+          </Tip>
         </div>
       </GuideSection>
 
@@ -363,6 +410,17 @@ function Example({ input, result }: { input: string; result: string }) {
       </code>
       <Icon name="arrow-right" size={12} className="text-muted-foreground" />
       <span className="text-muted-foreground text-xs">{result}</span>
+    </div>
+  )
+}
+
+function DomainExample({ category, query }: { category: string; query: string }) {
+  return (
+    <div className="flex items-start gap-2 py-1 text-xs">
+      <span className="shrink-0 px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy dark:bg-brand-gold/10 dark:text-brand-gold rounded font-medium whitespace-nowrap">
+        {category}
+      </span>
+      <code className="text-muted-foreground break-keep leading-relaxed">&quot;{query}&quot;</code>
     </div>
   )
 }

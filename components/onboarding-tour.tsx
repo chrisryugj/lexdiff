@@ -106,35 +106,39 @@ export function OnboardingTour({
     setRect((prev) => (rectsEqual(prev, next) ? prev : next))
   }, [currentSelector])
 
-  // 단계 전환 시 타겟 스크롤 + 재측정 (deps는 open/index/selector만)
+  // 단계 전환 시 타겟 스크롤 + 재측정 (scrollIntoView는 instant → 랙 방지)
   useLayoutEffect(() => {
     if (!open) return
     if (currentSelector) {
       const el = document.querySelector(currentSelector) as HTMLElement | null
       if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" })
+        // smooth 스크롤은 500ms+ 소요 — rect 측정 대기 시간 길어지고 리스너 부하 큼
+        el.scrollIntoView({ block: "center", behavior: "auto" })
       }
     }
-    // 여러 타이밍에 재측정 (scrollIntoView smooth + framer-motion 애니메이션 대응)
     measureTarget()
-    const timers = [80, 250, 500, 800].map((d) => setTimeout(measureTarget, d))
-    return () => timers.forEach(clearTimeout)
+    // 레이아웃 안정화 후 한 번 더 (framer-motion 대응)
+    const t = setTimeout(measureTarget, 120)
+    return () => clearTimeout(t)
   }, [open, index, currentSelector, measureTarget])
 
-  // resize/scroll 재측정
+  // resize/scroll 재측정 — rAF throttle + passive + window scroll만
   useEffect(() => {
     if (!open) return
     let raf = 0
     const onUpdate = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(measureTarget)
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        measureTarget()
+      })
     }
-    window.addEventListener("resize", onUpdate)
-    window.addEventListener("scroll", onUpdate, true)
+    window.addEventListener("resize", onUpdate, { passive: true })
+    window.addEventListener("scroll", onUpdate, { passive: true })
     return () => {
-      cancelAnimationFrame(raf)
+      if (raf) cancelAnimationFrame(raf)
       window.removeEventListener("resize", onUpdate)
-      window.removeEventListener("scroll", onUpdate, true)
+      window.removeEventListener("scroll", onUpdate)
     }
   }, [open, measureTarget])
 
@@ -248,44 +252,25 @@ export function OnboardingTour({
 
   if (!mounted || !open || !current) return null
 
-  const overlayBase =
-    "fixed bg-slate-950/60 backdrop-blur-[2px] transition-[top,left,width,height,right,bottom] duration-250 ease-[cubic-bezier(0.25,1,0.5,1)]"
-
+  // 단일 div + 거대 box-shadow = "구멍 뚫린 음영" (4-div/blur 없이 GPU 가벼움)
+  // box-shadow는 hit test 안 되므로 클릭 차단용 투명 overlay를 별도로 둠
   const overlays = hasTarget ? (
     <>
-      <div className={overlayBase} style={{ top: 0, left: 0, right: 0, height: spot.top }} />
+      <div className="fixed inset-0" onClick={(e) => e.stopPropagation()} />
       <div
-        className={overlayBase}
-        style={{ top: spot.top + spot.height, left: 0, right: 0, bottom: 0 }}
-      />
-      <div
-        className={overlayBase}
-        style={{ top: spot.top, left: 0, width: spot.left, height: spot.height }}
-      />
-      <div
-        className={overlayBase}
-        style={{
-          top: spot.top,
-          left: spot.left + spot.width,
-          right: 0,
-          height: spot.height,
-        }}
-      />
-      {/* 스포트라이트 글로우 + 링 (클릭 통과) */}
-      <div
-        className="fixed pointer-events-none rounded-lg transition-[top,left,width,height] duration-250 ease-[cubic-bezier(0.25,1,0.5,1)]"
+        className="fixed pointer-events-none rounded-md"
         style={{
           top: spot.top,
           left: spot.left,
           width: spot.width,
           height: spot.height,
           boxShadow:
-            "0 0 0 1.5px rgba(212,175,55,0.9), 0 0 0 6px rgba(255,255,255,0.08), 0 0 40px 8px rgba(212,175,55,0.25)",
+            "0 0 0 9999px rgba(15,23,42,0.62), 0 0 0 1.5px rgba(212,175,55,0.9)",
         }}
       />
     </>
   ) : (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-[2px]" />
+    <div className="fixed inset-0 bg-slate-950/70" />
   )
 
   const isLast = index === steps.length - 1
