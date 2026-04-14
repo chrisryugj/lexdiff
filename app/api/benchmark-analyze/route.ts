@@ -67,8 +67,11 @@ function buildPrompt(keyword: string, texts: Array<{ orgName: string; ordinanceN
     ordinanceName: sanitizeForPrompt(t.ordinanceName, 200),
     text: sanitizeForPrompt(t.text, 20000),
   }))
+  // 입력 조례 구분자는 markdown 헤딩을 쓰지 않는다 — Gemini가 입력 패턴을
+  // 답변에서 흉내 내 "### 1. ...", "### 2. ..." 서브헤딩을 남발해 렌더가 망가지는
+  // 현상을 유발했었음 (2026-04-15).
   const ordinanceList = safeTexts.map((t, i) =>
-    `### ${i + 1}. ${t.orgName} — ${t.ordinanceName}\n${t.text}`
+    `[조례 ${i + 1}] ${t.orgName} — ${t.ordinanceName}\n\n${t.text}`
   ).join('\n\n---\n\n')
 
   const focusInstruction = focus
@@ -89,25 +92,96 @@ function buildPrompt(keyword: string, texts: Array<{ orgName: string; ordinanceN
 
 ${ordinanceList}
 
-## 출력 형식 (반드시 이 형식)
+## 출력 형식 (엄격히 준수 — 위반 시 답변 거부)
+- 전체 답변을 \`\`\` 코드펜스로 감싸지 말 것.
+- 정확히 두 개의 섹션 헤딩 "### 비교표" / "### 주요 차이점" 만 사용.
+- 그 외 어떤 서브헤딩(###, ####, ##)도 금지. 번호 섹션 "### 1.", "### 2." 같은 것도 금지.
+- "주요 차이점" 섹션은 하이픈 \`- \` 으로 시작하는 flat bullet 목록만 사용.
+- 각 bullet 내부에서 강조는 \`**텍스트**\` 로, 지자체명만 **볼드**.
+
 ### 비교표
 | 비교 항목 | ${safeTexts.map(t => t.orgName).join(' | ')} |
 |------|${safeTexts.map(() => '------').join('|')}|
 (각 항목별 실제 규정 내용 요약. 해당 규정이 없으면 "미규정")
 
 ### 주요 차이점
-- 핵심 차이 3~5개 (어느 지자체가 더 상세하거나 선진적인 규정을 두고 있는지 포함)`
+- **${safeTexts[0]?.orgName ?? '지자체A'}**: 핵심 차이 요약.
+- **${safeTexts[1]?.orgName ?? '지자체B'}**: 핵심 차이 요약.
+- (총 3~5개 bullet, 어느 지자체가 더 상세하거나 선진적인지 포함)`
+}
+
+// ── 응답 노멀라이저 ──
+// Gemini 가 지시를 어겨도 렌더가 깨지지 않도록 원문을 안전화한다.
+function normalizeAnalysisText(raw: string): string {
+  let t = raw.trim()
+
+  // 1) 전체 코드펜스 벗기기
+  const fence = t.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/)
+  if (fence) t = fence[1].trim()
+
+  // 2) 헤딩 앞뒤에 blank line 보장 — remarkBreaks(single \n → <br>) 하에서
+  //    이전 paragraph 에 붙은 "### 제목" 이 h3 로 파싱되지 않는 현상 방지.
+  t = t.replace(/([^\n])\n(#{2,6}\s)/g, '$1\n\n$2')
+  t = t.replace(/(#{2,6}\s[^\n]+)\n(?!\n)/g, '$1\n\n')
+
+  // 3) 2번/3번 섹션 외 "### N." 형태 서브헤딩은 bold text 로 평탄화
+  //    (Gemini 가 지시를 무시하고 번호 서브헤딩을 남발하는 경우 대비)
+  t = t.replace(/(^|\n)#{2,6}\s*(\d+\.\s[^\n]+)/g, '$1**$2**')
+
+  return t
 }
 
 // ── 응답 파싱 ──
 
+/**
+ * Gemini 응답을 "비교표" / "주요 차이점" 두 섹션으로 분할.
+ * 마커 누락·코드펜스 래핑 등 포맷 드리프트를 방어한다.
+ *
+ * 방어 규칙:
+ *  1. `\`\`\`markdown ... \`\`\`` 같은 전체 코드펜스를 벗겨낸다 (안 그러면
+ *     ### 헤딩이 코드 블록 안에 갇혀 plain text 로 렌더됨).
+ *  2. "### 비교표" 마커가 없으면 "### 주요 차이점" 위치를 기준으로 앞/뒤 분할
+ *     → 전체 텍스트를 양쪽에 중복 할당해 같은 내용이 두 번 보이는 현상 차단.
+ *  3. 둘 다 없으면 단일 블록으로 comparisonTable 에 담는다.
+ */
 function parseAnalysisResponse(text: string): { comparisonTable: string; highlights: string } {
-  const tableMatch = text.match(/### 비교표\s*([\s\S]*?)(?=### 주요|$)/)
-  const highlightMatch = text.match(/### 주요 차이점\s*([\s\S]*)/)
-  return {
-    comparisonTable: tableMatch?.[1]?.trim() || text,
-    highlights: highlightMatch?.[1]?.trim() || '',
+  // 0) 포맷 노멀라이즈 (코드펜스 제거 + 헤딩 앞뒤 blank line + 서브헤딩 평탄화)
+  const cleaned = normalizeAnalysisText(text)
+
+  // 2) 섹션 헤딩 — `## 비교표` / `### 비교표` / `**비교표**` 등 변형 허용
+  const tableHeading = /(?:^|\n)#{2,3}\s*비교표\s*\n/
+  const highlightHeading = /(?:^|\n)#{2,3}\s*주요 차이점\s*\n/
+
+  const tableStart = cleaned.search(tableHeading)
+  const highlightStart = cleaned.search(highlightHeading)
+
+  const headLen = (idx: number, re: RegExp): number =>
+    cleaned.slice(idx).match(re)![0].length
+
+  if (tableStart >= 0 && highlightStart > tableStart) {
+    return {
+      comparisonTable: cleaned.slice(tableStart + headLen(tableStart, tableHeading), highlightStart).trim(),
+      highlights: cleaned.slice(highlightStart + headLen(highlightStart, highlightHeading)).trim(),
+    }
   }
+
+  if (highlightStart >= 0) {
+    // 비교표 마커 없이 주요차이점만 있는 경우 — 앞부분은 비교표로 취급
+    return {
+      comparisonTable: cleaned.slice(0, highlightStart).trim(),
+      highlights: cleaned.slice(highlightStart + headLen(highlightStart, highlightHeading)).trim(),
+    }
+  }
+
+  if (tableStart >= 0) {
+    return {
+      comparisonTable: cleaned.slice(tableStart + headLen(tableStart, tableHeading)).trim(),
+      highlights: '',
+    }
+  }
+
+  // 둘 다 없으면 단일 블록
+  return { comparisonTable: cleaned, highlights: '' }
 }
 
 // ── Gemini ──
