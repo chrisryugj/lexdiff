@@ -281,7 +281,7 @@ export async function* executeGeminiRAGStream(
   const cached = await getCachedAnswer(query, cacheOpts)
   if (cached) {
     yield { type: 'status', message: '캐시된 답변 반환 중...', progress: 95 }
-    yield { type: 'answer', data: cached }
+    yield { type: 'answer', data: { ...cached, fromCache: true } }
     return
   }
 

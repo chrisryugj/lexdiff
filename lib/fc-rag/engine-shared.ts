@@ -32,6 +32,8 @@ export interface FCRAGResult {
   queryType: LegalQueryType
   isTruncated?: boolean
   warnings?: string[]
+  /** answer-cache hit 여부. 관측/테스트용 — 캐시 hit 시에만 true. */
+  fromCache?: boolean
 }
 
 export type FCRAGStreamEvent =
