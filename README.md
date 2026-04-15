@@ -9,7 +9,7 @@
 [![Gemini](https://img.shields.io/badge/AI-Gemini_3_Flash-4285F4?logo=google)](https://deepmind.google/technologies/gemini/)
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue)](LICENSE)
 
-> *"관세법 38조가 뭐야?" — 이런 질문을 검색창에 치면, AI가 법령·판례를 직접 찾아서 근거와 함께 답합니다.*
+> *구글링으로 30분, GPT로 환각, LexDiff로 30초 — 법령·판례 근거까지.*
 
 <p align="center">
   <img src="demo/out/lexdiff-demo.gif" alt="LexDiff Demo" width="720" />
