@@ -351,7 +351,7 @@ export function SearchView({
           <div
             role="note"
             aria-label="법적 고지"
-            className="container mx-auto max-w-3xl px-4 sm:px-6 py-3 border border-amber-400/40 bg-amber-50/60 dark:bg-amber-900/10 rounded-md text-[11px] lg:text-xs text-amber-900 dark:text-amber-200 leading-relaxed break-keep text-center"
+            className="container mx-auto max-w-5xl px-4 sm:px-6 py-3 border border-amber-400/40 bg-amber-50/60 dark:bg-amber-900/10 rounded-md text-xs lg:text-sm text-amber-900 dark:text-amber-200 leading-relaxed break-keep text-center"
           >
             <span className="font-semibold">⚖️ 법적 고지</span> · 본 서비스는 법령 정보 제공을 위한 <span className="font-semibold">참고용 도구</span>이며, 법률 자문을 대체하지 않습니다. 중요한 법적 판단 전에는 반드시 변호사·법무사 상담을 권장합니다.
           </div>
