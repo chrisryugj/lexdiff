@@ -3,6 +3,15 @@ import { NextResponse, type NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { AI_CONFIG } from "@/lib/ai-config"
 import { requireAiAuth, refundAiQuota, resolveGeminiKey } from "@/lib/api-auth"
+import {
+  recordTelemetry,
+  bucketLength,
+  classifyUa,
+  sessionAnonHash,
+  categorizeError,
+  estimateCostUsd,
+  type ErrorCategory,
+} from "@/lib/ai-telemetry"
 
 function sanitizePromptInput(text: string): string {
   return text.replace(/"""/g, '"').replace(/```/g, "").substring(0, 8000)
@@ -67,6 +76,14 @@ export async function POST(request: NextRequest) {
   const authCtx = auth.ctx
 
   let succeeded = false
+  const startMs = Date.now()
+  let errorCategory: ErrorCategory | null = null
+  let answerLen = 0
+  let inputTokens: number | null = null
+  let outputTokens: number | null = null
+  let isPrecedentFlag = false
+  let oldLen = 0
+  let newLen = 0
   try {
     const contentLength = Number(request.headers.get("content-length") || "0")
     if (contentLength > 200_000) {
@@ -74,6 +91,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { lawTitle, joNum, oldContent, newContent, effectiveDate, isPrecedent } = await request.json()
+    isPrecedentFlag = Boolean(isPrecedent)
+    oldLen = typeof oldContent === 'string' ? oldContent.length : 0
+    newLen = typeof newContent === 'string' ? newContent.length : 0
 
     if (!isPrecedent && (!oldContent || !newContent)) {
       return NextResponse.json({ error: "구법과 신법 본문이 모두 필요합니다." }, { status: 400 })
@@ -114,10 +134,16 @@ export async function POST(request: NextRequest) {
       throw new Error('empty summary response')
     }
 
+    const usage = (response as unknown as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+    inputTokens = usage?.promptTokenCount ?? null
+    outputTokens = usage?.candidatesTokenCount ?? null
+    answerLen = summary.length
+
     succeeded = true
     debugLogger.success("AI summary complete (Gemini)", { length: summary.length })
     return NextResponse.json({ summary })
   } catch (error) {
+    errorCategory = categorizeError(error)
     // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 원문 메시지는 서버 로그로만.
     debugLogger.error("AI summary failed", error)
     return NextResponse.json(
@@ -125,6 +151,27 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   } finally {
+    // Serverless에서 fire-and-forget은 응답 후 잘린다 → await 필수 (실패는 swallow).
+    try {
+      const modelIdActual = AI_CONFIG.gemini.lite
+      await recordTelemetry({
+        endpoint: 'summarize',
+        isByok: authCtx.isByok,
+        sessionAnon: sessionAnonHash(authCtx.userId, authCtx.byokKey),
+        uaClass: classifyUa(request.headers.get('user-agent')),
+        lang: 'ko',
+        queryType: isPrecedentFlag ? 'precedent_summary' : 'revision_summary',
+        queryLengthBucket: bucketLength(Math.max(oldLen, newLen)),
+        answerLengthBucket: bucketLength(answerLen),
+        latencyTotalMs: Date.now() - startMs,
+        errorCategory,
+        modelIdActual,
+        inputTokens,
+        outputTokens,
+        costEstimateUsd: estimateCostUsd(modelIdActual, inputTokens, outputTokens),
+      })
+    } catch { /* telemetry failure swallowed */ }
+
     if (!succeeded) {
       await refundAiQuota(authCtx)
     }

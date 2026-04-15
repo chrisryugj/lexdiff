@@ -14,9 +14,18 @@ import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/
 import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import { requireAiAuth, refundAiQuota } from "@/lib/api-auth"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
-import { appendQueryLog, type QueryLogEntry } from "@/lib/query-logger"
-import { logAIQueryIfConsented } from "@/lib/ai-query-logger"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
+import {
+  recordTelemetry,
+  bucketLength,
+  classifyUa,
+  sessionAnonHash,
+  categorizeError,
+  estimateCostUsd,
+  type ErrorCategory,
+} from "@/lib/ai-telemetry"
+import { detectDomain } from "@/lib/fc-rag/tool-tiers"
+import { AI_CONFIG } from "@/lib/ai-config"
 
 /**
  * M5: citation 검증 블록 공통화.
@@ -158,17 +167,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ── 질의 로그 수집기 ──
+      // ── 텔레메트리 수집기 (본문 없음, 집계 신호만) ──
       const logStartMs = Date.now()
       const logTools: string[] = []
+      const logToolErrors: string[] = []
       let logAnswerLen = 0
       let logCitationCount = 0
       let logVerifiedCount = 0
       let logComplexity = ''
       let logQueryType = ''
-      let logError: string | null = null
-      let logAnswerText = ''
-      const logToolCalls: Array<{ name: string; args?: unknown }> = []
+      let logConfidenceLevel = ''
+      let logConfidenceScore: number | null = null
+      let logQualityScore: number | null = null
+      let logHasGrounds: boolean | null = null
+      let logIsTruncated: boolean | null = null
+      let logFastPathUsed: boolean | null = null
+      let logErrorCategory: ErrorCategory | null = null
+      let logErrorTool: string | null = null
+      let logInputTokens: number | null = null
+      let logOutputTokens: number | null = null
+      let logCachedTokens: number | null = null
+      const logVerificationMethods: Record<string, number> = {}
+      const logCitedLawIds = new Set<string>()
 
       // 법적 안전 면책 — 모든 answer 이벤트에 자동 주입 (변호사법/소비자 보호).
       // 주의: 엔진 내부의 cacheAnswer/storeConversation 는 원본 객체를 받으므로
@@ -179,15 +199,37 @@ export async function POST(request: NextRequest) {
         const evt = data as Record<string, unknown>
         if (evt.type === 'tool_call' && evt.name) {
           logTools.push(evt.name as string)
-          logToolCalls.push({ name: evt.name as string, args: evt.args })
+        }
+        if (evt.type === 'tool_result') {
+          const e = evt as { name?: string; success?: boolean }
+          if (e.success === false && e.name) logToolErrors.push(e.name)
+        }
+        if (evt.type === 'token_usage') {
+          const e = evt as { inputTokens?: number; outputTokens?: number; cachedTokens?: number }
+          if (typeof e.inputTokens === 'number') logInputTokens = e.inputTokens
+          if (typeof e.outputTokens === 'number') logOutputTokens = e.outputTokens
+          if (typeof e.cachedTokens === 'number') logCachedTokens = e.cachedTokens
         }
         if (evt.type === 'answer') {
           const d = evt.data as Record<string, unknown> | undefined
-          logAnswerText = String(d?.answer || '')
-          logAnswerLen = logAnswerText.length
+          const answerText = String(d?.answer || '')
+          logAnswerLen = answerText.length
           logCitationCount = (d?.citations as unknown[] || []).length
           logComplexity = String(d?.complexity || '')
           logQueryType = String(d?.queryType || '')
+          logConfidenceLevel = String(d?.confidenceLevel || '')
+          logIsTruncated = Boolean(d?.isTruncated)
+          const cb = d?.confidenceBreakdown as Record<string, unknown> | undefined
+          if (cb) {
+            if (typeof cb.score === 'number') logConfidenceScore = cb.score as number
+            if (typeof cb.qualityScore === 'number') logQualityScore = cb.qualityScore as number
+            if (typeof cb.hasGroundsSection === 'boolean') logHasGrounds = cb.hasGroundsSection as boolean
+          }
+          // citation 에서 answer-fallback 이 아닌 것 = 정상 tool 응답 → fast_path 힌트
+          const cits = (d?.citations as Array<{ source?: string }> | undefined) || []
+          if (cits.length > 0) {
+            logFastPathUsed = cits.every((c) => c?.source && c.source !== 'answer-fallback')
+          }
           // 면책 주입 (중복 방지) — 원본 보존, 전송용 복제본만 변형
           if (d) {
             const existing = (d.warnings as string[] | undefined) || []
@@ -198,10 +240,23 @@ export async function POST(request: NextRequest) {
           }
         }
         if (evt.type === 'citation_verification') {
-          const cits = (evt.citations as Array<{ verified?: boolean }> | undefined) || []
+          const cits = (evt.citations as Array<{
+            verified?: boolean
+            verificationMethod?: string
+            lawId?: string
+          }> | undefined) || []
           logVerifiedCount = cits.filter((c) => c?.verified).length
+          for (const c of cits) {
+            if (c.verificationMethod) {
+              logVerificationMethods[c.verificationMethod] =
+                (logVerificationMethods[c.verificationMethod] || 0) + 1
+            }
+            if (c.lawId) logCitedLawIds.add(c.lawId)
+          }
         }
-        if (evt.type === 'error') logError = String(evt.message || 'unknown')
+        if (evt.type === 'error') {
+          logErrorCategory = categorizeError(evt.message)
+        }
         send(data)
       }
 
@@ -210,6 +265,9 @@ export async function POST(request: NextRequest) {
       // 엔진이 실제 답변을 1회라도 전달했는지 — finally에서 쿼터 refund 판단에 사용.
       // Hermes+Gemini 모두 실패 시 fallback 더미 답변은 '실답변 아님'으로 간주 → refund 대상.
       let answerDelivered = false
+      // 엔진 경로 추적 (telemetry용). try 블록 밖에서도 접근 가능하도록 여기서 선언.
+      let finalSource: 'hermes' | 'gemini' = 'gemini'
+      let fallbackTriggered = false
 
       // 스트림 시작 직후 쿼터 상태를 1회 emit (BYOK는 null).
       // 이로써 UI는 Supabase 기반 단일 진실 소스만 바라보면 된다.
@@ -229,6 +287,7 @@ export async function POST(request: NextRequest) {
       try {
         let handled = false
         let source: 'hermes' | 'gemini' = 'gemini'
+        // note: finalSource/fallbackTriggered 는 바깥 스코프에서 최종값 추적
 
         // ── Hermes Primary ──
         // 사용자 자체 API 키 사용 시엔 Gemini로 직행 (Hermes 비용 도용 차단)
@@ -311,6 +370,7 @@ export async function POST(request: NextRequest) {
           source = 'hermes'
           traceLogger.completeTrace(traceId, 'hermes')
           } catch (hermesError) {
+            fallbackTriggered = true
             traceLogger.addEvent(traceId, 'hermes_failed', {
               message: hermesError instanceof Error ? hermesError.message : 'unknown',
               fallback: 'gemini',
@@ -389,70 +449,65 @@ export async function POST(request: NextRequest) {
         }
 
         sendAndLog({ type: 'source', source })
-
-        // ── 질의 로그 기록 ──
-        appendQueryLog({
-          ts: new Date().toISOString(),
-          traceId,
-          query,
-          source,
-          model: source === 'hermes' ? 'gpt-5.4' : 'gemini-flash',
-          env: process.env.VERCEL ? 'vercel' : 'local',
-          complexity: logComplexity,
-          queryType: logQueryType,
-          durationMs: Date.now() - logStartMs,
-          tools: logTools,
-          answerLength: logAnswerLen,
-          citationCount: logCitationCount,
-          verifiedCount: logVerifiedCount,
-          error: logError,
-        })
-
-        // Supabase 로그 (opt-in 동의한 사용자만, fire-and-forget)
-        logAIQueryIfConsented({
-          userId: authedUserId,
-          query,
-          answer: logAnswerText,
-          source,
-          model: source === 'hermes' ? 'gpt-5.4' : 'gemini-flash',
-          queryType: logQueryType,
-          toolCalls: logToolCalls,
-          latencyMs: Date.now() - logStartMs,
-          citationCount: logCitationCount,
-          verifiedCount: logVerifiedCount,
-        }).catch(() => { /* already swallowed inside */ })
+        finalSource = source
       } catch (error) {
-        logError = error instanceof Error ? error.message : 'unknown'
-        // 보안: 스택 대신 메시지만 console에, 전체 스택은 traceLogger 로만 기록.
-        console.error('[fc-rag route] engine error:', logError)
+        const errMsg = error instanceof Error ? error.message : 'unknown'
+        logErrorCategory = categorizeError(error)
+        console.error('[fc-rag route] engine error:', errMsg)
         traceLogger.addEvent(traceId, 'error', {
-          message: logError,
+          message: errMsg,
           stack: error instanceof Error ? error.stack : undefined,
         })
-        const friendly = classifyEngineError(logError)
+        const friendly = classifyEngineError(errMsg)
         sendAndLog({
           type: "error",
           message: friendly ?? "AI 검색 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
           retryable: Boolean(friendly),
         })
-        // 에러 시에도 로그 기록
-        appendQueryLog({
-          ts: new Date().toISOString(),
-          traceId,
-          query,
-          source: 'gemini',
-          model: 'error',
-          env: process.env.VERCEL ? 'vercel' : 'local',
-          complexity: logComplexity,
-          queryType: logQueryType,
-          durationMs: Date.now() - logStartMs,
-          tools: logTools,
-          answerLength: 0,
-          citationCount: 0,
-          verifiedCount: 0,
-          error: logError,
-        })
       } finally {
+        // ── 텔레메트리 기록 (본문 없음, BYOK/로그인 구분 없이 전체 기록) ──
+        // throw 여부와 무관하게 finally에서 단 1회만 호출.
+        // Serverless에서 fire-and-forget은 응답 flush 후 잘린다 → await 필수.
+        try {
+          const modelIdActual = finalSource === 'hermes' ? 'gpt-5.4' : AI_CONFIG.gemini.primary
+          const cost = estimateCostUsd(modelIdActual, logInputTokens, logOutputTokens)
+          const ua = request.headers.get('user-agent')
+          await recordTelemetry({
+            endpoint: 'fc-rag',
+            isByok: authCtx.isByok,
+            sessionAnon: sessionAnonHash(authedUserId, authCtx.byokKey),
+            uaClass: classifyUa(ua),
+            lang: /[a-zA-Z]/.test(query) && !/[가-힣]/.test(query) ? 'en' : 'ko',
+            complexity: logComplexity || null,
+            queryType: logQueryType || null,
+            domain: (() => { try { return detectDomain(query) } catch { return null } })(),
+            queryLengthBucket: bucketLength(query.length),
+            answerLengthBucket: bucketLength(logAnswerLen),
+            latencyTotalMs: Date.now() - logStartMs,
+            toolCallsCount: logTools.length,
+            toolNames: logTools.length > 0 ? logTools : null,
+            toolErrors: logToolErrors.length > 0 ? logToolErrors : null,
+            fallbackTriggered,
+            fastPathUsed: logFastPathUsed,
+            confidenceLevel: logConfidenceLevel || null,
+            confidenceScore: logConfidenceScore,
+            qualityScore: logQualityScore,
+            hasGroundsSection: logHasGrounds,
+            isTruncated: logIsTruncated,
+            citationCount: logCitationCount,
+            verifiedCount: logVerifiedCount,
+            verificationMethods: Object.keys(logVerificationMethods).length > 0 ? logVerificationMethods : null,
+            citedLawIds: logCitedLawIds.size > 0 ? Array.from(logCitedLawIds) : null,
+            errorCategory: logErrorCategory,
+            errorTool: logErrorTool,
+            modelIdActual,
+            inputTokens: logInputTokens,
+            outputTokens: logOutputTokens,
+            cachedTokens: logCachedTokens,
+            costEstimateUsd: cost,
+          })
+        } catch { /* telemetry failure must not affect user */ }
+
         // 사전 차감된 쿼터 보상: 실답변을 한 번도 전달하지 못했을 때만.
         // - 정상 응답: answerDelivered=true → no-op
         // - Hermes/Gemini 모두 실패(안전장치 더미 답변): answerDelivered=false → refund

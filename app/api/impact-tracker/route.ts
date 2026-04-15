@@ -10,6 +10,14 @@
 import { NextRequest } from 'next/server'
 import { executeImpactAnalysis } from '@/lib/impact-tracker/engine'
 import { requireAiAuth, refundAiQuota } from '@/lib/api-auth'
+import {
+  recordTelemetry,
+  classifyUa,
+  sessionAnonHash,
+  categorizeError,
+  type ErrorCategory,
+} from '@/lib/ai-telemetry'
+import { AI_CONFIG } from '@/lib/ai-config'
 
 export async function POST(request: NextRequest) {
   // Body 파싱
@@ -82,21 +90,54 @@ export async function POST(request: NextRequest) {
       }
 
       let produced = false
+      const startMs = Date.now()
+      let errorCategory: ErrorCategory | null = null
+      let totalChanges = 0
+      let aiClassifierFailed = false
       try {
         for await (const event of executeImpactAnalysis(
           { lawNames, dateFrom, dateTo, mode, region },
           { signal: combineSignals([request.signal, abortController.signal]), apiKey: userApiKey },
         )) {
           produced = true
+          // telemetry 수집: complete 이벤트에서 집계치 뽑기
+          if ((event as { type?: string }).type === 'complete') {
+            const result = (event as { result?: { items?: unknown[]; summary?: unknown } }).result
+            totalChanges = Array.isArray(result?.items) ? result.items.length : 0
+            // AI 분류 실패 감지 — items 중 severityReason이 "자동 분류 (AI 미응답)" 시그널
+            const items = (result?.items as Array<{ severityReason?: string }> | undefined) || []
+            aiClassifierFailed = items.some(it => typeof it?.severityReason === 'string' && it.severityReason.includes('AI 미응답'))
+          }
+          if ((event as { type?: string }).type === 'error') {
+            errorCategory = categorizeError((event as { message?: string }).message)
+          }
           send(event)
         }
-      } catch {
+      } catch (err) {
+        errorCategory = categorizeError(err)
         send({
           type: 'error',
           message: '영향 분석 처리 중 오류가 발생했습니다.',
           recoverable: false,
         })
       } finally {
+        try {
+          await recordTelemetry({
+            endpoint: 'impact-tracker',
+            isByok: authCtx.isByok,
+            sessionAnon: sessionAnonHash(authCtx.userId, authCtx.byokKey),
+            uaClass: classifyUa(request.headers.get('user-agent')),
+            lang: 'ko',
+            queryType: mode,
+            domain: region ? 'ordinance' : 'law',
+            latencyTotalMs: Date.now() - startMs,
+            citationCount: totalChanges,
+            fallbackTriggered: aiClassifierFailed,
+            errorCategory,
+            modelIdActual: AI_CONFIG.gemini.lite,
+          })
+        } catch { /* telemetry swallowed */ }
+
         if (!produced) {
           try { await refundAiQuota(authCtx) } catch { /* swallow */ }
         }

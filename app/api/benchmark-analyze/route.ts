@@ -13,6 +13,14 @@ import { AI_CONFIG } from '@/lib/ai-config'
 import { safeErrorResponse } from '@/lib/api-error'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { requireAiAuth, refundAiQuota, type AiAuthContext } from '@/lib/api-auth'
+import {
+  recordTelemetry,
+  bucketLength,
+  classifyUa,
+  sessionAnonHash,
+  categorizeError,
+  type ErrorCategory,
+} from '@/lib/ai-telemetry'
 
 // ── 조례 본문 조회 ──
 
@@ -235,6 +243,10 @@ export async function POST(request: NextRequest) {
   const authCtx = auth.ctx
 
   let succeeded = false
+  const startMs = Date.now()
+  let errorCategory: ErrorCategory | null = null
+  let ordinanceCount = 0
+  let keywordLen = 0
   try {
     let keyword: string
     let focus: string | undefined
@@ -250,8 +262,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!keyword || !ordinances?.length || ordinances.length < 2 || ordinances.length > 8) {
+      errorCategory = 'validation'
       return NextResponse.json({ error: '비교할 조례는 2~8개여야 합니다.' }, { status: 400 })
     }
+    keywordLen = keyword.length
+    ordinanceCount = ordinances.length
 
     if (typeof keyword !== 'string' || keyword.length > 200) {
       return NextResponse.json({ error: 'keyword는 200자 이하 문자열이어야 합니다.' }, { status: 400 })
@@ -299,9 +314,27 @@ export async function POST(request: NextRequest) {
       succeeded = true
       return NextResponse.json(parseAnalysisResponse(geminiAnswer))
     } catch (err: unknown) {
+      errorCategory = categorizeError(err)
       return safeErrorResponse(err, "AI 분석 실패")
     }
   } finally {
+    try {
+      await recordTelemetry({
+        endpoint: 'benchmark-analyze',
+        isByok: authCtx.isByok,
+        sessionAnon: sessionAnonHash(authCtx.userId, authCtx.byokKey),
+        uaClass: classifyUa(request.headers.get('user-agent')),
+        lang: 'ko',
+        queryType: 'ordinance_benchmark',
+        domain: 'ordinance',
+        queryLengthBucket: bucketLength(keywordLen),
+        latencyTotalMs: Date.now() - startMs,
+        citationCount: ordinanceCount,
+        errorCategory,
+        modelIdActual: AI_CONFIG.gemini.standard,
+      })
+    } catch { /* telemetry swallowed */ }
+
     if (!succeeded) {
       await refundAiQuota(authCtx)
     }

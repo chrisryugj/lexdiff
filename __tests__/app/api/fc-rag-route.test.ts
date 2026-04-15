@@ -42,8 +42,13 @@ vi.mock('@/lib/trace-logger', () => ({
   },
 }))
 
-vi.mock('@/lib/query-logger', () => ({
-  appendQueryLog: vi.fn(),
+vi.mock('@/lib/ai-telemetry', () => ({
+  recordTelemetry: vi.fn(() => Promise.resolve()),
+  bucketLength: vi.fn(() => null),
+  classifyUa: vi.fn(() => null),
+  sessionAnonHash: vi.fn(() => null),
+  categorizeError: vi.fn(() => 'unknown'),
+  estimateCostUsd: vi.fn(() => null),
 }))
 
 import { streamCitationVerification, combineSignals } from '@/app/api/fc-rag/route'
