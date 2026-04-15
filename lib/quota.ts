@@ -3,7 +3,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 export type QuotaFeature = 'fc_rag' | 'summarize' | 'benchmark' | 'impact'
 
 export const QUOTA_LIMITS: Record<'free' | 'pro', Record<QuotaFeature, number>> = {
-  free: { fc_rag: 10, summarize: 30, benchmark: 3, impact: 5 },
+  free: { fc_rag: 5, summarize: 10, benchmark: 5, impact: 5 },
   pro: { fc_rag: 100, summarize: 300, benchmark: 30, impact: 50 },
 }
 
