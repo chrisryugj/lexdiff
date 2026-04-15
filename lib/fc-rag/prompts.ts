@@ -6,6 +6,7 @@
  */
 
 import { detectDomain, type LegalDomain } from './tool-tiers'
+import { detectAliasesInQuery } from '@/lib/search-normalizer'
 
 type QueryComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -318,11 +319,19 @@ export function buildDynamicHeader(
     ? `\n## 🎯 결정문 도메인 강제 지시\n- 질의에서 다음 결정문 도메인이 감지됨. 반드시 해당 domain 으로 search_decisions 를 **각 1회 호출**하여 근거를 확보할 것:\n${decisionHits.map(h => `  - \`search_decisions(domain="${h.domain}", query=...)\` — ${h.label}`).join('\n')}\n- chain_* 도구를 호출한 경우에도 위 도메인은 **추가로 반드시** 호출. chain 도구가 자동 커버하지 않음.\n- 결과가 0건이면 핵심 키워드만 남겨 재검색 1회 허용.`
     : ''
 
+  // 법령 약칭 감지 → 정식명 변환 힌트 주입 (매칭 없으면 블록 없음)
+  // 법제처 aiSearch 는 약칭 의미검색이 약해 약칭 원문을 그대로 넘기면 엉뚱한 법령이
+  // 상위 매칭되는 사고가 잦다 (예: "산안기준규칙" → 국가표준기본법).
+  const aliasHits = query ? detectAliasesInQuery(query) : []
+  const aliasBlock = aliasHits.length > 0
+    ? `\n## 📖 법령 약칭 해석 (중요)\n- 질의에 다음 **약칭**이 포함되어 있음. 도구 호출 시 반드시 **정식 명칭**으로 변환해서 검색할 것:\n${aliasHits.map(h => `  - \`${h.alias}\` → 「${h.canonical}」`).join('\n')}\n- search_law / search_ai_law / get_law_text 등의 lawName·query 파라미터에 약칭 원문을 그대로 넣지 말 것. 약칭을 그대로 법제처 API 에 넘기면 키워드 부분매칭으로 전혀 다른 법령이 반환될 수 있음.`
+    : ''
+
   return `[답변 지침]
 - 복잡도: **${complexity}** (도구 예산 준수)
 - 분량: ${LENGTH_HINT[complexity]}
 - 답변 구조(아래 ## 헤딩 순서대로 작성):
-${SPECIALIST_INSTRUCTIONS[queryType]}${consequenceHint}${domainBlock}${decisionBlock}
+${SPECIALIST_INSTRUCTIONS[queryType]}${consequenceHint}${domainBlock}${decisionBlock}${aliasBlock}
 
 ---
 

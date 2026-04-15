@@ -31,7 +31,7 @@ const BASIC_CHAR_MAP = new Map<string, string>([
   ["얼", "업"],
 ])
 
-const LAW_ALIAS_ENTRIES: LawAliasEntry[] = [
+export const LAW_ALIAS_ENTRIES: LawAliasEntry[] = [
   {
     canonical: "대한민국헌법",
     aliases: ["헌법", "헌 법"],
@@ -65,7 +65,116 @@ const LAW_ALIAS_ENTRIES: LawAliasEntry[] = [
     aliases: ["원산지 표시법", "원산지표시"],
     alternatives: ["대외무역법", "관세법"],
   },
+  // ── 다빈도 노무/안전 ──
+  {
+    canonical: "산업안전보건법",
+    aliases: ["산안법"],
+    alternatives: ["산업안전보건법 시행령", "산업안전보건법 시행규칙", "산업안전보건기준에 관한 규칙"],
+  },
+  {
+    canonical: "산업안전보건기준에 관한 규칙",
+    aliases: ["산안기준규칙", "안전보건규칙", "산업안전보건규칙", "산안규칙", "안전보건기준규칙"],
+    alternatives: ["산업안전보건법", "산업안전보건법 시행령"],
+  },
+  {
+    canonical: "중대재해 처벌 등에 관한 법률",
+    aliases: ["중대재해처벌법", "중처법", "중대재해법"],
+    alternatives: ["산업안전보건법"],
+  },
+  {
+    canonical: "근로기준법",
+    aliases: ["근기법", "근로법"],
+  },
+  {
+    canonical: "남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률",
+    aliases: ["남녀고용평등법", "고평법"],
+  },
+  // ── 개인정보/정보통신 ──
+  {
+    canonical: "개인정보 보호법",
+    aliases: ["개보법", "개인정보법", "개인정보보호법"],
+  },
+  {
+    canonical: "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+    aliases: ["정보통신망법", "정통망법"],
+  },
+  // ── 청렴/이해충돌 ──
+  {
+    canonical: "부정청탁 및 금품등 수수의 금지에 관한 법률",
+    aliases: ["청탁금지법", "김영란법"],
+  },
+  {
+    canonical: "공직자의 이해충돌 방지법",
+    aliases: ["이해충돌방지법", "공직자이해충돌방지법"],
+  },
+  // ── 공공계약/공공기관 ──
+  {
+    canonical: "국가를 당사자로 하는 계약에 관한 법률",
+    aliases: ["국가계약법"],
+    alternatives: ["국가를 당사자로 하는 계약에 관한 법률 시행령"],
+  },
+  {
+    canonical: "지방자치단체를 당사자로 하는 계약에 관한 법률",
+    aliases: ["지방계약법"],
+    alternatives: ["지방자치단체를 당사자로 하는 계약에 관한 법률 시행령"],
+  },
+  {
+    canonical: "공공기관의 정보공개에 관한 법률",
+    aliases: ["정보공개법"],
+  },
+  // ── 부동산/주택 ──
+  {
+    canonical: "부동산 거래신고 등에 관한 법률",
+    aliases: ["부동산거래신고법", "부거법"],
+  },
+  {
+    canonical: "주택임대차보호법",
+    aliases: ["주임법"],
+  },
+  {
+    canonical: "상가건물 임대차보호법",
+    aliases: ["상임법", "상가임대차법"],
+  },
+  // ── 소방/건축 ──
+  {
+    canonical: "소방시설 설치 및 관리에 관한 법률",
+    aliases: ["소방시설법"],
+  },
+  // ── 세법 ──
+  {
+    canonical: "국세기본법",
+    aliases: ["국기법"],
+  },
+  {
+    canonical: "부가가치세법",
+    aliases: ["부가세법"],
+  },
 ]
+
+/**
+ * 쿼리 내에 등록된 약칭이 포함되어 있는지 감지해 매핑을 반환.
+ * FC-RAG 프롬프트에서 LLM 에게 "이 약칭은 정식 명칭으로 변환하라" 힌트를 주기 위해 사용.
+ * 중복 entry 는 dedup. 매칭 없으면 빈 배열.
+ */
+export function detectAliasesInQuery(query: string): Array<{ alias: string; canonical: string }> {
+  if (!query) return []
+  const normalized = normalizeBasicTypos(query).toLowerCase().replace(/\s+/gu, "")
+  const hits: Array<{ alias: string; canonical: string }> = []
+  const seen = new Set<string>()
+  for (const entry of LAW_ALIAS_ENTRIES) {
+    for (const alias of entry.aliases) {
+      const aliasKey = normalizeAliasKey(alias)
+      // 너무 짧은 약칭(3자 미만)은 오탐 위험 → 스킵
+      if (aliasKey.length < 3) continue
+      if (normalized.includes(aliasKey) && !seen.has(entry.canonical)) {
+        seen.add(entry.canonical)
+        hits.push({ alias, canonical: entry.canonical })
+        break
+      }
+    }
+  }
+  return hits
+}
 
 const aliasLookup = new Map<string, LawAliasEntry>()
 
