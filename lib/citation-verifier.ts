@@ -17,6 +17,14 @@ import { buildJO, formatJO } from './law-parser'
 import { debugLogger } from './debug-logger'
 import { matchCitationContent, type MatchMethod } from './citation-content-matcher'
 
+// 법제처 OPEN API가 Node 기본 UA(undici)를 봇으로 분류해 거부하므로
+// 일반 브라우저 UA로 호출. LAW_USER_AGENT 환경변수로 override 가능.
+const LAW_FETCH_HEADERS: HeadersInit = {
+  'user-agent':
+    process.env.LAW_USER_AGENT ||
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+}
+
 // C4: 조문 본문 LRU 캐시 (서버 인메모리). IndexedDB는 서버 런타임에서 사용 불가.
 const CONTENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24h
 const CONTENT_CACHE_MAX = 500
@@ -246,6 +254,7 @@ async function fetchLawId(lawName: string, externalSignal?: AbortSignal): Promis
     const response = await fetch(url, {
       next: { revalidate: 3600 },
       signal,
+      headers: LAW_FETCH_HEADERS,
     })
 
     if (!response.ok) {
@@ -333,6 +342,7 @@ async function checkArticleExists(
     const response = await fetch(url, {
       next: { revalidate: 3600 },
       signal,
+      headers: LAW_FETCH_HEADERS,
     })
 
     if (!response.ok) {
@@ -417,7 +427,7 @@ async function fetchArticleContent(
     const signal = externalSignal
       ? anySignal([externalSignal, AbortSignal.timeout(10_000)])
       : AbortSignal.timeout(10_000)
-    const response = await fetch(url, { next: { revalidate: 3600 }, signal })
+    const response = await fetch(url, { next: { revalidate: 3600 }, signal, headers: LAW_FETCH_HEADERS })
     if (!response.ok) return null
 
     const contentLength = Number(response.headers.get('content-length') || '0')
