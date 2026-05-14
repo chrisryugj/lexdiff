@@ -124,6 +124,7 @@ export interface SearchResultCache {
     court: string
     date: string
     judgmentType: string
+    dataSource?: string
   }>
   // 현재 보고 있는 판례 상세 (뒤로가기용)
   precedentDetail?: {

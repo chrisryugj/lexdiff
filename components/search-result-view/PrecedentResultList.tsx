@@ -242,6 +242,9 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
     return 'bg-muted text-muted-foreground border-border'
   }
 
+  // 법제처 OpenAPI는 대법원/헌재 출처만 본문 제공. 그 외(국세/지방세 정보시스템)는 외부 링크 안내.
+  const isExternalSource = !!precedent.dataSource && precedent.dataSource !== '대법원' && precedent.dataSource !== '헌법재판소'
+
   // 선고일자 포맷
   const formatDate = (date: string) => {
     if (!date) return ''
@@ -315,6 +318,17 @@ const PrecedentResultCard = memo(function PrecedentResultCard({
             className={`text-xs px-2 py-0.5 ${getTypeBadgeClass(precedent.type)}`}
           >
             {precedent.type}
+          </Badge>
+        )}
+        {/* 외부 출처 배지 — 법제처에 본문이 없는 NTIS/지방세 시스템 출처 */}
+        {isExternalSource && (
+          <Badge
+            variant="outline"
+            className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+            title={`${precedent.dataSource} 출처 — 본문은 외부 사이트에서 제공`}
+          >
+            <Icon name="external-link" className="h-3 w-3 mr-1" />
+            {precedent.dataSource}
           </Badge>
         )}
       </div>

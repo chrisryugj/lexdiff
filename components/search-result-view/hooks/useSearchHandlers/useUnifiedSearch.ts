@@ -234,6 +234,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
             court: item.court,
             date: item.date,
             judgmentType: item.type,
+            dataSource: item.dataSource,
           })),
           precedentDetail: undefined,
         })
@@ -260,8 +261,26 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
   )
 
   const handlePrecedentSelect = useCallback(
-    async (precedentId: string) => {
-      debugLogger.info("[unified-search] precedent detail", { precedentId })
+    async (precedentId: string, dataSource?: string) => {
+      debugLogger.info("[unified-search] precedent detail", { precedentId, dataSource })
+
+      // 법제처 OpenAPI는 대법원 출처 판례만 본문 제공.
+      // 국세법령정보시스템(NTIS)/지방세법령정보시스템 출처는 검색 결과에는 노출되지만
+      // target=prec 으로 detail 조회 시 "일치하는 판례가 없습니다" 반환 → 외부 사이트로 안내.
+      if (dataSource && dataSource !== "대법원" && dataSource !== "헌법재판소") {
+        const isJibang = dataSource.includes("지방세")
+        const externalUrl = isJibang ? "https://www.olta.re.kr" : "https://taxlaw.nts.go.kr"
+        const siteName = isJibang ? "지방세법령정보시스템" : "국세법령정보시스템"
+        if (typeof window !== "undefined") {
+          window.open(externalUrl, "_blank", "noopener,noreferrer")
+        }
+        toast({
+          title: `${siteName}에서 제공`,
+          description: `이 판례는 ${dataSource} 출처라 본문이 법제처에 없습니다. 외부 사이트에서 사건번호로 검색하세요.`,
+          variant: "default",
+        })
+        return
+      }
 
       try {
         actions.setIsSearching(true)

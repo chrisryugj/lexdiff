@@ -591,7 +591,7 @@ function SearchResultViewComponent({
               isLoading={state.isSearching}
               yearFilter={state.precedentYearFilter}
               courtFilter={state.precedentCourtFilter}
-              onSelect={(precedent) => handlers.handlePrecedentSelect(precedent.id)}
+              onSelect={(precedent) => handlers.handlePrecedentSelect(precedent.id, precedent.dataSource)}
               onPageChange={handlers.handlePrecedentPageChange}
               onPageSizeChange={handlers.handlePrecedentPageSizeChange}
               onBack={handlers.handleReset}

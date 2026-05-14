@@ -11,6 +11,7 @@ export interface PrecedentSearchResult {
   date: string         // 선고일자
   type: string         // 판결유형
   link: string         // 상세링크
+  dataSource: string   // 데이터출처명 ("대법원" / "국세법령정보시스템" / "지방세법령정보시스템" 등)
 }
 
 export interface PrecedentDetail {
@@ -67,7 +68,8 @@ export function parsePrecedentSearchXML(xml: string): {
       court: extractTag("법원명"),
       date: extractTag("선고일자"),
       type: extractTag("판결유형"),
-      link: extractTag("판례상세링크")
+      link: extractTag("판례상세링크"),
+      dataSource: extractTag("데이터출처명")
     })
   }
 

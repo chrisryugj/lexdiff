@@ -50,7 +50,7 @@ export interface SearchHandlers {
   fetchRelatedSearches: (lawName: string, currentResults: LawSearchResult[]) => Promise<void>
   // 통합검색 핸들러
   handlePrecedentSearch: (query: SearchQuery) => Promise<boolean>
-  handlePrecedentSelect: (precedentId: string) => Promise<void>
+  handlePrecedentSelect: (precedentId: string, dataSource?: string) => Promise<void>
   handlePrecedentPageChange: (page: number) => Promise<void>
   handlePrecedentPageSizeChange: (size: number) => Promise<void>
   handleInterpretationSearch: (query: SearchQuery) => Promise<boolean>
