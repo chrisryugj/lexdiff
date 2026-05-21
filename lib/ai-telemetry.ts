@@ -95,7 +95,7 @@ export function bucketLength(len: number | null | undefined): string | null {
 /** Gemini 토큰 단가(USD / 1M tokens) — 근사치. 실제 단가 변경 시 갱신. */
 const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
   'gemini-3-flash-preview':      { input: 0.15, output: 0.60 },
-  'gemini-3.1-flash-lite-preview': { input: 0.075, output: 0.30 },
+  'gemini-3.1-flash-lite':       { input: 0.075, output: 0.30 },
   'gemini-flash':                { input: 0.15, output: 0.60 },
 }
 
