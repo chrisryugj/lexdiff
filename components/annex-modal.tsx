@@ -550,7 +550,9 @@ export function AnnexModal({
           </div>
         ) : markdown ? (
           // 마크다운 뷰 (텍스트만 표시)
-          <ScrollArea className="max-h-[65vh]">
+          // flex-1 min-h-0: flex column 안에서 definite 높이를 받아야 Radix Viewport(height:100%)가
+          // 해석되어 내부 스크롤이 동작함. max-h-[65vh]만으로는 높이가 indefinite라 스크롤 안 됨.
+          <ScrollArea className="flex-1 min-h-0 max-h-[65vh]">
             <div
               ref={contentRef}
               className="p-4 sm:p-6"
