@@ -106,7 +106,9 @@ function detectLawType(lawName: string): 'law' | 'ordinance' | 'admin' {
   }
 
   // 행정규칙: 훈령, 예규, 고시, 지침, 내규
-  if (/훈령|예규|고시|지침|내규/.test(lawName)) {
+  // + 소방청 화재안전기준(NFPC 성능기준 / NFTC 기술기준) — 고시지만 이름이 "...기준"이라 위 패턴에 안 걸림
+  if (/훈령|예규|고시|지침|내규/.test(lawName) ||
+    /화재안전(성능|기술)기준|NFPC|NFTC/i.test(lawName)) {
     return 'admin'
   }
 

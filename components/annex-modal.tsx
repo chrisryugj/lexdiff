@@ -10,6 +10,7 @@ import { CopyButton } from "@/components/ui/copy-button"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import type { LawAnnex } from "@/lib/law-types"
 import { getAnnexCache, setAnnexCache } from "@/lib/annex-cache"
+import { parseAdminRuleList } from "@/lib/admrul-parser"
 
 interface AnnexModalProps {
   isOpen: boolean
@@ -114,6 +115,8 @@ export function AnnexModal({
   const [viewMode, setViewMode] = useState<ViewMode>("markdown")
   const [fileType, setFileType] = useState<"pdf" | "hwp" | "hwpx" | "unknown">("unknown")
   const [fontSize, setFontSize] = useState(14)
+  // 행정규칙(고시) 원문 링크 — admrul-search로 찾은 admRulSeq 기반 (없으면 통합검색)
+  const [adminRuleUrl, setAdminRuleUrl] = useState<string | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const savedScrollRef = useRef<number>(0)
 
@@ -121,10 +124,17 @@ export function AnnexModal({
   const isOrdinance = /조례/.test(lawName) ||
     /(특별시|광역시|도|시|군|구)\s+[가-힣]+\s*(조례|규칙)/.test(lawName)
 
-  // 원문 링크 (조례는 /자치법규/, 일반 법령은 /법령/)
+  // 행정규칙(고시·훈령 등) 별표 판별 — NFPC/NFTC 화재안전기준 포함.
+  // 행정규칙 별표는 법제처 OpenAPI에 본문 데이터가 없어 원문 링크로만 안내한다.
+  const isAdminRule = !isOrdinance && !/시행령|시행규칙/.test(lawName) &&
+    (/화재안전(성능|기술)기준|NFPC|NFTC/i.test(lawName) || /훈령|예규|고시|지침|내규/.test(lawName))
+
+  // 원문 링크 (조례→자치법규, 행정규칙→admRulSeq 원문 또는 통합검색, 일반→법령)
   const molegUrl = isOrdinance
     ? `https://www.law.go.kr/자치법규/${encodeURIComponent(lawName)}`
-    : `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
+    : isAdminRule
+      ? (adminRuleUrl || `https://www.law.go.kr/LSW/lsAstSc.do?menuId=391&query=${encodeURIComponent(lawName)}`)
+      : `https://www.law.go.kr/법령/${encodeURIComponent(lawName)}`
 
   // 폰트 크기 조절
   const increaseFontSize = () => setFontSize((prev) => Math.min(prev + 1, 28))
@@ -169,6 +179,31 @@ export function AnnexModal({
     setError(null)
     setAnnexData(null)
     setMarkdown(null)
+
+    // 행정규칙(NFPC/NFTC 등 고시) 별표: 법제처 OpenAPI에 본문 데이터가 없음.
+    // law-annexes(법령 별표) 검색 시 빈/엉뚱한 결과가 나오므로, 원문 페이지 링크로 안내한다.
+    if (isAdminRule) {
+      try {
+        const cleaned = lawName.replace(/[「」『』]/g, '').trim()
+        const searchName = cleaned.replace(/\s*\([^)]*\)\s*$/, '').trim() || cleaned
+        const sres = await fetch(`/api/admrul-search?query=${encodeURIComponent(searchName)}&display=20`, { signal: ctrl.signal })
+        if (!isStale() && sres.ok) {
+          const list = parseAdminRuleList(await sres.text())
+          const norm = (s: string) => s.replace(/[\s·•‧]/g, '')
+          const target = norm(cleaned)
+          const match = list.find(r => norm(r.name) === target) || (list.length === 1 ? list[0] : undefined)
+          if (match?.serialNumber) {
+            setAdminRuleUrl(`https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=${match.serialNumber}`)
+          }
+        }
+      } catch {
+        // admrul-search 실패 → molegUrl 통합검색 fallback 유지
+      }
+      if (isStale()) return
+      setError(`「${lawName}」은(는) 행정규칙(고시)으로, 별표 본문은 법제처 OpenAPI에서 제공되지 않습니다.\n아래 '법제처에서 보기'로 원문을 확인하세요.`)
+      setLoadingState("error")
+      return
+    }
 
     try {
       // 1. 캐시 확인 (lawId 우선, 없으면 lawName으로 fallback)
@@ -320,7 +355,7 @@ export function AnnexModal({
       setError(err instanceof Error ? err.message : "별표를 불러올 수 없습니다")
       setLoadingState("error")
     }
-  }, [lawName, annexNumber, lawId])
+  }, [lawName, annexNumber, lawId, isAdminRule])
 
   // 모달 열릴 때 데이터 가져오기
   useEffect(() => {
