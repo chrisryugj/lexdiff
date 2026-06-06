@@ -4,6 +4,7 @@ import { extractArticleText } from '@/lib/law-xml-parser'
 import { debugLogger } from '@/lib/debug-logger'
 import { parseOrdinanceSearchXML } from '@/lib/ordin-search-parser'
 import { parseOrdinanceXML } from '@/lib/ordin-parser'
+import { parseAdminRuleList, parseAdminRuleContent, buildAdminRuleContentHTML } from '@/lib/admrul-parser'
 import { LAW_GO_KR } from '@/lib/law-constants'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -492,6 +493,64 @@ export async function searchLawByName(lawName: string): Promise<{ lawId?: string
     lawId: lawNode?.querySelector("법령ID")?.textContent || undefined,
     mst: lawNode?.querySelector("법령일련번호")?.textContent || undefined,
   }
+}
+
+/**
+ * 행정규칙(고시·훈령·예규 등) 이름으로 조회 → 모달 ModalResult.
+ *
+ * 법령 검색(target=law)으로 안 잡히는 고시류(NFPC/NFTC 화재안전기준 등) 대응.
+ * - 검색어는 영문 약칭 괄호("(NFPC 103)")를 떼고 검색 (매칭 안정성)
+ * - 결과에서 **이름 정확 매칭** 우선 — 첫 결과 맹신 금지
+ *   (예: "스프링클러설비의 화재안전성능기준" 검색 시 첫 결과가 "간이스프링클러…(NFPC 103A)"로 나옴)
+ * - 본문 조회 실패해도 검증된 admRulSeq 원문 링크는 항상 제공
+ * - 검색 0건 / 정확 매칭 실패 → throw (호출측에서 통합검색 폴백)
+ */
+export async function fetchAdminRuleByName(lawName: string): Promise<ModalResult> {
+  const cleaned = lawName.replace(/[「」『』]/g, '').trim()
+  const searchName = cleaned.replace(/\s*\([^)]*\)\s*$/, '').trim() || cleaned
+
+  const searchRes = await fetch(`/api/admrul-search?${new URLSearchParams({ query: searchName, display: '20' })}`)
+  if (!searchRes.ok) throw new Error(`행정규칙 검색 실패: ${searchRes.status}`)
+  const list = parseAdminRuleList(await searchRes.text())
+  if (!list.length) throw new Error('행정규칙 검색 결과 없음')
+
+  const norm = (s: string) => s.replace(/[\s·•‧]/g, '')
+  const target = norm(cleaned)
+  // 정확 매칭 → (결과 1건이면) 단일 결과. 다건 + 매칭 실패는 throw (오답 방지)
+  const match = list.find(r => norm(r.name) === target)
+    || (list.length === 1 ? list[0] : undefined)
+  if (!match) throw new Error('행정규칙 정확 매칭 실패')
+
+  const idParam = match.serialNumber || match.id
+  if (!idParam) throw new Error('행정규칙 ID 없음')
+
+  // 검증된 외부 원문 링크 (admRulSeq) — 본문 조회 실패 시에도 제공
+  const viewUrl = match.serialNumber
+    ? `${LAW_GO_KR.BASE}/LSW/admRulLsInfoP.do?admRulSeq=${encodeURIComponent(match.serialNumber)}`
+    : `${LAW_GO_KR.BASE}/LSW/lsAstSc.do?menuId=391&query=${encodeURIComponent(match.name)}`
+  const linkHtml = `<div class="pt-3 mt-3 border-t"><a href="${viewUrl}" target="_blank" rel="noopener" class="text-primary hover:underline inline-flex items-center gap-1">법제처에서 ${match.name} 보기 →</a></div>`
+
+  // 본문 조회 (실패해도 링크는 제공)
+  let bodyHtml = ''
+  try {
+    const contentRes = await fetch(`/api/admrul?${new URLSearchParams({ ID: idParam })}`, { cache: 'no-store' })
+    if (contentRes.ok) {
+      const content = parseAdminRuleContent(await contentRes.text())
+      if (content && content.articles.length > 0) {
+        bodyHtml = buildAdminRuleContentHTML(content, content.name)
+      }
+    } else {
+      debugLogger.warning(`[citation] 행정규칙 본문 ${contentRes.status}, 외부 링크만 제공`)
+    }
+  } catch (e) {
+    debugLogger.warning('[citation] 행정규칙 본문 조회 오류, 외부 링크만 제공', e)
+  }
+
+  const html = bodyHtml
+    ? bodyHtml + linkHtml
+    : `<div class="space-y-3"><p>${match.name}</p><p class="text-sm text-muted-foreground">본문을 불러오지 못했습니다. 법제처 원문에서 확인하세요.</p>${linkHtml}</div>`
+
+  return { title: match.name, html }
 }
 
 export { extractJoCode, hasArticle as hasArticleLabel }

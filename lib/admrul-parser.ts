@@ -497,3 +497,40 @@ function applyRevisionStyling(text: string): string {
 
   return styled
 }
+
+/**
+ * 파싱된 행정규칙 본문(AdminRuleContent)을 모달 표시용 HTML로 변환.
+ * - 메타데이터 헤더(소관부처/발령일자/시행일자) + 조문별 제목/내용
+ * - 포맷은 use-law-viewer-admin-rules.ts 의 행정규칙 탭 인라인 빌더와 동일
+ */
+export function buildAdminRuleContentHTML(fullContent: AdminRuleContent, baseLawName: string): string {
+  const htmlParts: string[] = []
+
+  // 메타데이터 헤더
+  if (fullContent.department || fullContent.publishDate || fullContent.effectiveDate) {
+    htmlParts.push('<div style="padding: 12px; background: hsl(var(--secondary)); border-radius: 8px; margin-bottom: 24px; color: hsl(var(--foreground));">')
+    const metadata: string[] = []
+    if (fullContent.department) metadata.push(`<span style="font-size: 0.875rem;"><strong>소관부처:</strong> ${fullContent.department}</span>`)
+    if (fullContent.publishDate) metadata.push(`<span style="font-size: 0.875rem;"><strong>발령일자:</strong> ${fullContent.publishDate}</span>`)
+    if (fullContent.effectiveDate) metadata.push(`<span style="font-size: 0.875rem;"><strong>시행일자:</strong> ${fullContent.effectiveDate}</span>`)
+    htmlParts.push(metadata.join(' | '))
+    htmlParts.push('</div>')
+  }
+
+  // 조문별 제목 + 내용
+  const textParts: string[] = []
+  fullContent.articles.forEach((article, idx) => {
+    const titleHtml = '<strong style="font-size: 1rem;">' + article.number +
+      (article.title ? ' <span style="font-weight: 400; color: hsl(var(--muted-foreground));">(' + article.title + ')</span>' : '') +
+      '</strong>'
+    textParts.push(titleHtml)
+    textParts.push('<br>')
+    textParts.push(formatAdminRuleHTML(article.content, baseLawName))
+    if (idx < fullContent.articles.length - 1) {
+      textParts.push('<hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid hsl(var(--border));" />')
+    }
+  })
+  htmlParts.push(textParts.join(''))
+
+  return htmlParts.join('')
+}

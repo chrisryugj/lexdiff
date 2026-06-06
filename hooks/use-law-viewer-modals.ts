@@ -9,6 +9,7 @@ import {
   fetchOldLawArticle,
   fetchCurrentLawArticle,
   searchLawByName,
+  fetchAdminRuleByName,
   extractJoCode,
   type ModalResult,
 } from './law-viewer-modal-fetchers'
@@ -160,11 +161,22 @@ export function useLawViewerModals(meta: LawMeta, activeArticle: LawArticle | un
       if (ctrl.signal.aborted) return
 
       if (!lawId && !mst) {
+        // 법령 검색 실패 → 행정규칙(고시·훈령 등) 조회 시도 (NFPC/NFTC 화재안전기준 등)
+        try {
+          const adminResult = await fetchAdminRuleByName(cleanedLawName)
+          if (ctrl.signal.aborted) return
+          applyResult(ctrl, adminResult)
+          return
+        } catch (adminErr) {
+          if (ctrl.signal.aborted) return
+          debugLogger.info('[citation] 법령·행정규칙 모두 조회 실패, 통합검색 폴백', adminErr)
+        }
+        // 둘 다 실패 → 법제처 통합검색(법령+행정규칙)으로 안내
         safeSetRefModal(ctrl, {
           open: true,
           loading: false,
           title: cleanedLawName,
-          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.LAW_VIEW}/${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처에서 검색하기</a></p>`,
+          html: `<p>법령을 찾지 못했습니다.</p><p class="text-sm text-muted-foreground mt-2"><a href="${LAW_GO_KR.BASE}/LSW/lsAstSc.do?menuId=391&query=${encodeURIComponent(cleanedLawName)}" target="_blank" rel="noopener" class="text-primary hover:underline">법제처 통합검색 →</a></p>`,
         })
         return
       }
