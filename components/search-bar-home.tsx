@@ -94,7 +94,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
                 aria-label={isAiMode ? "AI 법률 자문 검색" : "법령명, 조문번호 검색"}
                 placeholder={isAiMode
                   ? (isMobile ? 'AI 법률 자문' : 'AI 법률 자문 (예: "수출통관 절차는?", "청년 창업 지원제도는?")')
-                  : (isMobile ? '법령명, 조문번호 검색' : '법령명, 조문번호 검색 (예: "관세법 38조", "근로기준법")')
+                  : (isMobile ? '법령·조문 검색' : '법령명, 조문번호 검색 (예: "관세법 38조", "근로기준법")')
                 }
                 value={query}
                 onChange={(e) => {
@@ -108,7 +108,7 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
                 }}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "h-16 pl-14 pr-4 text-base sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400",
+                  "h-16 pl-14 pr-3 text-base sm:text-lg border-0 rounded-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 placeholder:text-ellipsis",
                   showDropdown && "bg-gray-50 dark:bg-[#1a222c]"
                 )}
                 disabled={isLoading}
@@ -134,19 +134,21 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
           <Button
             type="submit"
             disabled={isLoading || !query.trim()}
+            aria-label="검색"
             className={cn(
-              "h-16 px-8 !rounded-none text-lg font-bold transition-all",
+              "h-16 w-16 shrink-0 px-0 sm:w-auto sm:px-8 !rounded-none text-lg font-bold transition-all",
               "bg-brand-navy hover:bg-brand-navy/90 text-white dark:text-background"
             )}
           >
             {isLoading ? (
               <>
-                <Icon name="loader" className="h-5 w-5 animate-spin mr-2" />
-                <span>검색중...</span>
+                <Icon name="loader" className="h-6 w-6 animate-spin sm:h-5 sm:w-5 sm:mr-2" />
+                <span className="hidden sm:inline">검색중...</span>
               </>
             ) : (
               <>
-                <span className="tracking-widest">검색</span>
+                <Icon name="search" className="h-6 w-6 sm:hidden" />
+                <span className="hidden sm:inline tracking-widest">검색</span>
               </>
             )}
           </Button>
