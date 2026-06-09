@@ -326,8 +326,9 @@ export function linkifyMarkdownLegalRefs(markdown: string): string {
 
   // 패턴 3a: [별표] 또는 [별표 N] 단독 (대괄호 포함, 문맥 추론)
   // 가장 가까운 「법령명」을 찾아서 링크 생성 (가드 통과 시)
+  // (?!\() : 이미 [별표 N](annex://...) 로 링크된 라벨은 재매칭 제외 (이중 변환 방지)
   result = result.replace(
-    /\[(별표)\s*(\d+)?(?:의(\d+))?\]/g,
+    /\[(별표)\s*(\d+)?(?:의(\d+))?\](?!\()/g,
     (match, _type, num1, num2, offset: number, fullString: string) => {
       // 이미 링크로 변환된 부분 제외
       const beforeText = fullString.substring(Math.max(0, offset - 500), offset)
