@@ -11,6 +11,7 @@ function makePrecedent(overrides: Partial<PrecedentSearchResult> = {}): Preceden
     date: '20230615',
     type: '판결',
     link: '',
+    dataSource: '대법원',
     ...overrides,
   }
 }

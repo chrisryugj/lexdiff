@@ -36,12 +36,15 @@ vi.mock('@/lib/fc-rag/tool-registry', async () => {
   }
 })
 
-// CACHE_TTL은 기본 export — fake_search 매핑 강제 추가
+// tool-adapter는 모듈 내부 클로저를 참조하는 getToolTTL()을 호출하므로
+// CACHE_TTL 객체 확장만으로는 부족 — getToolTTL 자체를 오버라이드해야 캐시가 동작.
 vi.mock('@/lib/fc-rag/tool-cache', async () => {
   const actual = await vi.importActual<typeof import('@/lib/fc-rag/tool-cache')>('@/lib/fc-rag/tool-cache')
+  const CACHE_TTL: Record<string, number> = { ...actual.CACHE_TTL, fake_search: 60_000 }
   return {
     ...actual,
-    CACHE_TTL: { ...actual.CACHE_TTL, fake_search: 60_000 },
+    CACHE_TTL,
+    getToolTTL: (name: string, args?: unknown) => CACHE_TTL[name] ?? actual.getToolTTL(name, args),
   }
 })
 

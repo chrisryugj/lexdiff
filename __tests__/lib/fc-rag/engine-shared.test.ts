@@ -132,9 +132,9 @@ describe('withTimeout', () => {
 
 describe('getMaxToolTurns / getMaxClaudeTurns', () => {
   it('complexity 별 limit', () => {
-    expect(getMaxToolTurns('simple')).toBe(2)
-    expect(getMaxToolTurns('moderate')).toBe(3)
-    expect(getMaxToolTurns('complex')).toBe(4)
+    expect(getMaxToolTurns('simple')).toBe(3)
+    expect(getMaxToolTurns('moderate')).toBe(4)
+    expect(getMaxToolTurns('complex')).toBe(5)
     expect(getMaxClaudeTurns('simple')).toBe(5)
     expect(getMaxClaudeTurns('moderate')).toBe(8)
     expect(getMaxClaudeTurns('complex')).toBe(12)

@@ -130,7 +130,7 @@ describe('streamCitationVerification (M5)', () => {
   })
 
   it('verifyAllCitations 타임아웃 시 skipped로 fallback하며 throw하지 않음', async () => {
-    // 10초 타임아웃 — 그보다 오래 걸리는 promise
+    // 15초 타임아웃 — 그보다 오래 걸리는 promise
     verifyAllCitationsMock.mockImplementation(
       () => new Promise(() => { /* never resolves */ }),
     )
@@ -145,10 +145,10 @@ describe('streamCitationVerification (M5)', () => {
     ]
 
     const { events, sendAndLog } = capture()
-    // 실제로 10초 대기하지 않도록 fake timer
+    // 실제로 15초 대기하지 않도록 fake timer
     vi.useFakeTimers()
     const promise = streamCitationVerification(citations, sendAndLog)
-    await vi.advanceTimersByTimeAsync(10_100)
+    await vi.advanceTimersByTimeAsync(15_100)
     await promise
     vi.useRealTimers()
 
@@ -161,7 +161,7 @@ describe('streamCitationVerification (M5)', () => {
       expect(verification.citations[0].verified).toBe(false)
       expect(verification.citations[0].verificationMethod).toBe('skipped')
     }
-  }, 15_000)
+  }, 20_000)
 })
 
 // ─── combineSignals ───
