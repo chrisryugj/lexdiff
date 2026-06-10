@@ -174,8 +174,8 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1(pdfjs-dist@5.5.207)
       korean-law-mcp:
-        specifier: ^4.1.1
-        version: 4.1.1
+        specifier: ^4.2.0
+        version: 4.2.0
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -3337,8 +3337,8 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.1.1:
-    resolution: {integrity: sha512-f+iMeE7yaP7O7H04+i2wV+DZ5GeEtzvP4cN8XeFzDYCALyMs3Z0w/WrJ0BerJsCsq8XE+CrWKI2L45l2P35NsA==}
+  korean-law-mcp@4.2.0:
+    resolution: {integrity: sha512-g1ykEdygrVhJUSEKwC9O4AzBKXnHMN6Az6YeHwcw9WcPf9M4ffPO0K+KnpG678t4m0Qw1TVjy8ipdyNWCca2lQ==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -7623,7 +7623,7 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  korean-law-mcp@4.1.1:
+  korean-law-mcp@4.2.0:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       '@xmldom/xmldom': 0.9.9
