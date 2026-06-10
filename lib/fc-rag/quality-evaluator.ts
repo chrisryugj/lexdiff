@@ -95,10 +95,12 @@ export function evaluateResponseQuality(
 
   let score = toolScore + contentScore + citationScore + answerScore
 
-  // ── Memory Bypass: 도구 없지만 인용 충분하면 marginal 보장 ──
-  if (retrievalCount === 0 && citationCount >= 3 && score < 30) {
-    score = 30
-    warnings.push('도구 미호출이나 인용 충분 (memory bypass)')
+  // ── 도구 미호출 + 인용 존재 = 학습 데이터 기반 인용(환각/개정 전 법령) 의심 ──
+  // 과거 memory bypass(인용 3개 이상이면 marginal 보장)는 개정 전 법령을 그럴듯하게
+  // 인용한 답변을 통과시키는 구멍이라 제거. 도구 근거 없는 인용은 fail로 강등.
+  if (retrievalCount === 0 && citationCount > 0) {
+    score = Math.min(score, 25)
+    warnings.push('도구 미호출 상태의 인용 — 학습 데이터 기반(개정 전 법령 가능성) 의심')
   }
 
   // ── 레벨 판정 ──

@@ -2,6 +2,23 @@
 
 LexDiff의 주요 변경사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)을 따르며, 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 사용합니다.
 
+## [2.3.0-beta] — 2026-06-10
+
+AI 답변 **현행성(現行性) 가드**. 실사고(소방 질의에 2022년 분법 전 법령 기준 답변) 원인 분석 결과 — ① LLM이 오늘 날짜를 모름 ② "현행 법령 기준" 지침 부재 ③ 도구 미호출 답변이 품질 평가를 통과하는 구멍 ④ 1년 묵은 도구 버전 — 4개를 모두 차단.
+
+### 🛡️ Added — 현행성 가드
+- **오늘 날짜(KST) 주입** (`lib/fc-rag/prompts.ts`) — 동적 헤더에 매 질의마다 주입. static 프롬프트에 넣으면 Gemini context cache가 매일 깨지므로 동적 헤더에만 배치.
+- **현행 법령 기준 섹션** (static 프롬프트) — 도구 결과의 시행일자·`[현행]`/`[연혁]` 라벨 확인 필수, 연혁/분법/시행예정 감지 시 답변에 명시, "## 근거 법령"에 시행일자 병기, 학습데이터의 옛 법령명·조문번호 사용 금지 (소방 분법 사례 명문화).
+
+### 🔧 Fixed
+- **quality-evaluator memory bypass 제거** — 도구 미호출 + 인용 3개 이상이면 marginal을 보장하던 규칙은 개정 전 법령을 그럴듯하게 인용한 환각 답변을 통과시키는 구멍. 역전: 도구 근거 없는 인용은 fail로 강등.
+- **vitest 전역 mock 누락 보강** (`vitest.setup.ts`) — `search-normalizer` mock에 `detectAliasesInQuery` 부재로 claude/gemini-engine 테스트 8건이 깨져 있던 문제 수정 (644→652 pass).
+
+### ⬆️ Changed — 의존성 현행화
+- **korean-law-mcp `^3.2.1` → `^4.1.1`** — 프로덕션이 semver 제약으로 3.5.x에 묶여 있던 문제 해소. v4의 판례 토큰 74% 감축, verify_citations, 판례 검색 구조화, 법제처 빈 응답 재시도 등 수용. (4.2.0 publish 시 `[현행]`/`[연혁]` 라벨·구 법령명 표기까지 자동 수용)
+- **kordoc `^2.2.6` → `^2.9.1`**
+- **answer cache 키 v29 → v30** — 옛 프롬프트로 생성된 캐시 답변 즉시 무효화.
+
 ## [2.2.0-beta] — 2026-04-15
 
 AI 파이프라인 **관찰성(observability)** 전면 재작성. 질의·답변 본문 없이 개발·품질·비용 신호를 전 엔드포인트에서 수집. 레거시 본문 로거 완전 제거 + 개인정보처리방침 국외이전 고지 반영.

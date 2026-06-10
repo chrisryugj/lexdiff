@@ -21,6 +21,7 @@ vi.mock('./lib/search-normalizer', () => ({
     matchedAlias: null,
   }),
   expandSearchSynonyms: () => ({ expanded: [] }),
+  detectAliasesInQuery: () => [],
 }))
 
 // Mock ResizeObserver (jsdom에 없음)
