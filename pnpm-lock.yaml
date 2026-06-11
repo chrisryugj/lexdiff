@@ -171,11 +171,11 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
       kordoc:
-        specifier: ^2.9.1
-        version: 2.9.1(pdfjs-dist@5.5.207)
+        specifier: ^3.0.0
+        version: 3.0.0(pdfjs-dist@5.5.207)
       korean-law-mcp:
-        specifier: ^4.2.0
-        version: 4.2.0
+        specifier: ^4.2.1
+        version: 4.2.1
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -3324,8 +3324,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  kordoc@2.9.1:
-    resolution: {integrity: sha512-R3k7//ySYMHqXuNqzeOnhFgyl0STHmn1rFUnTyLfkMfX9ezpSysgeCCqj3eru0nBaKlDafotI+Da6XFHvHIILA==}
+  kordoc@3.0.0:
+    resolution: {integrity: sha512-5mqvDm2PwdFgkCg3tfax1m1RhntxjlpkE6POeDA6NqA4LZubAm3Ft16jMM2wnJ/VzOjobt8m8Klk6JxO7JAX0A==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -3337,8 +3337,8 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.2.0:
-    resolution: {integrity: sha512-g1ykEdygrVhJUSEKwC9O4AzBKXnHMN6Az6YeHwcw9WcPf9M4ffPO0K+KnpG678t4m0Qw1TVjy8ipdyNWCca2lQ==}
+  korean-law-mcp@4.2.1:
+    resolution: {integrity: sha512-doF9K2C0bz4zos+yOpoELMe/NE+MpRpxv3+tkDzSRKf3QVns6LzcltnqNQN260/lXqcocUnAi0M2uJWhquGq4A==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -7604,7 +7604,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  kordoc@2.9.1(pdfjs-dist@5.5.207):
+  kordoc@3.0.0(pdfjs-dist@5.5.207):
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       '@xmldom/xmldom': 0.9.9
@@ -7618,19 +7618,19 @@ snapshots:
       '@hyzyla/pdfium': 2.1.13
       onnxruntime-node: 1.26.0
       pdfjs-dist: 5.5.207
-      sharp: 0.34.4
+      sharp: 0.34.5
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - supports-color
 
-  korean-law-mcp@4.2.0:
+  korean-law-mcp@4.2.1:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       '@xmldom/xmldom': 0.9.9
       commander: 14.0.3
       dotenv: 17.4.1
       express: 5.2.1
-      kordoc: 2.9.1(pdfjs-dist@5.5.207)
+      kordoc: 3.0.0(pdfjs-dist@5.5.207)
       pdfjs-dist: 5.5.207
       zod: 3.25.76
     transitivePeerDependencies:
