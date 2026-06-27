@@ -3,7 +3,7 @@
 **법령을 쉽게. AI로 똑똑하게. 공공 Legal AI의 시작.**
 
 [![Live](https://img.shields.io/badge/Live-lexdiff.gomdori.app-1a2b4c)](https://lexdiff.gomdori.app)
-[![Version](https://img.shields.io/badge/version-2.2.0--beta-b08d57)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.0--beta-b08d57)](CHANGELOG.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Gemini](https://img.shields.io/badge/AI-Gemini_3_Flash-4285F4?logo=google)](https://deepmind.google/technologies/gemini/)
@@ -35,10 +35,12 @@
 * **📖 판례·해석례 통합** — 대법원 판례, 법제처 해석례, 조세심판원 재결례, 관세청 해석을 한 곳에서 검색.
 * **🏠 자치법규 검색** — 전국 17개 시도 + 226개 시군구 조례/규칙 통합 검색.
 * **📎 위임법령 추적** — 조문별 행정규칙(고시/훈령)을 자동 연결. 법령 간 관계를 그래프로 시각화.
+* **🕘 조회 이력** — 열람한 법령·조례·판례를 홈과 `Cmd/Ctrl+K`에서 한 번에 다시 열기. 로그인 시 기기 간 동기화.
+* **📑 별표·별지 뷰어** — 조문이 참조하는 `[별표 N]`·`별지 제N호서식`을 클릭 한 번으로 원문(PDF/HWP) 확인.
 
 ---
 
-## 🧪 베타 안내 (v2.1.0)
+## 🧪 베타 안내 (v2.4.0)
 
 LexDiff는 현재 **공개 베타**입니다. Google 계정 로그인 후 누구나 무료로 사용할 수 있습니다.
 
