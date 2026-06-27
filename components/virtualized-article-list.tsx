@@ -49,9 +49,8 @@ export const VirtualizedArticleList = React.memo(
         const timer = setTimeout(() => {
           const container = parentRef.current
           if (container && container.clientHeight > 0) {
-            // Scroll to the top of the selected item rather than center
-            const scrollTop = Math.max(0, activeIndex * (isPrecedent ? 28 : 60))
-            container.scrollTop = scrollTop
+            // 가변 행높이 보정을 위해 virtualizer의 측정값 기반 스크롤 사용
+            virtualizer.scrollToIndex(activeIndex, { align: 'center' })
           }
         }, 150)
         return () => clearTimeout(timer)

@@ -128,6 +128,8 @@ export function AnnexModal({
 }: AnnexModalProps) {
   const [loadingState, setLoadingState] = useState<LoadingState>("idle")
   const [error, setError] = useState<string | null>(null)
+  // 에러 메시지를 '장애(빨강)'가 아니라 '안내(info 톤)'로 표시할지 — 스캔 PDF 등 정상적 제약
+  const [errorIsInfo, setErrorIsInfo] = useState(false)
   const [annexData, setAnnexData] = useState<LawAnnex | null>(null)
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("markdown")
@@ -201,6 +203,7 @@ export function AnnexModal({
 
     setLoadingState("fetching-list")
     setError(null)
+    setErrorIsInfo(false)
     setAnnexData(null)
     setMarkdown(null)
 
@@ -374,8 +377,14 @@ export function AnnexModal({
           // 구 HWP 파일인 경우 다운로드만 제공
           if (errorData?.fileType === "old-hwp") {
             // 구 HWP 파일 - 다운로드만 제공 (아무 조치 없음)
+          } else if (errorData?.fileType === "image-pdf") {
+            // 이미지(스캔) PDF — 텍스트 추출 불가는 장애가 아니라 제약. info 톤 안내 + 원문 링크.
+            setError("스캔(이미지) 형식 별표라 본문 텍스트를 뽑아낼 수 없어요.\n아래 '법제처에서 보기'로 원문을 확인하세요.")
+            setErrorIsInfo(true)
+            setLoadingState("error")
+            return // info톤 error 상태가 아래 setLoadingState("done")에 덮이지 않게(admin 분기와 동일)
           } else {
-            // PDF는 원문 뷰로 전환
+            // 기타 PDF 에러 - 원문 뷰로 전환
             setViewMode("pdf")
           }
         }
@@ -409,6 +418,7 @@ export function AnnexModal({
     const t = setTimeout(() => {
       setLoadingState("idle")
       setError(null)
+      setErrorIsInfo(false)
       setAnnexData(null)
       setMarkdown(null)
       setViewMode("markdown")
@@ -452,6 +462,7 @@ export function AnnexModal({
                 className="h-7 w-7 -ml-1 text-muted-foreground hover:text-foreground shrink-0"
                 onClick={onBack}
                 title="이전 별표로 돌아가기"
+                aria-label="이전 별표로 돌아가기"
               >
                 <Icon name="arrow-left" className="w-4 h-4" />
               </Button>
@@ -479,6 +490,7 @@ export function AnnexModal({
                 className="h-6 w-6"
                 onClick={decreaseFontSize}
                 title="글자 작게"
+                aria-label="글자 작게"
               >
                 <Icon name="minus" className="h-3 w-3" />
               </Button>
@@ -491,6 +503,7 @@ export function AnnexModal({
                 className="h-6 w-6"
                 onClick={increaseFontSize}
                 title="글자 크게"
+                aria-label="글자 크게"
               >
                 <Icon name="plus" className="h-3 w-3" />
               </Button>
@@ -504,6 +517,7 @@ export function AnnexModal({
               disabled={isLoading}
               className="h-7 w-7 hidden sm:flex"
               title="캐시 무시 새로고침"
+              aria-label="캐시 무시 새로고침"
             >
               <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             </Button>
@@ -521,6 +535,7 @@ export function AnnexModal({
               disabled={!annexData?.pdfLink}
               className="h-7 w-7 hidden sm:flex"
               title={fileType === "hwp" || fileType === "hwpx" ? "HWP 다운로드" : "PDF 다운로드"}
+              aria-label={fileType === "hwp" || fileType === "hwpx" ? "HWP 다운로드" : "PDF 다운로드"}
             >
               <Icon name="download" className="w-3.5 h-3.5" />
             </Button>
@@ -530,6 +545,7 @@ export function AnnexModal({
               asChild
               className="h-7 w-7 hidden sm:flex"
               title="법제처 원문"
+              aria-label="법제처 원문"
             >
               <a href={molegUrl} target="_blank" rel="noopener noreferrer">
                 <Icon name="external-link" className="w-3.5 h-3.5" />
@@ -553,6 +569,19 @@ export function AnnexModal({
           <div className="flex flex-col items-center justify-center h-[50vh] gap-3">
             <Icon name="loader" className="w-8 h-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">{getLoadingMessage()}</p>
+          </div>
+        ) : loadingState === "error" && (isAdminRule || errorIsInfo) ? (
+          // 행정규칙(법제처 미제공)·스캔 PDF 등 정상적 제약 — 장애가 아니라 안내. info 톤으로 표시하고
+          // 무의미한 '다시 시도'는 숨긴 채 원문 링크만 노출 (LV-ANNEX-3/4).
+          <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
+            <Icon name="info" className="w-12 h-12 text-amber-500/70" />
+            <p className="text-sm text-muted-foreground text-center whitespace-pre-line">{error}</p>
+            <Button variant="outline" size="sm" asChild>
+              <a href={molegUrl} target="_blank" rel="noopener noreferrer">
+                <Icon name="external-link" className="w-4 h-4 mr-2" />
+                법제처에서 보기
+              </a>
+            </Button>
           </div>
         ) : loadingState === "error" ? (
           <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-4">
@@ -672,25 +701,25 @@ export function AnnexModal({
         {/* 모바일 하단 컨트롤 툴바 — 데스크톱은 헤더에 노출하지만 모바일에선 hidden sm:
             이라 모든 컨트롤이 사라졌었음(LV-ANNEX-2). 동일 핸들러를 엄지 닿는 하단에 모음. */}
         <div className="sm:hidden mt-auto shrink-0 flex items-center justify-around gap-1 border-t border-border bg-background/80 px-2 py-1.5">
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={decreaseFontSize} title="글자 작게">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={decreaseFontSize} title="글자 작게" aria-label="글자 작게">
             <Icon name="minus" className="h-4 w-4" />
           </Button>
           <span className="text-xs tabular-nums text-muted-foreground select-none w-9 text-center">{fontSize}px</span>
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={increaseFontSize} title="글자 크게">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={increaseFontSize} title="글자 크게" aria-label="글자 크게">
             <Icon name="plus" className="h-4 w-4" />
           </Button>
           {markdown && (
             <CopyButton getText={() => markdown} variant="ghost" className="h-9 w-9" />
           )}
-          <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!annexData?.pdfLink} className="h-9 w-9" title="다운로드">
+          <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!annexData?.pdfLink} className="h-9 w-9" title="다운로드" aria-label="다운로드">
             <Icon name="download" className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" asChild className="h-9 w-9" title="법제처 원문">
+          <Button variant="ghost" size="icon" asChild className="h-9 w-9" title="법제처 원문" aria-label="법제처 원문">
             <a href={molegUrl} target="_blank" rel="noopener noreferrer">
               <Icon name="external-link" className="w-4 h-4" />
             </a>
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => { fetchAnnexData(true) }} disabled={isLoading} className="h-9 w-9" title="새로고침">
+          <Button variant="ghost" size="icon" onClick={() => { fetchAnnexData(true) }} disabled={isLoading} className="h-9 w-9" title="새로고침" aria-label="새로고침">
             <Icon name="refresh-cw" className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
         </div>

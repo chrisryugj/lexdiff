@@ -81,7 +81,7 @@ export function LawViewerActionButtons({
 
   return (
     <div className="border-b border-border px-3 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-3">
-      <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto">
+      <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto slim-scrollbar">
         {isPrecedent ? (
           // 판례 전용 액션 버튼
           <div className="flex items-center justify-between w-full">

@@ -275,6 +275,15 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
           </div>
         )}
 
+        {/* ── Loading 본문 스켈레톤 (상단 진행바와 중복 아님 — 빈 공백 방지) ── */}
+        {step !== 'done' && step !== 'error' && (
+          <div className="flex-1 space-y-2 p-4 overflow-hidden" aria-hidden>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-12 animate-pulse rounded-md bg-muted/40" />
+            ))}
+          </div>
+        )}
+
         {/* ── Error ── */}
         {step === 'error' && (
           <div className="flex-1 flex items-center justify-center p-6">
@@ -285,16 +294,6 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
                 <Icon name="refresh" size={14} className="mr-1" />
                 다시 시도
               </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Loading ── */}
-        {step !== 'done' && step !== 'error' && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-2">
-              <Icon name="loader" size={32} className="mx-auto animate-spin text-brand-navy dark:text-brand-gold" />
-              <p className="text-sm text-muted-foreground">{STEP_LABELS[step]} 중...</p>
             </div>
           </div>
         )}

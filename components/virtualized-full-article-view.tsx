@@ -92,6 +92,15 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   // scrollToIndex 점프 후 연쇄 재측정/스크롤 보정 루프를 끊기 위함.
   const heightCacheRef = useRef<Map<string, number>>(new Map())
 
+  // LV-1: 전체보기 스크롤 → activeJo 역추적용 가드 refs
+  // - scrollOriginJoRef: 스크롤이 만든 activeJo 변경을 표시 → activeJo→scroll 효과가 1회 재스크롤을 건너뛰어 무한루프 방지
+  // - programmaticScrollUntilRef: 프로그래matic 스크롤(클릭/점프) 동안 발생하는 scroll 이벤트를 사용자 스크롤로 오인하지 않게 무시할 시각(ms epoch)
+  const scrollOriginJoRef = useRef<string | null>(null)
+  const programmaticScrollUntilRef = useRef(0)
+  // 스크롤 핸들러가 재구독 없이 최신 activeJo를 읽도록 미러링
+  const activeJoRef = useRef(activeJo)
+  activeJoRef.current = activeJo
+
   // ✅ onContentClick 참조 고정 — law-viewer의 handleContentClick이 activeJo 바뀔 때마다
   // 새 참조로 재생성되어 ArticleContent memo가 매번 깨지던 문제 해결.
   // 래퍼는 마운트 1회만 만들고, 내부에서 최신 콜백을 ref로 조회.
@@ -282,6 +291,12 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       : undefined,
   })
 
+  // LV-1: 스크롤 핸들러가 재구독 없이 최신 virtualizer/allItems를 읽도록 미러링
+  const virtualizerRef = useRef(virtualizer)
+  virtualizerRef.current = virtualizer
+  const allItemsRef = useRef(allItems)
+  allItemsRef.current = allItems
+
   const formatSimpleJo = (article: LawArticle): string => {
     // ✅ 판례는 joNum을 직접 사용
     if (isPrecedent && article.joNum) {
@@ -328,6 +343,12 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
   useEffect(() => {
     if (!activeJo) return
 
+    // LV-1: 이 변경이 스크롤 역추적에서 비롯됐다면 재스크롤하지 않음(무한 루프 방지).
+    // 1회성 소비 — 이후의 클릭/점프 변경은 절대 억제되지 않도록 즉시 클리어.
+    const fromScroll = activeJo === scrollOriginJoRef.current
+    scrollOriginJoRef.current = null
+    if (fromScroll) return
+
     const articleIndex = articles.findIndex(a => a.jo === activeJo)
     if (articleIndex === -1) return
     const itemIndex = preambles.length + articleIndex
@@ -335,6 +356,9 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
     const performScroll = () => {
       const scrollElement = getScrollElement()
       if (!scrollElement) return
+
+      // LV-1: 프로그래matic 스크롤 동안의 scroll 이벤트를 사용자 스크롤로 오인하지 않게 차단
+      programmaticScrollUntilRef.current = Date.now() + 400
 
       const allVirtualItems = virtualizer.getVirtualItems()
       const targetVirtualItem = allVirtualItems.find(item => item.index === itemIndex)
@@ -345,6 +369,7 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
       } else {
         // 아직 렌더링 안 된 경우 virtualizer에게 요청
         setTimeout(() => {
+          programmaticScrollUntilRef.current = Date.now() + 400
           virtualizer.scrollToIndex(itemIndex, { align: 'start' })
         }, 0)
       }
@@ -353,6 +378,49 @@ export const VirtualizedFullArticleView = React.memo(function VirtualizedFullArt
     setTimeout(performScroll, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeJo])
+
+  // LV-1: 전체보기 본문 스크롤 → 뷰포트 상단 조문을 activeJo로 역추적(150ms 디바운스).
+  // 상위(law-viewer)로는 CustomEvent로 전달 — 렌더 트리 중간 컴포넌트(main-content)를
+  // 거치지 않고 직접 알리기 위함. 스크롤마다 setActiveJo→데이터 prefetch 폭주를 막으려
+  // 디바운스로 "스크롤이 멈춘 위치"에서만 1회 보고한다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const scrollElement = getScrollElement()
+    if (!scrollElement) return
+
+    let debounce: ReturnType<typeof setTimeout> | null = null
+
+    const handleScroll = () => {
+      // 프로그래matic 스크롤(클릭/점프) 중 발생한 이벤트는 무시 → 역추적 루프 방지
+      if (Date.now() < programmaticScrollUntilRef.current) return
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        const scrollTop = scrollElement.scrollTop
+        const items = virtualizerRef.current.getVirtualItems()
+        // 뷰포트 상단(scrollTop+8)을 포함하는 첫 항목 = 현재 읽는 조문
+        const topItem = items.find((vi) => vi.end > scrollTop + 8)
+        if (!topItem) return
+        const item = allItemsRef.current[topItem.index]
+        if (!item || item.type !== 'article') return
+        const jo = item.article.jo
+        if (jo === activeJoRef.current) return
+        // 이 변경의 출처가 스크롤임을 표시 → 상위가 setActiveJo 해도 재스크롤 안 함
+        scrollOriginJoRef.current = jo
+        window.dispatchEvent(
+          new CustomEvent('lexdiff:fullview-active-jo', {
+            detail: { jo, lawTitle, lawId },
+          })
+        )
+      }, 150)
+    }
+
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      scrollElement.removeEventListener('scroll', handleScroll)
+      if (debounce) clearTimeout(debounce)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lawTitle, lawId])
 
   return (
     <div

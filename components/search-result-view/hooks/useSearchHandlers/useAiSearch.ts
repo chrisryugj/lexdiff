@@ -21,6 +21,7 @@ export function useAiSearch(deps: HandlerDeps) {
   const streamBufferRef = useRef<string>('')  // 스트리밍 토큰 누적 버퍼
   const answerReceivedRef = useRef(false)  // answer 이벤트 수신 여부
   const answerTokenStartedRef = useRef(false)  // 첫 answer_token 수신 여부
+  const lastProgressRef = useRef(0)  // FC-RAG-2: 진행률 단조증가 가드용 (역행 차단)
   const logIdCounterRef = useRef(0)  // React concurrent/StrictMode 안전한 카운터
 
   /** 현재 답변을 대화 히스토리에 저장 */
@@ -101,6 +102,7 @@ export function useAiSearch(deps: HandlerDeps) {
     streamBufferRef.current = ''
     answerReceivedRef.current = false
     answerTokenStartedRef.current = false
+    lastProgressRef.current = 5
 
     // 이전 검색 진행 중이면 abort
     if (abortRef.current) {
@@ -174,6 +176,7 @@ export function useAiSearch(deps: HandlerDeps) {
     streamBufferRef.current = '' // 스트리밍 버퍼 초기화
     answerReceivedRef.current = false
     answerTokenStartedRef.current = false
+    lastProgressRef.current = 5
 
     // AI 뷰 즉시 표시
     const aiLawData: LawDataState = {
@@ -344,6 +347,7 @@ export function useAiSearch(deps: HandlerDeps) {
         streamBufferRef.current = ''
         answerTokenStartedRef.current = false
         answerReceivedRef.current = false
+        lastProgressRef.current = 0  // FC-RAG-2: retry/fallback 시 진행률 리셋 (단조 가드 예외)
         actions.setAiAnswerContent('')
         actions.clearToolCallLogs()
         return
@@ -364,7 +368,9 @@ export function useAiSearch(deps: HandlerDeps) {
             ? event.progress
             : (PHASE_PROGRESS[event.phase] ?? 30)
           // answer 이후 progress 역행 방지 (100% → 95% 역행 차단)
-          if (!answerReceivedRef.current) {
+          // FC-RAG-2: 단조 증가 가드 — 이전 진행률보다 작으면 무시 (85→75, 5→3 역행 차단)
+          if (!answerReceivedRef.current && resolvedProgress > lastProgressRef.current) {
+            lastProgressRef.current = resolvedProgress
             actions.updateProgress('streaming', resolvedProgress)
           }
           // status는 타임라인 단독 단계로는 안 쓰이지만,
@@ -430,7 +436,10 @@ export function useAiSearch(deps: HandlerDeps) {
             }
             streamBufferRef.current += tokenText
             actions.setAiAnswerContent(streamBufferRef.current)
-            actions.updateProgress('streaming', 75)
+            // FC-RAG-2: 고정 75 대신 누적 토큰 길이로 75→90 점근 (스트리밍 정체감 해소)
+            const streamingProgress = Math.min(90, 75 + streamBufferRef.current.length / 60)
+            lastProgressRef.current = streamingProgress
+            actions.updateProgress('streaming', streamingProgress)
           }
           break
         }

@@ -59,6 +59,8 @@ export interface SearchHandlers {
   // 조례 페이지네이션
   handleOrdinancePageChange: (page: number) => Promise<void>
   handleOrdinancePageSizeChange: (size: number) => Promise<void>
+  // 캐시 복원 후 판례 페이지네이션 파라미터 시드 (PREC-3)
+  seedPrecedentSearchParams: (params: { searchQuery: string; court?: string; caseNumber?: string }) => void
 }
 
 // ============================================================

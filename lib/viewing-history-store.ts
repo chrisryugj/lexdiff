@@ -15,6 +15,7 @@
 import { debugLogger } from "./debug-logger"
 import { getSupabaseBrowserClient } from "./supabase/browser"
 import { createEmptyClassification, type UnifiedQueryClassification } from "@/src/domain/search/entities/Classification"
+import type { SearchType } from "@/src/domain/search/value-objects/SearchType"
 
 const STORAGE_KEY = "law-comparison-viewing-history"
 const MAX_RECENT = 50 // 게스트 localStorage 상한 (카테고리 합산)
@@ -112,6 +113,8 @@ export interface ReviewQuery {
   lawName: string
   jo?: string
   rawQuery?: string
+  searchType?: SearchType
+  ordinanceSeq?: string
   classification?: UnifiedQueryClassification
 }
 
@@ -137,7 +140,22 @@ export function toReviewQuery(rec: ViewingRecord): ReviewQuery {
       },
     }
   }
-  return { lawName: rec.title } // ordinance: 조례명으로 재검색
+  // ordinance: 조례명으로 재검색하되 searchType='ordinance'를 실어 조례 검색 경로
+  // (useBasicSearch — query.searchType 기준 분기)로 라우팅한다. 안 실으면 평문
+  // 법령검색으로 새어 같은 이름의 다른 지자체 조례가 뜨거나 다른 모드로 빠진다(VH-2).
+  // ordinanceSeq를 알면 함께 실어 이름 검색을 건너뛰고 정확히 그 조례를 다시 연다
+  // (같은 이름 다지자체 모호성 제거). 없으면 기존처럼 조례명 검색으로 폴백.
+  return {
+    lawName: rec.title,
+    searchType: "ordinance",
+    ordinanceSeq: rec.ordinanceSeq,
+    classification: {
+      ...createEmptyClassification(),
+      searchType: "ordinance",
+      confidence: 1,
+      entities: { lawName: rec.title },
+    },
+  }
 }
 
 export class ViewingHistoryStore {
@@ -146,6 +164,7 @@ export class ViewingHistoryStore {
   private listeners: Set<(records: ViewingRecord[]) => void> = new Set()
   private mode: Mode = "guest"
   private userId: string | null = null
+  private hydrating = false
 
   private constructor() {
     if (typeof window !== "undefined") this.loadFromStorage()
@@ -201,6 +220,7 @@ export class ViewingHistoryStore {
       this.mode = "guest"
       this.userId = null
       this.records = []
+      this.hydrating = false // 진행 중이던 user hydrate가 로그아웃에 끊겨도 스켈레톤 고착 방지
       this.clearStorage()
       this.notifyListeners()
       return
@@ -208,6 +228,8 @@ export class ViewingHistoryStore {
 
     this.mode = "user"
     this.userId = userId
+    this.hydrating = true
+    this.notifyListeners()
     const supabase = getSupabaseBrowserClient()
 
     // 게스트 상태에서 쌓인 로컬 이력 머지 (중복은 무시)
@@ -241,12 +263,18 @@ export class ViewingHistoryStore {
     } else {
       this.records = (data as ViewingRow[]).map(rowToRecord)
     }
+    this.hydrating = false
     this.notifyListeners()
   }
 
   getRecords(category?: ViewingCategory): ViewingRecord[] {
     const all = [...this.records]
     return category ? all.filter((r) => r.category === category) : all
+  }
+
+  /** 로그인 사용자의 DB 이력 로드(hydrate) 진행 여부 — 패널이 스켈레톤 표시 판단에 사용. */
+  isHydrating(): boolean {
+    return this.hydrating
   }
 
   /** 항목 조회 기록. 기존 itemKey면 맨 위로 이동 + view_count 증가, 없으면 신규. */

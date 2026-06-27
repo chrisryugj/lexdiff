@@ -74,6 +74,8 @@ export const TimeMachineModal = memo(function TimeMachineModal({
   const [newContent, setNewContent] = useState('')
   const [selectedRevision, setSelectedRevision] = useState<HistoryItem | null>(null)
   const [noRevisions, setNoRevisions] = useState(false)
+  // TM-2: 신구대조표가 원래 제공되지 않는 개정(제정·타법개정 등)은 에러가 아니라 정상 빈상태.
+  const [noDiff, setNoDiff] = useState(false)
 
   // UI 상태
   const [syncScroll, setSyncScroll] = useState(true)
@@ -101,22 +103,24 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       setNewContent('')
       setSelectedRevision(null)
       setNoRevisions(false)
+      setNoDiff(false)
       setError(null)
       setShowHistory(false)
+      setMobileHistoryOpen(false) // 모바일 이력 오버레이 stale 잔류 방지(재오픈 시 닫기버튼 가림)
     }
     return () => { abortRef.current?.abort() }
   }, [isOpen])
 
   // 특정 개정의 신구대조 XML 조회
   const fetchRevisionDiff = useCallback(async (rev: HistoryItem, signal: AbortSignal) => {
+    setNoDiff(false)
     const cached = getDiffCached(rev.mst)
     if (cached) {
       setOldContent(cached.oldContent)
       setNewContent(cached.newContent)
       setSelectedRevision(rev)
-      if (!cached.oldContent && !cached.newContent) {
-        throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
-      }
+      // TM-2: 신구대조표 없음은 에러가 아니라 정상 빈상태 — throw 대신 noDiff 안내(사이드바 유지).
+      if (!cached.oldContent && !cached.newContent) setNoDiff(true)
       return
     }
 
@@ -133,9 +137,8 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setSelectedRevision(rev)
     setDiffCache(rev.mst, { oldContent: parsed.oldVersion.content, newContent: parsed.newVersion.content })
 
-    if (!parsed.oldVersion.content && !parsed.newVersion.content) {
-      throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
-    }
+    // TM-2: 신구대조표 없음은 에러가 아니라 정상 빈상태.
+    if (!parsed.oldVersion.content && !parsed.newVersion.content) setNoDiff(true)
   }, [])
 
   // 조회 실행
@@ -153,6 +156,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setNewContent('')
     setSelectedRevision(null)
     setNoRevisions(false)
+    setNoDiff(false)
 
     try {
       // Step 1: 연혁 조회 (lawId 우선 — ID 경로만 진짜 단일 법령 연혁 반환)
@@ -176,7 +180,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       // Step 2: 해당 날짜 버전 찾기
       const match = findVersionByDate(histories, searchDate, meta.mst || '')
       if (!match) {
-        setError(`${searchDate} 이전에 유효한 법령 버전이 없습니다.`)
+        setError(`${formatDateDisplay(searchDate.replace(/-/g, ''))} 이전에 유효한 법령 버전이 없습니다.`)
         return
       }
 
@@ -329,6 +333,18 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                 </div>
               </>
             )}
+
+            {!showHistory && versionMatch && versionMatch.betweenRevisions.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistory(true)}
+                className="text-xs h-8 px-2 hidden sm:flex"
+              >
+                <Icon name="history" size={12} className="mr-1" />
+                이력 보기
+              </Button>
+            )}
           </div>
 
           {/* 빠른 선택 템플릿 */}
@@ -435,7 +451,20 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                 <div className="text-center space-y-3 max-w-md px-4">
                   <Icon name="check-circle" size={40} className="mx-auto text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground">
-                    {targetDate} 이후 이 법령의 개정이 없습니다.
+                    {formatDateDisplay(targetDate.replace(/-/g, ''))} 이후 이 법령의 개정이 없습니다.
+                  </p>
+                </div>
+              </div>
+            ) : noDiff ? (
+              /* TM-2: 신구대조표가 원래 없는 개정 — 에러가 아니라 차분한 안내 (사이드바에서 다른 개정 선택 가능) */
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2 max-w-md px-4">
+                  <Icon name="info" size={40} className="mx-auto text-muted-foreground/50" />
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedRevision?.rrCls ? `${selectedRevision.rrCls}은(는) ` : '이 개정은 '}신구대조표가 제공되지 않아요
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    제정·타법개정 등은 대조할 이전 조문이 없어요. 왼쪽에서 다른 개정을 골라 비교해 보세요.
                   </p>
                 </div>
               </div>
@@ -502,18 +531,52 @@ export const TimeMachineModal = memo(function TimeMachineModal({
           </div>
         </div>
 
-        {/* ── Footer (mobile 이력 토글) ── */}
-        {hasResult && versionMatch && versionMatch.betweenRevisions.length > 0 && (
-          <div className="px-4 py-1.5 border-t border-border shrink-0 sm:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileHistoryOpen(true)}
-              className="text-xs h-6 px-2 w-full justify-center text-muted-foreground"
-            >
-              <Icon name="history" size={12} className="mr-1" />
-              이력 {versionMatch.betweenRevisions.length}건
-            </Button>
+        {/* ── Footer (mobile 컨트롤) ── */}
+        {hasResult && (
+          <div className="px-3 py-1.5 border-t border-border shrink-0 sm:hidden">
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant={syncScroll ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSyncScroll(!syncScroll)}
+                className="text-xs h-6 px-1.5 shrink-0"
+                title={syncScroll ? "동기 중" : "동기 해제"}
+              >
+                <Icon name="arrow-left-right" size={12} />
+              </Button>
+
+              <div className="flex items-center gap-0 border border-border rounded-md shrink-0">
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => setFontSize(v => Math.max(v - 1, 12))}
+                  className="h-6 px-1.5 rounded-r-none border-r border-border"
+                  title="글자 축소"
+                >
+                  <Icon name="zoom-out" size={12} />
+                </Button>
+                <span className="text-xs text-muted-foreground px-1.5 min-w-[24px] text-center">{fontSize}</span>
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => setFontSize(v => Math.min(v + 1, 28))}
+                  className="h-6 px-1.5 rounded-l-none border-l border-border"
+                  title="글자 확대"
+                >
+                  <Icon name="zoom-in" size={12} />
+                </Button>
+              </div>
+
+              {versionMatch && versionMatch.betweenRevisions.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMobileHistoryOpen(true)}
+                  className="text-xs h-6 px-1.5 ml-auto shrink-0 text-muted-foreground"
+                >
+                  <Icon name="history" size={12} className="mr-0.5" />
+                  <span className="text-[10px]">{versionMatch.betweenRevisions.length}</span>
+                </Button>
+              )}
+            </div>
           </div>
         )}
 

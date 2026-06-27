@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
         if (!HERMES_DISABLED && !authCtx.isByok) {
           try {
           traceLogger.addEvent(traceId, 'hermes_start', {})
-          sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 2 })
+          sendAndLog({ type: "status", message: "AI 엔진 연결 중...", progress: 3 })
 
           let lastAnswerCitations: FCRAGCitation[] = []
 
@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
         if (!handled) {
           // F1: Hermes 도중에 흘려보낸 답변/툴 로그가 있다면 클라에서 비우게 함
           sendAndLog({ type: "stream_reset", reason: "fallback" })
-          sendAndLog({ type: "status", message: "Gemini 엔진으로 전환 중...", progress: 3 })
+          sendAndLog({ type: "status", message: "법령 검색 중...", progress: 3 })
           traceLogger.addEvent(traceId, 'gemini_start', {})
 
           let lastAnswerCitations: FCRAGCitation[] = []

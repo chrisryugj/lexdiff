@@ -26,7 +26,7 @@ export function ConsentGate() {
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeAll, setAgreeAll] = useState(false)
-  const [aiLoggingOptIn, setAiLoggingOptIn] = useState(true)
+  const [aiLoggingOptIn, setAiLoggingOptIn] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [docOpen, setDocOpen] = useState<LegalDoc | null>(null)
 

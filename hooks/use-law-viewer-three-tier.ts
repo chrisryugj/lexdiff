@@ -7,7 +7,10 @@ export function useLawViewerThreeTier(
   activeJo: string,
   activeArticle: LawArticle | undefined,
   aiAnswerMode: boolean,
-  isOrdinance: boolean
+  isOrdinance: boolean,
+  // DELEG-1: 행정규칙이 로드되어 내용이 있는지 (showAdminRules && adminRules.length > 0).
+  // 시행령/시행규칙이 모두 비고 행정규칙만 위임된 조문에서 admin 탭으로 자동 전환하는 데 사용.
+  hasLoadedAdminContent: boolean = false
 ) {
   // 3-tier comparison data
   const [threeTierCitation, setThreeTierCitation] = useState<ThreeTierData | null>(null)
@@ -117,6 +120,45 @@ export function useLawViewerThreeTier(
     // 2-tier 모드는 자동으로 리셋하지 않음 - 행정규칙이 있을 수 있기 때문
     // 사용자가 "위임법령 닫기" 버튼을 눌러야만 1-tier로 복귀
   }, [tierViewMode, hasValidSihyungkyuchik, hasValidThreeTierData, activeJo])
+
+  // DELEG-1: 위임법령 패널을 열었을 때 기본 탭(시행령)이 비어있으면 내용 있는 탭으로 1회 자동 전환.
+  // 우선순위: 시행령(내용 있으면 유지) → 시행규칙 → 행정규칙(adminRules).
+  // - panel open당 1회로 한정(autoSwitchedTabRef) → 사용자가 수동으로 고른 탭을 덮지 않음
+  // - 조문 전환으로 validDelegations가 바뀌어도 가드로 재전환하지 않음
+  // - 행정규칙은 별도 비동기 훅이 로드 → 아직 로드 전이면 가드를 세우지 않고 대기했다가
+  //   hasLoadedAdminContent=true가 되는 렌더에서 전환(동기 전환 경합 방지)
+  const autoSwitchedTabRef = useRef(false)
+  useEffect(() => {
+    if (tierViewMode === "1-tier") {
+      // 패널이 닫히면 가드와 활성 탭을 기본값(decree)으로 리셋 → 다음 오픈 때 빈 탭 자동전환을
+      // 다시 평가한다. 안 그러면 한 번 rule/admin으로 전환된 뒤 활성 탭이 계속 비-decree로 남아
+      // (조문/법령 변경 후 재오픈 시) 가드(아래 decree 체크)에 막혀 stale·빈 탭으로 열린다.
+      autoSwitchedTabRef.current = false
+      setDelegationActiveTab("decree")
+      return
+    }
+    if (autoSwitchedTabRef.current || isLoadingThreeTier) return
+    if (delegationActiveTab !== "decree") return
+    const decreeCount = validDelegations.filter((d) => d.type === "시행령").length
+    const ruleCount = validDelegations.filter((d) => d.type === "시행규칙").length
+    // 시행령에 내용이 있으면 기본 탭 유지
+    if (decreeCount > 0) {
+      autoSwitchedTabRef.current = true
+      return
+    }
+    // 시행령 비고 시행규칙에 내용 → 시행규칙 탭
+    if (ruleCount > 0) {
+      setDelegationActiveTab("rule")
+      autoSwitchedTabRef.current = true
+      return
+    }
+    // 시행령·시행규칙 모두 비고 행정규칙만 로드돼 있으면 행정규칙 탭 (DELEG-1 잔여)
+    if (hasLoadedAdminContent) {
+      setDelegationActiveTab("admin")
+      autoSwitchedTabRef.current = true
+    }
+    // 셋 다 비어 있으면(행정규칙 로드 전 포함) 가드를 세우지 않고 다음 렌더에서 재평가
+  }, [tierViewMode, isLoadingThreeTier, validDelegations, delegationActiveTab, hasLoadedAdminContent])
 
   return {
     // State

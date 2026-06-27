@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Icon } from "@/components/ui/icon"
+import { ToastAction } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"
 import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
@@ -21,6 +23,7 @@ interface FavoritesDialogProps {
 
 export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogProps) {
   const [favorites, setFavorites] = useState<Favorite[]>([])
+  const { toast } = useToast()
 
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe(setFavorites)
@@ -28,9 +31,18 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
     return () => { unsubscribe() }
   }, [])
 
-  const handleRemove = (id: string, e: React.MouseEvent) => {
+  const handleRemove = (id: string, index: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    favoritesStore.removeFavorite(id)
+    const removed = favoritesStore.removeFavorite(id)
+    if (!removed) return
+    toast({
+      description: `'${removed.lawTitle}' 즐겨찾기에서 뺐어요`,
+      action: (
+        <ToastAction altText="삭제 실행취소" onClick={() => favoritesStore.restoreFavorite(removed, index)}>
+          실행취소
+        </ToastAction>
+      ),
+    })
   }
 
   const formatDateTime = (isoString: string) => {
@@ -76,28 +88,29 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
 
         {favorites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Icon name="file-text" className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">즐겨찾기한 법령이 없습니다.</p>
+            <Icon name="star" className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-foreground font-medium">즐겨찾기한 법령이 없습니다.</p>
+            <p className="text-xs text-muted-foreground mt-2">법령 조문 옆의 별 아이콘을 클릭하여 즐겨찾기를 추가하세요</p>
           </div>
         ) : (
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-3">
-              {favorites.map((favorite) => (
+              {favorites.map((favorite, index) => (
                 <div
                   key={favorite.id}
                   className="flex items-start justify-between gap-3 rounded-md border border-border bg-card/50 p-4 hover:bg-card transition-colors cursor-pointer"
                   onClick={() => handleSelectAndClose(favorite)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-foreground">{favorite.lawTitle}</span>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="font-medium text-foreground truncate max-w-full">{favorite.lawTitle}</span>
                       {/* 판례는 조문 배지 숨김 */}
                       {!favorite.lawId?.startsWith('prec-') && (
-                        <Badge variant="outline">{formatJO(favorite.jo)}</Badge>
+                        <Badge variant="outline" className="shrink-0">{formatJO(favorite.jo)}</Badge>
                       )}
                       {favorite.effectiveDate && (
-                        <Badge variant="secondary" className="text-xs">
-                          {formatDate(favorite.effectiveDate)}
+                        <Badge variant="secondary" className="text-xs" title="최종 개정일">
+                          개정일: {formatDate(favorite.effectiveDate)}
                         </Badge>
                       )}
                       {favorite.hasChanges && (
@@ -116,8 +129,8 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => handleRemove(favorite.id, e)}
-                    className="h-8 w-8 p-0 shrink-0"
+                    onClick={(e) => handleRemove(favorite.id, index, e)}
+                    className="min-h-10 min-w-10 p-0 shrink-0"
                   >
                     <Icon name="trash" className="h-4 w-4" />
                   </Button>

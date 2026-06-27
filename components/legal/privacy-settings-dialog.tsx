@@ -9,6 +9,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { ApiKeyInput } from '@/components/settings/api-key-input'
+import { useApiKey } from '@/hooks/use-api-key'
 
 interface ConsentData {
   ai_logging_opt_in: boolean
@@ -28,6 +30,7 @@ interface PrivacySettingsDialogProps {
  * AI 로그 수집 동의 토글 + 로그 삭제 + 동의 버전 정보.
  */
 export function PrivacySettingsDialog({ open, onClose }: PrivacySettingsDialogProps) {
+  const { apiKey, saveKey, clearKey } = useApiKey()
   const [consent, setConsent] = useState<ConsentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -92,6 +95,24 @@ export function PrivacySettingsDialog({ open, onClose }: PrivacySettingsDialogPr
         <DialogHeader>
           <DialogTitle className="text-lg">개인정보 설정</DialogTitle>
         </DialogHeader>
+
+        {/* settings F2: 쿼터 소진 시 막다른 길이던 'API 키 등록'을 실제 등록 UI로 노출 (로그인/비로그인 공통) */}
+        <section className="p-4 rounded-lg border border-border bg-card">
+          <h3 className="font-semibold text-sm mb-1.5">내 Gemini API 키</h3>
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+            본인 키를 등록하면 일일 무료 한도 없이 AI 검색을 쓸 수 있어요. 키는 이 브라우저 탭에만 저장되고 서버로 전송되지 않아요.
+          </p>
+          <div className="flex items-center gap-3">
+            <ApiKeyInput apiKey={apiKey} onSave={saveKey} onClear={clearKey} />
+            <span className="text-xs">
+              {apiKey ? (
+                <strong className="text-emerald-600">등록됨 · 무제한 사용 중</strong>
+              ) : (
+                <span className="text-muted-foreground">미등록 · 일일 한도 적용</span>
+              )}
+            </span>
+          </div>
+        </section>
 
         {loading ? (
           <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>

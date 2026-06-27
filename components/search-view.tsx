@@ -55,7 +55,7 @@ export function SearchView({
   const [tourRunKey, setTourRunKey] = useState(0)
   const isHeaderVisible = useScrollDirection()  // PERF-3: 통합 훅 사용
 
-  const tourSteps: TourStep[] = [
+  const allTourSteps: TourStep[] = [
     {
       selector: '[data-tour="search-input"]',
       title: "법령을 바로 검색하세요",
@@ -125,6 +125,13 @@ export function SearchView({
       padding: 6,
     },
   ]
+
+  // SR-3: 모바일(<640px)에선 AI 토글 버튼이 hidden sm:flex로 숨겨져 투어 스포트라이트가 빈 모서리를 가리킴 → 해당 단계 제외
+  const tourSteps = allTourSteps.filter((step) => {
+    if (typeof window === "undefined") return true
+    if (step.selector === '[data-tour="ai-toggle"]' && window.innerWidth < 640) return false
+    return true
+  })
 
   const featuresRef = useRef<HTMLElement>(null)
   const [featuresRevealed, setFeaturesRevealed] = useState(false)

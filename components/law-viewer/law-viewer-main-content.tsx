@@ -97,6 +97,7 @@ interface LawViewerMainContentProps {
   // Article data
   activeArticle: LawArticle | undefined
   activeArticleHtml: string
+  loadingJo: string | null
   actualArticles: LawArticle[]
   preambles: LawArticle[]
   activeJo: string
@@ -136,6 +137,7 @@ export function LawViewerMainContent({
   isPrecedent,
   activeArticle,
   activeArticleHtml,
+  loadingJo,
   actualArticles,
   preambles,
   activeJo,
@@ -252,8 +254,17 @@ export function LawViewerMainContent({
     )
   }
 
-  // 단문 조회 모드 - 조문 없음
+  // 단문 조회 모드 - 조문 없음 또는 로딩 중
   if (!activeArticle) {
+    if (loadingJo) {
+      return (
+        <div className="flex-1 min-h-0">
+          <div className="flex items-center justify-center h-full">
+            <Icon name="loader" size={24} className="animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="flex-1 min-h-0">
         <div className="flex items-center justify-center h-full text-muted-foreground">

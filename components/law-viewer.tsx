@@ -146,6 +146,9 @@ function LawViewerComponent({
   const [isArticleListCollapsed, setIsArticleListCollapsed] = useState(false) // 조문목록 접기 상태
   const articleRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const contentRef = useRef<HTMLDivElement>(null)
+  // LV-1: 모바일/데스크톱 LawViewer가 동일 props로 동시 마운트되므로(한쪽은 display:none),
+  // 전체보기 스크롤 역추적 이벤트는 "보이는" 인스턴스만 처리하도록 루트 가시성 가드에 사용.
+  const viewerRootRef = useRef<HTMLDivElement>(null)
   const [revisionHistory, setRevisionHistory] = useState<RevisionHistoryItem[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [showImpactAnalysis, setShowImpactAnalysis] = useState(false)
@@ -275,7 +278,7 @@ function LawViewerComponent({
     threeTierDataType,
     tierItems,
     fetchThreeTierData,
-  } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance)
+  } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance, loadedAdminRulesCount > 0)
 
   // 위임법령 버튼 비활성화 조건 계산
   // 1. 위임법령 데이터가 로드된 적 있음 (threeTierDelegation 존재)
@@ -414,6 +417,26 @@ function LawViewerComponent({
       })
     })
   }, [meta.lawId, activeJo, isOrdinance, isPrecedent])
+
+  // LV-1: 전체보기 본문 스크롤 → activeJo 역추적.
+  // VirtualizedFullArticleView가 뷰포트 상단 조문을 CustomEvent로 알림(중간 컴포넌트
+  // main-content를 거치는 prop 전달 대신 직접 수신). 다른 뷰어 인스턴스의 이벤트는
+  // lawTitle로 필터. 역추적 자체의 디바운스/루프 가드는 dispatch 측(가상스크롤 뷰)에 있음.
+  useEffect(() => {
+    if (!isFullView) return
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { jo?: string; lawTitle?: string } | undefined
+      if (!detail?.jo) return
+      if (detail.lawTitle !== meta.lawTitle) return
+      // 같은 lawTitle/lawId로 중복 마운트된 숨은 인스턴스(display:none)는 무시 —
+      // 보이지 않으면 offsetParent가 null. 보이는 뷰어만 activeJo를 갱신해
+      // 숨은 인스턴스의 불필요한 prefetch/재스크롤을 막는다.
+      if (viewerRootRef.current && viewerRootRef.current.offsetParent === null) return
+      setActiveJo((prev) => (prev === detail.jo ? prev : detail.jo!))
+    }
+    window.addEventListener("lexdiff:fullview-active-jo", handler)
+    return () => window.removeEventListener("lexdiff:fullview-active-jo", handler)
+  }, [isFullView, meta.lawTitle])
 
   // 관련 심급 훅
   const {
@@ -726,7 +749,7 @@ function LawViewerComponent({
 
   return (
     <LawViewerProvider value={ctxValue}>
-      <div className="w-full max-w-full mx-auto lg:max-w-[1280px] overflow-hidden">
+      <div ref={viewerRootRef} className="w-full max-w-full mx-auto lg:max-w-[1280px] overflow-hidden">
         <div
           className={`relative grid gap-0 sm:gap-4 min-h-0 lg:h-[calc(100vh-80px)] ${
             isArticleListCollapsed
@@ -828,6 +851,7 @@ function LawViewerComponent({
               isPrecedent={isPrecedent}
               activeArticle={activeArticle}
               activeArticleHtml={activeArticleHtml}
+              loadingJo={loadingJo}
               actualArticles={actualArticles}
               preambles={preambles}
               activeJo={activeJo}
@@ -850,6 +874,16 @@ function LawViewerComponent({
           <ReferenceModal
             isOpen={refModal.open}
             onClose={() => {
+              // ESC/Dialog 닫기: 히스토리가 있으면 한 단계 뒤로(F5 — 전부 닫지 않음), 루트면 닫고 stale 외부 ref 정리
+              if (refModalHistory.length > 0) {
+                handleRefModalBack()
+              } else {
+                setRefModal({ open: false })
+                setLastExternalRef(null)
+              }
+            }}
+            onCloseWithHistoryClear={() => {
+              // X 버튼 클릭: 히스토리 초기화
               setRefModal({ open: false })
               setRefModalHistory([]) // 히스토리 초기화
               setLastExternalRef(null) // P1-LV-2: stale 외부 ref 초기화

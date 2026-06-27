@@ -83,6 +83,8 @@ export function useRelatedPrecedentCases({
     if (!isPrecedent || !showRelatedCases) {
       setRelatedCases([])
       setLoadingRelatedCases(false)
+      // PREC-1: 토글 OFF 시 캐시 무효화 → 재오픈 시 같은 사건명도 다시 검색
+      lastSearchedNameRef.current = null
       return
     }
 

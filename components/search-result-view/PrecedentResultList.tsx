@@ -6,7 +6,7 @@
 
 "use client"
 
-import React, { memo, useState } from "react"
+import React, { memo, useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
@@ -49,6 +49,17 @@ export const PrecedentResultList = memo(function PrecedentResultList({
   onBack,
 }: PrecedentResultListProps) {
   const [filterKeyword, setFilterKeyword] = useState("")
+  const rootRef = useRef<HTMLDivElement>(null)
+  const isFirstRender = useRef(true)
+
+  // 페이지 변경 시 결과 상단으로 복귀(모바일). 최초 마운트는 건너뜀.
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [currentPage])
 
   // 키워드 필터링 (클라이언트 사이드)
   const filteredResults = filterKeyword
@@ -61,7 +72,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
   const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
-    <div className="py-4 md:py-8">
+    <div ref={rootRef} className="py-4 md:py-8">
       {/* 헤더 섹션 - Glassmorphism */}
       <div className="sticky top-0 z-10 -mx-6 px-6 py-4 mb-6 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-6xl mx-auto">
@@ -102,7 +113,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
               <div className="relative">
                 <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="결과 내 검색..."
+                  placeholder="이 페이지에서 찾기"
                   value={filterKeyword}
                   onChange={(e) => setFilterKeyword(e.target.value)}
                   className="pl-9 h-9 text-sm"
@@ -142,9 +153,33 @@ export const PrecedentResultList = memo(function PrecedentResultList({
             ))}
           </div>
         ) : filteredResults.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">검색 결과가 없습니다.</p>
+          <div className="text-center py-16 px-6">
+            <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+            {filterKeyword ? (
+              <>
+                <p className="text-lg font-semibold text-foreground mb-1">
+                  ‘{filterKeyword}’와 일치하는 판례가 이 페이지에 없어요
+                </p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  이 페이지에 보이는 {results.length}건 안에서만 찾아요. 필터를 지우면 전체 결과를 다시 볼 수 있어요.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setFilterKeyword("")} className="gap-2">
+                  <Icon name="x" className="h-4 w-4" />
+                  필터 지우기
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold text-foreground mb-1">판례를 찾지 못했어요</p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  사건명·법령명·사건번호로 검색어를 바꿔 보세요.
+                </p>
+                <Button variant="outline" size="sm" onClick={onBack} className="gap-2">
+                  <Icon name="arrow-left" className="h-4 w-4" />
+                  다른 검색어로 다시 시도
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

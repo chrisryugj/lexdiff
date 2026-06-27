@@ -196,10 +196,13 @@ function SearchResultViewComponent({
         // 판례 검색 결과 복원
         if (cached.precedentResults && cached.precedentResults.length > 0 && !initialPrecedentId) {
           const results = cached.precedentResults
+          const precedentParams = cached.precedentSearchParams
           restoreFromCache('판례 검색 결과', () => {
             actions.setPrecedentResults(results as unknown as PrecedentSearchResult[])
             actions.setLawData(null)
             actions.setMobileView("list")
+            // PREC-3: 새로고침 복원도 전용 핸들러를 거치지 않으므로 페이지네이션 파라미터를 직접 시드
+            if (precedentParams) handlers.seedPrecedentSearchParams(precedentParams)
           })
           return
         }
@@ -385,11 +388,18 @@ function SearchResultViewComponent({
           actions.setPrecedentResults(cached.precedentResults as unknown as PrecedentSearchResult[])
           actions.setLawData(null)
           actions.setMobileView("list")
+          // PREC-3: 전용 핸들러를 거치지 않고 캐시에서 직접 복원하므로 페이지네이션 파라미터를
+          // 직접 시드 → 복원 직후 페이지 변경 시 court/caseNumber/정제쿼리 유지.
+          if (cached.precedentSearchParams) {
+            handlers.seedPrecedentSearchParams(cached.precedentSearchParams)
+          }
         }
       }
 
       restorePrecedentResults()
     }
+    // handlers.seedPrecedentSearchParams 는 안정적인 useCallback 이라 deps 에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrecedentId, searchId, state.lawData?.isPrecedent, actions])
 
   // ============================================================
@@ -570,16 +580,20 @@ function SearchResultViewComponent({
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */
             <LawViewerSkeleton stage={state.searchStage} />
-          ) : state.interpretationResults !== null && state.interpretationResults.length > 0 ? (
-            /* 해석례 검색 결과 */
+          ) : state.interpretationResults !== null ? (
+            /* 해석례 검색 결과 (F1: 0건도 도메인 빈상태로 렌더 — 제네릭 에러 화면 방지) */
             <InterpretationResultList
               results={state.interpretationResults}
+              totalCount={state.interpretationTotalCount}
               onBack={handlers.handleReset}
+              onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
-          ) : state.rulingResults !== null && state.rulingResults.length > 0 ? (
+          ) : state.rulingResults !== null ? (
             <RulingResultList
               results={state.rulingResults}
+              totalCount={state.rulingTotalCount}
               onBack={handlers.handleReset}
+              onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
           ) : state.precedentResults !== null ? (
             /* 판례 검색 결과 */

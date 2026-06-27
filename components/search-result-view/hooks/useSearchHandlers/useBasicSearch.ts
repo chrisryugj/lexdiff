@@ -255,6 +255,20 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           actions.updateProgress('complete', 0)
         }
       } else if (isOrdinance) {
+        // VH-2: 조회 이력 재조회 등으로 ordinanceSeq를 이미 알고 있으면 이름 검색을 건너뛰고
+        // 해당 조례를 바로 연다 → 같은 이름의 다른 지자체 조례가 뜨는 모호성 제거.
+        // 직접 열기 실패 시 아래 이름 검색으로 폴백.
+        if (query.ordinanceSeq) {
+          const directTarget: OrdinanceSearchResult = {
+            ordinSeq: query.ordinanceSeq,
+            ordinName: lawName,
+            ordinId: "",
+          }
+          const opened = await fetchOrdinanceDirect(directTarget, actions, toast, state.searchMode || 'basic')
+          if (opened) return // fetchOrdinanceDirect 내부에서 mobileView/progress 처리
+          debugLogger.warning("VH-2 ordinanceSeq 직접 열기 실패 → 이름 검색 폴백", { ordinanceSeq: query.ordinanceSeq })
+        }
+
         // 다단계 검색 전략 생성 (동의어 확장 + 필살기 포함)
         const strategies = buildOrdinanceSearchStrategies(lawName)
 

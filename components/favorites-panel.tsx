@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Icon } from "@/components/ui/icon"
+import { ToastAction } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"
 import { favoritesStore } from "@/lib/favorites-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO } from "@/lib/law-parser"
@@ -21,6 +23,7 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
   const [favorites, setFavorites] = useState<Favorite[]>([])
   const [isExpanded, setIsExpanded] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     const unsubscribe = favoritesStore.subscribe(setFavorites)
@@ -41,9 +44,18 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
     return () => document.removeEventListener("mousedown", handleOutside)
   }, [isExpanded])
 
-  const handleRemove = (id: string, e: React.MouseEvent) => {
+  const handleRemove = (id: string, index: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    favoritesStore.removeFavorite(id)
+    const removed = favoritesStore.removeFavorite(id)
+    if (!removed) return
+    toast({
+      description: `'${removed.lawTitle}' 즐겨찾기에서 뺐어요`,
+      action: (
+        <ToastAction altText="삭제 실행취소" onClick={() => favoritesStore.restoreFavorite(removed, index)}>
+          실행취소
+        </ToastAction>
+      ),
+    })
   }
 
   const formatDateTime = (isoString: string) => {
@@ -117,7 +129,7 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
           <Separator className="mb-3" />
           <ScrollArea className="max-h-[400px]">
             <div className="space-y-2">
-              {favorites.map((favorite) => (
+              {favorites.map((favorite, index) => (
                 <div
                   key={favorite.id}
                   className="flex items-start justify-between gap-2 rounded-md border border-border bg-card/50 p-3 hover:bg-card transition-colors cursor-pointer"
@@ -153,10 +165,10 @@ export function FavoritesPanel({ onSelect }: FavoritesPanelProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => handleRemove(favorite.id, e)}
-                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={(e) => handleRemove(favorite.id, index, e)}
+                    className="min-h-10 min-w-10 p-0 shrink-0"
                   >
-                    <Icon name="trash" className="h-3 w-3" />
+                    <Icon name="trash" className="h-4 w-4" />
                   </Button>
                 </div>
               ))}

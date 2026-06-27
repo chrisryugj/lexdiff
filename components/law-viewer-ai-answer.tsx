@@ -563,9 +563,9 @@ export function AIAnswerContent({
                                                     type="button"
                                                     onClick={onStop}
                                                     aria-label="AI 답변 생성 중지"
-                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 ring-1 ring-rose-200/70 dark:ring-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors"
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 ring-1 ring-rose-200/70 dark:ring-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors"
                                                 >
-                                                    <Icon name="x" className="h-3 w-3" />
+                                                    <Icon name="x" className="h-4 w-4" />
                                                     중지
                                                 </button>
                                             )}

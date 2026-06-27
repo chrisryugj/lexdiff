@@ -27,15 +27,23 @@ export function ArticleBottomSheet({
   const [currentHeight, setCurrentHeight] = useState(snapPoints[0])
   const sheetRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  // LV-4: 직전 스냅 인덱스를 세션 한정으로 기억해 다음 오픈 시 복원
+  const lastSnapIndexRef = useRef(0)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // 스냅 변경을 ref에 기록 (드래그로 멈춘 위치 기억)
+  useEffect(() => {
+    lastSnapIndexRef.current = snapIndex
+  }, [snapIndex])
+
   useEffect(() => {
     if (isOpen) {
-      setSnapIndex(0)
-      setCurrentHeight(snapPoints[0])
+      const restoreIndex = lastSnapIndexRef.current
+      setSnapIndex(restoreIndex)
+      setCurrentHeight(snapPoints[restoreIndex] ?? snapPoints[0])
     }
   }, [isOpen, snapPoints])
 

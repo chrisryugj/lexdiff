@@ -56,9 +56,11 @@ interface ReferenceModalProps {
   onViewFullLaw?: () => void
   /** 다른 조문 검색 콜백 (같은 법령 내 조문 이동) */
   onSearchArticle?: (articleLabel: string) => void
+  /** X 버튼 클릭 시만 호출 (히스토리 초기화 포함) */
+  onCloseWithHistoryClear?: () => void
 }
 
-export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false, precedentMeta, onViewFullLaw, onSearchArticle }: ReferenceModalProps) {
+export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onContentClick, forceWhiteTheme = false, lawName, articleNumber, hasHistory = false, onBack, loading = false, precedentMeta, onViewFullLaw, onSearchArticle, onCloseWithHistoryClear }: ReferenceModalProps) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [fontSize, setFontSize] = useState(14) // 기본 폰트 크기
   const [articleInput, setArticleInput] = useState('') // 조문 검색 입력
@@ -192,19 +194,20 @@ export function ReferenceModal({ isOpen, onClose, title, html, originalUrl, onCo
             {/* 심급 배지 */}
             {precedentMeta?.court && (
               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                precedentMeta.court.includes("대법원") ? "bg-purple-500/20 text-purple-400" :
-                precedentMeta.court.includes("고등") ? "bg-blue-500/20 text-blue-400" :
+                precedentMeta.court.includes("대법원") || precedentMeta.court.includes("헌법") ? "bg-purple-500/20 text-purple-400" :
+                precedentMeta.court.includes("고등") || precedentMeta.court.includes("특허") ? "bg-blue-500/20 text-blue-400" :
                 "bg-green-500/20 text-green-400"
               }`} style={{ flexShrink: 0 }}>
                 {precedentMeta.court.includes("대법원") ? "3심" :
-                 precedentMeta.court.includes("고등") ? "2심" : "1심"}
+                 precedentMeta.court.includes("헌법") ? "헌재" :
+                 precedentMeta.court.includes("고등") || precedentMeta.court.includes("특허") ? "2심" : "1심"}
               </span>
             )}
             {/* 닫기 버튼 */}
             <Button
               variant="ghost"
               size="sm"
-              onClick={onClose}
+              onClick={onCloseWithHistoryClear || onClose}
               className="p-1 h-7 w-7 opacity-70 hover:opacity-100"
               style={{ flexShrink: 0 }}
               title="닫기"

@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
 import { ViewingHistoryPanel } from "@/components/viewing-history-panel"
-import { toReviewQuery } from "@/lib/viewing-history-store"
+import { toReviewQuery, viewingHistoryStore } from "@/lib/viewing-history-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO, parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -26,6 +26,7 @@ interface CommandSearchModalProps {
     jo?: string
     searchType?: SearchType  // ✅ 신규
     caseNumber?: string  // ✅ 신규
+    ordinanceSeq?: string  // VH-2: 조례 직접 재오픈
     classification?: UnifiedQueryClassification  // ✅ 신규
     rawQuery?: string
     forcedMode?: 'law' | 'ai'
@@ -59,12 +60,15 @@ function useDebounce<T>(value: T, delay: number): T {
 export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false }: CommandSearchModalProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [favorites, setFavorites] = useState<Favorite[]>([])
+  const [historyCount, setHistoryCount] = useState(0)
+  const [historyHydrating, setHistoryHydrating] = useState(false)
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // debounce된 쿼리
   const debouncedQuery = useDebounce(searchQuery, 200)
@@ -77,10 +81,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       return
     }
 
+    // SR-4: 이전 in-flight 요청 취소 — 느린 망에서 옛 응답이 최신 추천을 덮는 경합 방지
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setIsLoadingSuggestions(true)
     setSuggestionsError(null)
     try {
-      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`, { signal: controller.signal })
       if (!res.ok) {
         setSuggestionsError('자동완성을 불러올 수 없습니다')
         setSuggestions([])
@@ -88,19 +97,31 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         const data = await res.json()
         setSuggestions(data.suggestions || [])
       }
-    } catch {
+    } catch (err) {
+      // abort는 새 요청이 진행 중이라는 뜻 — 상태를 덮지 않고 무시
+      if (err instanceof DOMException && err.name === 'AbortError') return
       // UX-1: 사용자 피드백 — 단순 console.error 제거
       setSuggestionsError('자동완성을 불러올 수 없습니다')
       setSuggestions([])
     } finally {
-      setIsLoadingSuggestions(false)
+      // 최신 요청만 로딩 해제 (abort된 옛 요청의 finally가 스피너를 끄지 않도록)
+      if (abortRef.current === controller) setIsLoadingSuggestions(false)
     }
   }, [])
 
-  // 즐겨찾기 로드
+  // 즐겨찾기 로드 및 구독
   useEffect(() => {
     if (isOpen) {
       setFavorites(favoritesStore.getFavorites())
+      const unsubscribe = favoritesStore.subscribe(setFavorites)
+
+      // 조회이력 개수·하이드레이팅 반응형 추적(VH-4: 패널 게이트가 stale 되지 않게, 하이드레이트 중 스켈레톤 노출)
+      setHistoryCount(viewingHistoryStore.getRecords().length)
+      setHistoryHydrating(viewingHistoryStore.isHydrating())
+      const unsubHistory = viewingHistoryStore.subscribe((recs) => {
+        setHistoryCount(recs.length)
+        setHistoryHydrating(viewingHistoryStore.isHydrating())
+      })
 
       // 최근 검색어 로드 (localStorage) - search-bar.tsx와 동일한 키 사용
       const recent = localStorage.getItem('recentSearches')
@@ -114,7 +135,11 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
       // 입력창 포커스 (PERF-9: cleanup 추가)
       const focusTimer = setTimeout(() => inputRef.current?.focus(), 100)
-      return () => clearTimeout(focusTimer)
+      return () => {
+        clearTimeout(focusTimer)
+        unsubscribe()
+        unsubHistory()
+      }
     } else {
       // 모달 닫힐 때 상태 초기화
       setSearchQuery("")
@@ -143,9 +168,11 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
+      if (totalItems === 0) return
       setSelectedIndex(prev => (prev + 1) % totalItems)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      if (totalItems === 0) return
       setSelectedIndex(prev => (prev - 1 + totalItems) % totalItems)
     } else if (e.key === 'Enter') {
       e.preventDefault()
@@ -264,6 +291,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
     debugLogger.info('CommandSearchModal 최근 검색 실행', { query })
   }
 
+  // SR-7: 최근 검색 개별 삭제 (검색 실행과 분리 — stopPropagation)
+  const handleRemoveRecent = (e: React.MouseEvent, query: string) => {
+    e.stopPropagation()
+    const updated = recentSearches.filter(s => s !== query)
+    setRecentSearches(updated)
+    setSelectedIndex(-1) // 목록 축소로 stale selectedIndex가 favIndex 범위초과 크래시 내는 것 방지
+    localStorage.setItem('recentSearches', JSON.stringify(updated))
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
@@ -292,6 +328,11 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             onKeyDown={handleKeyDown}
             className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-base text-foreground placeholder:text-muted-foreground shadow-none"
             autoComplete="off"
+            aria-label="법령명, 조문번호 검색"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded={suggestions.length > 0 || recentSearches.length > 0 || favorites.length > 0 || historyCount > 0}
+            aria-autocomplete="list"
           />
         </div>
 
@@ -302,6 +343,14 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground border-b border-border">
               <Icon name="loader" className="h-3 w-3 animate-spin" />
               <span>검색 중...</span>
+            </div>
+          )}
+
+          {/* SR-2: 자동완성 실패 안내 — 실패 시 빈 화면 대신 사유+재시도 안내 (429/네트워크) */}
+          {suggestionsError && searchQuery.trim() && !isLoadingSuggestions && (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-destructive border-b border-border">
+              <Icon name="alert-triangle" className="h-3 w-3" />
+              <span>{suggestionsError} · 잠시 후 다시 시도하세요</span>
             </div>
           )}
 
@@ -405,25 +454,33 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                   const isSelected = selectedIndex === globalIndex
 
                   return (
-                    <button
+                    <div
                       key={idx}
-                      onClick={() => handleRecentClick(query)}
                       className={cn(
-                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors group border",
                         isSelected
                           ? "bg-accent border-primary/40"
                           : "border-transparent hover:bg-muted hover:border-border"
                       )}
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <button
+                        onClick={() => handleRecentClick(query)}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                      >
                         <Icon name="clock" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <span className="text-sm truncate text-foreground">{query}</span>
-                      </div>
-                      <Icon name="arrow-right" className={cn(
-                        "h-4 w-4 text-muted-foreground transition-all flex-shrink-0",
-                        isSelected ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 group-hover:text-primary"
-                      )} />
-                    </button>
+                      </button>
+                      <button
+                        onClick={(e) => handleRemoveRecent(e, query)}
+                        aria-label={`${query} 최근 검색에서 삭제`}
+                        className={cn(
+                          "h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground transition-all flex-shrink-0 ml-1",
+                          isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                        )}
+                      >
+                        <Icon name="x" className="h-4 w-4" />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -471,16 +528,21 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             </div>
           )}
 
-          {/* 최근 조회 이력 — 본 항목 재조회 */}
-          <div className="px-2 pb-2">
-            <ViewingHistoryPanel
-              hideWhenEmpty
-              onReview={(rec) => {
-                onSearch(toReviewQuery(rec))
-                onClose()
-              }}
-            />
-          </div>
+          {/* 최근 조회 이력 — 본 항목 재조회 (5개 제한 + 독립 스크롤) */}
+          {(historyCount > 0 || historyHydrating) && (
+            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+              <div className="px-2 py-2">
+                <ViewingHistoryPanel
+                  hideWhenEmpty={false}
+                  maxItems={5}
+                  onReview={(rec) => {
+                    onSearch(toReviewQuery(rec))
+                    onClose()
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 안내 메시지 */}
           {!searchQuery.trim() && recentSearches.length === 0 && favorites.length === 0 && (
