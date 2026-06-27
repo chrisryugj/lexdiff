@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { checkAndIncrementQuota, decrementQuota, type QuotaFeature, type QuotaResult } from '@/lib/quota'
+import { checkAndIncrementQuota, decrementQuota, QUOTA_FEATURE_LABELS, type QuotaFeature, type QuotaResult } from '@/lib/quota'
 
 export interface AiAuthContext {
   userId: string | null
@@ -97,7 +97,7 @@ export async function requireAiAuth(
       error: NextResponse.json(
         {
           error: 'quota_exceeded',
-          message: `오늘 ${feature} 사용 한도(${quota.limit})를 초과했습니다. 본인 API 키를 등록하면 무제한입니다.`,
+          message: `오늘 ${QUOTA_FEATURE_LABELS[feature]} 사용 한도(${quota.limit}회)를 초과했습니다. 본인 API 키를 등록하면 무제한입니다.`,
           quota,
         },
         { status: 429 }

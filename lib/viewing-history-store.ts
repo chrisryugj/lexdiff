@@ -14,6 +14,7 @@
 
 import { debugLogger } from "./debug-logger"
 import { getSupabaseBrowserClient } from "./supabase/browser"
+import { createEmptyClassification, type UnifiedQueryClassification } from "@/src/domain/search/entities/Classification"
 
 const STORAGE_KEY = "law-comparison-viewing-history"
 const MAX_RECENT = 50 // 게스트 localStorage 상한 (카테고리 합산)
@@ -107,16 +108,34 @@ export function makeItemKey(
   }
 }
 
+export interface ReviewQuery {
+  lawName: string
+  jo?: string
+  rawQuery?: string
+  classification?: UnifiedQueryClassification
+}
+
 /**
  * 조회 기록 항목을 재조회(검색) 쿼리로 변환.
- * 통합 검색(handleSearch)이 lawName을 classify해 법령/판례/조례로 분기하므로,
- * 법령은 정확히 그 조문, 판례는 사건번호, 조례는 조례명으로 재검색된다.
+ * 법령/조례는 lawName 으로 통합검색 재실행. 판례는 사건번호를 그대로 통합검색에 넘기면
+ * '법령명'으로 검색돼 결과 0건이 되므로(VH-1), classification(searchType='precedent')을
+ * 함께 실어 통합검색이 판례 전용 핸들러(handlePrecedentSearch)로 라우팅하게 한다.
  */
-export function toReviewQuery(rec: ViewingRecord): { lawName: string; jo?: string } {
+export function toReviewQuery(rec: ViewingRecord): ReviewQuery {
   if (rec.category === "law") return { lawName: rec.title, jo: rec.jo }
   if (rec.category === "precedent") {
     const caseNumber = typeof rec.metadata?.caseNumber === "string" ? rec.metadata.caseNumber : ""
-    return { lawName: caseNumber || rec.title }
+    const term = caseNumber || rec.title
+    return {
+      lawName: term,
+      rawQuery: rec.title,
+      classification: {
+        ...createEmptyClassification(),
+        searchType: "precedent",
+        confidence: 1,
+        entities: caseNumber ? { caseNumber } : { lawName: rec.title },
+      },
+    }
   }
   return { lawName: rec.title } // ordinance: 조례명으로 재검색
 }

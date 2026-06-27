@@ -188,7 +188,10 @@ export function AnnexModal({
 
   // 별표 데이터 가져오기
   const fetchAnnexData = useCallback(async (skipCache = false) => {
-    if (!lawName || !annexNumber) return
+    // annexNumber 가 비어도(="별표 보기" 액션) lawName 만 있으면 진행 → 아래 폴백(3c)이
+    // 같은 법령의 첫 별표를 띄운다. 과거엔 !annexNumber 가드가 폴백을 막아 빈 모달
+    // dead-end 였음 (ANNEX-1).
+    if (!lawName) return
 
     annexAbortRef.current?.abort()
     const ctrl = new AbortController()
@@ -387,9 +390,9 @@ export function AnnexModal({
     }
   }, [lawName, annexNumber, lawId, isAdminRule])
 
-  // 모달 열릴 때 데이터 가져오기
+  // 모달 열릴 때 데이터 가져오기 (annexNumber 없는 "별표 보기"도 폴백으로 처리)
   useEffect(() => {
-    if (isOpen && annexNumber && lawName) {
+    if (isOpen && lawName) {
       fetchAnnexData()
     }
   }, [isOpen, annexNumber, lawName, fetchAnnexData])

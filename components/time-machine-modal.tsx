@@ -79,6 +79,9 @@ export const TimeMachineModal = memo(function TimeMachineModal({
   const [syncScroll, setSyncScroll] = useState(true)
   const [fontSize, setFontSize] = useState(15)
   const [showHistory, setShowHistory] = useState(false)
+  // 모바일 개정이력은 데스크톱 사이드바(showHistory)와 분리된 전체화면 오버레이로 표시.
+  // (showHistory는 'hidden sm:flex' 사이드바 전용이라 모바일 토글이 무력했음 — TM-1)
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false)
 
   // Scroll refs
   const oldScrollRef = useRef<HTMLDivElement>(null)
@@ -505,12 +508,50 @@ export const TimeMachineModal = memo(function TimeMachineModal({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={() => setMobileHistoryOpen(true)}
               className="text-xs h-6 px-2 w-full justify-center text-muted-foreground"
             >
               <Icon name="history" size={12} className="mr-1" />
               이력 {versionMatch.betweenRevisions.length}건
             </Button>
+          </div>
+        )}
+
+        {/* ── 모바일 개정 이력 오버레이 (사이드바 대체) ── */}
+        {mobileHistoryOpen && versionMatch && versionMatch.betweenRevisions.length > 0 && (
+          <div className="absolute inset-0 z-20 flex flex-col bg-background sm:hidden">
+            <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
+              <h4 className="font-semibold text-xs">
+                이 기간 개정 이력 ({versionMatch.betweenRevisions.length}건)
+              </h4>
+              <Button variant="ghost" size="sm" onClick={() => setMobileHistoryOpen(false)} className="h-5 w-5 p-0">
+                <Icon name="x" size={14} />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {versionMatch.betweenRevisions.map((rev, i) => (
+                  <button
+                    key={`m-${rev.mst}-${i}`}
+                    onClick={() => { handleRevisionSelect(rev); setMobileHistoryOpen(false) }}
+                    className={cn(
+                      "w-full text-left p-2.5 rounded-md border transition-colors cursor-pointer",
+                      selectedRevision?.mst === rev.mst
+                        ? "bg-primary/10 border-primary/50"
+                        : "bg-card border-border hover:bg-muted/50 hover:border-primary/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Badge variant="outline" className="text-[10px] h-4">{rev.rrCls}</Badge>
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-medium">{formatDateDisplay(rev.efYd)} 시행</div>
+                      <div className="text-muted-foreground text-[10px]">{rev.ancNo}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         )}
       </DialogContent>

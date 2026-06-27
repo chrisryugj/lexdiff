@@ -2,6 +2,14 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 
 export type QuotaFeature = 'fc_rag' | 'summarize' | 'benchmark' | 'impact'
 
+/** 사용자 노출용 한글 기능명 (내부 키를 메시지에 그대로 노출하지 않기 위함) */
+export const QUOTA_FEATURE_LABELS: Record<QuotaFeature, string> = {
+  fc_rag: 'AI 법령검색',
+  summarize: 'AI 요약',
+  benchmark: '조례 벤치마킹',
+  impact: '영향 분석',
+}
+
 export const QUOTA_LIMITS: Record<'free' | 'pro', Record<QuotaFeature, number>> = {
   free: { fc_rag: 5, summarize: 10, benchmark: 5, impact: 5 },
   pro: { fc_rag: 100, summarize: 300, benchmark: 30, impact: 50 },

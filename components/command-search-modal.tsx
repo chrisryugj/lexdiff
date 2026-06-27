@@ -136,7 +136,10 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   // 키보드 네비게이션
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const displayedRecentSearches = recentSearches.slice(0, 5)
-    const totalItems = suggestions.length + displayedRecentSearches.length + favorites.length
+    // 즐겨찾기는 렌더에서 5개만 표시(slice(0,5))하므로 키보드 네비도 동일 범위로 한정.
+    // (full favorites.length 로 두면 화살표가 안 보이는 항목을 선택·실행 — SR-1)
+    const displayedFavorites = favorites.slice(0, 5)
+    const totalItems = suggestions.length + displayedRecentSearches.length + displayedFavorites.length
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -160,7 +163,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         } else {
           // 즐겨찾기
           const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
-          handleFavoriteClick(favorites[favIndex])
+          handleFavoriteClick(displayedFavorites[favIndex])
         }
       } else {
         // 선택 안 했으면 현재 입력값으로 검색
