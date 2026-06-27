@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { classifySearchQuery } from "@/lib/unified-query-classifier"
 import type { SearchBarState, SearchBarActions, Suggestion } from "../types"
 import { MAX_RECENT } from "../types"
@@ -93,23 +93,31 @@ export function useSearchBarState(searchMode: 'basic' | 'rag' = 'basic') {
   }, [])
 
   // 자동완성 API 호출
+  const abortRef = useRef<AbortController | null>(null)
   const fetchSuggestions = useCallback(async (q: string) => {
     if (!q || q.length < 1) {
       setSuggestions([])
       return
     }
 
+    // SR-4: 이전 in-flight 요청 취소 — 느린 망에서 옛 응답이 최신 추천을 덮는 경합 방지
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setIsLoadingSuggestions(true)
     try {
-      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`, { signal: controller.signal })
       if (res.ok) {
         const data = await res.json()
         setSuggestions(data.suggestions || [])
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
       console.error("[SearchBar] Failed to fetch suggestions:", error)
     } finally {
-      setIsLoadingSuggestions(false)
+      // 최신 요청만 로딩 해제 (abort된 옛 요청의 finally가 스피너를 끄지 않도록)
+      if (abortRef.current === controller) setIsLoadingSuggestions(false)
     }
   }, [])
 

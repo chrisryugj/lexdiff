@@ -118,6 +118,27 @@ export function useLawViewerThreeTier(
     // 사용자가 "위임법령 닫기" 버튼을 눌러야만 1-tier로 복귀
   }, [tierViewMode, hasValidSihyungkyuchik, hasValidThreeTierData, activeJo])
 
+  // DELEG-1: 위임법령 패널을 열었을 때 기본 탭(시행령)이 비어있고
+  // 시행규칙에만 내용이 있으면 1회만 시행규칙 탭으로 자동 전환.
+  // - panel open당 1회로 한정(autoSwitchedTabRef) → 사용자가 수동으로 고른 탭을 덮지 않음
+  // - 조문 전환으로 validDelegations가 바뀌어도 ref 가드로 재전환하지 않음
+  // - admin 탭 로직은 건드리지 않음
+  const autoSwitchedTabRef = useRef(false)
+  useEffect(() => {
+    if (tierViewMode === "1-tier") {
+      autoSwitchedTabRef.current = false
+      return
+    }
+    if (autoSwitchedTabRef.current || isLoadingThreeTier) return
+    if (delegationActiveTab !== "decree") return
+    const decreeCount = validDelegations.filter((d) => d.type === "시행령").length
+    const ruleCount = validDelegations.filter((d) => d.type === "시행규칙").length
+    if (decreeCount === 0 && ruleCount > 0) {
+      setDelegationActiveTab("rule")
+    }
+    autoSwitchedTabRef.current = true
+  }, [tierViewMode, isLoadingThreeTier, validDelegations, delegationActiveTab])
+
   return {
     // State
     threeTierCitation,

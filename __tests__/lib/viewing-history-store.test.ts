@@ -47,9 +47,10 @@ describe("toReviewQuery", () => {
     expect(q.classification?.entities?.lawName).toBe("양도소득세 이월과세 판결")
   })
 
-  test("조례: 조례명으로 재검색, classification 없음", () => {
+  test("조례: 조례명으로 재검색 + ordinance 라우팅(searchType/classification) (VH-2)", () => {
     const q = toReviewQuery(rec({ category: "ordinance", title: "서울특별시 주차장 설치 조례" }))
     expect(q.lawName).toBe("서울특별시 주차장 설치 조례")
-    expect(q.classification).toBeUndefined()
+    expect(q.searchType).toBe("ordinance")
+    expect(q.classification?.searchType).toBe("ordinance")
   })
 })

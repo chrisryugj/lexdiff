@@ -4,7 +4,7 @@
  * Unified search handlers for precedent, interpretation, and ruling flows.
  */
 
-import { useCallback } from "react"
+import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { parseOrdinanceSearchXML } from "@/lib/ordin-search-parser"
 import { formatPrecedentDate, type PrecedentDetail, type PrecedentSearchResult } from "@/lib/precedent-parser"
@@ -123,6 +123,12 @@ async function buildPrecedentLawData(precedentId: string, precedent: PrecedentDe
 export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
   const { state, actions, toast, searchId, onPrecedentSelect, handleSearchInternal } = deps
 
+  // 초기 판례 검색에서 실제 사용한 파라미터(정제 쿼리 + court/caseNumber)를 보관.
+  // 페이지/페이지크기 변경 시 동일한 검색 조건을 재사용해 결과 어긋남 방지.
+  const precedentSearchParamsRef = useRef<{ searchQuery: string; court?: string; caseNumber?: string }>({
+    searchQuery: "",
+  })
+
   const clearSecondaryResults = useCallback(() => {
     actions.setLawSelectionState(null)
     actions.setOrdinanceSelectionState(null)
@@ -135,6 +141,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     actions.setPrecedentPage(1)
     actions.setPrecedentYearFilter(undefined)
     actions.setPrecedentCourtFilter(undefined)
+    precedentSearchParamsRef.current = { searchQuery: "" }
     actions.setInterpretationResults(null)
     actions.setRulingResults(null)
     actions.setOrdinancePage(1)
@@ -199,6 +206,8 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setUserQuery(displayQuery)
         actions.setIsSearching(true)
         actions.setMobileView("list")
+
+        precedentSearchParamsRef.current = { searchQuery, court, caseNumber }
 
         const params = new URLSearchParams({
           query: searchQuery,
@@ -619,11 +628,14 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setIsSearching(true)
         actions.setPrecedentPage(page)
 
+        const { searchQuery, court, caseNumber } = precedentSearchParamsRef.current
         const params = new URLSearchParams({
-          query: state.userQuery || "",
+          query: searchQuery || state.userQuery || "",
           page: page.toString(),
           display: String(state.precedentPageSize),
         })
+        if (court) params.append("court", court)
+        if (caseNumber) params.append("caseNumber", caseNumber)
 
         const data = await fetchPrecedents(params)
         applyPrecedentResults(actions, data)
@@ -648,11 +660,14 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
         actions.setPrecedentPageSize(size)
         actions.setPrecedentPage(1)
 
+        const { searchQuery, court, caseNumber } = precedentSearchParamsRef.current
         const params = new URLSearchParams({
-          query: state.userQuery || "",
+          query: searchQuery || state.userQuery || "",
           page: "1",
           display: size.toString(),
         })
+        if (court) params.append("court", court)
+        if (caseNumber) params.append("caseNumber", caseNumber)
 
         const data = await fetchPrecedents(params)
         applyPrecedentResults(actions, data)

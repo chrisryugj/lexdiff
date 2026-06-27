@@ -15,6 +15,7 @@
 import { debugLogger } from "./debug-logger"
 import { getSupabaseBrowserClient } from "./supabase/browser"
 import { createEmptyClassification, type UnifiedQueryClassification } from "@/src/domain/search/entities/Classification"
+import type { SearchType } from "@/src/domain/search/value-objects/SearchType"
 
 const STORAGE_KEY = "law-comparison-viewing-history"
 const MAX_RECENT = 50 // 게스트 localStorage 상한 (카테고리 합산)
@@ -112,6 +113,7 @@ export interface ReviewQuery {
   lawName: string
   jo?: string
   rawQuery?: string
+  searchType?: SearchType
   classification?: UnifiedQueryClassification
 }
 
@@ -137,7 +139,19 @@ export function toReviewQuery(rec: ViewingRecord): ReviewQuery {
       },
     }
   }
-  return { lawName: rec.title } // ordinance: 조례명으로 재검색
+  // ordinance: 조례명으로 재검색하되 searchType='ordinance'를 실어 조례 검색 경로
+  // (useBasicSearch — query.searchType 기준 분기)로 라우팅한다. 안 실으면 평문
+  // 법령검색으로 새어 같은 이름의 다른 지자체 조례가 뜨거나 다른 모드로 빠진다(VH-2).
+  return {
+    lawName: rec.title,
+    searchType: "ordinance",
+    classification: {
+      ...createEmptyClassification(),
+      searchType: "ordinance",
+      confidence: 1,
+      entities: { lawName: rec.title },
+    },
+  }
 }
 
 export class ViewingHistoryStore {

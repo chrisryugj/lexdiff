@@ -65,6 +65,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // debounce된 쿼리
   const debouncedQuery = useDebounce(searchQuery, 200)
@@ -77,10 +78,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       return
     }
 
+    // SR-4: 이전 in-flight 요청 취소 — 느린 망에서 옛 응답이 최신 추천을 덮는 경합 방지
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setIsLoadingSuggestions(true)
     setSuggestionsError(null)
     try {
-      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`)
+      const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}&limit=5`, { signal: controller.signal })
       if (!res.ok) {
         setSuggestionsError('자동완성을 불러올 수 없습니다')
         setSuggestions([])
@@ -88,12 +94,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         const data = await res.json()
         setSuggestions(data.suggestions || [])
       }
-    } catch {
+    } catch (err) {
+      // abort는 새 요청이 진행 중이라는 뜻 — 상태를 덮지 않고 무시
+      if (err instanceof DOMException && err.name === 'AbortError') return
       // UX-1: 사용자 피드백 — 단순 console.error 제거
       setSuggestionsError('자동완성을 불러올 수 없습니다')
       setSuggestions([])
     } finally {
-      setIsLoadingSuggestions(false)
+      // 최신 요청만 로딩 해제 (abort된 옛 요청의 finally가 스피너를 끄지 않도록)
+      if (abortRef.current === controller) setIsLoadingSuggestions(false)
     }
   }, [])
 
@@ -302,6 +311,14 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground border-b border-border">
               <Icon name="loader" className="h-3 w-3 animate-spin" />
               <span>검색 중...</span>
+            </div>
+          )}
+
+          {/* SR-2: 자동완성 실패 안내 — 실패 시 빈 화면 대신 사유+재시도 안내 (429/네트워크) */}
+          {suggestionsError && searchQuery.trim() && !isLoadingSuggestions && (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-destructive border-b border-border">
+              <Icon name="alert-triangle" className="h-3 w-3" />
+              <span>{suggestionsError} · 잠시 후 다시 시도하세요</span>
             </div>
           )}
 
