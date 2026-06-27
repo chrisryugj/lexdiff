@@ -637,4 +637,44 @@ export function collectAnnexMatches(text: string, matches: LinkMatch[]): void {
       })
     }
   }
+
+  // 패턴 3: 별지(別紙) 제N호서식 — 서식 링크
+  // Markdown 경로(linkifyMarkdownLegalRefs 패턴 3b)와 동일하게 annexNumber에 "별지제N호서식"
+  // 문자열을 실어 종류를 구분한다 (별도 type/kind 필드 없음 — annex-modal이 prefix로 분기).
+  // 예: "별지 제2호서식", "[별지 제2호서식]" → "별지제2호서식"
+  // ⚠️ 별지는 서식번호(제N호서식)나 번호가 반드시 있어야 함 (별표처럼 '1' 기본값 금지 → 산문 오링크 방지)
+  const annexFormPattern = /\[?별지\s*(?:제\s*(\d+)\s*호\s*서식|(\d+)(?:의(\d+))?)\]?/g
+
+  while ((match = annexFormPattern.exec(text)) !== null) {
+    const formNum = match[1]
+    const num1 = match[2]
+    const num2 = match[3]
+    let annexNum: string
+    if (formNum) {
+      annexNum = `별지제${formNum}호서식`
+    } else if (num1) {
+      annexNum = num2 ? `별지${num1}의${num2}` : `별지${num1}`
+    } else {
+      continue // 번호 없는 '별지'는 링크 안 함
+    }
+    const lawName = extractLawNameBeforeAnnex(text, match.index)
+
+    const isOverlap = matches.some(m =>
+      (match!.index >= m.start && match!.index < m.end) ||
+      (m.start >= match!.index && m.start < match!.index + match![0].length)
+    )
+
+    if (!isOverlap) {
+      const dataLawAttr = lawName ? ` data-law="${escapeHtml(lawName)}"` : ''
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: 'annex',
+        lawName,
+        annexNumber: annexNum,
+        displayText: match[0],
+        html: `<a href="#" class="law-ref annex-ref" data-ref="annex" data-annex="${escapeHtml(annexNum)}"${dataLawAttr} aria-label="${escapeHtml(getAriaLabel('annex', lawName, undefined, annexNum))}">${escapeHtml(match[0])}</a>`
+      })
+    }
+  }
 }

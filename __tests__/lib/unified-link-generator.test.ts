@@ -236,4 +236,34 @@ describe('unified-link-generator', () => {
       expect(result).toContain('data-law="부가가치세법"')
     })
   })
+
+  describe('별표/별지(서식) annex 링크', () => {
+    it('별표 N → data-ref="annex" data-annex="N" (회귀 방지)', () => {
+      const result = generateLinks('「관세법」 별표 2의3에 따른다', { mode: 'safe' })
+      expect(result).toContain('data-ref="annex"')
+      expect(result).toContain('data-annex="2의3"')
+    })
+
+    it('별지 제N호서식 → data-annex="별지제N호서식"', () => {
+      const result = generateLinks('「도로교통법 시행규칙」 별지 제128호서식으로 신청한다', { mode: 'safe' })
+      expect(result).toContain('data-ref="annex"')
+      expect(result).toContain('data-annex="별지제128호서식"')
+    })
+
+    it('대괄호 [별지 제2호서식]도 링크', () => {
+      const result = generateLinks('「민원처리규칙」 [별지 제2호서식]', { mode: 'safe' })
+      expect(result).toContain('data-annex="별지제2호서식"')
+    })
+
+    it('번호 없는 "별지"는 링크하지 않음 (산문 오링크 방지)', () => {
+      const result = generateLinks('별지와 같이 처리한다', { mode: 'safe' })
+      expect(result).not.toContain('data-annex="별지')
+    })
+
+    it('별지 aria-label은 별표가 아닌 서식으로 표기', () => {
+      const result = generateLinks('「규칙」 별지 제3호서식', { mode: 'safe' })
+      expect(result).not.toContain('aria-label="별표 별지')
+      expect(result).toContain('별지 제3호서식 서식 보기')
+    })
+  })
 })

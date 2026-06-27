@@ -62,6 +62,24 @@ function extractAnnexNum(text: string): string {
 }
 
 /**
+ * 별지(서식) 식별 — 매처/Markdown 경로가 annexNumber에 "별지제N호서식" 문자열을 실어 종류를 구분한다.
+ * (LinkMatch에 별표/별지 구분 필드가 없어 문자열 prefix가 곧 종류 마커)
+ */
+function isFormAnnexNumber(text: string): boolean {
+  return /별지|서식/.test(text)
+}
+
+/** 모달 표시용 라벨: 별지("별지제N호서식")는 "별지 제N호서식", 별표는 "별표 N" */
+function formatAnnexLabel(annexNumber: string): string {
+  if (isFormAnnexNumber(annexNumber)) {
+    return annexNumber
+      .replace(/^별지제(\d+)호서식$/, "별지 제$1호서식")
+      .replace(/^별지(\d+)(?:의(\d+))?$/, (_m, a, b) => (b ? `별지 ${a}의${b}` : `별지 ${a}`))
+  }
+  return `별표 ${annexNumber}`
+}
+
+/**
  * 묶음 별표 범위 매칭: annexName에 "[별표1~5]" 같은 범위가 있으면 targetNum 포함 여부 확인
  */
 function matchesAnnexRange(annexName: string, targetNum: string): boolean {
@@ -120,6 +138,9 @@ export function AnnexModal({
   const contentRef = useRef<HTMLDivElement>(null)
   const savedScrollRef = useRef<number>(0)
 
+  // 표시용 별표/별지 라벨
+  const annexLabel = formatAnnexLabel(annexNumber)
+
   // 조례 여부 판별 (자치법규)
   const isOrdinance = /조례/.test(lawName) ||
     /(특별시|광역시|도|시|군|구)\s+[가-힣]+\s*(조례|규칙)/.test(lawName)
@@ -152,7 +173,7 @@ export function AnnexModal({
     const annexNamePart = annexData.annexName
       ? ` (${annexData.annexName.replace(/[\\/:*?"<>|]/g, "")})`  // 파일명 금지 문자 제거
       : ""
-    const filename = `${lawName} 별표 ${annexNumber}${annexNamePart}`
+    const filename = `${lawName} ${formatAnnexLabel(annexNumber)}${annexNamePart}`
 
     // API에 filename 쿼리 파라미터로 전달
     const downloadUrl = `/api/annex-pdf?flSeq=${flSeq}&filename=${encodeURIComponent(filename)}`
@@ -231,8 +252,12 @@ export function AnnexModal({
         }
       }
 
+      // 별지(서식) 여부 — 법제처는 "별지 제N호서식"을 별표종류 "서식"(knd=2)으로 분류한다.
+      // (knd=2가 0건이면 law-annexes API가 knd 필터를 떼고 재조회 → 아래 종류 매칭으로 보정)
+      const isForm = isFormAnnexNumber(annexNumber)
+
       // 2. 별표 목록 조회
-      const res = await fetch(`/api/law-annexes?query=${encodeURIComponent(lawName)}&knd=1`, { signal: ctrl.signal })
+      const res = await fetch(`/api/law-annexes?query=${encodeURIComponent(lawName)}&knd=${isForm ? '2' : '1'}`, { signal: ctrl.signal })
       if (!res.ok) {
         throw new Error("별표 목록을 불러올 수 없습니다")
       }
@@ -251,18 +276,23 @@ export function AnnexModal({
       const searchPool = sameLawAnnexes.length > 0 ? sameLawAnnexes : annexes
 
       // 3b. 번호 매칭 (정확한 번호 → 범위 매칭 순)
-      let targetAnnex = searchPool.find((a) => {
-        const num = extractAnnexNum(a.annexNumber)
-        return num === targetNum
-      })
+      // 별지(서식)는 별표와 번호가 겹칠 수 있어 종류(별표종류 ≠ 별표="1")를 우선한다.
+      let targetAnnex = searchPool.find((a) =>
+        (!isForm || a.annexKind !== "1") && extractAnnexNum(a.annexNumber) === targetNum
+      )
+      // 종류 불명확 시 번호만이라도 일치 (별지인데 법제처가 "별표"로 분류한 드문 경우)
+      if (!targetAnnex && isForm) {
+        targetAnnex = searchPool.find((a) => extractAnnexNum(a.annexNumber) === targetNum)
+      }
 
       // 3b-2. 범위 매칭: [별표1~5] 같은 묶음 별표에서 요청 번호가 범위 내인지 확인
       if (!targetAnnex && targetNum) {
         targetAnnex = searchPool.find((a) => matchesAnnexRange(a.annexName, targetNum))
       }
 
-      // 3c. 폴백: 같은 법령의 첫 번째 별표, 없으면 전체 첫 번째
+      // 3c. 폴백: 별지면 같은 법령의 첫 서식, 아니면 첫 별표 → 없으면 전체 첫 번째
       const finalAnnex = targetAnnex
+        || (isForm ? searchPool.find((a) => a.annexKind !== "1") : null)
         || (sameLawAnnexes.length > 0 ? sameLawAnnexes[0] : null)
         || (annexes.length > 0 ? annexes[0] : null)
 
@@ -299,7 +329,7 @@ export function AnnexModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             pdfUrl: fileUrl,
-            annexNumber: `별표 ${annexNumber}`,
+            annexNumber: formatAnnexLabel(annexNumber),
             lawName,
           }),
           signal: ctrl.signal,
@@ -424,7 +454,7 @@ export function AnnexModal({
               </Button>
             )}
             <DialogTitle className="text-sm sm:text-base font-bold text-primary truncate">
-              {lawName || '법령'} 별표 {annexNumber}
+              {lawName || '법령'} {annexLabel}
               {annexData?.annexName && (
                 <span className="text-muted-foreground font-normal ml-1 hidden sm:inline">
                   ({annexData.annexName})
@@ -432,7 +462,7 @@ export function AnnexModal({
               )}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              {lawName || '법령'} 별표 {annexNumber} 내용
+              {lawName || '법령'} {annexLabel} 내용
             </DialogDescription>
           </div>
 
@@ -552,7 +582,7 @@ export function AnnexModal({
             {/* 파일명 */}
             <div className="text-center">
               <p className="text-base font-medium mb-1">
-                {lawName || '법령'} 별표 {annexNumber}
+                {lawName || '법령'} {annexLabel}
                 {annexData?.annexName && ` (${annexData.annexName})`}
               </p>
               <p className="text-sm text-muted-foreground">
@@ -607,7 +637,7 @@ export function AnnexModal({
             <Icon name="file-image" className="w-16 h-16 text-muted-foreground/60" />
             <div className="text-center">
               <p className="text-lg font-medium mb-1">
-                {annexData?.annexName || `별표 ${annexNumber}`}
+                {annexData?.annexName || annexLabel}
               </p>
               <p className="text-sm text-muted-foreground">
                 {fileType === "hwp" || fileType === "hwpx" ? "HWP" : "PDF"} 원문을 확인하세요.

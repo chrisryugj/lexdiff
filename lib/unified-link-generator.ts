@@ -84,7 +84,13 @@ export function getAriaLabel(type: string, lawName?: string, article?: string, a
   }
   const baseLabel = labels[type] || '법령 참조'
   if (caseNumber) return `${caseNumber} ${baseLabel}`
-  if (annexNumber) return `별표 ${annexNumber} ${baseLabel}`
+  if (annexNumber) {
+    // 별지(서식)는 annexNumber에 "별지제N호서식" 문자열이 실려옴 → 별표로 읽지 않도록 분기
+    if (annexNumber.startsWith('별지')) {
+      return `${annexNumber.replace(/^별지제(\d+)호서식$/, '별지 제$1호서식')} 서식 보기`
+    }
+    return `별표 ${annexNumber} ${baseLabel}`
+  }
   if (lawName && article) return `${lawName} ${article} ${baseLabel}`
   if (lawName) return `${lawName} ${baseLabel}`
   if (article) return `${article} ${baseLabel}`
