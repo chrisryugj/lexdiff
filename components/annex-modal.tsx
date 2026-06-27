@@ -668,6 +668,32 @@ export function AnnexModal({
             </div>
           </div>
         )}
+
+        {/* 모바일 하단 컨트롤 툴바 — 데스크톱은 헤더에 노출하지만 모바일에선 hidden sm:
+            이라 모든 컨트롤이 사라졌었음(LV-ANNEX-2). 동일 핸들러를 엄지 닿는 하단에 모음. */}
+        <div className="sm:hidden mt-auto shrink-0 flex items-center justify-around gap-1 border-t border-border bg-background/80 px-2 py-1.5">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={decreaseFontSize} title="글자 작게">
+            <Icon name="minus" className="h-4 w-4" />
+          </Button>
+          <span className="text-xs tabular-nums text-muted-foreground select-none w-9 text-center">{fontSize}px</span>
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={increaseFontSize} title="글자 크게">
+            <Icon name="plus" className="h-4 w-4" />
+          </Button>
+          {markdown && (
+            <CopyButton getText={() => markdown} variant="ghost" className="h-9 w-9" />
+          )}
+          <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!annexData?.pdfLink} className="h-9 w-9" title="다운로드">
+            <Icon name="download" className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" asChild className="h-9 w-9" title="법제처 원문">
+            <a href={molegUrl} target="_blank" rel="noopener noreferrer">
+              <Icon name="external-link" className="w-4 h-4" />
+            </a>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => { fetchAnnexData(true) }} disabled={isLoading} className="h-9 w-9" title="새로고침">
+            <Icon name="refresh-cw" className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
