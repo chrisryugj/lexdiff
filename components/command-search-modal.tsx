@@ -178,19 +178,24 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
       e.preventDefault()
 
       // 항목 선택 중이면 해당 항목 실행
+      // ⚠️ favoritesStore.subscribe로 favorites가 모달 열린 채 축소되면 selectedIndex가 stale →
+      //    아래 인덱싱이 undefined를 반환할 수 있어 use-site에서 바운드 가드(크래시 방지).
       if (selectedIndex >= 0 && totalItems > 0) {
         // 순서: 실시간 추천 → 최근 검색 → 즐겨찾기
         if (selectedIndex < suggestions.length) {
           // 실시간 추천
-          handleSearch(suggestions[selectedIndex].text)
+          const suggestion = suggestions[selectedIndex]
+          if (suggestion) handleSearch(suggestion.text)
         } else if (selectedIndex < suggestions.length + displayedRecentSearches.length) {
           // 최근 검색
           const recentIndex = selectedIndex - suggestions.length
-          handleRecentClick(displayedRecentSearches[recentIndex])
+          const recent = displayedRecentSearches[recentIndex]
+          if (recent) handleRecentClick(recent)
         } else {
           // 즐겨찾기
           const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
-          handleFavoriteClick(displayedFavorites[favIndex])
+          const fav = displayedFavorites[favIndex]
+          if (fav) handleFavoriteClick(fav)
         }
       } else {
         // 선택 안 했으면 현재 입력값으로 검색
