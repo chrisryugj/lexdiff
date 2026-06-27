@@ -171,20 +171,27 @@ async function* forceLastTurnAnswer(opts: ForceLastTurnOptions): AsyncGenerator<
   const existingAnswerLen = textParts.reduce((n, p) => n + (p.text?.length ?? 0), 0)
   if (textParts.length > 0 && existingAnswerLen >= 300) {
     const answer = textParts.map((p: GeminiPart) => p.text).join('')
+    // 🔴 완료 경로(:630)와 달리 forceLastTurn 은 품질평가를 스킵해 왔다 → 현행성 백스톱이
+    //    이 경로에 미적용되는 갭. 완료 경로와 동일하게 평가/경고 머지/confidence 하향.
+    const quality = evaluateResponseQuality(allToolResults, answer)
+    const mergedWarnings = quality.warnings.length > 0 ? [...warnings, ...quality.warnings] : warnings
     const citations = buildCitationsWithAnswerFallback(allToolResults, answer)
     const flt1Conf = calcConfidenceDetailed(allToolResults, answer, citations)
+    const fltConfidence = quality.level === 'fail' ? 'low' as const
+      : quality.level === 'marginal' ? 'medium' as const
+      : flt1Conf.level
     yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
     yield {
       type: 'answer',
       data: {
         answer,
         citations,
-        confidenceLevel: flt1Conf.level,
+        confidenceLevel: fltConfidence,
         complexity,
         queryType,
         isTruncated: accFinishReason === 'MAX_TOKENS',
-        warnings: warnings.length > 0 ? warnings : undefined,
-        confidenceBreakdown: { score: flt1Conf.score, ...flt1Conf.breakdown },
+        warnings: mergedWarnings.length > 0 ? mergedWarnings : undefined,
+        confidenceBreakdown: { score: flt1Conf.score, ...flt1Conf.breakdown, qualityLevel: quality.level, qualityScore: quality.score },
       },
     }
     return
@@ -492,7 +499,7 @@ export async function* executeGeminiRAGStream(
 
   const contextPrefix = prevContext ? `[이전 대화 맥락]\n${prevContext}\n\n---\n\n` : ''
   const userText = geminiEvidence
-    ? `${dynamicHeader}${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
+    ? `${dynamicHeader}${contextPrefix}⚡ 빠른 답변 모드 — 필요한 조문이 이미 수집됨.\n규칙: 아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것. 부족한 경우에만 최소한 추가 사용.\n단, 사전 수집 데이터에 시행일자·[현행]/[연혁] 라벨이 없으면 폐지·분법·개정 여부를 확인할 수 없으므로, 조문번호·기준치를 인용하기 전에 search_law 또는 get_law_text로 현행 여부를 확인할 것.\n\n[사전 수집된 법령 데이터]\n${geminiEvidence}\n\n${query}`
     : `${dynamicHeader}${contextPrefix}${query}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -32,6 +32,18 @@ vi.mock('@/lib/fc-rag/tool-registry', async () => {
         schema: z.object({}),
         handler: () => new Promise(() => { /* never resolves */ }),
       },
+      {
+        name: 'get_batch_articles',
+        description: 'fake batch',
+        schema: z.object({ mst: z.string().optional(), articles: z.array(z.string()).optional(), efYd: z.string().optional() }),
+        handler: () => ({ content: [{ text: '도로교통법\n제44조(음주운전 금지) 본문 ...' }], isError: false }),
+      },
+      {
+        name: 'get_historical_law',
+        description: 'fake historical',
+        schema: z.object({ mst: z.string().optional(), jo: z.string().optional() }),
+        handler: () => ({ content: [{ text: '=== 개인정보보호법 ===\n기본 정보:\n 시행일자: 2015-01-01' }], isError: false }),
+      },
     ],
   }
 })
@@ -166,5 +178,31 @@ describe('executeToolsParallel', () => {
     expect(results[0].isError).toBe(false)
     expect(results[1].isError).toBe(true)
     expect(results[2].isError).toBe(false)
+  })
+})
+
+describe('executeTool — 현행성 라벨 주입 (LEAK 감사 TL-1/TL-2)', () => {
+  it('get_batch_articles + efYd → 시행일자 경고 라벨 prepend', async () => {
+    const r = await executeTool('get_batch_articles', { mst: '123', articles: ['제44조'], efYd: '20190101' })
+    expect(r.isError).toBe(false)
+    expect(r.result).toContain('⚠️ 특정 시행일자(efYd=20190101)')
+    expect(r.result).toContain('현행 법령이 아닐 수 있음')
+    // 본문은 라벨 뒤에 보존
+    expect(r.result).toContain('제44조')
+  })
+
+  it('get_batch_articles + efYd 없음 → 라벨 미부착 (현행 조회는 그대로)', async () => {
+    const r = await executeTool('get_batch_articles', { mst: '123', articles: ['제44조'] })
+    expect(r.isError).toBe(false)
+    expect(r.result).not.toContain('⚠️ 특정 시행일자')
+    expect(r.result).toContain('제44조')
+  })
+
+  it('get_historical_law → [연혁-과거버전] 라벨 prepend', async () => {
+    const r = await executeTool('get_historical_law', { mst: '999', jo: '002900' })
+    expect(r.isError).toBe(false)
+    expect(r.result).toContain('⚠️[연혁-과거버전]')
+    expect(r.result).toContain('현행과 다를 수 있으니')
+    expect(r.result).toContain('개인정보보호법')
   })
 })
