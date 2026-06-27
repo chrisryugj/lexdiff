@@ -102,7 +102,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
               <div className="relative">
                 <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="결과 내 검색..."
+                  placeholder="이 페이지에서 찾기"
                   value={filterKeyword}
                   onChange={(e) => setFilterKeyword(e.target.value)}
                   className="pl-9 h-9 text-sm"
@@ -150,7 +150,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
                   ‘{filterKeyword}’와 일치하는 판례가 이 페이지에 없어요
                 </p>
                 <p className="text-sm text-muted-foreground mb-5">
-                  결과 내 검색은 지금 보는 {results.length}건만 훑어봐요. 필터를 지우고 전체 결과를 다시 보세요.
+                  이 페이지에 보이는 {results.length}건 안에서만 찾아요. 필터를 지우면 전체 결과를 다시 볼 수 있어요.
                 </p>
                 <Button variant="outline" size="sm" onClick={() => setFilterKeyword("")} className="gap-2">
                   <Icon name="x" className="h-4 w-4" />

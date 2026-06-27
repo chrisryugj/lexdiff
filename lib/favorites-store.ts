@@ -58,6 +58,8 @@ export class FavoritesStore {
   private listeners: Set<(favorites: Favorite[]) => void> = new Set()
   private mode: Mode = "guest"
   private userId: string | null = null
+  // user 모드 undo 경합 방지: 진행 중인 DB 삭제를 추적해 복원 insert를 그 뒤로 직렬화
+  private pendingDeletes = new Map<string, Promise<unknown>>()
 
   private constructor() {
     if (typeof window !== "undefined") {
@@ -207,30 +209,66 @@ export class FavoritesStore {
     return newFavorite
   }
 
-  removeFavorite(id: string) {
+  removeFavorite(id: string): Favorite | undefined {
     const index = this.favorites.findIndex((f) => f.id === id)
-    if (index === -1) return
+    if (index === -1) return undefined
     const [removed] = this.favorites.splice(index, 1)
     this.notifyListeners()
 
     if (this.mode === "user" && this.userId) {
       const supabase = getSupabaseBrowserClient()
-      void supabase
-        .from("favorites")
-        .delete()
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error) {
-            this.favorites.splice(index, 0, removed)
-            this.notifyListeners()
-            debugLogger.error("즐겨찾기 삭제 실패 (롤백)", error)
-          }
-        })
+      // Promise.resolve로 thenable을 한 번만 실행 → 같은 promise를 restoreFavorite에서 안전하게 await
+      const deletePromise = Promise.resolve(supabase.from("favorites").delete().eq("id", id))
+      this.pendingDeletes.set(id, deletePromise)
+      void deletePromise.then(({ error }) => {
+        this.pendingDeletes.delete(id)
+        if (error) {
+          this.favorites.splice(index, 0, removed)
+          this.notifyListeners()
+          debugLogger.error("즐겨찾기 삭제 실패 (롤백)", error)
+        }
+      })
     } else {
       this.saveToStorage()
     }
 
     debugLogger.info("즐겨찾기 삭제", { lawTitle: removed.lawTitle, jo: removed.jo })
+    return removed
+  }
+
+  /** 삭제 취소(undo)용 복원. 원본 객체를 그대로 재삽입해 id/createdAt 보존(addFavorite와 구분). */
+  restoreFavorite(favorite: Favorite, index = 0) {
+    if (this.favorites.some((f) => f.id === favorite.id)) {
+      debugLogger.info("즐겨찾기 복원 건너뜀 (이미 존재)", { id: favorite.id })
+      return
+    }
+
+    const at = Math.min(Math.max(index, 0), this.favorites.length)
+    this.favorites.splice(at, 0, favorite)
+    this.notifyListeners()
+
+    if (this.mode === "user" && this.userId) {
+      const userId = this.userId
+      const supabase = getSupabaseBrowserClient()
+      const runInsert = () =>
+        supabase
+          .from("favorites")
+          .insert(favoriteToInsert(favorite, userId))
+          .then(({ error }) => {
+            if (error) {
+              this.favorites = this.favorites.filter((f) => f.id !== favorite.id)
+              this.notifyListeners()
+              debugLogger.error("즐겨찾기 복원 실패 (롤백)", error)
+            }
+          })
+      // 진행 중인 삭제가 있으면 그 뒤에 insert를 직렬화 (delete가 복원 행을 덮어쓰는 경합 방지)
+      const pendingDelete = this.pendingDeletes.get(favorite.id)
+      void (pendingDelete ? pendingDelete.then(runInsert) : runInsert())
+    } else {
+      this.saveToStorage()
+    }
+
+    debugLogger.success("즐겨찾기 복원", { lawTitle: favorite.lawTitle, jo: favorite.jo })
   }
 
   updateFavorite(id: string, updates: Partial<Favorite>) {

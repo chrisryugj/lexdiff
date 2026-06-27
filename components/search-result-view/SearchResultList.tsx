@@ -500,12 +500,14 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
 
 interface InterpretationResultListProps {
   results: InterpretationSearchResult[]
+  totalCount?: number
   onBack: () => void
   onRetryAi?: () => void
 }
 
 export const InterpretationResultList = memo(function InterpretationResultList({
   results,
+  totalCount,
   onBack,
   onRetryAi,
 }: InterpretationResultListProps) {
@@ -522,7 +524,9 @@ export const InterpretationResultList = memo(function InterpretationResultList({
             해석례 검색 결과
           </h3>
           <Badge variant="secondary" className="text-xs">
-            {results.length}건
+            {totalCount && totalCount > results.length
+              ? `전체 ${totalCount.toLocaleString()}건 (상위 ${results.length}건)`
+              : `${results.length}건`}
           </Badge>
         </div>
       </div>
@@ -589,12 +593,14 @@ export const InterpretationResultList = memo(function InterpretationResultList({
 
 interface RulingResultListProps {
   results: RulingSearchResult[]
+  totalCount?: number
   onBack: () => void
   onRetryAi?: () => void
 }
 
 export const RulingResultList = memo(function RulingResultList({
   results,
+  totalCount,
   onBack,
   onRetryAi,
 }: RulingResultListProps) {
@@ -610,7 +616,9 @@ export const RulingResultList = memo(function RulingResultList({
             재결례 검색결과
           </h3>
           <Badge variant="secondary" className="text-xs">
-            {results.length}건
+            {totalCount && totalCount > results.length
+              ? `전체 ${totalCount.toLocaleString()}건 (상위 ${results.length}건)`
+              : `${results.length}건`}
           </Badge>
         </div>
       </div>

@@ -31,10 +31,12 @@ interface PrecedentSearchResponse {
 
 interface InterpretationSearchResponse {
   interpretations: InterpretationSearchResult[]
+  totalCount?: number
 }
 
 interface RulingSearchResponse {
   rulings: RulingSearchResult[]
+  totalCount?: number
 }
 
 async function fetchPrecedents(params: URLSearchParams): Promise<PrecedentSearchResponse> {
@@ -156,7 +158,9 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     actions.setPrecedentCourtFilter(undefined)
     precedentSearchParamsRef.current = { searchQuery: "" }
     actions.setInterpretationResults(null)
+    actions.setInterpretationTotalCount(0)
     actions.setRulingResults(null)
+    actions.setRulingTotalCount(0)
     actions.setOrdinancePage(1)
     actions.setOrdinanceTotalCount(0)
     actions.setAiAnswerContent('')
@@ -448,6 +452,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
 
         const data = (await response.json()) as InterpretationSearchResponse
         actions.setInterpretationResults(data.interpretations ?? [])
+        actions.setInterpretationTotalCount(data.totalCount ?? 0)
 
         if ((data.interpretations?.length ?? 0) === 0) {
           toast({
@@ -533,6 +538,7 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
 
         const data = (await response.json()) as RulingSearchResponse
         actions.setRulingResults(data.rulings ?? [])
+        actions.setRulingTotalCount(data.totalCount ?? 0)
 
         if ((data.rulings?.length ?? 0) === 0) {
           toast({

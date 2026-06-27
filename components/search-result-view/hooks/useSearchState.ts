@@ -104,7 +104,9 @@ export interface SearchState {
   precedentYearFilter?: string
   precedentCourtFilter?: string
   interpretationResults: InterpretationSearchResult[] | null
+  interpretationTotalCount: number
   rulingResults: RulingSearchResult[] | null
+  rulingTotalCount: number
 
   // 조례 페이지네이션 상태
   ordinancePage: number
@@ -178,7 +180,9 @@ export interface SearchStateActions {
   setPrecedentYearFilter: (year: string | undefined) => void
   setPrecedentCourtFilter: (court: string | undefined) => void
   setInterpretationResults: (results: InterpretationSearchResult[] | null) => void
+  setInterpretationTotalCount: (count: number) => void
   setRulingResults: (results: RulingSearchResult[] | null) => void
+  setRulingTotalCount: (count: number) => void
 
   // 조례 페이지네이션 상태 업데이트
   setOrdinancePage: (page: number) => void
@@ -274,7 +278,9 @@ export function useSearchState({
   const [precedentYearFilter, setPrecedentYearFilter] = useState<string | undefined>()
   const [precedentCourtFilter, setPrecedentCourtFilter] = useState<string | undefined>()
   const [interpretationResults, setInterpretationResults] = useState<InterpretationSearchResult[] | null>(null)
+  const [interpretationTotalCount, setInterpretationTotalCount] = useState(0)
   const [rulingResults, setRulingResults] = useState<RulingSearchResult[] | null>(null)
+  const [rulingTotalCount, setRulingTotalCount] = useState(0)
 
   // ============================================================
   // 조례 페이지네이션 상태
@@ -367,7 +373,9 @@ export function useSearchState({
     setPrecedentYearFilter(undefined)
     setPrecedentCourtFilter(undefined)
     setInterpretationResults(null)
+    setInterpretationTotalCount(0)
     setRulingResults(null)
+    setRulingTotalCount(0)
     setAiAnswerContent('')
     setAiRelatedLaws([])
     setAiCitations([])
@@ -443,7 +451,9 @@ export function useSearchState({
     precedentYearFilter,
     precedentCourtFilter,
     interpretationResults,
+    interpretationTotalCount,
     rulingResults,
+    rulingTotalCount,
     ordinancePage,
     ordinancePageSize,
     ordinanceTotalCount,
@@ -499,7 +509,9 @@ export function useSearchState({
     setPrecedentYearFilter,
     setPrecedentCourtFilter,
     setInterpretationResults,
+    setInterpretationTotalCount,
     setRulingResults,
+    setRulingTotalCount,
     setOrdinancePage,
     setOrdinancePageSize,
     setOrdinanceTotalCount,

@@ -7,6 +7,7 @@ import { MotionProvider } from "@/components/providers/motion-provider"
 import { ConsentGate } from "@/components/consent-gate"
 import { FavoritesSync } from "@/components/favorites-sync"
 import { AiGateProvider } from "@/components/ai-gate-provider"
+import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 export const viewport: Viewport = {
@@ -56,6 +57,7 @@ export default function RootLayout({
               </footer>
               <ConsentGate />
               <FavoritesSync />
+              <Toaster />
             </MotionProvider>
           </ErrorBoundary>
         </ThemeProvider>

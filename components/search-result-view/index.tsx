@@ -584,12 +584,14 @@ function SearchResultViewComponent({
             /* 해석례 검색 결과 (F1: 0건도 도메인 빈상태로 렌더 — 제네릭 에러 화면 방지) */
             <InterpretationResultList
               results={state.interpretationResults}
+              totalCount={state.interpretationTotalCount}
               onBack={handlers.handleReset}
               onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
           ) : state.rulingResults !== null ? (
             <RulingResultList
               results={state.rulingResults}
+              totalCount={state.rulingTotalCount}
               onBack={handlers.handleReset}
               onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
