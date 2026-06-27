@@ -58,11 +58,15 @@ export async function GET(request: NextRequest) {
       page,
     })
 
+    // 본문검색 모드: query는 항상 "법령명 제N조"라 법원명/연도 추출이 불필요(오히려 "대법원..."으로
+    // 시작하는 법령명을 curt로 잘못 빼낼 수 있어) → 자유검색 전용 추출/연도필터를 건너뛴다.
+    const isBodySearch = searchParams.get("bodySearch") === "1"
+
     // ✅ 법원명 + 연도 조합 처리 (예: "대법원 2025")
     let extractedYear: string | null = null
     let extractedCourt: string | null = court
 
-    if (query && !caseNumber) {
+    if (query && !caseNumber && !isBodySearch) {
       // 법원명 추출
       const courtMatch = query.match(/(대법원|서울고등법원|서울고법|부산고등법원|부산고법|대구고등법원|대구고법|광주고등법원|광주고법|서울중앙지법|서울동부지법|서울남부지법|서울북부지법|서울서부지법|인천지법|수원지법|부산지법|대구지법|광주지법|대전지법|울산지법|창원지법)/)
       if (courtMatch && !extractedCourt) {
@@ -109,21 +113,38 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const url = `https://www.law.go.kr/DRF/lawSearch.do?${params.toString()}`
-    const response = await fetchWithTimeout(url)
-
-    if (!response.ok) {
-      throw new Error(`API 오류: ${response.status}`)
+    // 법제처 검색 1회 실행 + XML 파싱
+    const runSearch = async (p: URLSearchParams) => {
+      const url = `https://www.law.go.kr/DRF/lawSearch.do?${p.toString()}`
+      const response = await fetchWithTimeout(url)
+      if (!response.ok) {
+        throw new Error(`API 오류: ${response.status}`)
+      }
+      const xmlText = await response.text()
+      // HTML 에러 페이지 감지
+      if (xmlText.includes("<!DOCTYPE html") || xmlText.includes("<html>")) {
+        throw new Error("법제처 API가 에러 페이지를 반환했습니다")
+      }
+      return parsePrecedentSearchXML(xmlText)
     }
 
-    const xmlText = await response.text()
-
-    // HTML 에러 페이지 감지
-    if (xmlText.includes("<!DOCTYPE html") || xmlText.includes("<html>")) {
-      throw new Error("법제처 API가 에러 페이지를 반환했습니다")
-    }
-
-    const { totalCount, precedents } = parsePrecedentSearchXML(xmlText)
+    // 본문검색 모드 (law.go.kr search=2 = bdyText): "법령명 제N조"를 판례 본문에서 찾는다.
+    // 기본 판례명검색(search=1)은 "제N조" 토큰이 안 걸려 항상 0건이라 본문검색으로 우회한다.
+    //  · 1차 = 구문(따옴표)검색: "법령명 제N조"가 본문에 인접 표기된 판례만 = 그 조문을 실제 인용한 판례.
+    //    토큰 AND(법명·제N조가 본문 아무 데나 흩어져도 매칭)보다 오탐이 적다
+    //    (예: 형법 제38조(경합범 가중)를 스치는 무관한 경합범 판결 오염을 배제).
+    //  · 폴백 = 긴 분법/개명 법령명은 본문에 풀네임이 인접 표기되지 않아 구문검색 0건 →
+    //    토큰 AND로 폴백해 0건 회피(예: "소방시설 설치 및 관리에 관한 법률 제12조" 구문 0 / AND 129).
+    const { totalCount, precedents } =
+      isBodySearch && query
+        ? await (async () => {
+            params.append("search", "2")
+            const phraseParams = new URLSearchParams(params)
+            phraseParams.set("query", `"${query}"`)
+            const phrase = await runSearch(phraseParams)
+            return phrase.totalCount > 0 ? phrase : runSearch(params)
+          })()
+        : await runSearch(params)
 
     debugLogger.debug(`[precedent-search] API 응답: totalCount=${totalCount}, precedents.length=${precedents.length}, display=${display}, extractedYear=${extractedYear}, extractedCourt=${extractedCourt}`)
 

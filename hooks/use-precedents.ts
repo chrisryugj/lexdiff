@@ -54,8 +54,12 @@ export function usePrecedents(
       return
     }
 
-    // 검색 쿼리 구성: "법령명 제N조"
+    // 검색 쿼리 구성: "법령명 제N조" (예: "관세법 제38조")
+    // 이 문자열을 판례 "본문"에서 검색(bodySearch=1 → search=2)해 해당 조문을 인용한 판례를 찾는다.
+    // (기본 판례명검색은 "제N조" 토큰이 안 걸려 항상 0건)
     const query = `${lawName} ${articleNumber}`
+    // 본문검색 전용 캐시키 — 과거 판례명검색(search=1) 시절 캐시된 0건 항목과 충돌 방지
+    const cacheKey = `${query}::ref`
 
     // 동일 쿼리면 스킵
     if (query === lastQueryRef.current) {
@@ -75,7 +79,7 @@ export function usePrecedents(
 
       try {
         // 1. 캐시 확인
-        const cached = await getPrecedentSearchCache(query)
+        const cached = await getPrecedentSearchCache(cacheKey)
         if (cached) {
           setPrecedents(cached.precedents)
           setTotalCount(cached.totalCount)
@@ -87,7 +91,8 @@ export function usePrecedents(
         const params = new URLSearchParams({
           query,
           display: display.toString(),
-          exact: "1" // 법령명 기반 조회 — 서버측 검색어 정제 스킵(법령명 손상 방지)
+          exact: "1", // 법령명 기반 조회 — 서버측 검색어 정제 스킵(법령명 손상 방지)
+          bodySearch: "1" // 본문검색(search=2) — "제N조" 토큰을 판례 본문에서 매칭
         })
 
         const response = await fetch(`/api/precedent-search?${params}`, {
@@ -109,7 +114,7 @@ export function usePrecedents(
         setTotalCount(data.totalCount || 0)
 
         // 4. 캐시에 저장
-        await setPrecedentSearchCache(query, data.totalCount || 0, data.precedents || [])
+        await setPrecedentSearchCache(cacheKey, data.totalCount || 0, data.precedents || [])
 
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {

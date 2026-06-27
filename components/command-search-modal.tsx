@@ -528,11 +528,13 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             </div>
           )}
 
-          {/* 최근 조회 이력 — 본 항목 재조회 (5개 제한 + 독립 스크롤) */}
+          {/* 최근 조회 이력 — 본 항목 재조회 (5개 제한 + 독립 스크롤).
+              embedded: Card chrome 없이 형제 섹션과 동일한 평평한 sticky 헤더로 렌더(부유/중첩 방지) */}
           {(historyCount > 0 || historyHydrating) && (
             <div className="max-h-[200px] overflow-y-auto border-b border-border">
-              <div className="px-2 py-2">
+              <div className="p-2">
                 <ViewingHistoryPanel
+                  embedded
                   hideWhenEmpty={false}
                   maxItems={5}
                   onReview={(rec) => {
