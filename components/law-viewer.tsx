@@ -401,6 +401,18 @@ function LawViewerComponent({
     }
 
     fetchRevisionHistory(activeJo)
+
+    // 조회 이력 기록 (재조회용 — 법령). 위 가드로 법령 조문 활성 시점만 통과(판례/조례/AI 제외).
+    void import("@/lib/viewing-history-store").then(({ viewingHistoryStore, makeItemKey }) => {
+      viewingHistoryStore.addViewingRecord({
+        category: "law",
+        itemKey: makeItemKey("law", { lawId: meta.lawId, jo: activeJo }),
+        title: meta.lawTitle,
+        lawId: meta.lawId,
+        jo: activeJo,
+        metadata: { article: activeArticleNumber },
+      })
+    })
   }, [meta.lawId, activeJo, isOrdinance, isPrecedent])
 
   // 관련 심급 훅

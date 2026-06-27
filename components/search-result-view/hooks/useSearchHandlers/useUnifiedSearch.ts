@@ -330,6 +330,16 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
           date: precedent.date || "",
         })
 
+        // 조회 이력 기록 (재조회용 — 판례). recent-precedent-store 통합 예정.
+        const { viewingHistoryStore, makeItemKey } = await import("@/lib/viewing-history-store")
+        viewingHistoryStore.addViewingRecord({
+          category: "precedent",
+          itemKey: makeItemKey("precedent", { precedentId }),
+          title: precedent.name || precedent.caseNumber || "판례",
+          precedentId,
+          metadata: { caseNumber: precedent.caseNumber, court: precedent.court, date: precedent.date },
+        })
+
         onPrecedentSelect?.(precedentId)
       } catch (error) {
         debugLogger.error("[unified-search] precedent detail failed", error)

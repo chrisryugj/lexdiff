@@ -156,6 +156,16 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
           return `<div class="mb-4 pb-4 border-b border-border/30 last:border-0">${header}<div class="text-sm leading-relaxed">${content}</div></div>`
         }).join('')
         setModalHtml(`<div class="space-y-2">${html}</div>`)
+
+        // 조회 이력 기록 (재조회용 — 조례)
+        const { viewingHistoryStore, makeItemKey } = await import("@/lib/viewing-history-store")
+        viewingHistoryStore.addViewingRecord({
+          category: "ordinance",
+          itemKey: makeItemKey("ordinance", { ordinanceSeq: r.ordinanceSeq }),
+          title: r.ordinanceName,
+          ordinanceSeq: r.ordinanceSeq,
+          metadata: { orgName: r.orgName, effectiveDate: r.effectiveDate },
+        })
       }
     } catch {
       setModalHtml('<p class="text-center py-8 text-muted-foreground">조례 본문을 불러올 수 없습니다.</p>')

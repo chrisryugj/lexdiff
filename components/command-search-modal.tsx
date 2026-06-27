@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
+import { ViewingHistoryPanel } from "@/components/viewing-history-panel"
+import { toReviewQuery } from "@/lib/viewing-history-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO, parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -465,6 +467,17 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
               </div>
             </div>
           )}
+
+          {/* 최근 조회 이력 — 본 항목 재조회 */}
+          <div className="px-2 pb-2">
+            <ViewingHistoryPanel
+              hideWhenEmpty
+              onReview={(rec) => {
+                onSearch(toReviewQuery(rec))
+                onClose()
+              }}
+            />
+          </div>
 
           {/* 안내 메시지 */}
           {!searchQuery.trim() && recentSearches.length === 0 && favorites.length === 0 && (
