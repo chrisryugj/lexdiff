@@ -74,6 +74,8 @@ export const TimeMachineModal = memo(function TimeMachineModal({
   const [newContent, setNewContent] = useState('')
   const [selectedRevision, setSelectedRevision] = useState<HistoryItem | null>(null)
   const [noRevisions, setNoRevisions] = useState(false)
+  // TM-2: 신구대조표가 원래 제공되지 않는 개정(제정·타법개정 등)은 에러가 아니라 정상 빈상태.
+  const [noDiff, setNoDiff] = useState(false)
 
   // UI 상태
   const [syncScroll, setSyncScroll] = useState(true)
@@ -101,6 +103,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
       setNewContent('')
       setSelectedRevision(null)
       setNoRevisions(false)
+      setNoDiff(false)
       setError(null)
       setShowHistory(false)
     }
@@ -109,14 +112,14 @@ export const TimeMachineModal = memo(function TimeMachineModal({
 
   // 특정 개정의 신구대조 XML 조회
   const fetchRevisionDiff = useCallback(async (rev: HistoryItem, signal: AbortSignal) => {
+    setNoDiff(false)
     const cached = getDiffCached(rev.mst)
     if (cached) {
       setOldContent(cached.oldContent)
       setNewContent(cached.newContent)
       setSelectedRevision(rev)
-      if (!cached.oldContent && !cached.newContent) {
-        throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
-      }
+      // TM-2: 신구대조표 없음은 에러가 아니라 정상 빈상태 — throw 대신 noDiff 안내(사이드바 유지).
+      if (!cached.oldContent && !cached.newContent) setNoDiff(true)
       return
     }
 
@@ -133,9 +136,8 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setSelectedRevision(rev)
     setDiffCache(rev.mst, { oldContent: parsed.oldVersion.content, newContent: parsed.newVersion.content })
 
-    if (!parsed.oldVersion.content && !parsed.newVersion.content) {
-      throw new Error(`이 개정(${rev.rrCls})은 신구대조표가 제공되지 않습니다.`)
-    }
+    // TM-2: 신구대조표 없음은 에러가 아니라 정상 빈상태.
+    if (!parsed.oldVersion.content && !parsed.newVersion.content) setNoDiff(true)
   }, [])
 
   // 조회 실행
@@ -153,6 +155,7 @@ export const TimeMachineModal = memo(function TimeMachineModal({
     setNewContent('')
     setSelectedRevision(null)
     setNoRevisions(false)
+    setNoDiff(false)
 
     try {
       // Step 1: 연혁 조회 (lawId 우선 — ID 경로만 진짜 단일 법령 연혁 반환)
@@ -436,6 +439,19 @@ export const TimeMachineModal = memo(function TimeMachineModal({
                   <Icon name="check-circle" size={40} className="mx-auto text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground">
                     {targetDate} 이후 이 법령의 개정이 없습니다.
+                  </p>
+                </div>
+              </div>
+            ) : noDiff ? (
+              /* TM-2: 신구대조표가 원래 없는 개정 — 에러가 아니라 차분한 안내 (사이드바에서 다른 개정 선택 가능) */
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2 max-w-md px-4">
+                  <Icon name="info" size={40} className="mx-auto text-muted-foreground/50" />
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedRevision?.rrCls ? `${selectedRevision.rrCls}은(는) ` : '이 개정은 '}신구대조표가 제공되지 않아요
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    제정·타법개정 등은 대조할 이전 조문이 없어요. 왼쪽에서 다른 개정을 골라 비교해 보세요.
                   </p>
                 </div>
               </div>

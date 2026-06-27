@@ -142,9 +142,33 @@ export const PrecedentResultList = memo(function PrecedentResultList({
             ))}
           </div>
         ) : filteredResults.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">검색 결과가 없습니다.</p>
+          <div className="text-center py-16 px-6">
+            <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+            {filterKeyword ? (
+              <>
+                <p className="text-lg font-semibold text-foreground mb-1">
+                  ‘{filterKeyword}’와 일치하는 판례가 이 페이지에 없어요
+                </p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  결과 내 검색은 지금 보는 {results.length}건만 훑어봐요. 필터를 지우고 전체 결과를 다시 보세요.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setFilterKeyword("")} className="gap-2">
+                  <Icon name="x" className="h-4 w-4" />
+                  필터 지우기
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold text-foreground mb-1">판례를 찾지 못했어요</p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  사건명·법령명·사건번호로 검색어를 바꿔 보세요.
+                </p>
+                <Button variant="outline" size="sm" onClick={onBack} className="gap-2">
+                  <Icon name="arrow-left" className="h-4 w-4" />
+                  다른 검색어로 다시 시도
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

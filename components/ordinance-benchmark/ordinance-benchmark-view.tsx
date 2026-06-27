@@ -521,6 +521,16 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
             </Card>
           )}
 
+          {/* OB-1: progress가 아직 없는 첫 페이지 검색 구간 로딩 피드백 (공백 대기 방지) */}
+          {isSearching && !progress && (
+            <Card className="p-4">
+              <span className="text-sm font-medium flex items-center">
+                <Icon name="loader" size={14} className="animate-spin mr-1.5" />
+                조례를 검색하고 있어요...
+              </span>
+            </Card>
+          )}
+
           {/* 에러 */}
           {error && (
             <Card className="p-4 border-red-500/30 bg-red-500/5">

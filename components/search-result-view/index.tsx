@@ -580,16 +580,18 @@ function SearchResultViewComponent({
           ) : state.isSearching && !state.isAiMode ? (
             /* 법령 검색 로딩 - 스켈레톤 + 중앙 스피너 */
             <LawViewerSkeleton stage={state.searchStage} />
-          ) : state.interpretationResults !== null && state.interpretationResults.length > 0 ? (
-            /* 해석례 검색 결과 */
+          ) : state.interpretationResults !== null ? (
+            /* 해석례 검색 결과 (F1: 0건도 도메인 빈상태로 렌더 — 제네릭 에러 화면 방지) */
             <InterpretationResultList
               results={state.interpretationResults}
               onBack={handlers.handleReset}
+              onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
-          ) : state.rulingResults !== null && state.rulingResults.length > 0 ? (
+          ) : state.rulingResults !== null ? (
             <RulingResultList
               results={state.rulingResults}
               onBack={handlers.handleReset}
+              onRetryAi={() => handlers.handleAiQuery(state.userQuery || state.searchQuery)}
             />
           ) : state.precedentResults !== null ? (
             /* 판례 검색 결과 */

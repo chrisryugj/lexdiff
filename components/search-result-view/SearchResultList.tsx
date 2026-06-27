@@ -501,11 +501,13 @@ const OrdinanceResultCard = memo(function OrdinanceResultCard({
 interface InterpretationResultListProps {
   results: InterpretationSearchResult[]
   onBack: () => void
+  onRetryAi?: () => void
 }
 
 export const InterpretationResultList = memo(function InterpretationResultList({
   results,
   onBack,
+  onRetryAi,
 }: InterpretationResultListProps) {
   return (
     <div className="space-y-3">
@@ -525,7 +527,23 @@ export const InterpretationResultList = memo(function InterpretationResultList({
         </div>
       </div>
 
-      {/* 결과 리스트 */}
+      {results.length === 0 ? (
+        /* F1: 0건은 에러가 아니라 정상 빈상태 — 도메인 안내 + AI 재시도 */
+        <div className="text-center py-16 px-6">
+          <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-lg font-semibold text-foreground mb-1">해석례를 찾지 못했어요</p>
+          <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+            법제처에 등록된 해석례 중에는 없네요. 질문형으로 묻는 AI 검색이 더 잘 찾을 수 있어요.
+          </p>
+          {onRetryAi && (
+            <Button variant="default" size="sm" onClick={onRetryAi} className="gap-2">
+              <Icon name="sparkles" className="h-4 w-4" />
+              AI 검색으로 다시 시도
+            </Button>
+          )}
+        </div>
+      ) : (
+      /* 결과 리스트 */
       <div className="space-y-2">
         {results.map((item, index) => (
           <a
@@ -533,12 +551,17 @@ export const InterpretationResultList = memo(function InterpretationResultList({
             href={safeHref(item.link)}
             target="_blank"
             rel="noopener noreferrer"
+            title="새 탭에서 law.go.kr 원문이 열립니다"
             className="block p-4 bg-card/50 border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 animate-fade-in"
             style={{ animationDelay: `${index * 50}ms`, fontFamily: "Pretendard, sans-serif" }}
           >
-            <h4 className="font-bold text-sm md:text-base leading-tight mb-2 text-foreground">
-              {item.name || '(안건명 없음)'}
-            </h4>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h4 className="font-bold text-sm md:text-base leading-tight text-foreground">
+                {item.name || '(안건명 없음)'}
+              </h4>
+              {/* F3: 외부 이탈 예고 */}
+              <Icon name="external-link" className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/50" title="새 탭에서 law.go.kr 열림" />
+            </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               {item.number && (
                 <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-300/50">
@@ -559,6 +582,7 @@ export const InterpretationResultList = memo(function InterpretationResultList({
           </a>
         ))}
       </div>
+      )}
     </div>
   )
 })
@@ -566,11 +590,13 @@ export const InterpretationResultList = memo(function InterpretationResultList({
 interface RulingResultListProps {
   results: RulingSearchResult[]
   onBack: () => void
+  onRetryAi?: () => void
 }
 
 export const RulingResultList = memo(function RulingResultList({
   results,
   onBack,
+  onRetryAi,
 }: RulingResultListProps) {
   return (
     <div className="space-y-3">
@@ -589,6 +615,22 @@ export const RulingResultList = memo(function RulingResultList({
         </div>
       </div>
 
+      {results.length === 0 ? (
+        /* F1: 0건은 에러가 아니라 정상 빈상태 — 도메인 안내 + AI 재시도 */
+        <div className="text-center py-16 px-6">
+          <Icon name="file-search" className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-lg font-semibold text-foreground mb-1">재결례를 찾지 못했어요</p>
+          <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+            법제처에 등록된 재결례 중에는 없네요. 질문형으로 묻는 AI 검색이 더 잘 찾을 수 있어요.
+          </p>
+          {onRetryAi && (
+            <Button variant="default" size="sm" onClick={onRetryAi} className="gap-2">
+              <Icon name="sparkles" className="h-4 w-4" />
+              AI 검색으로 다시 시도
+            </Button>
+          )}
+        </div>
+      ) : (
       <div className="space-y-2">
         {results.map((item, index) => (
           <a
@@ -596,12 +638,17 @@ export const RulingResultList = memo(function RulingResultList({
             href={safeHref(item.link)}
             target="_blank"
             rel="noopener noreferrer"
+            title="새 탭에서 law.go.kr 원문이 열립니다"
             className="block p-4 bg-card/50 border-2 border-border/50 rounded-xl hover:border-primary/40 hover:bg-card/70 transition-all duration-200 animate-fade-in"
             style={{ animationDelay: `${index * 50}ms`, fontFamily: "Pretendard, sans-serif" }}
           >
-            <h4 className="font-bold text-sm md:text-base leading-tight mb-2 text-foreground">
-              {item.name || '(사건명 없음)'}
-            </h4>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h4 className="font-bold text-sm md:text-base leading-tight text-foreground">
+                {item.name || '(사건명 없음)'}
+              </h4>
+              {/* F3: 외부 이탈 예고 */}
+              <Icon name="external-link" className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/50" title="새 탭에서 law.go.kr 열림" />
+            </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               {item.claimNumber && (
                 <Badge variant="outline" className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300/50">
@@ -627,6 +674,7 @@ export const RulingResultList = memo(function RulingResultList({
           </a>
         ))}
       </div>
+      )}
     </div>
   )
 })
