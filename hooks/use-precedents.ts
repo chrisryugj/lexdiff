@@ -86,7 +86,8 @@ export function usePrecedents(
         // 2. API 호출
         const params = new URLSearchParams({
           query,
-          display: display.toString()
+          display: display.toString(),
+          exact: "1" // 법령명 기반 조회 — 서버측 검색어 정제 스킵(법령명 손상 방지)
         })
 
         const response = await fetch(`/api/precedent-search?${params}`, {

@@ -14,9 +14,15 @@ import { storeRelationsAsync } from "@/lib/relation-graph/relation-db"
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const rawQuery = searchParams.get("query")
-  // 카테고리/조사 제거 — "관세 관련 판례" → "관세"
+  // exact=1: 법령명 기반 자동 조회(use-precedents의 "법령명 제N조")는 검색어가 이미
+  // 정확하므로 정제를 건너뛴다. 정제 정규식이 "공공기관의 정보공개에 관한 법률"의 "관한",
+  // "대한민국헌법"의 "대한"을 제거해 법령명을 손상시키던 버그 방지.
+  const exact = searchParams.get("exact") === "1"
+  // 카테고리/조사 제거 — "관세 관련 판례" → "관세" (자유검색 전용)
   const query = rawQuery
-    ? (rawQuery.replace(/\s*(판례|판결|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, ' ').replace(/\s+/g, ' ').trim() || rawQuery.trim())
+    ? (exact
+        ? rawQuery.trim()
+        : (rawQuery.replace(/\s*(판례|판결|에\s*관한|에\s*대한|에\s*대해|관련된|관련|관한|대한)\s*/g, ' ').replace(/\s+/g, ' ').trim() || rawQuery.trim()))
     : null
   const court = searchParams.get("court")
   const caseNumber = searchParams.get("caseNumber")

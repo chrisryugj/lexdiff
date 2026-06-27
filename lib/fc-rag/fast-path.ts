@@ -125,15 +125,20 @@ export function detectFastPath(query: string): FastPathDetection {
     }
   }
 
-  // ── 패턴 4: 별표 조회 ("OO법 별표 N") ──
-  const annexMatch = query.match(/^(.+?(?:법|령|규칙))\s+별표\s*(\d+)?/)
+  // ── 패턴 4: 별표 조회 ("OO법 별표 N", "OO법 별표 3의2", "OO법 별표 제3호") ──
+  // 가지번호(의N)를 보존해야 fast-path가 동작. 미지원 시 full pipeline으로 빠져
+  // fast_path_used 저하 + 멀티턴 지연 발생. searchQuery의 "별표3의2"는
+  // korean-law-mcp 4.4.2 get_annexes가 6자리 코드(000302)로 변환 처리.
+  const annexMatch = query.match(/^(.+?(?:법|령|규칙))\s+별표\s*(?:제\s*)?(\d+)?(?:\s*의\s*(\d+))?/)
   if (annexMatch && !/비교|분석|개정/.test(query)) {
     const lawName = annexMatch[1].trim()
+    const sub = annexMatch[3] ? `의${annexMatch[3]}` : ''
+    const annexLabel = `별표${annexMatch[2] || ''}${sub}`
     const mst = KNOWN_MST.get(lawName)
     if (mst) {
-      return { type: 'annex_resolve', lawName, mst, searchQuery: `${lawName} 별표${annexMatch[2] || ''}` }
+      return { type: 'annex_resolve', lawName, mst, searchQuery: `${lawName} ${annexLabel}` }
     }
-    return { type: 'annex_resolve', lawName, searchQuery: `${lawName} 별표${annexMatch[2] || ''}` }
+    return { type: 'annex_resolve', lawName, searchQuery: `${lawName} ${annexLabel}` }
   }
 
   // ── 패턴 5: 용어 정의 ("XX란?", "XX 뜻") ──
