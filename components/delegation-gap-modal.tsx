@@ -318,11 +318,15 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
                       부분 {analysis.partialCount}
                     </Badge>
                   )}
-                  {analysis.missingCount === 0 && analysis.partialCount === 0 && (
+                  {analysis.totalClauses === 0 ? (
+                    <Badge className="bg-muted text-muted-foreground border-border text-xs">
+                      분석할 위임 조항 없음
+                    </Badge>
+                  ) : analysis.missingCount === 0 && analysis.partialCount === 0 ? (
                     <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/15 text-xs">
                       모두 정상
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Button
@@ -368,9 +372,15 @@ export function DelegationGapModal({ isOpen, onClose, meta }: DelegationGapModal
               {filteredResults.length === 0 ? (
                 <div className="flex items-center justify-center h-full p-8">
                   <div className="text-center space-y-2">
-                    <Icon name="check-circle" size={40} className="mx-auto text-emerald-500" />
+                    {analysis.totalClauses === 0 ? (
+                      <Icon name="file-text" size={40} className="mx-auto text-muted-foreground" />
+                    ) : (
+                      <Icon name="check-circle" size={40} className="mx-auto text-emerald-500" />
+                    )}
                     <p className="text-sm font-medium">
-                      {showOnlyGaps ? '미비 항목이 없습니다' : '위임 조항이 없습니다'}
+                      {analysis.totalClauses === 0
+                        ? '이 조문에서 위임 조항을 찾지 못했습니다'
+                        : showOnlyGaps ? '미비 항목이 없습니다' : '위임 조항이 없습니다'}
                     </p>
                     {showOnlyGaps && analysis.totalClauses > 0 && (
                       <p className="text-xs text-muted-foreground">

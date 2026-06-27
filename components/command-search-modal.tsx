@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
+import { ViewingHistoryPanel } from "@/components/viewing-history-panel"
+import { toReviewQuery } from "@/lib/viewing-history-store"
 import type { Favorite } from "@/lib/law-types"
 import { formatJO, parseSearchQuery } from "@/lib/law-parser"
 import { debugLogger } from "@/lib/debug-logger"
@@ -134,7 +136,10 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   // 키보드 네비게이션
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const displayedRecentSearches = recentSearches.slice(0, 5)
-    const totalItems = suggestions.length + displayedRecentSearches.length + favorites.length
+    // 즐겨찾기는 렌더에서 5개만 표시(slice(0,5))하므로 키보드 네비도 동일 범위로 한정.
+    // (full favorites.length 로 두면 화살표가 안 보이는 항목을 선택·실행 — SR-1)
+    const displayedFavorites = favorites.slice(0, 5)
+    const totalItems = suggestions.length + displayedRecentSearches.length + displayedFavorites.length
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -158,7 +163,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         } else {
           // 즐겨찾기
           const favIndex = selectedIndex - suggestions.length - displayedRecentSearches.length
-          handleFavoriteClick(favorites[favIndex])
+          handleFavoriteClick(displayedFavorites[favIndex])
         }
       } else {
         // 선택 안 했으면 현재 입력값으로 검색
@@ -465,6 +470,17 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
               </div>
             </div>
           )}
+
+          {/* 최근 조회 이력 — 본 항목 재조회 */}
+          <div className="px-2 pb-2">
+            <ViewingHistoryPanel
+              hideWhenEmpty
+              onReview={(rec) => {
+                onSearch(toReviewQuery(rec))
+                onClose()
+              }}
+            />
+          </div>
 
           {/* 안내 메시지 */}
           {!searchQuery.trim() && recentSearches.length === 0 && favorites.length === 0 && (

@@ -43,6 +43,13 @@ const ARTICLE_REF_PATTERN = /제\d+조/g
 const LAW_NAME_PATTERN = /(?:「[^」]+」|[\w가-힣]+법(?:\s|$))/g
 const ANSWER_FAILURE_PATTERN = /추출[이가은]\s*(?:반복\s*)?실패|직접\s*추출|검색\s*결과\s*없음|조회되지\s*않/
 
+// ── 현행성 백스톱 패턴 ──
+// 도구 결과에 "연혁/시행예정/구법령명" 위험 마커가 있는데(=과거·미시행 버전을 실제로
+// 끌어옴) 답변이 현행성을 한 마디도 언급하지 않으면, 모델이 과거 본문을 현행처럼 단정한
+// 것으로 보고 marginal 로 강등한다. 정상 현행 조회에 늘 붙는 'ℹ️ 조회기준일'은 제외.
+const CURRENCY_RISK_MARKER = /⚠️|시행\s?예정|미시행|연혁|과거\s?버전|구\s?법령명|특정\s?시행일자/
+const CURRENCY_ACK_PATTERN = /시행일|시행\s?예정|현행|연혁|과거\s?버전|구\s?법/
+
 /**
  * RAG 응답 품질 평가
  *
@@ -101,6 +108,15 @@ export function evaluateResponseQuality(
   if (retrievalCount === 0 && citationCount > 0) {
     score = Math.min(score, 25)
     warnings.push('도구 미호출 상태의 인용 — 학습 데이터 기반(개정 전 법령 가능성) 의심')
+  }
+
+  // ── 현행성 백스톱 ──
+  // 도구 결과에 연혁/시행예정/구법령명 위험 마커가 있는데 답변이 현행성을 전혀 언급하지
+  // 않으면 → 과거 본문을 현행처럼 단정한 의심. marginal 이하로 캡 + 경고(→캐시 저장 차단).
+  const toolText = toolResults.map(t => t.result).join('\n')
+  if (CURRENCY_RISK_MARKER.test(toolText) && !CURRENCY_ACK_PATTERN.test(answerText)) {
+    score = Math.min(score, 50)
+    warnings.push('현행성 라벨 미반영 — 연혁/시행예정 버전을 현행으로 단정했을 가능성 (현행 여부 명시 권장)')
   }
 
   // ── 레벨 판정 ──

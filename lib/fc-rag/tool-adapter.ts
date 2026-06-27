@@ -191,6 +191,20 @@ export async function executeTool(
       finalIsError = true
     }
 
+    // 현행성 라벨 비대칭 보정 — get_batch_articles(efYd 지정)/get_historical_law 출력에는
+    // get_law_text 와 달리 시행일자·연혁 경고가 없어 LLM 이 과거 본문을 현행처럼 인용하는
+    // 누수가 생긴다(korean-law-mcp batch-articles.js/historical-law.js 무라벨). law-text.js
+    // 의 경고 문구를 미러링해 라벨을 앞단에 주입한다 → quality-evaluator 현행성 백스톱이
+    // 이 마커를 감지해 강등할 수 있게 된다.
+    if (!finalIsError) {
+      const efYd = (parsedArgs as { efYd?: string }).efYd
+      if (name === 'get_batch_articles' && efYd) {
+        finalResult = `⚠️ 특정 시행일자(efYd=${efYd}) 버전 조회 — 현행 법령이 아닐 수 있음. 현행 기준 답변에는 efYd 없이 재조회할 것.\n${finalResult}`
+      } else if (name === 'get_historical_law') {
+        finalResult = `⚠️[연혁-과거버전] 아래는 과거 시점 법령 본문임. 현행과 다를 수 있으니, 현행 기준 답변에는 search_law 의 [현행] MST 로 재조회할 것.\n${finalResult}`
+      }
+    }
+
     const result: ToolCallResult = {
       name,
       result: finalResult,

@@ -39,12 +39,32 @@ async function openDB(): Promise<IDBDatabase> {
 }
 
 /**
+ * 별표 번호 정규화 — 캐시 키 일관성용
+ *
+ * 같은 별표가 진입점에 따라 서로 다른 문자열로 들어와 캐시 키가 갈리는 문제를 막는다.
+ * - API 6자리 형식("000203")과 텍스트 형식("[별표 2의3]", "2의3")을 동일 키("2의3")로 통일
+ * - ⚠️ 별지(서식)는 숫자만 뽑으면 별표 번호와 충돌하므로 그대로 두고 대괄호/공백만 제거
+ *   (annex-modal의 extractAnnexNum은 매칭용이라 "별지제2호서식"→"2"로 줄이지만,
+ *    캐시 키는 별표/별지를 구분해야 하므로 의도적으로 다른 규칙을 쓴다)
+ */
+function normalizeAnnexNumber(annexNumber: string): string {
+  // API 6자리 형식: "000203" → "2의3", "000100" → "1", "000000" → "" (번호 없는 별표)
+  if (/^\d{6}$/.test(annexNumber)) {
+    const main = parseInt(annexNumber.substring(0, 4), 10)
+    const sub = parseInt(annexNumber.substring(4, 6), 10)
+    if (main === 0 && sub === 0) return ""
+    return sub > 0 ? `${main}의${sub}` : String(main)
+  }
+  // 텍스트 형식: 대괄호/별표/공백 제거 ("[별표 2의3]" → "2의3")
+  // 별지("별지제2호서식")는 "별"만 빠진 "지제2호서식"으로 남아 별표 키와 충돌하지 않음
+  return annexNumber.replace(/[\[\]별표\s]/g, "")
+}
+
+/**
  * 별표 캐시 키 생성
  */
 export function getAnnexCacheKey(lawId: string, annexNumber: string): string {
-  // annexNumber에서 숫자만 추출 (예: "[별표 2의3]" → "2의3")
-  const normalized = annexNumber.replace(/[\[\]별표\s]/g, "")
-  return `${lawId}_${normalized}`
+  return `${lawId}_${normalizeAnnexNumber(annexNumber)}`
 }
 
 /**

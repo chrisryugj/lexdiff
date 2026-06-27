@@ -65,6 +65,11 @@ export function PrivacyContent() {
                     <li>UA 클래스(mobile/desktop/tablet)와 30분 윈도우 세션 해시(영속 식별 불가)</li>
                   </ul>
                 </li>
+                <li>
+                  <strong className="font-semibold text-foreground">조회 이력</strong>{' '}
+                  — 로그인 사용자가 열람한 법령·조례·판례의 <strong>표시용 제목, 식별자(법령ID·조문번호·조례 일련번호·판례 ID), 조회 시각</strong>만 저장합니다.
+                  최근 조회 항목 재조회 편의 제공 목적이며, 질의·답변 원문은 저장하지 않습니다. (비로그인 시 기기 내 localStorage에만 보관)
+                </li>
               </ul>
             </div>
           </div>
@@ -107,6 +112,12 @@ export function PrivacyContent() {
                   <td className="px-3 py-2">AI 파이프라인 텔레메트리 (본문 제외 집계)</td>
                   <td className="px-3 py-2">
                     <strong className="font-semibold">90일</strong> 경과 후 자동 삭제
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">조회 이력 (법령/조례/판례 메타)</td>
+                  <td className="px-3 py-2">
+                    마지막 조회 후 <strong className="font-semibold">180일</strong> 경과 시 자동 삭제
                   </td>
                 </tr>
                 <tr>

@@ -169,6 +169,11 @@ export async function POST(request: NextRequest) {
 
       // ── 텔레메트리 수집기 (본문 없음, 집계 신호만) ──
       const logStartMs = Date.now()
+      // 단계별 latency 계측 — SSE 이벤트 타임스탬프로 router/retrieval/generation 근사.
+      // (엔진 무수정: 이벤트 루프에서 첫 도구호출·마지막 도구결과·첫 답변 시각만 기록)
+      let tFirstTool: number | null = null
+      let tLastToolResult: number | null = null
+      let tFirstAnswer: number | null = null
       const logTools: string[] = []
       const logToolErrors: string[] = []
       let logAnswerLen = 0
@@ -399,6 +404,7 @@ export async function POST(request: NextRequest) {
               lastEngineErrorMsg = (event as { message?: string }).message || null
             }
             if (event.type === "answer") {
+              if (tFirstAnswer === null) tFirstAnswer = Date.now()
               geminiAnswerSent = true
               answerDelivered = true
               lastAnswerCitations = event.data.citations || []
@@ -406,12 +412,14 @@ export async function POST(request: NextRequest) {
             // 진단: tool_call(args) / tool_result(summary) 를 trace 파일에 기록해
             //       환각 원인 분석을 가능하게 한다 (P1: 여권법 시행령 제40조 환각 사건).
             if (event.type === 'tool_call') {
+              if (tFirstTool === null) tFirstTool = Date.now()
               traceLogger.addEvent(traceId, 'tool_call', {
                 name: (event as { name?: string }).name,
                 args: (event as { args?: unknown }).args,
                 query: (event as { query?: string }).query,
               })
             } else if (event.type === 'tool_result') {
+              tLastToolResult = Date.now()
               const e = event as { name?: string; success?: boolean; summary?: string }
               traceLogger.addEvent(traceId, 'tool_result', {
                 name: e.name,
@@ -484,6 +492,9 @@ export async function POST(request: NextRequest) {
             queryLengthBucket: bucketLength(query.length),
             answerLengthBucket: bucketLength(logAnswerLen),
             latencyTotalMs: Date.now() - logStartMs,
+            latencyRouterMs: tFirstTool !== null ? tFirstTool - logStartMs : null,
+            latencyRetrievalMs: tFirstTool !== null && tLastToolResult !== null ? tLastToolResult - tFirstTool : null,
+            latencyGenerationMs: tLastToolResult !== null && tFirstAnswer !== null ? tFirstAnswer - tLastToolResult : null,
             toolCallsCount: logTools.length,
             toolNames: logTools.length > 0 ? logTools : null,
             toolErrors: logToolErrors.length > 0 ? logToolErrors : null,
