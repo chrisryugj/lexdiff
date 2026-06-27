@@ -595,7 +595,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
 
               {/* 테이블 */}
               <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border bg-muted/50">
@@ -642,6 +642,39 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* 모바일 카드형 — 데스크톱 테이블의 시행일·개정유형 컬럼이 hidden sm:table-cell
+                    이라 모바일선 통째로 사라졌었음(OB-3). 행을 카드로 풀어 메타를 조례명 아래 노출. */}
+                <div className="sm:hidden divide-y divide-border">
+                  {displayResults.map((r) => {
+                    const key = `${r.orgCode}-${r.ordinanceSeq || r.ordinanceName}`
+                    return (
+                      <div key={key} className="flex items-start gap-2 px-1 py-3">
+                        <Checkbox checked={checkedItems.has(key)}
+                          disabled={!checkedItems.has(key) && checkedItems.size >= MAX_CHECKED}
+                          onCheckedChange={() => toggleCheck(key)} className="mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1">
+                            <Badge variant="outline" className="text-[11px]">{r.orgShortName}</Badge>
+                          </div>
+                          <button onClick={() => openOrdinanceModal(r)}
+                            className="text-sm font-medium text-left hover:text-brand-navy dark:hover:text-brand-gold hover:underline underline-offset-2 transition-colors break-keep block"
+                            style={serifStyle}>
+                            {r.ordinanceName}
+                          </button>
+                          <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                            {r.effectiveDate && <span className="tabular-nums">시행 {formatDate(r.effectiveDate)}</span>}
+                            {r.revisionType && (
+                              <span className={cn("text-[11px] px-2 py-0.5 rounded", revisionBadgeClass(r.revisionType))}>
+                                {r.revisionType}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </Card>
 

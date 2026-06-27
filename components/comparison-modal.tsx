@@ -300,7 +300,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="w-full max-w-[100vw] sm:max-w-[950px] h-[65vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10">
+      <DialogContent className="w-full max-w-[100vw] sm:max-w-[950px] h-[92dvh] sm:h-[65vh] p-0 flex flex-col border-primary/20 shadow-2xl shadow-primary/10">
         <DialogHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-0 shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
