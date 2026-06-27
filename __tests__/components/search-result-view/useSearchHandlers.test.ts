@@ -65,6 +65,14 @@ vi.mock('@/lib/rag-response-cache', () => ({
   cacheResponse: vi.fn()
 }))
 
+// VH-2 직접 재오픈 테스트: 조례 본문 파싱을 결정론적으로 (DOMParser XML 브리틀니스 회피)
+vi.mock('@/lib/ordin-parser', () => ({
+  parseOrdinanceXML: vi.fn(() => ({
+    meta: { lawTitle: '서울특별시 주차장 설치 조례', fetchedAt: '2026-06-27T00:00:00.000Z', isOrdinance: true },
+    articles: [{ jo: '000100', joNum: '제1조', title: '목적', content: '내용', isPreamble: false }],
+  })),
+}))
+
 // fetch mock
 const mockFetch = vi.fn()
 global.fetch = mockFetch
@@ -450,6 +458,88 @@ describe('useSearchHandlers', () => {
       })
 
       expect(mockActions.setSearchQuery).toHaveBeenCalled()
+    })
+  })
+
+  // PREC-3: 캐시 복원(뒤로가기) 후 판례 페이지네이션이 court/caseNumber/정제쿼리를 유지하는지
+  describe('PREC-3: 판례 페이지네이션 파라미터 시드', () => {
+    it('seedPrecedentSearchParams 후 페이지 변경 시 court/caseNumber 유지', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ precedents: [], totalCount: 0 }),
+      })
+
+      const { result } = renderHook(() => useSearchHandlers({
+        state: mockState,
+        actions: mockActions,
+        onBack: mockOnBack,
+      }))
+
+      act(() => {
+        result.current.seedPrecedentSearchParams({ searchQuery: '2020도1234', court: '대법원', caseNumber: '2020도1234' })
+      })
+
+      await act(async () => {
+        await result.current.handlePrecedentPageChange(2)
+      })
+
+      const url = mockFetch.mock.calls.at(-1)?.[0] as string
+      expect(url).toContain('/api/precedent-search')
+      expect(url).toContain('page=2')
+      expect(url).toContain('court=')
+      expect(url).toContain('caseNumber=')
+      expect(url).toContain(encodeURIComponent('2020도1234'))
+    })
+
+    it('시드 없이 페이지 변경 시 court/caseNumber 미포함(회귀 없음)', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ precedents: [], totalCount: 0 }),
+      })
+
+      const { result } = renderHook(() => useSearchHandlers({
+        state: { ...mockState, userQuery: '민법' },
+        actions: mockActions,
+        onBack: mockOnBack,
+      }))
+
+      await act(async () => {
+        await result.current.handlePrecedentPageChange(2)
+      })
+
+      const url = mockFetch.mock.calls.at(-1)?.[0] as string
+      expect(url).toContain('/api/precedent-search')
+      expect(url).not.toContain('court=')
+      expect(url).not.toContain('caseNumber=')
+    })
+  })
+
+  // VH-2: 조회 이력 재조회 시 ordinanceSeq를 알면 이름검색 없이 해당 조례를 직접 연다
+  describe('VH-2: 조례 ordinanceSeq 직접 재오픈', () => {
+    it('ordinanceSeq 있으면 이름검색(/api/ordin-search) 없이 /api/ordin 직접 호출', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve('<자치법규></자치법규>'),
+      })
+
+      const { result } = renderHook(() => useSearchHandlers({
+        state: mockState,
+        actions: mockActions,
+        onBack: mockOnBack,
+      }))
+
+      await act(async () => {
+        result.current.handleSearch({
+          lawName: '서울특별시 주차장 설치 조례',
+          searchType: 'ordinance',
+          ordinanceSeq: '2057000',
+          classification: { searchType: 'ordinance', confidence: 1 },
+        } as never)
+      })
+
+      const urls = mockFetch.mock.calls.map((c) => c[0] as string)
+      expect(urls.some((u) => u.includes('/api/ordin?') && u.includes('ordinSeq=2057000'))).toBe(true)
+      expect(urls.some((u) => u.includes('/api/ordin-search'))).toBe(false)
     })
   })
 })

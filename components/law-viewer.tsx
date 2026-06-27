@@ -278,7 +278,7 @@ function LawViewerComponent({
     threeTierDataType,
     tierItems,
     fetchThreeTierData,
-  } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance)
+  } = useLawViewerThreeTier(meta, activeJo, activeArticle, aiAnswerMode, isOrdinance, showAdminRules && loadedAdminRulesCount > 0)
 
   // 위임법령 버튼 비활성화 조건 계산
   // 1. 위임법령 데이터가 로드된 적 있음 (threeTierDelegation 존재)

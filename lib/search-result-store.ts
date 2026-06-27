@@ -23,6 +23,9 @@ export interface SearchResultCache {
     lawName: string
     article?: string
     jo?: string
+    // VH-2: 조회 이력에서 재오픈한 조례 검색은 query에 ordinanceSeq를 실어 저장 → 새로고침
+    // 복원 시 cached.query가 handleBasicSearch로 전달돼 이름 검색 없이 직접 재오픈된다.
+    ordinanceSeq?: string
     classification?: {
       searchType: string
       confidence: number
@@ -130,6 +133,13 @@ export interface SearchResultCache {
   precedentDetail?: {
     id: string
     lawData: any  // LawDataState 형식
+  }
+  // PREC-3: 판례 검색에 실제 사용한 파라미터(정제 쿼리 + court/caseNumber).
+  // 캐시 복원(뒤로가기) 후 페이지/페이지크기 변경 시 동일 조건으로 재조회하기 위해 보관.
+  precedentSearchParams?: {
+    searchQuery: string
+    court?: string
+    caseNumber?: string
   }
   timestamp: number
   expiresAt: number

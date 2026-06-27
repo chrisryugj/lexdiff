@@ -135,6 +135,8 @@ export interface SearchQuery {
   article?: string
   jo?: string
   searchType?: string
+  /** 조회 이력 재조회 시 조례 일련번호 — 있으면 이름 검색 없이 직접 재오픈 (VH-2) */
+  ordinanceSeq?: string
   /** 사전 분류 결과 (통합검색 분류기에서 주입) */
   classification?: SearchClassification
   /** 원본 사용자 입력 (파싱 전 쿼리) */

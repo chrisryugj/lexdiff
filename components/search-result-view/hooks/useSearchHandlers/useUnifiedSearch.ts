@@ -129,6 +129,19 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     searchQuery: "",
   })
 
+  // PREC-3: 뒤로가기로 판례 목록을 캐시에서 직접 복원할 때(전용 핸들러를 거치지 않음)
+  // 보관해둔 검색 파라미터를 ref에 주입 → 복원 직후 페이지네이션이 court/caseNumber를 유지.
+  const seedPrecedentSearchParams = useCallback(
+    (params: { searchQuery: string; court?: string; caseNumber?: string }) => {
+      precedentSearchParamsRef.current = {
+        searchQuery: params.searchQuery || "",
+        court: params.court,
+        caseNumber: params.caseNumber,
+      }
+    },
+    []
+  )
+
   const clearSecondaryResults = useCallback(() => {
     actions.setLawSelectionState(null)
     actions.setOrdinanceSelectionState(null)
@@ -230,8 +243,12 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
           return false
         }
 
+        // PREC-3: 정제 쿼리 + court/caseNumber를 캐시에 보관 → 복원(새로고침/뒤로가기) 후
+        // 판례 리스트는 전용 핸들러를 거치지 않고 직접 복원되므로, 복원 블록에서 이 값을
+        // precedentSearchParamsRef에 시드해 페이지네이션이 동일 조건을 재사용하게 한다.
         await persistSearchCache({
           query: { lawName: searchQuery },
+          precedentSearchParams: { searchQuery, court, caseNumber },
           lawData: undefined,
           aiMode: undefined,
           interpretationResults: undefined,
@@ -757,5 +774,6 @@ export function useUnifiedSearch(deps: UseUnifiedSearchDeps) {
     handlePrecedentPageSizeChange,
     handleOrdinancePageChange,
     handleOrdinancePageSizeChange,
+    seedPrecedentSearchParams,
   }
 }

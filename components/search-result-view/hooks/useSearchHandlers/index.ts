@@ -267,5 +267,8 @@ export function useSearchHandlers({
     // 조례 페이지네이션
     handleOrdinancePageChange: unifiedHandlers.handleOrdinancePageChange,
     handleOrdinancePageSizeChange: unifiedHandlers.handleOrdinancePageSizeChange,
+
+    // PREC-3: 캐시 복원 후 판례 페이지네이션 파라미터 시드
+    seedPrecedentSearchParams: unifiedHandlers.seedPrecedentSearchParams,
   }
 }

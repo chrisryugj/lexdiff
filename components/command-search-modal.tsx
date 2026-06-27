@@ -26,6 +26,7 @@ interface CommandSearchModalProps {
     jo?: string
     searchType?: SearchType  // ✅ 신규
     caseNumber?: string  // ✅ 신규
+    ordinanceSeq?: string  // VH-2: 조례 직접 재오픈
     classification?: UnifiedQueryClassification  // ✅ 신규
     rawQuery?: string
     forcedMode?: 'law' | 'ai'

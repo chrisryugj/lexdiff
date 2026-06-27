@@ -114,6 +114,7 @@ export interface ReviewQuery {
   jo?: string
   rawQuery?: string
   searchType?: SearchType
+  ordinanceSeq?: string
   classification?: UnifiedQueryClassification
 }
 
@@ -142,9 +143,12 @@ export function toReviewQuery(rec: ViewingRecord): ReviewQuery {
   // ordinance: 조례명으로 재검색하되 searchType='ordinance'를 실어 조례 검색 경로
   // (useBasicSearch — query.searchType 기준 분기)로 라우팅한다. 안 실으면 평문
   // 법령검색으로 새어 같은 이름의 다른 지자체 조례가 뜨거나 다른 모드로 빠진다(VH-2).
+  // ordinanceSeq를 알면 함께 실어 이름 검색을 건너뛰고 정확히 그 조례를 다시 연다
+  // (같은 이름 다지자체 모호성 제거). 없으면 기존처럼 조례명 검색으로 폴백.
   return {
     lawName: rec.title,
     searchType: "ordinance",
+    ordinanceSeq: rec.ordinanceSeq,
     classification: {
       ...createEmptyClassification(),
       searchType: "ordinance",

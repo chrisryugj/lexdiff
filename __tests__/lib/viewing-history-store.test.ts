@@ -53,4 +53,17 @@ describe("toReviewQuery", () => {
     expect(q.searchType).toBe("ordinance")
     expect(q.classification?.searchType).toBe("ordinance")
   })
+
+  test("조례(ordinanceSeq 있음): seq를 실어 직접 재오픈 가능 (VH-2 잔여)", () => {
+    const q = toReviewQuery(
+      rec({ category: "ordinance", title: "서울특별시 주차장 설치 조례", ordinanceSeq: "2057000" }),
+    )
+    expect(q.ordinanceSeq).toBe("2057000")
+    expect(q.searchType).toBe("ordinance")
+  })
+
+  test("조례(ordinanceSeq 없음): seq 미보유면 undefined → 이름 검색 폴백", () => {
+    const q = toReviewQuery(rec({ category: "ordinance", title: "서울특별시 주차장 설치 조례" }))
+    expect(q.ordinanceSeq).toBeUndefined()
+  })
 })
