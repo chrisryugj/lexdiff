@@ -185,6 +185,7 @@ export function ImpactTrackerView({
                     onClick={handleForceRefresh}
                     className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
                     title="캐시 무시 새로고침"
+                    aria-label="캐시 무시 새로고침"
                   >
                     <Icon name="refresh-cw" size={14} />
                   </Button>
@@ -239,7 +240,7 @@ export function ImpactTrackerView({
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">영향 분석 진행 중</span>
                     <span className="text-sm font-bold text-brand-navy tabular-nums">{Math.min(100, Math.round(progress))}%</span>
                   </div>
-                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4">
+                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 mb-4" role="progressbar" aria-valuenow={Math.min(100, Math.round(progress))} aria-valuemin={0} aria-valuemax={100} aria-label="영향 분석 진행률">
                     <div
                       className="bg-gradient-to-r from-brand-navy to-brand-gold h-2 rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${Math.min(100, progress)}%` }}
@@ -262,7 +263,7 @@ export function ImpactTrackerView({
                 {completedSteps.map((cs, i) => (
                   <div key={i} className="flex items-center gap-2.5 text-sm">
                     <Icon name="check-circle" size={15} className="text-emerald-500 shrink-0" />
-                    <span className="text-gray-600 dark:text-gray-400 flex-1">{STEP_LABELS[cs.step] || cs.step}</span>
+                    <span className="text-gray-600 dark:text-gray-400 flex-1">{cs.message || STEP_LABELS[cs.step] || cs.step}</span>
                     <span className="text-xs text-gray-400 tabular-nums shrink-0">{(cs.durationMs / 1000).toFixed(1)}초</span>
                   </div>
                 ))}

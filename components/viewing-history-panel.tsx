@@ -41,22 +41,39 @@ function formatWhen(iso: string): string {
 export function ViewingHistoryPanel({
   onReview,
   hideWhenEmpty = false,
+  maxItems,
 }: {
   onReview: (record: ViewingRecord) => void
   hideWhenEmpty?: boolean
+  maxItems?: number
 }) {
   const [records, setRecords] = useState<ViewingRecord[]>([])
   const [filter, setFilter] = useState<ViewingCategory | "all">("all")
+  const [hydrating, setHydrating] = useState(false)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
 
   useEffect(() => {
     setRecords(viewingHistoryStore.getRecords())
-    const unsubscribe = viewingHistoryStore.subscribe(setRecords)
+    setHydrating(viewingHistoryStore.isHydrating())
+    const unsubscribe = viewingHistoryStore.subscribe((recs) => {
+      setRecords(recs)
+      setHydrating(viewingHistoryStore.isHydrating())
+    })
     return () => {
       unsubscribe()
     }
   }, [])
 
-  if (hideWhenEmpty && records.length === 0) return null
+  useEffect(() => {
+    if (filter !== "all" && records.length > 0) {
+      const hasCurrentFilter = records.some((r) => r.category === filter)
+      if (!hasCurrentFilter) {
+        setFilter("all")
+      }
+    }
+  }, [filter, records])
+
+  if (hideWhenEmpty && records.length === 0 && !hydrating) return null
 
   const filtered = filter === "all" ? records : records.filter((r) => r.category === filter)
 
@@ -73,21 +90,50 @@ export function ViewingHistoryPanel({
           )}
         </div>
         {records.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => viewingHistoryStore.clearAll(filter === "all" ? undefined : filter)}
-            className="h-7 text-xs"
-          >
-            {filter === "all" ? "전체 삭제" : `${CATEGORY_LABEL[filter]} 삭제`}
-          </Button>
+          confirmClearOpen ? (
+            // 인라인 2단계 확인(Radix Dialog 미사용 → Cmd+K 중첩 시 ESC 충돌 회피)
+            <div className="flex items-center gap-1">
+              <span role="alert" className="mr-0.5 text-[11px] text-muted-foreground">되돌릴 수 없어요</span>
+              <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmClearOpen(false)} className="h-7 text-xs">
+                취소
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  viewingHistoryStore.clearAll(filter === "all" ? undefined : filter)
+                  setConfirmClearOpen(false)
+                }}
+              >
+                {filter === "all" ? "전체 삭제" : `${CATEGORY_LABEL[filter]} 삭제`}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmClearOpen(true)}
+              className="h-7 text-xs"
+            >
+              {filter === "all" ? "전체 삭제" : `${CATEGORY_LABEL[filter]} 삭제`}
+            </Button>
+          )
         )}
       </div>
 
       {records.length === 0 ? (
-        <p className="py-6 text-center text-xs text-muted-foreground">
-          조회한 법령·조례·판례가 여기 모입니다.
-        </p>
+        hydrating ? (
+          <div className="space-y-1" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-11 animate-pulse rounded-md bg-muted/50" />
+            ))}
+          </div>
+        ) : (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            조회한 법령·조례·판례가 여기 모입니다.
+          </p>
+        )
       ) : (
         <>
           <div className="mb-3 flex items-center gap-1">
@@ -113,7 +159,7 @@ export function ViewingHistoryPanel({
           </div>
 
           <div className="space-y-1">
-            {filtered.map((rec) => (
+            {(maxItems ? filtered.slice(0, maxItems) : filtered).map((rec) => (
               <div
                 key={rec.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/50 p-2 transition-colors hover:bg-card"
@@ -138,10 +184,10 @@ export function ViewingHistoryPanel({
                     variant="ghost"
                     size="sm"
                     onClick={() => viewingHistoryStore.removeRecord(rec.id)}
-                    className="h-6 w-6 p-0"
+                    className="h-9 w-9 p-0"
                     aria-label={`${rec.title} 삭제`}
                   >
-                    <Icon name="x" className="h-3 w-3" />
+                    <Icon name="x" className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

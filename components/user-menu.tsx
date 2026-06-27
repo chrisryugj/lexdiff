@@ -30,6 +30,7 @@ interface QuotaData {
   tier: 'free' | 'pro' | 'admin'
   counts: Record<QuotaFeature, number>
   limits: Record<QuotaFeature, number> | null
+  reset_at: string | null
 }
 
 const FEATURE_LABELS: Record<QuotaFeature, string> = {
@@ -177,9 +178,14 @@ export function UserMenu({ onLoginClick, onFavoriteSelect, onAllFavoritesClick }
             </div>
           ) : (
             <>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 오늘 사용량
               </div>
+              {quota?.reset_at && new Date(quota.reset_at).getTime() > Date.now() && (
+                <div className="text-[9px] text-muted-foreground mb-2">
+                  {new Date(quota.reset_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}에 초기화
+                </div>
+              )}
               {!quota ? (
                 <div className="text-[11px] text-muted-foreground">불러오는 중...</div>
               ) : (
@@ -276,7 +282,7 @@ export function UserMenu({ onLoginClick, onFavoriteSelect, onAllFavoritesClick }
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={handleSignOut}
+            onClick={() => { handleSignOut().catch(() => { /* ignore */ }) }}
             className="rounded-md px-3 py-2 text-[12px] text-muted-foreground focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400 cursor-pointer"
           >
             <Icon name="x" size={13} className="mr-2" />

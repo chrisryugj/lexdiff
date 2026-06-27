@@ -50,12 +50,13 @@ export function LawViewerRelatedCases({
               >
                 <span className={cn(
                   "px-1.5 py-0.5 rounded text-xs font-medium shrink-0",
-                  prec.court.includes("대법원") ? "bg-purple-500/20 text-purple-500 dark:text-purple-400" :
-                  prec.court.includes("고등") ? "bg-blue-500/20 text-blue-500 dark:text-blue-400" :
+                  prec.court.includes("대법원") || prec.court.includes("헌법") ? "bg-purple-500/20 text-purple-500 dark:text-purple-400" :
+                  prec.court.includes("고등") || prec.court.includes("특허") ? "bg-blue-500/20 text-blue-500 dark:text-blue-400" :
                   "bg-green-500/20 text-green-500 dark:text-green-400"
                 )}>
                   {prec.court.includes("대법원") ? "3심" :
-                   prec.court.includes("고등") ? "2심" : "1심"}
+                   prec.court.includes("헌법") ? "헌재" :
+                   prec.court.includes("고등") || prec.court.includes("특허") ? "2심" : "1심"}
                 </span>
                 <span className="text-sm font-medium truncate max-w-[150px]">{prec.caseNumber}</span>
                 <span className="text-xs text-muted-foreground shrink-0">{formatPrecedentDate(prec.date)}</span>

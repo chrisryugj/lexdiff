@@ -250,9 +250,11 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
   }, [])
 
   // ── AI 비교 분석 ──
+  // OB-4: 체크는 필터를 넘나들어 유지되므로 전체(flatResults) 기준으로 조회해야
+  // '{size}/5개 선택' 배지·비교 실행 집합이 일치(displayResults 기준이면 필터 밖 체크가 무단 탈락).
   const checkedResults = useMemo(() =>
-    Array.from(checkedItems).map(k => displayResults.find(r => `${r.orgCode}-${r.ordinanceSeq || r.ordinanceName}` === k)).filter((r): r is BenchmarkOrdinanceResult => !!r),
-    [checkedItems, displayResults])
+    Array.from(checkedItems).map(k => flatResults.find(r => `${r.orgCode}-${r.ordinanceSeq || r.ordinanceName}` === k)).filter((r): r is BenchmarkOrdinanceResult => !!r),
+    [checkedItems, flatResults])
 
   // OAuth 복귀 대비 스냅샷 저장 — 뷰 mount 시 복원 훅이 읽어 자동 재실행
   const saveRestoreSnapshot = useCallback((autoAnalyze: boolean) => {
@@ -568,39 +570,53 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
               </div>
 
               {/* 지자체 필터 배지 (클릭 가능) */}
-              {orgCounts.size > 0 && orgCounts.size <= 80 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {/* 전체 버튼 */}
-                  <button onClick={() => { setFilterOrgs(new Set()); setCheckedItems(new Set()) }}
-                    className={cn(
-                      "text-xs px-2 py-1 rounded-md border font-medium transition-all cursor-pointer",
-                      filterOrgs.size === 0
-                        ? "bg-brand-navy text-white border-brand-navy dark:bg-brand-gold dark:text-black dark:border-brand-gold"
-                        : "bg-background text-foreground border-border hover:bg-muted/50"
-                    )}>
-                    전체 {flatResults.length}
-                  </button>
-                  {Array.from(orgCounts.entries()).map(([code, { shortName, count }]) => (
-                    <button key={code}
-                      onClick={() => {
-                        setFilterOrgs(prev => {
-                          const next = new Set(prev)
-                          if (next.has(code)) next.delete(code)
-                          else next.add(code)
-                          return next
-                        })
-                        setCheckedItems(new Set())
-                      }}
+              {orgCounts.size > 0 && (
+                orgCounts.size <= 80 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* 전체 버튼 */}
+                    <button onClick={() => { setFilterOrgs(new Set()) }}
                       className={cn(
-                        "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-all cursor-pointer",
-                        filterOrgs.has(code)
-                          ? "bg-sky-600 text-white border-sky-600 dark:bg-sky-500 dark:border-sky-500"
-                          : "bg-background text-muted-foreground border-border hover:bg-muted/50 hover:text-foreground"
+                        "text-xs px-2 py-1 rounded-md border font-medium transition-all cursor-pointer",
+                        filterOrgs.size === 0
+                          ? "bg-brand-navy text-white border-brand-navy dark:bg-brand-gold dark:text-black dark:border-brand-gold"
+                          : "bg-background text-foreground border-border hover:bg-muted/50"
                       )}>
-                      {shortName} <span className="text-[10px] opacity-70">{count}</span>
+                      전체 {flatResults.length}
                     </button>
-                  ))}
-                </div>
+                    {Array.from(orgCounts.entries()).map(([code, { shortName, count }]) => (
+                      <button key={code}
+                        onClick={() => {
+                          setFilterOrgs(prev => {
+                            const next = new Set(prev)
+                            if (next.has(code)) next.delete(code)
+                            else next.add(code)
+                            return next
+                          })
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-all cursor-pointer",
+                          filterOrgs.has(code)
+                            ? "bg-sky-600 text-white border-sky-600 dark:bg-sky-500 dark:border-sky-500"
+                            : "bg-background text-muted-foreground border-border hover:bg-muted/50 hover:text-foreground"
+                        )}>
+                        {shortName} <span className="text-[10px] opacity-70">{count}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md text-sm text-yellow-700 dark:text-yellow-400">
+                    <Icon name="alert-circle" size={14} className="inline mr-2" />
+                    지자체가 많아 필터 배지를 숨겼어요. 대상 지역을 좁혀 다시 검색하면 배지가 다시 나타나요.
+                    {filterOrgs.size > 0 && (
+                      <button
+                        onClick={() => setFilterOrgs(new Set())}
+                        className="ml-2 underline underline-offset-2 hover:text-yellow-900 dark:hover:text-yellow-200"
+                      >
+                        전체 보기
+                      </button>
+                    )}
+                  </div>
+                )
               )}
 
               {/* 테이블 */}

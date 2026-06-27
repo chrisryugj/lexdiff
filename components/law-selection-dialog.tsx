@@ -89,7 +89,7 @@ export function LawSelectionDialog({
   }, [query, runSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && results.length > 0) handleSelect(results[0])
+    if (e.key === 'Enter' && results.length > 0 && !isSearching) handleSelect(results[0])
   }
 
   const handleSelect = (law: LawSearchResult) => {

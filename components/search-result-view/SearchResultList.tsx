@@ -50,6 +50,11 @@ export const LawSearchResultList = memo(function LawSearchResultList({
   onSelect,
   onCancel,
 }: LawSearchResultListProps) {
+  // 행정규칙 종류 판정: 첫 번째 결과의 lawType이 훈령/예규/고시 등인지 확인
+  const adminRuleTypes = ['훈령', '예규', '고시', '공고', '지침', '기타', '행정규칙']
+  const isAdminRule = results.length > 0 && adminRuleTypes.includes(String(results[0].lawType))
+  const headerTitle = isAdminRule ? '행정규칙 검색 결과' : '법령 검색 결과'
+
   return (
     <div className="py-4 md:py-8">
       {/* 헤더 섹션 - Glassmorphism */}
@@ -57,7 +62,7 @@ export const LawSearchResultList = memo(function LawSearchResultList({
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl md:text-3xl font-bold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
-              법령 검색 결과
+              {headerTitle}
             </h2>
             <Badge
               variant="secondary"
@@ -520,9 +525,9 @@ export const InterpretationResultList = memo(function InterpretationResultList({
             <Icon name="arrow-left" className="h-4 w-4" />
             돌아가기
           </Button>
-          <h3 className="text-base font-semibold text-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
             해석례 검색 결과
-          </h3>
+          </h2>
           <Badge variant="secondary" className="text-xs">
             {totalCount && totalCount > results.length
               ? `전체 ${totalCount.toLocaleString()}건 (상위 ${results.length}건)`
@@ -612,9 +617,9 @@ export const RulingResultList = memo(function RulingResultList({
             <Icon name="arrow-left" className="h-4 w-4" />
             돌아가기
           </Button>
-          <h3 className="text-base font-semibold text-foreground">
-            재결례 검색결과
-          </h3>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground" style={{ fontFamily: "Pretendard, sans-serif" }}>
+            재결례 검색 결과
+          </h2>
           <Badge variant="secondary" className="text-xs">
             {totalCount && totalCount > results.length
               ? `전체 ${totalCount.toLocaleString()}건 (상위 ${results.length}건)`

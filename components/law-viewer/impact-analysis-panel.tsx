@@ -7,6 +7,7 @@ import { useImpactAnalysis } from "@/hooks/use-impact-analysis"
 import type { ImpactItem, ImpactResult } from "@/lib/relation-graph/impact-analysis"
 import type { RelationType } from "@/lib/relation-graph/relation-types"
 import { RELATION_LABELS } from "@/lib/relation-graph/relation-types"
+import { formatJO } from "@/lib/law-parser"
 
 interface ImpactAnalysisPanelProps {
   lawId: string | undefined
@@ -39,7 +40,7 @@ export function ImpactAnalysisPanel({
           <Icon name="chart-line" size={16} className="text-brand-gold" />
           <span className="text-sm font-medium">
             영향 분석{lawTitle ? `: ${lawTitle}` : ''}
-            {jo ? ` ${formatJo(jo)}` : ''}
+            {jo ? ` ${formatJO(jo)}` : ''}
           </span>
           {data && (
             <Badge variant="secondary" className="h-5 px-1.5 text-xs">
@@ -156,7 +157,7 @@ function ImpactItemRow({
 
   return (
     <button
-      className="flex items-center gap-1.5 w-full text-left px-2 py-1 rounded text-sm hover:bg-accent transition-colors"
+      className="flex items-center gap-1.5 w-full text-left px-2 py-2 rounded text-sm hover:bg-accent transition-colors"
       onClick={() => onNavigate?.(item.nodeId, item.article || undefined)}
     >
       {/* depth 들여쓰기 */}
@@ -167,25 +168,11 @@ function ImpactItemRow({
       )}
       <span className="truncate flex-1">
         {item.title}
-        {item.article ? ` ${formatJo(item.article)}` : ''}
+        {item.article ? ` ${formatJO(item.article)}` : ''}
       </span>
       <Badge variant="outline" className="h-4 px-1 text-[10px] shrink-0">
         {relationLabel}
       </Badge>
     </button>
   )
-}
-
-// ─── 유틸 ─────────────────────────────────────────────
-
-function formatJo(jo: string): string {
-  if (!jo) return ''
-  // 6자리 JO 코드 → "제38조" 형식
-  if (/^\d{6}$/.test(jo)) {
-    const num = parseInt(jo.substring(0, 4), 10)
-    return `제${num}조`
-  }
-  // 이미 "제N조" 형식이면 그대로
-  if (jo.startsWith('제')) return jo
-  return jo
 }

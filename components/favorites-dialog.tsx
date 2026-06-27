@@ -88,8 +88,9 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
 
         {favorites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Icon name="file-text" className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">즐겨찾기한 법령이 없습니다.</p>
+            <Icon name="star" className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-foreground font-medium">즐겨찾기한 법령이 없습니다.</p>
+            <p className="text-xs text-muted-foreground mt-2">법령 조문 옆의 별 아이콘을 클릭하여 즐겨찾기를 추가하세요</p>
           </div>
         ) : (
           <ScrollArea className="flex-1 pr-4">
@@ -101,15 +102,15 @@ export function FavoritesDialog({ isOpen, onClose, onSelect }: FavoritesDialogPr
                   onClick={() => handleSelectAndClose(favorite)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-foreground">{favorite.lawTitle}</span>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="font-medium text-foreground truncate max-w-full">{favorite.lawTitle}</span>
                       {/* 판례는 조문 배지 숨김 */}
                       {!favorite.lawId?.startsWith('prec-') && (
-                        <Badge variant="outline">{formatJO(favorite.jo)}</Badge>
+                        <Badge variant="outline" className="shrink-0">{formatJO(favorite.jo)}</Badge>
                       )}
                       {favorite.effectiveDate && (
-                        <Badge variant="secondary" className="text-xs">
-                          {formatDate(favorite.effectiveDate)}
+                        <Badge variant="secondary" className="text-xs" title="최종 개정일">
+                          개정일: {formatDate(favorite.effectiveDate)}
                         </Badge>
                       )}
                       {favorite.hasChanges && (

@@ -144,10 +144,14 @@ export function PrecedentSection({
             ))}
           </div>
 
-          {totalCount > 5 && onShowMore && (
-            <div className="mt-3 text-center">
+          {totalCount > precedents.length && onShowMore && (
+            <div className="mt-3 flex flex-col items-center gap-1.5">
+              <p className="text-xs text-muted-foreground">
+                여기는 상위 {precedents.length}건만 추렸어요 · 전체 {totalCount}건은 검색에서 볼 수 있어요
+              </p>
               <Button variant="outline" size="sm" className="text-xs" onClick={onShowMore}>
-                더 보기 ({totalCount - 5}건 더)
+                <Icon name="search" className="h-3 w-3 mr-1" />
+                전체 판례 검색으로 보기
               </Button>
             </div>
           )}

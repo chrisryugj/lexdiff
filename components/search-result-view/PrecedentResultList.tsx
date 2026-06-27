@@ -6,7 +6,7 @@
 
 "use client"
 
-import React, { memo, useState } from "react"
+import React, { memo, useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
@@ -49,6 +49,17 @@ export const PrecedentResultList = memo(function PrecedentResultList({
   onBack,
 }: PrecedentResultListProps) {
   const [filterKeyword, setFilterKeyword] = useState("")
+  const rootRef = useRef<HTMLDivElement>(null)
+  const isFirstRender = useRef(true)
+
+  // 페이지 변경 시 결과 상단으로 복귀(모바일). 최초 마운트는 건너뜀.
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [currentPage])
 
   // 키워드 필터링 (클라이언트 사이드)
   const filteredResults = filterKeyword
@@ -61,7 +72,7 @@ export const PrecedentResultList = memo(function PrecedentResultList({
   const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
-    <div className="py-4 md:py-8">
+    <div ref={rootRef} className="py-4 md:py-8">
       {/* 헤더 섹션 - Glassmorphism */}
       <div className="sticky top-0 z-10 -mx-6 px-6 py-4 mb-6 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-6xl mx-auto">

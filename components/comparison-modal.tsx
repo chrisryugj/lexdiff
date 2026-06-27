@@ -33,6 +33,9 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
   const [revisionStack, setRevisionStack] = useState<Array<{ date?: string; number?: string }>>([])
   const [currentRevisionIndex, setCurrentRevisionIndex] = useState(0)
   const [showRevisionHistory, setShowRevisionHistory] = useState(true)
+  const [lastLoadedDate, setLastLoadedDate] = useState<string | undefined>(undefined)
+  const [lastLoadedNumber, setLastLoadedNumber] = useState<string | undefined>(undefined)
+  const [selectedMobileRevisionIndex, setSelectedMobileRevisionIndex] = useState<string>('')
 
   const oldScrollRef = useRef<HTMLDivElement>(null)
   const newScrollRef = useRef<HTMLDivElement>(null)
@@ -141,6 +144,8 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
       if (signal?.aborted) return
       setComparison(comparisonData)
+      setLastLoadedDate(revisionDate)
+      setLastLoadedNumber(revisionNumber)
       debugLogger.success("신·구법 비교 로드 완료", { changeCount: comparisonData.changes.length })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
@@ -164,6 +169,8 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
       setArticleHistory([])
       setRevisionStack([{ date: undefined, number: undefined }])
       setCurrentRevisionIndex(0)
+      setSelectedMobileRevisionIndex("")
+      setShowRevisionHistory(!!targetJo)
       loadRevisionHistory()
       loadComparison(undefined, undefined, 0, controller.signal)
 
@@ -260,6 +267,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
     const newStack = revisionStack.slice(0, currentRevisionIndex + 1).concat(next)
     setRevisionStack(newStack)
     setCurrentRevisionIndex(currentRevisionIndex + 1)
+    setSelectedMobileRevisionIndex("") // chevron 네비와 모바일 Select 라벨 desync 방지
 
     loadComparison(oldDate, oldNumber)
   }
@@ -269,6 +277,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
     const newIndex = currentRevisionIndex - 1
     setCurrentRevisionIndex(newIndex)
+    setSelectedMobileRevisionIndex("") // chevron 네비와 모바일 Select 라벨 desync 방지
 
     const revision = revisionStack[newIndex]
     loadComparison(revision.date, revision.number)
@@ -372,8 +381,9 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
 
             <div className="sm:hidden flex-1 min-w-[120px]">
               <Select
-                value=""
+                value={selectedMobileRevisionIndex}
                 onValueChange={(value) => {
+                  setSelectedMobileRevisionIndex(value)
                   const revision = articleHistory[Number.parseInt(value)]
                   if (revision) handleRevisionSelect(revision)
                 }}
@@ -519,7 +529,7 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md px-4">
                   <p className="text-sm text-destructive mb-4">{error}</p>
-                  <Button onClick={() => loadComparison()} variant="outline" size="sm">
+                  <Button onClick={() => loadComparison(lastLoadedDate, lastLoadedNumber)} variant="outline" size="sm">
                     다시 시도
                   </Button>
                 </div>

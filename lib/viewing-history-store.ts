@@ -164,6 +164,7 @@ export class ViewingHistoryStore {
   private listeners: Set<(records: ViewingRecord[]) => void> = new Set()
   private mode: Mode = "guest"
   private userId: string | null = null
+  private hydrating = false
 
   private constructor() {
     if (typeof window !== "undefined") this.loadFromStorage()
@@ -219,6 +220,7 @@ export class ViewingHistoryStore {
       this.mode = "guest"
       this.userId = null
       this.records = []
+      this.hydrating = false // 진행 중이던 user hydrate가 로그아웃에 끊겨도 스켈레톤 고착 방지
       this.clearStorage()
       this.notifyListeners()
       return
@@ -226,6 +228,8 @@ export class ViewingHistoryStore {
 
     this.mode = "user"
     this.userId = userId
+    this.hydrating = true
+    this.notifyListeners()
     const supabase = getSupabaseBrowserClient()
 
     // 게스트 상태에서 쌓인 로컬 이력 머지 (중복은 무시)
@@ -259,12 +263,18 @@ export class ViewingHistoryStore {
     } else {
       this.records = (data as ViewingRow[]).map(rowToRecord)
     }
+    this.hydrating = false
     this.notifyListeners()
   }
 
   getRecords(category?: ViewingCategory): ViewingRecord[] {
     const all = [...this.records]
     return category ? all.filter((r) => r.category === category) : all
+  }
+
+  /** 로그인 사용자의 DB 이력 로드(hydrate) 진행 여부 — 패널이 스켈레톤 표시 판단에 사용. */
+  isHydrating(): boolean {
+    return this.hydrating
   }
 
   /** 항목 조회 기록. 기존 itemKey면 맨 위로 이동 + view_count 증가, 없으면 신규. */
