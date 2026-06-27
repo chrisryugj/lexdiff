@@ -178,8 +178,7 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
       {/* 개정 원문 모달 - 다크테마 */}
       <Dialog open={!!selectedRevision} onOpenChange={(open) => !open && setSelectedRevision(null)}>
         <DialogContent
-          className="max-h-[65vh] overflow-hidden flex flex-col"
-          style={{ width: "900px", maxWidth: "900px" }}
+          className="w-[95vw] sm:w-[900px] sm:max-w-[900px] max-h-[85vh] sm:max-h-[65vh] overflow-hidden flex flex-col"
         >
           <DialogHeader className="border-b border-border pb-3 flex-shrink-0">
             <DialogTitle className="text-base flex items-center gap-2">
@@ -200,16 +199,28 @@ export function RevisionHistory({ history, articleTitle }: RevisionHistoryProps)
               )}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {selectedRevision?.articleLink && (
-              <div className="relative w-full h-[550px] overflow-hidden rounded">
-                <iframe
-                  src={selectedRevision.articleLink}
-                  className="absolute top-0 left-0 w-full h-full border-0 bg-white"
-                  title="개정 원문 내용"
-                  style={{ colorScheme: "light" }}
-                />
-              </div>
+              <>
+                <div className="flex justify-end pb-2 shrink-0">
+                  <a
+                    href={selectedRevision.articleLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Icon name="external-link" className="w-3.5 h-3.5" /> 새 창에서 열기
+                  </a>
+                </div>
+                <div className="relative w-full flex-1 min-h-[55vh] sm:min-h-0 sm:h-[550px] overflow-hidden rounded">
+                  <iframe
+                    src={selectedRevision.articleLink}
+                    className="absolute top-0 left-0 w-full h-full border-0 bg-white"
+                    title="개정 원문 내용"
+                    style={{ colorScheme: "light" }}
+                  />
+                </div>
+              </>
             )}
           </div>
         </DialogContent>
