@@ -6,7 +6,8 @@
  * route.ts에서 Primary로 사용하고, 실패/타임아웃 시 Gemini로 폴백.
  *
  * 릴레이 계약: POST {RELAY_URL}/law/query {query} → SSE
- *   status / narration / tool_call{name,input} / tool_result{name,bytes} / rate_limit / done{answer,cost,turns} / error
+ *   status / narration / answer_delta{text} / tool_call{name,input} / tool_result{name,bytes} / rate_limit / done{answer,cost,turns} / error
+ *   answer_delta = 토큰 스트리밍(content_block_delta) → answer_token으로 매핑, done에서 완성 답변으로 교체
  *
  * citation: 릴레이는 평문 답변만 반환 → parseCitationsFromAnswer(「법령명」 제N조)로 텍스트 기반 추출.
  *           (릴레이 시스템프롬프트가 낫표 「」 형식으로 인용하도록 맞춰져 있음)
@@ -92,6 +93,11 @@ export async function* executeRelayRAGStream(
         switch (ev.type) {
           case 'status':
             yield { type: 'status', message: String(ev.message ?? '처리 중...'), progress: Number(ev.progress ?? 5) }
+            break
+          case 'answer_delta':
+            // 토큰 스트리밍: 릴레이가 content_block_delta로 흘리는 답변 토큰을 실시간 표시.
+            // 최종 done에서 완성 답변(+인용)으로 교체된다(useAiSearch가 answer 이벤트에서 setAiAnswerContent로 덮어씀).
+            if (ev.text) yield { type: 'answer_token', data: { text: String(ev.text) } }
             break
           case 'tool_call': {
             const name = String(ev.name)
