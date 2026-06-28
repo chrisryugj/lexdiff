@@ -5,7 +5,7 @@
  * 종합 요약을 생성한다.
  */
 
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, Type } from '@google/genai'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import { AI_CONFIG } from '@/lib/ai-config'
 import { debugLogger } from '@/lib/debug-logger'
@@ -52,6 +52,20 @@ async function classifyWithGemini(
       config: {
         systemInstruction: buildClassificationSystemPrompt(),
         temperature: 0.1,
+        // 구조화 출력: severity enum까지 강제 → '프롬프트 JSON 강제 + 정규식 파싱'의 취약성 제거.
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              jo: { type: Type.STRING },
+              severity: { type: Type.STRING, enum: ['critical', 'review', 'info'] },
+              reason: { type: Type.STRING },
+            },
+            required: ['jo', 'severity', 'reason'],
+          },
+        },
       },
     })
     const text = response.text || ''

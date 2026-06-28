@@ -715,6 +715,7 @@ function SearchResultViewComponent({
               oldContent={state.summaryDialog.oldContent || ""}
               newContent={state.summaryDialog.newContent}
               effectiveDate={state.summaryDialog.effectiveDate}
+              prevEffectiveDate={state.summaryDialog.prevEffectiveDate}
               isPrecedent={state.summaryDialog.isPrecedent}
             />
           )}

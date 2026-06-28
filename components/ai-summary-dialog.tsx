@@ -20,6 +20,7 @@ interface AISummaryDialogProps {
   oldContent: string
   newContent: string
   effectiveDate?: string
+  prevEffectiveDate?: string  // 직전(구법) 시행일 — 비교 기준 표시
   isPrecedent?: boolean  // 판례 요약 모드
 }
 
@@ -31,6 +32,7 @@ export function AISummaryDialog({
   oldContent,
   newContent,
   effectiveDate,
+  prevEffectiveDate,
   isPrecedent = false,
 }: AISummaryDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -75,12 +77,48 @@ export function AISummaryDialog({
         return
       }
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error("AI 요약 생성 실패")
       }
 
-      const data = await response.json()
-      setSummary(data.summary)
+      // SSE 토큰 스트리밍 — 첫 토큰에서 로딩 해제하고 점진 렌더.
+      const reader = response.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ""
+      let acc = ""
+      let gotToken = false
+
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        let idx: number
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, idx)
+          buf = buf.slice(idx + 2)
+          const line = block.split("\n").find((l) => l.startsWith("data: "))
+          if (!line) continue
+          let ev: { type?: string; text?: string; message?: string }
+          try {
+            ev = JSON.parse(line.slice(6))
+          } catch {
+            continue
+          }
+          if (ev.type === "token" && ev.text) {
+            acc += ev.text
+            if (!gotToken) {
+              gotToken = true
+              setIsLoading(false)
+            }
+            setSummary(acc)
+          } else if (ev.type === "error") {
+            throw new Error(ev.message || "AI 요약 생성 실패")
+          }
+          // done: 루프 자연 종료
+        }
+      }
+
+      if (!acc) throw new Error("AI 요약 생성 실패")
       debugLogger.success("AI 요약 생성 완료")
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "알 수 없는 오류"
@@ -125,7 +163,9 @@ export function AISummaryDialog({
           {!isPrecedent && (
             <div className="flex items-center gap-1.5 flex-wrap text-xs">
               <span className="text-muted-foreground mr-0.5">비교 기준</span>
-              <Badge variant="outline" className="px-2 py-0.5 font-normal">직전 시행본</Badge>
+              <Badge variant="outline" className="px-2 py-0.5 font-normal">
+                {prevEffectiveDate ? formatDate(prevEffectiveDate) : "직전"} 시행본
+              </Badge>
               <Icon name="arrow-right" className="h-3 w-3 text-muted-foreground" />
               <Badge variant="outline" className="px-2 py-0.5 font-normal border-primary/40 text-foreground">
                 {effectiveDate ? formatDate(effectiveDate) : "선택"} 시행본

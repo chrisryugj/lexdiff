@@ -100,105 +100,23 @@ function buildPrompt(keyword: string, texts: Array<{ orgName: string; ordinanceN
 
 ${ordinanceList}
 
-## 출력 형식 (엄격히 준수 — 위반 시 답변 거부)
-- 전체 답변을 \`\`\` 코드펜스로 감싸지 말 것.
-- 정확히 두 개의 섹션 헤딩 "### 비교표" / "### 주요 차이점" 만 사용.
-- 그 외 어떤 서브헤딩(###, ####, ##)도 금지. 번호 섹션 "### 1.", "### 2." 같은 것도 금지.
-- "주요 차이점" 섹션은 하이픈 \`- \` 으로 시작하는 flat bullet 목록만 사용.
-- 각 bullet 내부에서 강조는 \`**텍스트**\` 로, 지자체명만 **볼드**.
+## 출력 형식
+JSON 객체의 두 필드를 채우세요 (각 필드는 마크다운 문자열):
 
-### 비교표
-| 비교 항목 | ${safeTexts.map(t => t.orgName).join(' | ')} |
-|------|${safeTexts.map(() => '------').join('|')}|
-(각 항목별 실제 규정 내용 요약. 해당 규정이 없으면 "미규정")
-
-### 주요 차이점
-- **${safeTexts[0]?.orgName ?? '지자체A'}**: 핵심 차이 요약.
-- **${safeTexts[1]?.orgName ?? '지자체B'}**: 핵심 차이 요약.
-- (총 3~5개 bullet, 어느 지자체가 더 상세하거나 선진적인지 포함)`
-}
-
-// ── 응답 노멀라이저 ──
-// Gemini 가 지시를 어겨도 렌더가 깨지지 않도록 원문을 안전화한다.
-function normalizeAnalysisText(raw: string): string {
-  let t = raw.trim()
-
-  // 1) 전체 코드펜스 벗기기
-  const fence = t.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/)
-  if (fence) t = fence[1].trim()
-
-  // 2) 헤딩 앞뒤에 blank line 보장 — remarkBreaks(single \n → <br>) 하에서
-  //    이전 paragraph 에 붙은 "### 제목" 이 h3 로 파싱되지 않는 현상 방지.
-  t = t.replace(/([^\n])\n(#{2,6}\s)/g, '$1\n\n$2')
-  t = t.replace(/(#{2,6}\s[^\n]+)\n(?!\n)/g, '$1\n\n')
-
-  // 3) 2번/3번 섹션 외 "### N." 형태 서브헤딩은 bold text 로 평탄화
-  //    (Gemini 가 지시를 무시하고 번호 서브헤딩을 남발하는 경우 대비)
-  t = t.replace(/(^|\n)#{2,6}\s*(\d+\.\s[^\n]+)/g, '$1**$2**')
-
-  return t
-}
-
-// ── 응답 파싱 ──
-
-/**
- * Gemini 응답을 "비교표" / "주요 차이점" 두 섹션으로 분할.
- * 마커 누락·코드펜스 래핑 등 포맷 드리프트를 방어한다.
- *
- * 방어 규칙:
- *  1. `\`\`\`markdown ... \`\`\`` 같은 전체 코드펜스를 벗겨낸다 (안 그러면
- *     ### 헤딩이 코드 블록 안에 갇혀 plain text 로 렌더됨).
- *  2. "### 비교표" 마커가 없으면 "### 주요 차이점" 위치를 기준으로 앞/뒤 분할
- *     → 전체 텍스트를 양쪽에 중복 할당해 같은 내용이 두 번 보이는 현상 차단.
- *  3. 둘 다 없으면 단일 블록으로 comparisonTable 에 담는다.
- */
-function parseAnalysisResponse(text: string): { comparisonTable: string; highlights: string } {
-  // 0) 포맷 노멀라이즈 (코드펜스 제거 + 헤딩 앞뒤 blank line + 서브헤딩 평탄화)
-  const cleaned = normalizeAnalysisText(text)
-
-  // 2) 섹션 헤딩 — `## 비교표` / `### 비교표` / `**비교표**` 등 변형 허용
-  const tableHeading = /(?:^|\n)#{2,3}\s*비교표\s*\n/
-  const highlightHeading = /(?:^|\n)#{2,3}\s*주요 차이점\s*\n/
-
-  const tableStart = cleaned.search(tableHeading)
-  const highlightStart = cleaned.search(highlightHeading)
-
-  const headLen = (idx: number, re: RegExp): number =>
-    cleaned.slice(idx).match(re)![0].length
-
-  if (tableStart >= 0 && highlightStart > tableStart) {
-    return {
-      comparisonTable: cleaned.slice(tableStart + headLen(tableStart, tableHeading), highlightStart).trim(),
-      highlights: cleaned.slice(highlightStart + headLen(highlightStart, highlightHeading)).trim(),
-    }
-  }
-
-  if (highlightStart >= 0) {
-    // 비교표 마커 없이 주요차이점만 있는 경우 — 앞부분은 비교표로 취급
-    return {
-      comparisonTable: cleaned.slice(0, highlightStart).trim(),
-      highlights: cleaned.slice(highlightStart + headLen(highlightStart, highlightHeading)).trim(),
-    }
-  }
-
-  if (tableStart >= 0) {
-    return {
-      comparisonTable: cleaned.slice(tableStart + headLen(tableStart, tableHeading)).trim(),
-      highlights: '',
-    }
-  }
-
-  // 둘 다 없으면 단일 블록
-  return { comparisonTable: cleaned, highlights: '' }
+- **comparisonTable**: 마크다운 표 하나. 첫 행은 헤더 \`| 비교 항목 | ${safeTexts.map(t => t.orgName).join(' | ')} |\`, 이후 각 행은 비교 축별로 지자체 규정 내용을 요약(해당 규정이 없으면 "미규정"). 표 이외의 텍스트나 헤딩은 넣지 마세요.
+- **highlights**: 하이픈 \`- \`으로 시작하는 flat bullet 목록(3~5개). 지자체명만 \`**볼드**\` 처리하고, 어느 지자체가 더 상세하거나 선진적인지 포함하세요.`
 }
 
 // ── Gemini ──
-// 503 UNAVAILABLE(모델 과부하)은 Gemini 3 preview에서 빈번 → 지수백오프 재시도 + lite 폴백
-async function callGemini(prompt: string, ctx: AiAuthContext): Promise<string> {
+// 503 UNAVAILABLE(모델 과부하)은 Gemini 3 preview에서 빈번 → 지수백오프 재시도 + lite 폴백.
+// responseSchema로 { comparisonTable, highlights } 구조화 출력을 강제 → 사후 정규식 파싱/노멀라이즈 불필요.
+type AnalysisResult = { comparisonTable: string; highlights: string }
+
+async function callGemini(prompt: string, ctx: AiAuthContext): Promise<AnalysisResult> {
   const apiKey = ctx.byokKey || process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.')
 
-  const { GoogleGenAI } = await import('@google/genai')
+  const { GoogleGenAI, Type } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
 
   const isTransient = (e: unknown): boolean => {
@@ -206,12 +124,30 @@ async function callGemini(prompt: string, ctx: AiAuthContext): Promise<string> {
     return /"code":(503|429|500)|UNAVAILABLE|RESOURCE_EXHAUSTED|INTERNAL/.test(msg)
   }
 
-  const tryModel = async (model: string, attempts: number): Promise<string> => {
+  const tryModel = async (model: string, attempts: number): Promise<AnalysisResult> => {
     let lastErr: unknown
     for (let i = 0; i < attempts; i++) {
       try {
-        const response = await ai.models.generateContent({ model, contents: prompt })
-        return response.text || ''
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                comparisonTable: { type: Type.STRING },
+                highlights: { type: Type.STRING },
+              },
+              required: ['comparisonTable', 'highlights'],
+            },
+          },
+        })
+        const parsed = JSON.parse(response.text || '{}')
+        return {
+          comparisonTable: String(parsed.comparisonTable || ''),
+          highlights: String(parsed.highlights || ''),
+        }
       } catch (err) {
         lastErr = err
         if (!isTransient(err)) throw err
@@ -310,9 +246,9 @@ export async function POST(request: NextRequest) {
     const prompt = buildPrompt(keyword, validTexts, focus)
 
     try {
-      const geminiAnswer = await callGemini(prompt, authCtx)
+      const result = await callGemini(prompt, authCtx)
       succeeded = true
-      return NextResponse.json(parseAnalysisResponse(geminiAnswer))
+      return NextResponse.json(result)
     } catch (err: unknown) {
       errorCategory = categorizeError(err)
       return safeErrorResponse(err, "AI 분석 실패")

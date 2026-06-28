@@ -160,21 +160,26 @@ export async function* executeImpactAnalysis(
     const BATCH_SIZE = 10
     const classificationResults = new Map<string, { severity: ImpactSeverity; reason: string }>()
 
+    // 배치를 병렬 분류 — Gemini는 동시성 제약이 없어 순차(for-await) 대비 wall-clock 대폭 단축.
+    const batches: ClassificationInput[][] = []
     for (let i = 0; i < classificationInputs.length; i += BATCH_SIZE) {
-      if (options?.signal?.aborted) throw new Error('cancelled')
+      batches.push(classificationInputs.slice(i, i + BATCH_SIZE))
+    }
 
-      const batch = classificationInputs.slice(i, i + BATCH_SIZE)
-      const results = await classifyImpact(batch, { signal: options?.signal, apiKey: options?.apiKey })
+    if (options?.signal?.aborted) throw new Error('cancelled')
+    yield {
+      type: 'status',
+      message: `AI 영향도 분류 중... (${classificationInputs.length}건)`,
+      progress: 75,
+      step: 'classifying',
+    }
 
+    const batchResults = await Promise.all(
+      batches.map((batch) => classifyImpact(batch, { signal: options?.signal, apiKey: options?.apiKey })),
+    )
+    for (const results of batchResults) {
       for (const r of results) {
         classificationResults.set(r.jo, { severity: r.severity, reason: r.reason })
-      }
-
-      yield {
-        type: 'status',
-        message: `AI 분류 중... (${Math.min(i + BATCH_SIZE, classificationInputs.length)}/${classificationInputs.length})`,
-        progress: Math.min(85, 65 + (Math.min(i + BATCH_SIZE, classificationInputs.length) / classificationInputs.length) * 20),
-        step: 'classifying',
       }
     }
 

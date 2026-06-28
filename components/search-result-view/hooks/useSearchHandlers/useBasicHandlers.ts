@@ -283,6 +283,7 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
         oldContent: comparison.oldVersion.content,
         newContent: comparison.newVersion.content,
         effectiveDate: state.lawData.meta.latestEffectiveDate,
+        prevEffectiveDate: comparison.oldVersion.effectiveDate,
       })
 
     } catch (error) {

@@ -78,110 +78,141 @@ ${sanitizePromptInput(params.newContent).substring(0, 3000)}
 }
 
 export async function POST(request: NextRequest) {
-  // 쿼터 사전 차감 (BYOK 시 no-op). 실패 시 finally에서 refund.
+  // 쿼터 사전 차감 (BYOK 시 no-op). 실패 시 refundAiQuota로 환불.
   const auth = await requireAiAuth(request, 'summarize')
   if ('error' in auth) return auth.error
   const authCtx = auth.ctx
 
-  let succeeded = false
   const startMs = Date.now()
-  let errorCategory: ErrorCategory | null = null
-  let answerLen = 0
-  let inputTokens: number | null = null
-  let outputTokens: number | null = null
-  let isPrecedentFlag = false
-  let oldLen = 0
-  let newLen = 0
-  try {
-    const contentLength = Number(request.headers.get("content-length") || "0")
-    if (contentLength > 200_000) {
-      return NextResponse.json({ error: "요청 본문이 너무 큽니다." }, { status: 413 })
-    }
 
-    const { lawTitle, joNum, oldContent, newContent, effectiveDate, isPrecedent } = await request.json()
-    isPrecedentFlag = Boolean(isPrecedent)
-    oldLen = typeof oldContent === 'string' ? oldContent.length : 0
-    newLen = typeof newContent === 'string' ? newContent.length : 0
-
-    if (!isPrecedent && (!oldContent || !newContent)) {
-      return NextResponse.json({ error: "구법과 신법 본문이 모두 필요합니다." }, { status: 400 })
-    }
-
-    if (isPrecedent && !newContent) {
-      return NextResponse.json({ error: "판례 본문이 필요합니다." }, { status: 400 })
-    }
-
-    const apiKey = resolveGeminiKey(authCtx)
-    if (!apiKey) {
-      debugLogger.error("GEMINI_API_KEY is missing")
-      return NextResponse.json(
-        { error: "AI 서비스를 사용할 수 없습니다." },
-        { status: 500 }
-      )
-    }
-
-    debugLogger.info("AI summary request", { lawTitle, joNum, effectiveDate, isPrecedent })
-
-    const prompt = buildPrompt({
-      lawTitle,
-      joNum,
-      oldContent,
-      newContent,
-      effectiveDate,
-      isPrecedent,
-    })
-
-    const ai = new GoogleGenAI({ apiKey })
-    const response = await ai.models.generateContent({
-      model: AI_CONFIG.gemini.lite,
-      contents: prompt,
-    })
-
-    const summary = response.text
-    if (!summary) {
-      throw new Error('empty summary response')
-    }
-
-    const usage = (response as unknown as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
-    inputTokens = usage?.promptTokenCount ?? null
-    outputTokens = usage?.candidatesTokenCount ?? null
-    answerLen = summary.length
-
-    succeeded = true
-    debugLogger.success("AI summary complete (Gemini)", { length: summary.length })
-    return NextResponse.json({ summary })
-  } catch (error) {
-    errorCategory = categorizeError(error)
-    // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 원문 메시지는 서버 로그로만.
-    debugLogger.error("AI summary failed", error)
-    return NextResponse.json(
-      { error: "AI 요약 생성 중 오류가 발생했습니다." },
-      { status: 500 }
-    )
-  } finally {
-    // Serverless에서 fire-and-forget은 응답 후 잘린다 → await 필수 (실패는 swallow).
-    try {
-      const modelIdActual = AI_CONFIG.gemini.lite
-      await recordTelemetry({
-        endpoint: 'summarize',
-        isByok: authCtx.isByok,
-        sessionAnon: sessionAnonHash(authCtx.userId, authCtx.byokKey),
-        uaClass: classifyUa(request.headers.get('user-agent')),
-        lang: 'ko',
-        queryType: isPrecedentFlag ? 'precedent_summary' : 'revision_summary',
-        queryLengthBucket: bucketLength(Math.max(oldLen, newLen)),
-        answerLengthBucket: bucketLength(answerLen),
-        latencyTotalMs: Date.now() - startMs,
-        errorCategory,
-        modelIdActual,
-        inputTokens,
-        outputTokens,
-        costEstimateUsd: estimateCostUsd(modelIdActual, inputTokens, outputTokens),
-      })
-    } catch { /* telemetry failure swallowed */ }
-
-    if (!succeeded) {
-      await refundAiQuota(authCtx)
-    }
+  // ── 입력 파싱·검증 (스트림 시작 전; 에러는 일반 JSON 응답) ──
+  const contentLength = Number(request.headers.get("content-length") || "0")
+  if (contentLength > 200_000) {
+    await refundAiQuota(authCtx)
+    return NextResponse.json({ error: "요청 본문이 너무 큽니다." }, { status: 413 })
   }
+
+  let lawTitle: string | undefined
+  let joNum: string | undefined
+  let oldContent: string | undefined
+  let newContent: string | undefined
+  let effectiveDate: string | undefined
+  let isPrecedent: boolean | undefined
+  try {
+    const body = await request.json()
+    lawTitle = body.lawTitle
+    joNum = body.joNum
+    oldContent = body.oldContent
+    newContent = body.newContent
+    effectiveDate = body.effectiveDate
+    isPrecedent = body.isPrecedent
+  } catch {
+    await refundAiQuota(authCtx)
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 })
+  }
+
+  const isPrecedentFlag = Boolean(isPrecedent)
+  const oldLen = typeof oldContent === 'string' ? oldContent.length : 0
+  const newLen = typeof newContent === 'string' ? newContent.length : 0
+
+  if (!isPrecedent && (!oldContent || !newContent)) {
+    await refundAiQuota(authCtx)
+    return NextResponse.json({ error: "구법과 신법 본문이 모두 필요합니다." }, { status: 400 })
+  }
+  if (isPrecedent && !newContent) {
+    await refundAiQuota(authCtx)
+    return NextResponse.json({ error: "판례 본문이 필요합니다." }, { status: 400 })
+  }
+
+  const apiKey = resolveGeminiKey(authCtx)
+  if (!apiKey) {
+    debugLogger.error("GEMINI_API_KEY is missing")
+    await refundAiQuota(authCtx)
+    return NextResponse.json({ error: "AI 서비스를 사용할 수 없습니다." }, { status: 500 })
+  }
+
+  debugLogger.info("AI summary request", { lawTitle, joNum, effectiveDate, isPrecedent })
+
+  const prompt = buildPrompt({
+    lawTitle: lawTitle || "",
+    joNum,
+    oldContent,
+    newContent: newContent || "",
+    effectiveDate,
+    isPrecedent,
+  })
+  const modelIdActual = AI_CONFIG.gemini.lite
+
+  // ── 토큰 스트리밍 (SSE) — 답변을 generateContentStream으로 실시간 전송 ──
+  const ai = new GoogleGenAI({ apiKey })
+  const encoder = new TextEncoder()
+
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let full = ""
+      let inputTokens: number | null = null
+      let outputTokens: number | null = null
+      let errorCategory: ErrorCategory | null = null
+      const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
+
+      try {
+        const stream = await ai.models.generateContentStream({ model: modelIdActual, contents: prompt })
+        for await (const chunk of stream) {
+          const text = chunk.candidates?.[0]?.content?.parts?.map(p => p.text ?? "").join("") ?? ""
+          if (text) {
+            full += text
+            send({ type: "token", text })
+          }
+          const usage = (chunk as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
+          if (usage) {
+            inputTokens = usage.promptTokenCount ?? inputTokens
+            outputTokens = usage.candidatesTokenCount ?? outputTokens
+          }
+        }
+        if (!full) throw new Error("empty summary response")
+        send({ type: "done" })
+        debugLogger.success("AI summary complete (Gemini stream)", { length: full.length })
+      } catch (error) {
+        errorCategory = categorizeError(error)
+        // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 원문은 서버 로그로만.
+        debugLogger.error("AI summary failed", error)
+        send({ type: "error", message: "AI 요약 생성 중 오류가 발생했습니다." })
+      } finally {
+        // Serverless에서 fire-and-forget은 잘린다 → close 전에 await로 보장 (실패는 swallow).
+        try {
+          await recordTelemetry({
+            endpoint: 'summarize',
+            isByok: authCtx.isByok,
+            sessionAnon: sessionAnonHash(authCtx.userId, authCtx.byokKey),
+            uaClass: classifyUa(request.headers.get('user-agent')),
+            lang: 'ko',
+            queryType: isPrecedentFlag ? 'precedent_summary' : 'revision_summary',
+            queryLengthBucket: bucketLength(Math.max(oldLen, newLen)),
+            answerLengthBucket: bucketLength(full.length),
+            latencyTotalMs: Date.now() - startMs,
+            errorCategory,
+            modelIdActual,
+            inputTokens,
+            outputTokens,
+            costEstimateUsd: estimateCostUsd(modelIdActual, inputTokens, outputTokens),
+          })
+        } catch { /* telemetry failure swallowed */ }
+
+        // 실패(에러/빈 답변)면 사전차감 쿼터 환불.
+        if (errorCategory !== null || !full) {
+          await refundAiQuota(authCtx)
+        }
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }

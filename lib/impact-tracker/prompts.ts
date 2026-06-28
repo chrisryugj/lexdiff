@@ -1,9 +1,8 @@
 /**
- * 영향 추적기 AI 프롬프트 빌더
+ * 영향 추적기 AI 프롬프트 빌더 (Gemini)
  *
- * OpenClaw와 Gemini 모두에서 사용 가능한 범용 프롬프트.
- * OpenClaw: NL 쿼리로 전송 → 답변에서 JSON 추출
- * Gemini: 시스템 프롬프트 + 사용자 프롬프트로 분리
+ * 분류는 responseSchema로 구조화 출력(JSON 배열)을 강제하고,
+ * 종합 요약은 마크다운 자유텍스트로 생성한다.
  */
 
 import type { ClassificationInput, ImpactItem } from './types'
@@ -68,15 +67,11 @@ info(참고) — 실질적 내용 변경 없음:
 변경사항:
 ${changesJson}
 
-반드시 아래 JSON 배열 형식으로만 답변하세요. 다른 텍스트는 포함하지 마세요.
+각 변경 조문마다 jo·severity·reason을 채워 분류하세요. jo에는 위 입력의 "jo" 값을 그대로 사용하세요.
 
 **reason 작성 규칙** (개조식, 명사형 종결):
 - critical/review: 2문장. ①무엇이 어떻게 변경되었는지 + ②실무적 영향/필요 조치. 예: "저소득층 외 다자녀 양육자 우대 정책 추가 신설. 조례 내 우대 대상 범위 확대 반영 및 관련 예산 검토 필요"
-- info: 1문장. 예: "결격사유 조문으로 실질적 내용 변경 없음 – 별도 조치 불필요"
-
-[
-  { "jo": "조문코드", "severity": "critical|review|info", "reason": "분류 근거" }
-]`
+- info: 1문장. 예: "결격사유 조문으로 실질적 내용 변경 없음 – 별도 조치 불필요"`
 }
 
 /**
@@ -86,8 +81,7 @@ export function buildClassificationSystemPrompt(): string {
   return `당신은 한국 법령 개정 영향도 분석 전문가입니다.
 주어진 조문 변경사항을 분석하여 영향도를 critical/review/info로 분류합니다.
 구법과 신법 텍스트를 면밀히 비교하여, 규범 효과(권리·의무·절차·대상·범위)가 달라지면 critical로 분류하세요.
-애매한 경우 상위 등급으로 분류하세요 (under-classify보다 over-classify가 안전).
-반드시 JSON 배열만 반환하세요. 마크다운이나 설명 텍스트를 포함하지 마세요.`
+애매한 경우 상위 등급으로 분류하세요 (under-classify보다 over-classify가 안전).`
 }
 
 // ── 종합 요약 ──

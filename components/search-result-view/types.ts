@@ -201,6 +201,7 @@ export interface SummaryDialogState {
   oldContent?: string
   newContent?: string
   effectiveDate?: string
+  prevEffectiveDate?: string  // 직전(구법) 시행일 — 비교 기준 표시용
   isPrecedent?: boolean  // 판례 요약 모드
 }
 
