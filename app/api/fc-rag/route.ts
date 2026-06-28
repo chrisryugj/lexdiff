@@ -11,7 +11,7 @@
 import { NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
-import { executeClaudeRAGStream, executeGeminiRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
+import { executeClaudeRAGStream, executeGeminiRAGStream, executeRelayRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import { requireAiAuth, refundAiQuota } from "@/lib/api-auth"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
       // Hermes+Gemini 모두 실패 시 fallback 더미 답변은 '실답변 아님'으로 간주 → refund 대상.
       let answerDelivered = false
       // 엔진 경로 추적 (telemetry용). try 블록 밖에서도 접근 가능하도록 여기서 선언.
-      let finalSource: 'hermes' | 'gemini' = 'gemini'
+      let finalSource: 'hermes' | 'gemini' | 'relay' = 'gemini'
       let fallbackTriggered = false
 
       // 스트림 시작 직후 쿼터 상태를 1회 emit (BYOK는 null).
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
 
       try {
         let handled = false
-        let source: 'hermes' | 'gemini' = 'gemini'
+        let source: 'hermes' | 'gemini' | 'relay' = 'gemini'
         // note: finalSource/fallbackTriggered 는 바깥 스코프에서 최종값 추적
 
         // ── Hermes Primary ──
@@ -378,6 +378,43 @@ export async function POST(request: NextRequest) {
             fallbackTriggered = true
             traceLogger.addEvent(traceId, 'hermes_failed', {
               message: hermesError instanceof Error ? hermesError.message : 'unknown',
+              fallback: 'gemini',
+            })
+          }
+        }
+
+        // ── Relay Primary (맥미니 구독 Claude + korean-law MCP) ──
+        // RELAY_URL 설정 시 우선 사용, 실패/타임아웃 시 아래 Gemini로 폴백.
+        // BYOK 사용자는 자기 키로 Gemini 직행(구독 릴레이 비용 도용 차단).
+        const RELAY_URL = process.env.RELAY_URL
+        if (!handled && RELAY_URL && !authCtx.isByok) {
+          try {
+            traceLogger.addEvent(traceId, 'relay_start', {})
+            sendAndLog({ type: "status", message: "법령 엔진 연결 중...", progress: 3 })
+
+            let lastAnswerCitations: FCRAGCitation[] = []
+            for await (const event of executeRelayRAGStream(query, {
+              signal: combinedSignal,
+              conversationId,
+            })) {
+              if (event.type === "error") throw new Error(event.message)
+              if (event.type === "answer") {
+                if (tFirstAnswer === null) tFirstAnswer = Date.now()
+                answerDelivered = true
+                lastAnswerCitations = event.data.citations || []
+              }
+              if (event.type === "tool_call" && tFirstTool === null) tFirstTool = Date.now()
+              sendAndLog(event)
+            }
+
+            await streamCitationVerification(lastAnswerCitations, sendAndLog)
+            handled = true
+            source = 'relay'
+            traceLogger.completeTrace(traceId, 'relay')
+          } catch (relayError) {
+            fallbackTriggered = true
+            traceLogger.addEvent(traceId, 'relay_failed', {
+              message: relayError instanceof Error ? relayError.message : 'unknown',
               fallback: 'gemini',
             })
           }

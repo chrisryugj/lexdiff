@@ -25,7 +25,7 @@ export interface Trace {
   query: string
   startedAt: string
   completedAt?: string
-  source?: 'hermes' | 'gemini'
+  source?: 'hermes' | 'gemini' | 'relay'
   events: TraceEvent[]
 }
 
@@ -99,7 +99,7 @@ class TraceLogger {
     })
   }
 
-  completeTrace(traceId: string, source?: 'hermes' | 'gemini'): void {
+  completeTrace(traceId: string, source?: 'hermes' | 'gemini' | 'relay'): void {
     const trace = this.traces.get(traceId)
     if (!trace) return
     trace.completedAt = new Date().toISOString()

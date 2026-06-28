@@ -32,6 +32,7 @@ export { KNOWN_MST } from './fast-path'
 // ── 엔진 re-export ──
 export { executeClaudeRAGStream } from './claude-engine'
 export { executeGeminiRAGStream } from './gemini-engine'
+export { executeRelayRAGStream } from './relay-engine'
 
 /** @deprecated route.ts에서 직접 executeClaudeRAGStream/executeGeminiRAGStream 사용 */
 export { executeGeminiRAGStream as executeRAGStream } from './gemini-engine'
