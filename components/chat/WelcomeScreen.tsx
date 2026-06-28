@@ -2,6 +2,7 @@
 
 import { m, type Variants } from 'framer-motion'
 import { Icon } from '@/components/ui/icon'
+import { BrandMark } from '@/components/brand-mark'
 
 interface WelcomeScreenProps {
   onExampleClick: (query: string, mode: 'law' | 'ai') => void
@@ -72,9 +73,7 @@ export function WelcomeScreen({ onExampleClick }: WelcomeScreenProps) {
       {/* Logo */}
       <m.div variants={itemVariants} className="flex items-center gap-3 mb-4">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20">
-            <Icon name="scale" className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <BrandMark className="w-16 h-16 drop-shadow-xl" />
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center border-2 border-background">
             <Icon name="sparkles" className="w-3 h-3 text-white" />
           </div>

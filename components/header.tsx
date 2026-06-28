@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Icon } from "@/components/ui/icon"
+import { BrandMark } from "@/components/brand-mark"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
@@ -53,9 +54,7 @@ export function Header({ onReset, onFavoritesClick, onSettingsClick, onHelpClick
           onClick={handleHomeClick}
           className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Icon name="scale" size={20} className="text-primary-foreground" />
-          </div>
+          <BrandMark size={36} />
           <span
             className="text-lg font-medium italic text-foreground tracking-tight"
             style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}

@@ -6,6 +6,7 @@ import type { ImpactStep } from '@/lib/impact-tracker/types'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
+import { BrandMark } from '@/components/brand-mark'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 import { useImpactTracker } from '@/hooks/use-impact-tracker'
@@ -164,9 +165,7 @@ export function ImpactTrackerView({
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <button onClick={handleLogoClick} className="flex items-center gap-3 group">
-              <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
-                <Icon name="scale" size={22} />
-              </div>
+              <BrandMark className="h-10 w-10 drop-shadow-md transition-transform duration-300 group-hover:scale-105" />
               <span
                 className="text-xl lg:text-2xl font-medium italic text-brand-navy tracking-tight"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}

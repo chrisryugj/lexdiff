@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { m } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
+import { BrandMark } from "@/components/brand-mark"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
@@ -108,9 +109,7 @@ export function FloatingCompactHeader({
                     className="flex items-center gap-2 lg:gap-3 group flex-shrink-0"
                     title="홈으로 이동"
                   >
-                    <div className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-sm bg-brand-navy transition-transform duration-300 group-hover:scale-105">
-                      <Icon name="scale" size={18} className="text-white dark:text-background" />
-                    </div>
+                    <BrandMark className="h-8 w-8 lg:h-9 lg:w-9 transition-transform duration-300 group-hover:scale-105" />
                     <span
                       className="hidden md:block text-lg lg:text-xl font-medium italic text-brand-navy tracking-tight"
                       style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}

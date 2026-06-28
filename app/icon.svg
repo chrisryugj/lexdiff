@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="22" fill="#0b1c2c"/>
-  <g fill="#9a6500" opacity="0.55">
-    <rect x="40" y="28" width="12" height="46" rx="4"/>
-    <rect x="40" y="62" width="33" height="12" rx="4"/>
-  </g>
+  <rect width="100" height="100" rx="24" fill="#0b1c2c"/>
   <g fill="#d8944d">
-    <rect x="33" y="24" width="13" height="48" rx="4.5"/>
-    <rect x="33" y="59" width="35" height="13" rx="4.5"/>
+    <path d="M37 27h15v40h-15z"/>
+    <rect x="30" y="27" width="29" height="4.5" rx="2"/>
+    <rect x="37" y="62" width="36" height="13" rx="3"/>
+    <rect x="68" y="57" width="5" height="18" rx="2.5" fill="#9a6500"/>
   </g>
 </svg>

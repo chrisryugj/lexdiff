@@ -9,6 +9,7 @@ import dynamic from "next/dynamic"
 import type { Favorite } from "@/lib/law-types"
 import { m } from "framer-motion"
 import { Icon } from "@/components/ui/icon"
+import { BrandMark } from "@/components/brand-mark"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
@@ -208,9 +209,7 @@ export function SearchView({
               onClick={handleLogoClick}
               className="flex items-center gap-3 group"
             >
-              <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
-                <Icon name="scale" size={22} />
-              </div>
+              <BrandMark className="h-10 w-10 drop-shadow-md transition-transform duration-300 group-hover:scale-105" />
               <span
                 className="text-xl lg:text-2xl font-medium italic text-brand-navy tracking-tight"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}

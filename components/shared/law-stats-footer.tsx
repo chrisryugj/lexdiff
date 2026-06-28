@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Icon } from "@/components/ui/icon"
+import { BrandMark } from "@/components/brand-mark"
 import { AnimatedNumber } from "./animated-number"
 
 export interface LawStats {
@@ -44,7 +45,7 @@ export function LawStatsFooter({ extraLinks }: LawStatsFooterProps) {
       <div className="container mx-auto max-w-7xl px-6 lg:px-8">
         <div className="pb-8 border-b border-gray-200 dark:border-gray-700/50 space-y-5">
           <div className="flex items-center justify-center gap-2">
-            <Icon name="scale" size={24} className="text-brand-navy" />
+            <BrandMark size={24} />
             <span
               className="text-xl font-medium italic text-brand-navy tracking-tight"
               style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic', fontVariationSettings: "'wght' 500" }}

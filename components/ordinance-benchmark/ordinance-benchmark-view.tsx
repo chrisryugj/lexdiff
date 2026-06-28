@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
+import { BrandMark } from "@/components/brand-mark"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -378,9 +379,7 @@ export function OrdinanceBenchmarkView({ initialKeyword, onBack, onHomeClick }: 
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <button onClick={() => onHomeClick?.()} className="flex items-center gap-3 group">
-              <div className="flex h-10 w-10 items-center justify-center bg-brand-navy text-white dark:text-background shadow-md transition-transform duration-300 group-hover:scale-105">
-                <Icon name="scale" size={22} />
-              </div>
+              <BrandMark className="h-10 w-10 drop-shadow-md transition-transform duration-300 group-hover:scale-105" />
               <span className="text-xl lg:text-2xl font-medium italic text-brand-navy tracking-tight"
                 style={{ fontFamily: "'Libre Bodoni', serif", fontWeight: 500, fontStyle: 'italic' }}>
                 LexDiff
