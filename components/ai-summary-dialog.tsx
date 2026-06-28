@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Icon } from "@/components/ui/icon"
 import { debugLogger } from "@/lib/debug-logger"
 import { CopyButton } from "@/components/ui/copy-button"
+import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import { formatDate } from "@/lib/revision-parser"
 import { useApiKey } from "@/hooks/use-api-key"
 
@@ -90,10 +91,10 @@ export function AISummaryDialog({
     }
   }
 
-  const fontSizeClasses = {
-    small: "text-sm",
-    medium: "text-base",
-    large: "text-lg",
+  const fontSizePx = {
+    small: "14px",
+    medium: "16px",
+    large: "18px",
   }
 
   return (
@@ -178,8 +179,8 @@ export function AISummaryDialog({
 
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ScrollArea className="h-full pr-4">
-                  <div className={`${fontSizeClasses[fontSize]} leading-relaxed whitespace-pre-wrap text-foreground`}>
-                    {summary}
+                  <div style={{ fontSize: fontSizePx[fontSize] }} className="leading-relaxed text-foreground">
+                    <LegalMarkdownRenderer content={summary} disabledLink />
                   </div>
                 </ScrollArea>
               </div>

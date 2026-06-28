@@ -59,7 +59,7 @@ export type FCRAGStreamEvent =
   | { type: 'answer'; data: FCRAGResult }
   | { type: 'answer_token'; data: { text: string } }
   | { type: 'citation_verification'; citations: Array<{ lawName: string; articleNum: string; text: string; source: string; verified: boolean; verificationMethod: string }> }
-  | { type: 'source'; source: 'claude' | 'openclaw' | 'gemini' }
+  | { type: 'source'; source: 'relay' | 'gemini' }
   | { type: 'error'; message: string }
 
 export interface RAGStreamOptions {

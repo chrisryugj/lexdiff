@@ -12,8 +12,6 @@ import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { favoritesStore } from "@/lib/favorites-store"
-import { ViewingHistoryPanel } from "@/components/viewing-history-panel"
-import { toReviewQuery } from "@/lib/viewing-history-store"
 import { UserMenu } from "@/components/user-menu"
 import { AiGateDialog } from "@/components/ai-gate-dialog"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
@@ -352,13 +350,6 @@ export function SearchView({
         >
           <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <FeatureCards revealed={featuresRevealed} onToolClick={onToolClick} />
-          </div>
-        </section>
-
-        {/* 최근 조회 이력 — 본 항목 재조회 (이력 있을 때만 노출) */}
-        <section className="pb-2">
-          <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <ViewingHistoryPanel hideWhenEmpty onReview={(rec) => void onSearch(toReviewQuery(rec))} />
           </div>
         </section>
 

@@ -20,6 +20,9 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
     'data-ref', 'data-law', 'data-article', 'data-law-type',
     'data-annex', 'data-old-law', 'data-ef-yd',
     'data-precedent-id', 'data-case-name', 'data-court',
+    // 생성기(link-specialized/link-pattern-matchers)가 실제 emit하는 속성 — 누락 시
+    // sanitize 단계에서 떨어져 클릭 핸들러가 빈 값을 받음(예: 참조판례 사건번호).
+    'data-case-number', 'data-date', 'data-kind', 'data-efyd',
   ],
   span: ['class', 'style', 'data-jo'],
   div: ['class', 'style', 'id'],

@@ -9,6 +9,7 @@
 import * as React from "react"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/ui/copy-button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -295,6 +296,8 @@ export function PrecedentDetailPanel({
     return sanitizeForRender(result)
   }, [])
 
+  const [fontSize, setFontSize] = React.useState(14)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -311,9 +314,27 @@ export function PrecedentDetailPanel({
     )
   }
 
+  const stripHtml = (s?: string) =>
+    (s || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  const copyText = [
+    detail.name,
+    [detail.court, detail.caseNumber, formatPrecedentDate(detail.date)].filter(Boolean).join(' · '),
+    detail.holdings && `【판시사항】\n${stripHtml(detail.holdings)}`,
+    detail.summary && `【판결요지】\n${stripHtml(detail.summary)}`,
+    detail.refStatutes && `【참조조문】\n${stripHtml(detail.refStatutes)}`,
+    detail.refPrecedents && `【참조판례】\n${stripHtml(detail.refPrecedents)}`,
+    detail.fullText && `【판결 전문】\n${stripHtml(detail.fullText)}`,
+  ].filter(Boolean).join('\n\n')
+
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3" style={{ fontSize: `${fontSize}px` }}>
         {/* 헤더 */}
         <div className="space-y-2">
           <h3 className="font-bold text-lg font-maruburi">{detail.name}</h3>
@@ -327,6 +348,20 @@ export function PrecedentDetailPanel({
           </div>
         </div>
 
+        {/* 글자크기 + 복사 컨트롤 */}
+        <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setFontSize(s => Math.max(11, s - 2))} disabled={fontSize <= 11} title="글자 작게">
+              <Icon name="zoom-out" size={14} />
+            </Button>
+            <span className="text-xs text-muted-foreground tabular-nums w-8 text-center">{fontSize}px</span>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setFontSize(s => Math.min(24, s + 2))} disabled={fontSize >= 24} title="글자 크게">
+              <Icon name="zoom-in" size={14} />
+            </Button>
+          </div>
+          <CopyButton getText={() => copyText} message="복사됨" iconOnly={false} label="복사" variant="outline" size="sm" />
+        </div>
+
         {/* 판시사항 */}
         {detail.holdings && (
           <div>
@@ -334,7 +369,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판시사항
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
+              className="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.holdings) }}
             />
@@ -348,7 +383,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판결요지
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
+              className="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.summary) }}
             />
@@ -362,7 +397,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />참조조문
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
+              className="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.refStatutes) }}
             />
@@ -376,7 +411,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />참조판례
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
+              className="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.refPrecedents) }}
             />
@@ -390,7 +425,7 @@ export function PrecedentDetailPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-foreground" />판결 전문
             </h4>
             <div
-              className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg whitespace-pre-wrap font-maruburi"
+              className="leading-relaxed text-foreground/80 bg-muted/30 p-3 rounded-lg whitespace-pre-wrap font-maruburi"
               onClick={onContentClick}
               dangerouslySetInnerHTML={{ __html: processHtml(detail.fullText) }}
             />

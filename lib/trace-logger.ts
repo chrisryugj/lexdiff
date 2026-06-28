@@ -22,7 +22,7 @@ export interface TraceEvent {
 
 export interface Trace {
   traceId: string
-  query: string
+  // 법령질의(사용자 질문) 원문은 수집하지 않음 — traceId로만 상관관계 추적
   startedAt: string
   completedAt?: string
   source?: 'hermes' | 'gemini' | 'relay'
@@ -72,7 +72,7 @@ class TraceLogger {
   private traceOrder: string[] = [] // for FIFO eviction
   private maxTraces = 200
 
-  startTrace(traceId: string, query: string): void {
+  startTrace(traceId: string): void {
     if (this.traces.size >= this.maxTraces) {
       // FIFO: remove oldest
       const oldest = this.traceOrder.shift()
@@ -80,7 +80,6 @@ class TraceLogger {
     }
     const trace: Trace = {
       traceId,
-      query,
       startedAt: new Date().toISOString(),
       events: [],
     }

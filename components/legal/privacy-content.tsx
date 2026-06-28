@@ -70,6 +70,12 @@ export function PrivacyContent() {
                   — 로그인 사용자가 열람한 법령·조례·판례의 <strong>표시용 제목, 식별자(법령ID·조문번호·조례 일련번호·판례 ID), 조회 시각</strong>만 저장합니다.
                   최근 조회 항목 재조회 편의 제공 목적이며, 질의·답변 원문은 저장하지 않습니다. (비로그인 시 기기 내 localStorage에만 보관)
                 </li>
+                <li>
+                  <strong className="font-semibold text-foreground">AI 답변 피드백</strong>{' '}
+                  — 답변 하단의 피드백 버튼(좋음/별로/개선요청)을 직접 누른 경우에만 1건 기록합니다.
+                  ‘좋음’은 유형·엔진 등 메타데이터만 저장하며, <strong>‘별로·개선요청’ 선택 시에 한해</strong> 품질
+                  개선 목적으로 해당 질문·답변 본문을 함께 저장합니다. (상시 자동 수집이 아니며, 버튼을 누르지 않으면 저장되지 않습니다)
+                </li>
               </ul>
             </div>
           </div>
@@ -83,7 +89,7 @@ export function PrivacyContent() {
             <li>회원 식별 및 로그인 세션 유지</li>
             <li>서비스 제공 및 사용자별 쿼터 관리</li>
             <li>부정이용 방지 및 서비스 운영 안정성 확보</li>
-            <li>(선택 동의 시) AI 검색 품질 개선 — 로그 분석을 통한 모델/프롬프트 개선</li>
+            <li>AI 답변 품질 개선 — 사용자가 남긴 답변 피드백(좋음/별로/개선요청) 분석을 통한 모델·프롬프트 개선</li>
           </ul>
         </section>
 
@@ -204,7 +210,13 @@ export function PrivacyContent() {
                 </tr>
                 <tr>
                   <td className="px-3 py-2">Google LLC</td>
-                  <td className="px-3 py-2">OAuth 인증, Gemini AI 모델 API</td>
+                  <td className="px-3 py-2">OAuth 인증, Gemini AI 모델 API (본인 키 등록 시 및 폴백 경로)</td>
+                  <td className="px-3 py-2">미국 (global)</td>
+                  <td className="px-3 py-2">HTTPS/TLS 암호화 전송</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">Anthropic PBC</td>
+                  <td className="px-3 py-2">법령 답변 AI 엔진(Themis) — Claude 모델 API에 질의 전송</td>
                   <td className="px-3 py-2">미국 (global)</td>
                   <td className="px-3 py-2">HTTPS/TLS 암호화 전송</td>
                 </tr>
@@ -235,8 +247,7 @@ export function PrivacyContent() {
             <li>오류 정정·삭제 요구</li>
             <li>처리 정지 요구</li>
             <li>
-              AI 로그 수집 동의 철회 및 기존 로그 전체 삭제 — 사용자 메뉴 &gt; 개인정보 설정에서
-              즉시 가능
+              AI 답변 피드백 등 수집 정보의 삭제 요청 — 아래 개인정보 보호책임자 이메일로 요청 시 처리
             </li>
             <li>회원 탈퇴</li>
           </ul>

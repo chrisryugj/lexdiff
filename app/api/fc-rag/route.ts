@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   const authedUserId = authCtx.userId
 
   const traceId = generateTraceId()
-  traceLogger.startTrace(traceId, query)
+  traceLogger.startTrace(traceId)
 
   const encoder = new TextEncoder()
   const abortController = new AbortController()
@@ -453,7 +453,6 @@ export async function POST(request: NextRequest) {
               traceLogger.addEvent(traceId, 'tool_call', {
                 name: (event as { name?: string }).name,
                 args: (event as { args?: unknown }).args,
-                query: (event as { query?: string }).query,
               })
             } else if (event.type === 'tool_result') {
               tLastToolResult = Date.now()

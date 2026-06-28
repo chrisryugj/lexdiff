@@ -8,6 +8,7 @@ import { Icon, DynamicIcon, ICON_REGISTRY, type IconType } from "@/components/ui
 import { CopyButton } from "@/components/ui/copy-button"
 import type { VerifiedCitation } from '@/lib/citation-verifier'
 import { debugLogger } from '@/lib/debug-logger'
+import { sourceLabel } from '@/lib/fc-rag/source-label'
 import { LegalMarkdownRenderer } from '@/components/legal-markdown-renderer'
 import { AiStepTimeline } from '@/components/ai-step-timeline'
 
@@ -165,6 +166,62 @@ function FontControls({ fontSize, setFontSize, onRefresh, aiAnswerContent }: Fon
                 className="h-8 w-8 p-0"
             />
         </>
+    )
+}
+
+/**
+ * AI 답변 피드백 바 — 답변 완료 후 1회 표시.
+ * 상시 자동수집 아님: 버튼 클릭 시에만 /api/ai-feedback 로 1건 전송.
+ * good=메타만 / 별로·개선요청=질문·답변 본문 포함(서버에서 강제 분기).
+ */
+function AnswerFeedback({ query, answer, engine, queryType }: {
+    query: string
+    answer: string
+    engine?: string
+    queryType?: string
+}) {
+    const [submitted, setSubmitted] = useState<null | 'good' | 'bad' | 'improve'>(null)
+    const answerIdRef = useRef<string>('')
+    if (!answerIdRef.current) {
+        answerIdRef.current = `ans-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    }
+
+    const send = (type: 'good' | 'bad' | 'improve') => {
+        if (submitted) return
+        setSubmitted(type)
+        void fetch('/api/ai-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedbackType: type, answerId: answerIdRef.current, engine, queryType, query, answer }),
+        }).catch(() => { })
+    }
+
+    if (submitted) {
+        return (
+            <div className="mt-4 text-center text-xs text-muted-foreground animate-in fade-in duration-300">
+                피드백 감사합니다. 답변 품질 개선에 활용할게요.
+            </div>
+        )
+    }
+
+    return (
+        <div className="mt-4 flex flex-col items-center gap-1.5 animate-in fade-in duration-500 delay-300">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="text-xs text-muted-foreground mr-1">이 답변 어땠나요?</span>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => send('good')}>
+                    <Icon name="thumbs-up" size={14} />좋아요
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => send('bad')}>
+                    <Icon name="thumbs-down" size={14} />별로예요
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => send('improve')}>
+                    <Icon name="lightbulb" size={14} />개선요청
+                </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground/50 text-center px-2">
+                피드백은 답변 품질 개선에 쓰여요. ‘별로·개선요청’ 선택 시 이 질문·답변이 함께 저장됩니다.
+            </p>
+        </div>
     )
 }
 
@@ -365,7 +422,7 @@ export function AIAnswerContent({
         })
         const tokenLog = toolCallLogs.find(l => l.type === 'token_usage')
         const sourceLog = toolCallLogs.find(l => l.type === 'source')
-        const source = (sourceLog?.message as 'openclaw' | 'gemini') || 'gemini'
+        const source = (sourceLog?.message as string) || 'gemini'
         return {
             totalCalls: calls.length,
             uniqueTools: toolNames.size,
@@ -408,7 +465,7 @@ export function AIAnswerContent({
                                     {/* AI 엔진 소스 */}
                                     <div className="flex items-center justify-between gap-4">
                                         <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="sparkles" size={12} />AI 엔진</span>
-                                        <span className="font-medium">{searchStats.source === 'openclaw' ? 'OpenClaw' : 'Gemini'}</span>
+                                        <span className="font-medium">{sourceLabel(searchStats.source)}</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-4">
                                         <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="clock" size={12} />소요 시간</span>
@@ -718,6 +775,16 @@ export function AIAnswerContent({
                         <Icon name="alert-circle" size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-amber-900 dark:text-amber-200/80">이 답변은 AI가 생성한 것으로, 법적 자문을 대체할 수 없습니다. 정확한 정보는 원문을 확인하거나 전문가와 상담하시기 바랍니다.</p>
                     </div>
+                )}
+
+                {/* 답변 피드백 */}
+                {displayedContent && !isTyping && !isStreaming && userQuery && (
+                    <AnswerFeedback
+                        query={userQuery}
+                        answer={aiAnswerContent}
+                        engine={searchStats?.source}
+                        queryType={aiQueryType}
+                    />
                 )}
 
                 {/* 웹 검색 + 추가 질문 버튼 영역 */}

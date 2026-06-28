@@ -9,6 +9,7 @@ import { useCallback, useRef } from "react"
 import { debugLogger } from "@/lib/debug-logger"
 import { extractRelatedLaws, type ParsedRelatedLaw } from "@/lib/law-parser"
 import { getCachedResponse, cacheResponse, updateCachedResponseCitations } from "@/lib/rag-response-cache"
+import { sourceLabel } from "@/lib/fc-rag/source-label"
 import type { VerifiedCitation } from "@/lib/citation-verifier"
 import type { HandlerDeps, LawDataState } from "./types"
 import type { ToolCallLogEntry } from "../../types"
@@ -523,7 +524,7 @@ export function useAiSearch(deps: HandlerDeps) {
           actions.addToolCallLog({
             id: `log-${++logIdCounterRef.current}`,
             type: 'source',
-            displayName: event.source === 'claude' ? 'Claude' : event.source === 'openclaw' ? 'Claude (Bridge)' : 'Gemini',
+            displayName: sourceLabel(event.source),
             message: event.source,
             timestamp: Date.now(),
           })

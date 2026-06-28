@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
   // Return summary view (without full event details for list)
   const summaries = traces.map(t => ({
     traceId: t.traceId,
-    query: t.query.slice(0, 100),
     source: t.source,
     startedAt: t.startedAt,
     completedAt: t.completedAt,
