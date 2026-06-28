@@ -1,0 +1,290 @@
+[
+  {
+    "area": "프롬프트 + LLM 행동 가드 (prompts.ts / gemini-engine.ts / quality-evaluator.ts / result-utils.ts / answer-cache.ts)",
+    "summary": "현행성 라벨은 systemInstruction과 raw tool_result로 모델에 정상 도달하나(프롬프트 가드 배선 OK), 모델이 라벨을 무시하고 연혁을 현행처럼 단정해도 막을 프로그램적 백스톱이 없음 — quality-evaluator는 현행성 무지(memory-bypass 제거는 retrievalCount===0일 때만 발동, TIER_0가 항상 검색도구 로드해 사실상 미발동), forceLastTurn은 평가 자체를 스킵, answer-cache는 오답을 6h 증폭. 누수 가드는 advisory 프롬프트 하나뿐.",
+    "leak_paths": [
+      {
+        "id": "LEAK-PROMPT-WIRING",
+        "title": "현행성 프롬프트+라벨 배선 검증 (안전 — 누수 아님)",
+        "severity": "P2",
+        "scenario": "질의 \"소방시설 설치 기준\" → get_law_text 결과에 ⚠️/ℹ️ 조회기준일 라벨 포함. 기대: 라벨이 모델 systemInstruction과 contents에 도달. 실제: 도달함(정상).",
+        "trace": "gemini-engine.ts:487 buildStaticSystemPrompt(true) → :566 config.systemInstruction=systemPrompt (메인 루프), :209 forceLastTurn 재요청에도 systemInstruction=systemPrompt. prompts.ts:224-229 '현행 법령 기준' 섹션은 isGemini 게이트 밖(무조건 포함)이라 항상 시스템 인스트럭션에 들어감. todayKST(prompts.ts:339-342)는 buildDynamicHeader→userText(gemini-engine.ts:488,495-496)로 contents에 주입. 도구결과는 raw r.result로 LLM에 전달(:839 functionResponse, :437/:461 geminiEvidence, :856 autoChains). summarizeToolResult(result-utils.ts:99 '법령 연혁 조회 완료')는 SSE summary 필드 전용(gemini-engine.ts:404/460/730/775/821)으로 LLM에 안 닿음.",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "gemini-engine.ts:487,566,209; prompts.ts:224-229,339-342; gemini-engine.ts:839,437,461,856; result-utils.ts:99; node_modules/korean-law-mcp/build/tools/law-text.js:106,109,112 (⚠️ 시행 예정/연혁 MST 라벨), law-history.js:51 (상태: 현행연혁코드)",
+        "fix_proposal": "현재 안전, 수정불요. (단 이 배선이 '정상'이라는 것은 라벨이 모델에 도달한다는 의미일 뿐, 모델이 준수하는지는 아래 LEAK-1~3이 다룸)",
+        "fix_files": []
+      },
+      {
+        "id": "LEAK-1",
+        "title": "quality-evaluator 현행성 무지 — 연혁을 현행처럼 단정한 답변을 못 잡음",
+        "severity": "P1",
+        "scenario": "질의: \"최저임금법 최근 개정 내용과 현재 최저임금 기준 알려줘\". detectContextNeeds가 '개정' 감지(tool-tiers.ts:95)→TIER_2.historical(compare_old_new/get_law_history/get_historical_law) + chain_amendment_track 선택. 모델이 get_law_history/compare_old_new(둘 다 EVIDENCE_TOOLS)를 호출한 뒤 '구법' 컬럼/연혁 버전 수치를 현행으로 서술. 기대: 가드가 marginal/fail 강등 또는 경고. 실제: pass+confidence high로 통과하고 캐시까지 저장됨.",
+        "trace": "quality-evaluator.ts:52-116 evaluateResponseQuality는 toolScore/contentScore/citationScore/answerScore만 계산 — [현행]/[연혁]/시행일 라벨을 전혀 보지 않음. 유일한 현행성 관련 가드는 :101-104 (retrievalCount===0 && citationCount>0 → score cap 25). 그러나 retrievalCount(:62)는 EVIDENCE_TOOLS(:20-37, get_law_history/compare_old_new/chain_amendment_track 모두 포함) 호출 수. TIER_0(tool-tiers.ts:3-8)가 매 질의 search_ai_law/search_law 등을 항상 로드하고 prompts.ts:231-235가 '도구 최소 1회 호출 필수'를 강제하므로 retrievalCount는 사실상 항상 >0 → cap 미발동. 따라서 연혁 evidence 도구로 답한 오답은 만점 통과. gemini-engine.ts:628-676 완료 경로가 이 평가를 쓰지만(:630) 현행성 갭을 못 메움.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "quality-evaluator.ts:52-116 (현행성 체크 부재), :101-104 (memory-bypass 제거가 retrievalCount===0 한정), :20-37 (get_law_history/compare_old_new/chain_amendment_track가 EVIDENCE_TOOLS라 retrievalCount 충족), tool-tiers.ts:3-8 (TIER_0 항상 검색도구 로드), prompts.ts:231-235 (도구 호출 필수)",
+        "fix_proposal": "quality-evaluator.ts evaluateResponseQuality에 현행성 백스톱 추가(이미 toolResults를 받음). 점수 계산부 이후에: 도구결과 중 하나라도 현행성 경고 마커(/시행\\s?예정|미시행|연혁\\s?MST|과거\\s?버전일\\s?수\\s?있|상태:\\s*연혁/)를 포함하고 answerText가 현행성 명시(/시행일|시행\\s?예정|현행|연혁/)를 결여하면 → warnings.push('현행성 라벨 미반영 — 연혁/시행예정 가능성') + level을 marginal 이하로 캡. 5~8줄 추가, 시그니처 불변(surgical).",
+        "fix_files": [
+          "lib/fc-rag/quality-evaluator.ts"
+        ]
+      },
+      {
+        "id": "LEAK-2",
+        "title": "forceLastTurn 경로가 quality-evaluator를 통째로 스킵",
+        "severity": "P2",
+        "scenario": "복합 질의로 도구 턴이 maxToolTurns에 도달(gemini-engine.ts:544 isLastTurn). 모델이 마지막 턴까지 도구 호출 후 300자 이상 답변을 이미 생성한 상태. 기대: 완료 경로처럼 품질 평가. 실제: forceLastTurnAnswer가 evaluateResponseQuality와 noToolsCalled 가드를 호출하지 않고 buildCitations+calcConfidenceDetailed만으로 바로 answer yield.",
+        "trace": "gemini-engine.ts:680-686 isLastTurn이면 forceLastTurnAnswer 호출. :165-191 기존 텍스트(>=300자) 분기는 buildCitationsWithAnswerFallback(:174)+calcConfidenceDetailed(:175)만 수행하고 yield(:177-189). 완료 경로(:630 evaluateResponseQuality, :634 noToolsCalled, :641 downgraded)와 달리 품질 평가/경고 주입이 전혀 없음. LEAK-1의 (제안된) 현행성 백스톱조차 이 경로엔 적용 안 됨.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "gemini-engine.ts:165-191 (forceLastTurn 기존답변 분기에 evaluateResponseQuality 부재), :680-686 (isLastTurn 진입), 대조: :628-676 완료 경로 품질평가",
+        "fix_proposal": "forceLastTurnAnswer 기존답변 분기(gemini-engine.ts:170-191)에서 yield 직전 evaluateResponseQuality(allToolResults, answer) 호출 → quality.warnings를 warnings에 머지하고, LEAK-1 백스톱이 marginal 이하면 confidenceLevel을 medium/low로 하향. 완료 경로와 동일 패턴 4~6줄 추가.",
+        "fix_files": [
+          "lib/fc-rag/gemini-engine.ts"
+        ]
+      },
+      {
+        "id": "LEAK-3",
+        "title": "todayKST 제공하나 '시행일>오늘=미시행' 명시 규칙 없음 (라벨 없는 집계 출력에서 잔여 누수)",
+        "severity": "P2",
+        "scenario": "질의: \"개정된 ○○법 신규 기준\" → chain_amendment_track/chain_law_system 등 chain 집계 출력. chain 핸들러가 하위 get_law_text의 ℹ️/⚠️ 시행예정 라벨을 보존하지 않으면, 모델은 todayKST는 알지만 본문 시행일과 비교해 미시행을 판단할 명시적 규칙이 프롬프트에 없어 시행예정 조문을 현행으로 서술 가능.",
+        "trace": "prompts.ts:342가 '오늘 날짜: todayKST' 주입, :225-226이 '시행일자·라벨 확인' 및 '시행 예정 표시가 있으면 명시'를 지시 — 라벨이 출력에 있을 때만 작동. 라벨 없는 경우(chain 집계 등) '시행일 > 오늘이면 미시행'이라는 계산 규칙은 프롬프트에 없음. 단독 get_law_text는 law-text.js:109가 '⚠️ 시행 예정 (조회기준일 today 현재 미시행)'을 자체 출력하므로 prompts.ts:226 규칙이 커버 → 라벨 있는 경로는 가드 유효. 잔여 갭은 라벨이 유실되는 집계 경로 한정(이 부분 확인은 tool 출력 영역 소관).",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "prompts.ts:339-342 (todayKST 주입), :225-226 (라벨 의존 지시), node_modules/korean-law-mcp/build/tools/law-text.js:109,112 (단독 도구는 라벨 자체출력 → 라벨경로는 커버됨)",
+        "fix_proposal": "prompts.ts:224-229 '현행 법령 기준' 섹션에 1줄 추가: '- 도구 결과의 시행일자가 [답변 지침]의 오늘 날짜보다 미래이면 그 조문은 아직 효력이 없는 시행예정본임 — 현행으로 단정하지 말고 시행예정임을 명시할 것.' (라벨 유실 집계 출력까지 커버하는 계산 규칙). 정적 프롬프트라 캐시 prefix만 1회 갱신.",
+        "fix_files": [
+          "lib/fc-rag/prompts.ts"
+        ]
+      },
+      {
+        "id": "LEAK-4",
+        "title": "answer-cache가 현행성 오답을 6h 증폭 (현행성 차원 필터 부재)",
+        "severity": "P2",
+        "scenario": "LEAK-1로 통과한 연혁-as-현행 오답(warnings 없음, confidence!==low)이 동일 질의 재호출 시 6h 동안 전 사용자에게 그대로 서빙됨. 또는 캐시 저장 후 법령이 개정되어도 6h 동안 stale.",
+        "trace": "gemini-engine.ts:674 cacheAnswer(query, answerData). answer-cache.ts:137-164 cacheAnswer는 warnings/low/truncated/짧음만 필터(:147-150) — 현행성 차원 없음. 키는 normalizeQuery(query) sha256만(:82-89), 날짜/시행일 무관. TTL 6h(:27). getCachedAnswer(:104-131, gemini-engine.ts:304)는 todayKST 무시하고 저장된 답변 그대로 반환. 현행성 오답은 warnings 비고 confidence high라 :147 필터를 못 거름.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "answer-cache.ts:147-150 (필터에 현행성 차원 없음), :82-89 (query-only 키), :27 (6h TTL), gemini-engine.ts:674 (저장), :304 (조회)",
+        "fix_proposal": "LEAK-1 수정으로 현행성 의심 시 warnings를 push하면 answer-cache.ts:147 (warnings 있으면 skip)이 자동으로 캐시를 막아 증폭 차단 — 별도 수정 최소화. 추가 보강 원하면 cacheAnswer에 '도구결과에 시행예정/연혁 마커 존재 시 skip' 1줄. 우선순위는 LEAK-1 선행.",
+        "fix_files": [
+          "lib/fc-rag/quality-evaluator.ts",
+          "lib/fc-rag/answer-cache.ts"
+        ]
+      }
+    ]
+  },
+  {
+    "area": "도구층(tool layer) — 과거버전 도구 노출 & MST/efYd 선택 누수",
+    "summary": "get_batch_articles 의 efYd 파라미터가 TIER_0(항상 노출)에 실려 있으나 핸들러가 현행성 라벨을 전혀 붙이지 않아(get_law_text 와 비대칭) 과거버전 조문이 무라벨로 LLM에 들어가는 P1 누수가 실재. get_historical_law 도 [연혁] 하드 라벨이 없고 MST 교정 대상이 아니라 P2 누수. 기존 quality-evaluator memory-bypass 가드는 두 도구가 evidence 로 카운트되거나 pre-evidence search_ai_law 가 retrievalCount>0 을 만들어 무력화됨. 반면 search_law→get_batch_articles 의 MST 선택 자체는 현행 우선 정렬+라벨+findBestMST+correctToolArgs 로 현행 편향이 잘 걸려 있음.",
+    "leak_paths": [
+      {
+        "id": "TL-1",
+        "title": "get_batch_articles 의 efYd 과거날짜 → 무라벨 과거버전 조문 누수 (get_law_text 와 비대칭)",
+        "severity": "P1",
+        "scenario": "질의: \"2019년 음주운전 했는데 그때 도로교통법 제44조 처벌 기준이 어떻게 됐었나요?\" 또는 \"2020년 기준 주택임대차보호법 제7조 인상 상한\". 기대: 과거버전을 쓰면 결과에 '⚠️ 과거버전' 라벨이 붙어 LLM 이 현행과 구분해 답변. 실제: LLM 이 search_law 로 현행 MST 확인 후 get_batch_articles(mst=현행MST, efYd=\"20190101\", articles=[\"제44조\"]) 호출 → 법제처가 2019년 버전을 반환 → 결과 텍스트는 '도로교통법\\n제44조 ...' 로 시작하며 efYd/연혁 표시가 전혀 없음 → LLM 이 과거 처벌기준을 현행처럼 인용.",
+        "trace": "tool-tiers.ts:3-8 (get_batch_articles 가 TIER_0 → 모든 질의에 항상 노출) → tool-adapter.ts:30-60 getToolDeclarations 가 zodToJsonSchema 로 변환, tool-adapter.ts:46-53 에서 apiKey 만 삭제하고 efYd 는 그대로 선언에 포함(node 확인: get_batch_articles -> mst, lawId, articles, efYd, apiKey, laws) → gemini-engine.ts:490-491 selectToolsForQuery 통과 후 Gemini 에 efYd 호출 가능한 파라미터로 전달 → gemini-engine.ts:720 correctToolArgs 호출 → result-utils.ts:185 MST_TOOLS 에 get_batch_articles 포함되나 보정 대상은 mst/lawId/jo 뿐(result-utils.ts:174-257 전체에서 efYd 미참조) → efYd 그대로 실행 → batch-articles.js:139,29-42 fetchArticlesForLaw 가 efYd 를 apiClient.getLawText 로 전달 → batch-articles.js:75 resultText=`${lawName}\\n` 로 시작, batch-articles.js:94-100 에서도 efYd/연혁 라벨 미부착 → tool-adapter.ts:165-177 get_batch_articles 는 else 분기로 compressed=truncated(라벨 추가 없음) → gemini-engine.ts:757 allToolResults 누적 → LLM 컨텍스트로 무라벨 과거조문 전달.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "tool-adapter.ts:46-53 (apiKey만 strip, efYd 유지) / batch-articles.js:20 (efYd 스키마), batch-articles.js:75,94-100 (무라벨) / 대조군 law-text.js:104-113 (get_law_text 는 efYd 시 '⚠️ 특정 시행일자(efYd=...) 버전 조회 — 현행 법령이 아닐 수 있음' 라벨 부착) / result-utils.ts:185 (MST_TOOLS), result-utils.ts:174-257 (efYd 미보정) / quality-evaluator.ts:22 (get_batch_articles ∈ EVIDENCE_TOOLS) → quality-evaluator.ts:101 memory-bypass 패널티는 retrievalCount===0 일 때만 발동하므로 무력 / prompts.ts:224-229 현행 가드는 '도구 결과의 시행일자·현행성 라벨([현행]/[연혁]/⚠️)을 확인'을 전제로 하나 get_batch_articles 결과에 라벨 자체가 없어 확인할 대상이 없음",
+        "fix_proposal": "lexdiff 측 surgical 수정(published 패키지 batch-articles.js 미수정). tool-adapter.ts executeTool 의 finalResult 산출부(178행 `let finalResult = compressed` 직후, 185행 MST_MISMATCH 블록과 동형)에 라벨 주입: `if (name === 'get_batch_articles' && (parsedArgs as { efYd?: string }).efYd) { finalResult = '⚠️ 특정 시행일자(efYd=' + (parsedArgs as { efYd?: string }).efYd + ') 버전 조회 — 현행 법령이 아닐 수 있음. 현행 기준 답변에는 efYd 없이 재조회할 것.\\n' + finalResult }`. 이는 law-text.js:106 의 문구를 미러링해 비대칭 제거. (대안: tool-adapter.ts:46-53 에서 apiKey 처럼 efYd 를 get_batch_articles 선언에서 삭제해 LLM 이 아예 설정 못 하게 막기 — 단 정당한 행위시법 조회까지 차단하므로 라벨링이 더 보수적.)",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/tool-adapter.ts"
+        ]
+      },
+      {
+        "id": "TL-2",
+        "title": "get_historical_law 결과에 [연혁] 하드 라벨 부재 + MST 미교정",
+        "severity": "P2",
+        "scenario": "질의: \"개인정보보호법 예전 조문이랑 지금이랑 뭐가 달라졌어?\" 기대: 과거 시점 본문은 명확히 '[연혁/과거버전]' 으로 표시되어 LLM 이 현행과 혼동하지 않음. 실제: 질의의 '달라' 키워드로 TIER_2 historical 활성 → LLM 이 search_historical_law 로 과거 MST 목록 획득 → get_historical_law(mst=과거MST) 호출 → 결과 헤더가 '=== 개인정보보호법 ===\\n기본 정보:\\n 시행일자: (옛 날짜)\\n 제개정구분: 일부개정' 형식이며 ⚠️/[연혁] 하드 라벨이 없음 → LLM 이 옛 조문을 현행 조문처럼 ## 결론에 인용할 위험.",
+        "trace": "tool-tiers.ts:92-99 detectContextNeeds 가 /개정|변경|이력|역사|신구|대조|바뀐/ 매칭 시 'historical' 푸시 → tool-tiers.ts:34 TIER_2.historical = [get_article_history, get_law_history, compare_old_new, get_historical_law, search_historical_law] 활성 → gemini-engine.ts:490-491 선언에 포함 → LLM 이 search_historical_law(historical-law.js:34 '연혁 (총 N개 버전)' 으로 과거 MST 노출) 후 get_historical_law(mst=과거MST) 호출 → gemini-engine.ts:720 correctToolArgs 는 result-utils.ts:185 MST_TOOLS 에 get_historical_law 가 없어 MST 보정/검증 자체를 건너뜀 → historical-law.js:88-95 output 은 기본정보(시행일자/제개정구분)만 출력, [연혁] 하드 라벨 없음 → tool-adapter.ts:165-177 default else → 무라벨 통과.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "historical-law.js:67-95 (getHistoricalLaw output 에 [연혁]/⚠️ 라벨 없음, 시행일자 필드만) / historical-law.js:62-66 (mst/jo 스키마) / result-utils.ts:185 (MST_TOOLS 에 get_historical_law 부재 → 미교정) / quality-evaluator.ts:20-37 (EVIDENCE_TOOLS 에 get_historical_law/search_historical_law 모두 부재) — 따라서 두 도구만 호출 시 retrievalCount===0 으로 quality-evaluator.ts:101 가드가 발동하나, gemini-engine.ts:455-464 가 simple/moderate 질의에서 pre-evidence 로 search_ai_law(EVIDENCE_TOOLS 소속, quality-evaluator.ts:29)를 선실행해 retrievalCount>0 을 만들어 가드를 무력화 / prompts.ts:226 '연혁/과거버전 표시가 있으면 명시' 지시는 라벨 부재로 발동 안 함",
+        "fix_proposal": "tool-adapter.ts executeTool 의 finalResult 산출부에 라벨 주입: `if (name === 'get_historical_law') { finalResult = '⚠️[연혁-과거버전] 아래는 과거 시점 법령 본문임. 현행과 다를 수 있으니 현행 기준 답변에는 search_law 의 [현행] MST 로 재조회할 것.\\n' + finalResult }`. (MST 보정 추가는 부적절 — get_historical_law 는 과거 MST 가 정상 인자이므로 result-utils.ts:185 MST_TOOLS 에 넣으면 기능이 깨짐. 라벨링만이 안전한 surgical 조치.)",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/tool-adapter.ts"
+        ]
+      },
+      {
+        "id": "TL-3",
+        "title": "과거버전 도구 전체가 키워드/문맥만으로 Gemini 활성 tier 에 광범위 노출",
+        "severity": "P2",
+        "scenario": "질의에 '개정/변경/이력/역사/신구/대조/바뀐' 중 하나만 있으면 search_historical_law/get_historical_law/get_law_history/compare_old_new + chain_amendment_track 이 한꺼번에 LLM 에 노출됨. 예: \"근로기준법 연차 개정\" → historical 5종 + chain_amendment_track 동시 노출. 노출 자체는 '무엇이 바뀌었나' 질의 응답을 위해 의도된 설계이며, 라벨이 일관되면 leak 으로 직결되지는 않음. 다만 TL-1/TL-2 의 라벨 공백 도구(get_batch_articles+efYd, get_historical_law)에 LLM 이 도달하는 활성화 경로 역할을 함.",
+        "trace": "tool-tiers.ts:92-99 detectContextNeeds(historical) + tool-tiers.ts:127 keyword boost(`if (/개정|바뀐/) tools.add('chain_amendment_track')`) + tool-tiers.ts:32-37 TIER_2 → tool-registry.ts:159-160,53-55 에서 historical 도구 등록 → gemini-engine.ts:490-491 활성 선언 포함. 동반 노출되는 compare_old_new(comparison.js:78-92 [개정 전]/[개정 후] 라벨), get_law_history(law-history.js:36,51 '변경이력'+상태 라벨), get_article_history(article-history.js:69 '개정 이력' list), search_historical_law(historical-law.js:34 '연혁 N버전') 는 모두 현행/과거 구분 라벨이 양호 → 단독으로는 현행처럼 새지 않음.",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "tool-tiers.ts:92-99,127,32-37 (노출 트리거) / 라벨 양호 근거: comparison.js:81-92, law-history.js:48-51, article-history.js:88-97, historical-law.js:34 / fast-path.ts:159 (개정/신구/대조/이력 포함 질의는 fast-path 'none' 으로 빠져 풀 파이프라인행 → fast-path 무라벨 우회 없음) / 실질 leak 은 TL-1/TL-2 의 라벨 공백 도구에 집중",
+        "fix_proposal": "현재 안전, 수정불요. 단 노출 범위 자체가 TL-1/TL-2 의 진입로이므로 두 라벨 수정이 선결. (추가 강화 원하면 prompts.ts:229 의 '개정 전후 비교가 필요한 질문에만 ... 사용' 지시를 historical 도구 노출 시 동적 헤더에 한 줄 더 강조 가능하나 필수 아님.)",
+        "fix_files": []
+      },
+      {
+        "id": "TL-4",
+        "title": "search_law→get_batch_articles MST 선택은 현행 편향이 걸려 있으나, 분법/개명 법령(연혁만 존재) 잔여 누수가 TL-1 무라벨 출력으로 귀결",
+        "severity": "P2",
+        "scenario": "일반 질의 \"근로기준법 제60조 연차\": search_law 가 현행을 정확매칭/상단 정렬하고 findBestMST 가 현행 MST 를 고름 → 누수 없음(가드 동작). 잔여 케이스 \"화재예방, 소방시설 설치ㆍ유지 및 안전관리에 관한 법률 제xx조\"(2021 분법으로 현행에 동명 법령 없음): search_law 가 연혁(과거버전) 항목만 반환 → findBestMST 가 연혁 MST 를 선택 → get_batch_articles(mst=연혁MST) 가 옛 조문을 반환하는데 TL-1 대로 무라벨.",
+        "trace": "정상 가드 흐름: search.js:97-101 (연혁 statusCode 후순위 정렬) + search.js:36 formatHit('[현행]'/'⚠️[연혁-과거버전]' 라벨) + search.js:140-142 footer 경고 → tool-adapter.ts:169 compressSearchResult 호출하나 tool-cache.ts:158 정규식이 '공포일: X / 시행일: Y' 형식(시행일 동행)에 매칭 실패 → tool-cache.ts:164 entries.length===0 → 원본 반환(라벨+footer 보존) → fast-path.ts:197-205 parseLawEntries 가 라벨 포함 이름으로 파싱 → fast-path.ts:208-240 findBestMST 가 exact('근로기준법'==='근로기준법 [현행]' 불일치) 후 prefix 정렬 시 ' [현행]'(짧음)이 ' ⚠️[연혁-과거버전]'(김)보다 앞 → 현행 우선 → result-utils.ts:215-238 correctToolArgs 가 미지 MST 를 findBestMST(현행)로 교정. 잔여: 현행이 존재하지 않으면 search.js 결과가 연혁뿐 → findBestMST 가 연혁 MST 반환 → correctToolArgs 가 '알려진 MST'로 통과시킴 → get_batch_articles 무라벨(TL-1).",
+        "leaks": true,
+        "guard_effective": true,
+        "evidence": "search.js:97-101 (현행 우선 정렬), search.js:36 (라벨), search.js:140-142 (연혁 footer 경고) / tool-cache.ts:153-166 (compressSearchResult — 시행일 동행 시 매칭 실패로 원본 보존하여 라벨 유지) / fast-path.ts:208-240 (findBestMST 현행 prefix 우선), fast-path.ts:50-63 (cacheMSTEntries 는 라벨 포함 이름 키라 현행/연혁 충돌 없음) / result-utils.ts:215-238 (correctToolArgs 현행 교정) / 잔여 누수는 TL-1 과 동일 근원(batch-articles.js:75,94-100 무라벨)",
+        "fix_proposal": "MST 선택 로직 자체는 현행 편향이 적절히 걸려 있어 수정불요. 잔여(연혁-only 법령)는 TL-1 의 get_batch_articles efYd/연혁 라벨 보강으로 함께 완화되며, 추가로 원한다면 result-utils.ts:215-238 correctToolArgs 에서 채택된 MST 가 latestSearchEntries 에서 이름에 '⚠️[연혁' 라벨을 가진 항목이면 finalResult 에 '⚠️ 현행 동명 법령 없음(연혁 본문)' 경고를 부착하는 것도 가능(선택).",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/tool-adapter.ts"
+        ]
+      }
+    ]
+  },
+  {
+    "area": "재현 시나리오 구성 + 코드 흐름 추적 (search-normalizer / fast-path / engine / gemini-engine + korean-law-mcp 4.4.2 도구 출력)",
+    "summary": "현행성 가드(프롬프트·quality-evaluator)는 \"도구 결과에 [현행]/[연혁]/구법령명/시행예정 라벨이 있을 때만\" 작동하는데, 정작 파이프라인이 가장 많이 쓰는 두 도구(search_ai_law=pre-evidence, get_batch_articles=프롬프트 1순위·fast-path)가 그 라벨을 전혀 안 붙인다. search_law/get_law_text만 라벨을 붙이므로 LLM이 그 둘을 우회하면 연혁/시행예정/분법 본문이 라벨 없이 새어나갈 수 있다. alias 정규화는 약칭 전용이라 분법·개명에는 무력. compare_old_new 자동발동은 라벨이 붙어 비교적 안전.",
+    "leak_paths": [
+      {
+        "id": "LP-1",
+        "title": "분법(폐지) 구법: search_ai_law pre-evidence가 라벨 없이 연혁/폐지 본문을 즉답 근거로 주입",
+        "severity": "P1",
+        "scenario": "질의 \"화재예방, 소방시설 설치ㆍ유지 및 안전관리에 관한 법률 제9조\" (2021년 「소방시설 설치 및 관리에 관한 법률」+「화재의 예방 및 안전관리에 관한 법률」로 분법·폐지된 구법). 기대: '이 법은 폐지/분법됨 → 현행 두 법으로 재조회' 안내. 실제: search_ai_law가 매칭 법령을 시행일자만 붙여 본문 200자까지 반환, 폐지/연혁 플래그 없음 → 빠른답변 모드 지시로 LLM이 search_law 안 부르고 구법 조문을 현행처럼 답변 가능.",
+        "trace": "engine-shared.ts:328 detectFastPath → lawNameMatch 정규식 /([\\w가-힣]+(?:법|령|규칙))(?:경계)/ 는 '관한 법률'의 '법률'(률로 끝남)을 못 잡아 {type:'none'} 반환 → 풀 파이프라인. gemini-engine.ts:455-463 simple/moderate 시 pre-evidence로 executeTool('search_ai_law',{query}) 실행, result.length>200이면 geminiEvidence에 주입. gemini-engine.ts:495 userText에 '아래 데이터만으로 답변 가능하면 추가 도구 호출하지 말 것' 지시. life-law.js:102-128 출력은 법령명+제N조+조문내용(200자)+'시행: 날짜'만, [현행]/[연혁]/폐지 라벨 없음(life-law.js 전체에 현행연혁코드 추출 자체가 없음).",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "node_modules/korean-law-mcp/build/tools/life-law.js:102-128 (라벨 없는 출력), :120 ('시행:'만), lib/fc-rag/gemini-engine.ts:457,461,495, lib/fc-rag/engine-shared.ts:328, lib/fc-rag/fast-path.ts:164 (정규식), lib/fc-rag/prompts.ts:225-226 (가드는 라벨 존재 전제)",
+        "fix_proposal": "(a) korean-law-mcp life-law.js renderAiLawSearchResult(:120 근처)에 항목별 시행일자>today면 '⚠️시행예정', 그리고 결과 말미에 'ℹ️ search_ai_law는 현행/연혁을 구분하지 않음 — 폐지·분법·개정 의심 시 search_law로 [현행] 여부 재확인' 1줄 푸터 추가. (b) lexdiff 측 무수정 대안: gemini-engine.ts:495 빠른답변 모드 문구에 'search_ai_law 결과만으로는 현행성 확인 불가 — 조문 인용 전 search_law/get_law_text로 [현행] 확인 필수' 추가해 pre-evidence 단독 답변 차단. (a)+(b) 병행 권장.",
+        "fix_files": [
+          "/Users/mong-e/workspace/korean-law-mcp (src→build/tools/life-law.js renderAiLawSearchResult)",
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/gemini-engine.ts"
+        ]
+      },
+      {
+        "id": "LP-2",
+        "title": "get_batch_articles가 get_law_text의 현행성 라벨(구법령명/시행예정/조회기준일)을 전부 누락 — 동일 API, 다른 포맷",
+        "severity": "P1",
+        "scenario": "질의 \"○○법 제5조\"에서 LLM이 연혁 또는 시행예정 MST를 골라 get_batch_articles(mst, articles)로 본문 조회. 기대: get_law_text처럼 '⚠️시행 예정 버전(미시행)' 또는 'ℹ️조회기준일… 연혁 MST면 과거버전' 경고. 실제: get_batch_articles 출력은 '법령명 + 조문헤더 + 본문'뿐, 시행일자조차 안 찍음 → 미래/과거 조문이 현행처럼 인용됨.",
+        "trace": "두 도구 모두 apiClient.getLawText({mst,efYd})로 동일 데이터 취득(law-text.js:49, batch-articles.js:37). law-text.js:94-113은 basicInfo.이전법령명→'(구 법령명…개정/분법)', 시행일자>today→'⚠️시행 예정', efYd지정→'⚠️특정 시행일자 버전', else→'ℹ️조회기준일… search_law로 [현행] 재확인'을 출력. 반면 batch-articles.js:50-51,75는 같은 basicInfo에서 법령명만 추출하고 이전법령명/시행일자/today 비교를 전혀 안 함. 프롬프트(prompts.ts:283-284,287)는 get_batch_articles를 1순위 retrieval로 지시. correctToolArgs(result-utils.ts:215-222)는 '미지(unknown) MST'만 현행으로 스냅하므로, search_law가 함께 반환한 연혁 MST는 knownMSTs에 들어 있어(parseLawEntries가 연혁행까지 파싱) 스냅 대상에서 제외 → 라벨 없는 구버전 본문 그대로 통과.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "node_modules/korean-law-mcp/build/tools/batch-articles.js:50-51,75-100 (라벨 전무), /build/tools/law-text.js:94-113 (라벨 존재), lib/fc-rag/result-utils.ts:215-222 (known MST는 미보정), lib/fc-rag/fast-path.ts:199 (parseLawEntries가 연혁행 MST까지 캐시), lib/fc-rag/prompts.ts:283-284,287 (batch 1순위 지시)",
+        "fix_proposal": "korean-law-mcp batch-articles.js fetchArticlesForLaw(:50 직후, lawName 산출 지점)에서 basicInfo.이전법령명·시행일자를 읽어 law-text.js:96-113과 동일한 현행성 라인(구 법령명/⚠️시행 예정/⚠️efYd/ℹ️조회기준일)을 resultText 앞단에 붙인다. efYd는 input.efYd, today는 동일 계산. ~12줄, law-text 로직 미러링이라 위험 낮음.",
+        "fix_files": [
+          "/Users/mong-e/workspace/korean-law-mcp (src→build/tools/batch-articles.js fetchArticlesForLaw)"
+        ]
+      },
+      {
+        "id": "LP-3",
+        "title": "구법령명(분법·개명) 질의: alias 정규화가 약칭 사전 전용이라 개명/폐지명을 현행명으로 못 바꿈",
+        "severity": "P2",
+        "scenario": "사용자가 옛 이름 \"화재예방, 소방시설 설치ㆍ유지 및 안전관리에 관한 법률\"로 질의. 기대: 현행명(소방시설 설치 및 관리에 관한 법률 / 화재의 예방 및 안전관리에 관한 법률)으로 변환 후 검색. 실제: detectAliasesInQuery는 매칭 0 → aliasBlock 없음. 구명이 그대로 search_ai_law/search_law로 전달.",
+        "trace": "prompts.ts:332 detectAliasesInQuery(query). search-normalizer.ts:34-255 LAW_ALIAS_ENTRIES에는 '소방시설법'→'소방시설 설치 및 관리에 관한 법률' 약칭만 있고 구 통합법명/폐지명→현행명 매핑이 없음. detectAliasesInQuery(:262-280)는 등록 약칭 substring 매칭만 수행 → 구명에 hit 없음 → prompts.ts:333 aliasBlock 빈 문자열. 코드 정규화(normalizeSearchQuery/resolveLawAlias)도 Gemini 경로에서 tool args에 강제 적용되지 않음(LLM이 인자 결정). 부분완충: 구명으로 search_law를 LLM이 부르면 search.js:36,140-141이 연혁 라벨+경고를 붙임. 하지만 LP-1처럼 pre-evidence(search_ai_law)만으로 끝나면 그 완충도 우회.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "lib/search-normalizer.ts:34-255 (약칭만, 개명/폐지 매핑 부재), :262-280 (substring 매칭), lib/fc-rag/prompts.ts:332-335 (hit 없으면 블록 없음), node_modules/korean-law-mcp/build/tools/search.js:140-141 (search_law 호출 시에만 작동하는 완충)",
+        "fix_proposal": "근본은 '개명/분법 리네임 맵' 신설: search-normalizer.ts에 RENAMED_LAWS(구명→현행명[들]) 테이블을 두고 prompts.ts buildDynamicHeader에서 detectAliasesInQuery와 병렬로 detectRenamedLaws를 호출해 '⚠️ 이 법령명은 폐지/분법됨 → 현행 「A」/「B」로 검색' 블록 주입. 최소판: 분법 빈출 케이스(소방·화재 등) 수건만 등록. 코드 강제는 어려우니(LLM 인자 결정) 프롬프트 힌트로 처리하되 LP-1/LP-2 픽스와 병행해야 실효.",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/search-normalizer.ts",
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/prompts.ts"
+        ]
+      },
+      {
+        "id": "LP-4",
+        "title": "compare_old_new 자동발동은 '변경/개정' 키워드만으로 코드가 강제 — prompts.ts:229 '비교 필요한 질문에만'은 LLM 자발호출에만 적용",
+        "severity": "P2",
+        "scenario": "질의 \"근로기준법 최근 변경된 연차 규정\" (비교의도 없이 현행만 궁금). 기대: 현행 본문만. 실제: search_law 호출 후 buildAutoChains가 '변경' 매칭으로 compare_old_new를 자동 추가 → [개정 전]/[개정 후] 신구대조표가 근거에 주입. 추가로 selectToolsForQuery가 chain_amendment_track을, detectContextNeeds가 get_historical_law/search_historical_law를 declarations에 올림.",
+        "trace": "gemini-engine.ts:136-141: search_law 성공 && /개정|변경|바뀐|신구|대조/.test(query) 면 compare_old_new 무조건 push(프롬프트 제약과 무관한 순수 regex). tool-tiers.ts:127 selectToolsForQuery가 /개정|바뀐/에 chain_amendment_track 추가, :131-135 + detectContextNeeds(tool-tiers.ts:94 '개정|변경|이력|역사|신구|대조|바뀐')가 TIER_2.historical(get_historical_law,search_historical_law,compare_old_new 등)을 declarations에 적재. 즉 '사용 가능 여부'는 키워드로 code-gate(키워드 없으면 호출 불가=강제됨), 그러나 '비교 필요한 질문에만'이라는 의미적 제약은 prompts.ts:229 프롬프트 의존. 다만 compare_old_new(comparison.js:82,88)는 [개정 전]/[개정 후]를 명시 → 그 자체 본문은 라벨됨(누수 낮음). 잔존 위험은 get_historical_law(historical-law.js:88-95)로, 출력 본문에 '연혁/과거버전' 단어가 없고 시행일자+제개정구분만 있어 현행 오인 여지.",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "lib/fc-rag/gemini-engine.ts:136-141 (regex 강제 auto-chain), lib/fc-rag/tool-tiers.ts:94,127,131-135 (키워드 기반 declaration gate), lib/fc-rag/prompts.ts:229 (프롬프트 전용 제약), node_modules/korean-law-mcp/build/tools/comparison.js:82,88 (명시 라벨), /build/tools/historical-law.js:88-95 (본문 연혁 단어 부재)",
+        "fix_proposal": "(1) 의미적 제약을 코드로 보강하려면 buildAutoChains compare_old_new 자동발동을 '변경/개정' 단독이 아니라 '신구|대조|개정 전후|전후 비교' 같은 명시적 비교의도일 때만 발동하도록 정규식 좁히기(gemini-engine.ts:138). (2) get_historical_law 본문에 '⚠️ 연혁(과거버전) — 현행 아님' 헤더 1줄을 historical-law.js:88 출력 앞에 추가(현재 라벨 부재 보완). compare_old_new 자체는 이미 라벨되어 수정 불요.",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/gemini-engine.ts",
+          "/Users/mong-e/workspace/korean-law-mcp (src→build/tools/historical-law.js getHistoricalLaw)"
+        ]
+      },
+      {
+        "id": "LP-5",
+        "title": "quality-evaluator/Confidence 가드는 '도구를 한 번도 안 부른 경우'만 강등 — 연혁/시행예정 도구를 정상 호출하면 통과",
+        "severity": "P2",
+        "scenario": "LLM이 get_historical_law 또는 라벨 없는 get_batch_articles(연혁 MST)를 정상 호출해 구버전 본문을 인용. 기대: 현행성 미검증 답변을 marginal/low로 강등. 실제: 도구가 '호출됨+성공'이라 retrievalCount>0 → memory-bypass 제거 가드(retrievalCount===0 조건)에 안 걸림 → pass 가능.",
+        "trace": "quality-evaluator.ts:101-104 강등 조건은 retrievalCount===0 && citationCount>0 (도구 미호출 인용만). get_historical_law/get_law_history는 EVIDENCE_TOOLS에 미포함(quality-evaluator.ts:20-37)이라 retrievalCount에 안 더해지지만, 같은 답변에 get_batch_articles/search_ai_law도 함께 호출되면 retrievalCount>0이 되어 가드 무력. gemini-engine.ts:634 noToolsCalled=allToolResults.length===0도 '도구 0건'만 검사 → 연혁 도구를 불러도 통과. 즉 현행/연혁 구분을 평가하는 신호가 평가기에 전무.",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "lib/fc-rag/quality-evaluator.ts:20-37 (EVIDENCE_TOOLS, 현행성 신호 없음), :101-104 (retrievalCount===0 조건), lib/fc-rag/gemini-engine.ts:634 (length===0만), lib/fc-rag/citations.ts (현행성 검사 없음, grep 무매칭)",
+        "fix_proposal": "평가기에 현행성 신호 추가: evaluateResponseQuality에서 toolResults 텍스트에 '⚠️[연혁-과거버전]'/'시행 예정'/'구 법령명'이 있는데 답변이 그 사실을 명시하지 않거나, get_historical_law/get_law_history 결과를 인용했는데 '현행' 언급이 없으면 warnings+marginal 강등. 단 이는 LP-1/LP-2에서 라벨이 실제 출력돼야 검출 가능하므로 LP-1/LP-2 픽스 선행 필요(라벨이 있어야 평가기가 본다).",
+        "fix_files": [
+          "/Users/mong-e/workspace/lexdiff/lib/fc-rag/quality-evaluator.ts"
+        ]
+      }
+    ]
+  },
+  {
+    "area": "인용 검증 / 별표 / 판례 인용의 efYd·조회기준일 누수 (citations.ts, citation-verifier.ts, citation-content-matcher.ts, merge-citations.ts, link-specialized.ts, annex-viewer/annex-cache, link-pattern-matchers.ts)",
+    "summary": "내 영역에서 '과거 법령을 fetch해 현행처럼 보여주는' 직접 누수는 없음 — 인용검증기·별표모달·AI답변 법령링크가 모두 현행 anchored(efYd/MST 미사용). 단 간접 누수 2건: (CIT-1) 기본 existence-mode 검증이 연혁 본문 인용에도 '검증됨' 배지를 부여해 과거 내용을 정당화, (PREC-1) AI답변 링크 경로가 구법/efYd·경고를 통째로 폐기해 판례의 구(舊) 조문을 현행 본문에 무경고로 연결(법령뷰어 경로엔 amber 경고가 있어 비일관). 별표·content-mode 검증·법령뷰어 구법 경로는 가드 양호.",
+    "leak_paths": [
+      {
+        "id": "CIT-1",
+        "title": "기본 existence-mode 인용검증이 현행 '존재'만 확인 → 연혁 본문 인용도 '검증됨' 배지로 정당화",
+        "severity": "P2",
+        "scenario": "질의: '상속세 및 증여세법 가업상속공제 한도?'처럼 최근 개정된 조문. AI가 답변 본문에 「상속세 및 증여세법」 제18조를 (개정 전 한도 설명과 함께) 인용. parseCitationsFromAnswer가 이 패턴을 citation으로 추출하고, articleNumber가 '제18조'라 verifiable로 분류됨. verifyAllCitations는 기본 existence mode라 현행 법령에 제18조가 '존재'하기만 하면 verified:true('eflaw-lookup'). 기대: 개정 전 내용이면 '검증불가/불일치' 또는 '내용 대조 아님' 표시. 실제: 초록 '검증됨' 배지가 과거 본문 설명을 현행처럼 정당화.",
+        "trace": "lib/fc-rag/gemini-engine.ts:174 buildCitationsWithAnswerFallback(answer) → lib/fc-rag/citations.ts:340-388 parseCitationsFromAnswer(「법령명」제N조, chunkText=답변 발췌) → app/api/fc-rag/route.ts:72-80 convertForVerification(/^제?\\d+조/ → verifiable) → route.ts:46-48 verifyAllCitations → lib/citation-verifier.ts:205-208 mode 기본 existence → 133-144 verifyCitation: fetchLawId(현행)→checkArticleExists → 338 lawService.do?...&ID=${lawId} (efYd/MST 없음=현행) → verified:true 'eflaw-lookup'",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "lib/citation-verifier.ts:205-208(envMode existence 기본, CITATION_CONTENT_VERIFY!=='true'), :133-144(existence 분기는 존재만 확인), :338·:426(lawService.do ID=lawId — efYd/MST 미부여=현행만); lib/citations.ts:340-388(answer-fallback로 답변 prose가 citation); app/api/fc-rag/route.ts:72-80; .env.local에 CITATION_CONTENT_VERIFY 미설정(grep 0건)",
+        "fix_proposal": "surgical 2안. (A) verifyAllCitations 기본 mode를 content로(또는 route에서 process.env.CITATION_CONTENT_VERIFY 기본값을 'true'로) — content mode는 현행 본문과 대조해 연혁 인용을 content-mismatch로 잡음(CIT-2 참조). 비용 증가 우려 시 (B) existence-mode 결과의 verificationMethod 'eflaw-lookup'을 UI에서 '현행 존재만 확인(본문·시점 대조 아님)'으로 라벨링해 '검증됨' 오해를 차단. 둘 다 렌더/배지 레이어 소폭 수정.",
+        "fix_files": [
+          "lib/citation-verifier.ts",
+          "app/api/fc-rag/route.ts"
+        ]
+      },
+      {
+        "id": "CIT-2",
+        "title": "인용 본문대조(content mode)는 항상 현행 조문과 비교 — 검증기는 연혁을 끌어오지 않음",
+        "severity": "P2",
+        "scenario": "CITATION_CONTENT_VERIFY=true일 때, AI가 연혁(개정 전) 조문 본문을 인용하면 fetchArticleContent가 현행 본문을 가져와 matchCitationContent로 대조 → 불일치 시 content-mismatch로 플래그(보호적). 즉 검증기 자체는 과거 버전을 fetch하지 않으므로 '과거를 현행처럼' 끌어오는 누수원이 아님. 다만 이 보호는 content mode에서만 작동(기본 OFF).",
+        "trace": "lib/citation-verifier.ts:147-181 mode==='content' → :411-485 fetchArticleContent: 426 lawService.do?...&ID=${lawId}(efYd 없음=현행) → lib/citation-content-matcher.ts:109-157 matchCitationContent → 현행과 불일치 시 verificationMethod:'content-mismatch'(citation-verifier.ts:172-181)",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "lib/citation-verifier.ts:147-181, :411-485(현행 fetch), :426; lib/citation-content-matcher.ts:109-157(L1 substring / L2 char-bigram jaccard 0.25)",
+        "fix_proposal": "현재 안전, 수정불요. (단 CIT-1대로 content mode를 기본화하면 이 경로가 연혁 인용에 대한 실질 가드가 됨)",
+        "fix_files": []
+      },
+      {
+        "id": "ANNEX-1",
+        "title": "AI답변 [별표 N] 링크는 efYd/시점 슬롯 없이 현행 별표만 fetch (구조적 현행 anchored)",
+        "severity": "P2",
+        "scenario": "AI가 「도로교통법 시행규칙」 별표28(범칙금/벌점)을 답변에서 언급. linkifyMarkdownLegalRefs가 annex://도로교통법 시행규칙/28(시점정보 전혀 없음)을 생성 → 클릭 시 AnnexModal이 /api/law-annexes?query=법령명(현행)으로 현행 별표를 가져옴. 기대=현행 별표, 실제=현행 별표 → 누수 없음. 역으로 답변 본문이 연혁 시점 별표를 근거로 했다면 모달은 현행 별표를 보여 답변과 불일치할 수 있으나, 이는 '과거를 현행처럼'의 역방향(현행을 보여줌)이라 현행성 누수가 아님.",
+        "trace": "lib/link-specialized.ts:269-325(별표 링크 생성, efYd 파라미터 없음) → components/legal-markdown-renderer/LinkRenderer onAnnexClick → components/law-viewer-ai-answer.tsx:293-303 handleAnnexClick(annexNumber,lawName; lawId/efYd 없음) → components/annex-modal.tsx:260 fetch('/api/law-annexes?query='+lawName+'&knd=...') → app/api/law-annexes(현행 별표 목록); 별도 app/api/annex-viewer/route.ts도 bylSeq/bylNo/lsiSeq만 받고 efYd 미사용",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "lib/link-specialized.ts:269-325; components/annex-modal.tsx:190-260(law-annexes 호출, efYd 없음); app/api/annex-viewer/route.ts:21-59(bylSeq/bylNo/lsiSeq만, efYd 파라미터 부재); lib/annex-cache.ts:66-68(캐시키=lawId_별표번호, 시점 미포함)",
+        "fix_proposal": "현재 안전(현행성 누수 없음), 수정불요. 개선여지(누수 아님): 답변이 연혁 별표를 근거로 했을 때 현행 별표와 내용이 다를 수 있으므로 별표 모달 헤더에 '현행 기준 별표' 라벨을 노출하면 답변-모달 불일치 혼동을 줄일 수 있음.",
+        "fix_files": []
+      },
+      {
+        "id": "PREC-1",
+        "title": "AI답변 링크 경로가 구법/efYd·경고를 폐기 → 판례의 구(舊) 조문이 현행 본문에 무경고로 연결",
+        "severity": "P2",
+        "scenario": "질의: '양도소득세 이월과세 관련 대법원 판례 알려줘'. AI가 search_decisions 결과로 '구 「소득세법」 제97조의2(2014. 1. 1. 법률 개정 전) 취지'를 설명하되, 답변 본문엔 「소득세법」 제97조의2로 인용. linkifyMarkdownLegalRefs가 law://소득세법/제97조의2를 생성 → 클릭 시 현행 제97조의2 본문이 '구법령 참조' 경고 없이 표시. 동일 '구 조문' 참조가 법령뷰어 판례 경로에서는 amber 경고('아래는 현행법…개정으로 내용이 다를 수 있습니다')가 붙는 것과 비일관. 기대: 연혁 조문 또는 구법 경고. 실제: 현행 본문 무경고 → 사용자가 현행=판례 근거 조문으로 오인.",
+        "trace": "components/legal-markdown-renderer/index.tsx:192 linkifyMarkdownLegalRefs(구법/efYd 미처리) → lib/link-specialized.ts:237-267 Pattern1(「법령명」제N조→law://, efYd·old-law 슬롯 없음) → LinkRenderer onLawClick → components/law-viewer.tsx:177-180 handleLawLinkClick(efYd/isOldLaw 미전달) → hooks/use-law-viewer-modals.ts:120,199-206 fetchCurrentLawArticle(isOldLawRequest=false) → hooks/law-viewer-modal-fetchers.ts:440-452 (isOldLawRequest=false라 경고배너 미부착, titlePrefix 없음)",
+        "leaks": true,
+        "guard_effective": false,
+        "evidence": "components/legal-markdown-renderer/index.tsx:192 + lib/link-specialized.ts:237-267(AI답변 linkify엔 '구'/efYd/data-old-law 처리 전무) ↔ 대조: lib/link-pattern-matchers.ts:174-303(법령뷰어 aggressive 경로는 '구 법명(날짜) 제N조'에서 efYd 추출+data-old-law 부여); components/law-viewer.tsx:177-180(efYd 없이 호출); hooks/law-viewer-modal-fetchers.ts:445-452(경고는 isOldLawRequest일 때만 부착)",
+        "fix_proposal": "surgical 2안. (A 비침습): lib/fc-rag/prompts.ts 현행성 섹션(224-229 근방)에 '판례가 적용한 구 조문은 반드시 \"구 「법명」(YYYY. M. D. 개정 전) 제N조\" 형식으로 표기하고 현행 조문과 구분하라' 지침 추가 — 렌더 무변경. (B 구조적): linkifyMarkdownLegalRefs가 '구 「법명」' 또는 '(…개정되기 전)' 문맥을 감지하면 law:// URL에 ?old=1 쿼리를 부여하고, LinkRenderer/handleLawLinkClick가 이를 isOldLaw로 onLawClick에 전달해 fetchCurrentLawArticle(isOldLawRequest=true) → 기존 amber 경고 배너 재사용. 표시 본문은 현행 유지하되 '구법 현행과 다를 수 있음' 경고를 AI답변 경로에도 일관 적용.",
+        "fix_files": [
+          "lib/fc-rag/prompts.ts",
+          "lib/link-specialized.ts",
+          "components/legal-markdown-renderer/LinkRenderer.tsx",
+          "components/law-viewer.tsx"
+        ]
+      },
+      {
+        "id": "PREC-2",
+        "title": "법령뷰어 판례 경로의 efYd-없는 구법 링크는 현행 표시+명시 경고로 가드됨",
+        "severity": "P2",
+        "scenario": "법령뷰어에서 판례 본문 '구 지방세법 제11조'(괄호 날짜 없음, 앞선 '이하 같다' 정의도 없음) 클릭. collectUnquotedLawMatches simpleOldLawPattern이 data-old-law=true, data-efyd는 비움 → openExternalLawArticleModal(efYd 없음, isOldLaw=true) → fetchCurrentLawArticle(isOldLawRequest=true) → 현행 본문 + amber '⚠️ 구법령 참조: …아래는 현행법 내용이며, 개정으로 인해 내용이 다를 수 있습니다' 경고 표시. 기대/실제 일치 → 현행성 누수 아님(현행임을 명시).",
+        "trace": "lib/link-pattern-matchers.ts:270-303 simpleOldLawPattern(inheritedEfYd 없으면 efYdAttr 공백, data-old-law='true') → lib/content-click-handlers/law-article-handler.ts:38-39,132 efYd=undefined,isOldLaw=true → hooks/use-law-viewer-modals.ts:200-206(efYd 없으면 현행 조회) → hooks/law-viewer-modal-fetchers.ts:440-452(isOldLawRequest=true라 경고배너+ '구 ' 접두 부착); efYd 있는 경우는 :186-197 fetchOldLawArticle→/api/old-law(실제 연혁본문)+'📜 연혁 법령' 라벨",
+        "leaks": false,
+        "guard_effective": true,
+        "evidence": "hooks/law-viewer-modal-fetchers.ts:314-339(efYd 경로: /api/old-law 실제 연혁 fetch + '📜 연혁 법령'), :440-452(no-efYd 경로: 현행 + ⚠️구법령 경고); hooks/use-law-viewer-modals.ts:186-206; lib/content-click-handlers/law-article-handler.ts:38-39,132",
+        "fix_proposal": "현재 안전, 수정불요",
+        "fix_files": []
+      }
+    ]
+  }
+]

@@ -1,0 +1,652 @@
+[
+  {
+    "id": "DELEG-1",
+    "title": "위임법령 패널이 항상 '시행령' 탭으로 열려, 시행규칙만 있는 조문에선 빈 화면에 착지",
+    "severity": "P1",
+    "what": "위임법령 버튼을 눌렀을 때 시행령이 없고 시행규칙(또는 행정규칙)만 위임된 조문이면, 사용자는 '시행령 없음'이라는 빈 탭을 먼저 보게 된다. 내용이 실제로 있는 시행규칙 탭으로 한 번 더 직접 이동해야 비로소 위임 본문을 볼 수 있다. 탭 배지에 '시행령(0)'이 보이긴 하지만, 버튼을 눌러 펼친 직후의 첫인상이 '비어 있음'이라 '위임된 하위법령이 없다'고 오해하기 쉽다.",
+    "why": "delegationActiveTab 기본값이 'decree'로 고정(use-law-viewer-three-tier.ts:21)이고, 패널을 여는 핸들러(law-viewer-action-buttons.tsx:186-201)가 tierViewMode만 '2-tier'로 바꿀 뿐 콘텐츠가 있는 탭으로 자동 전환하지 않는다. decreeCount===0이어도 decree 탭이 활성(index.tsx:224-249).",
+    "category": "flow",
+    "evidence": "hooks/use-law-viewer-three-tier.ts:21",
+    "fix_proposal": "패널이 1-tier→2-tier로 열릴 때(또는 activeJo 변경 시) '현재 탭이 비어있고 다른 탭에 내용이 있으면' 내용 있는 탭으로 1회 자동 전환. 예: index.tsx에 effect 추가 — delegationActiveTab==='decree' && decreeCount===0 && ruleCount>0 이면 setDelegationActiveTab('rule'). 사용자가 명시적으로 고른 탭을 덮지 않도록, 빈 탭일 때에 한해서만 전환(시행령이 있으면 기본 'decree' 유지). 인접 admin 탭 로직은 건드리지 않음.",
+    "fix_files": [
+      "hooks/use-law-viewer-three-tier.ts",
+      "components/law-viewer-delegation-panel/index.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "사용자가 의도적으로 빈 시행령 탭을 보려던 경우를 덮어쓸 수 있음 → '버튼으로 새로 열 때만' 또는 '현재 탭이 비었을 때만' 조건으로 한정하면 위험 낮음. 조문 전환 시 매번 재평가하면 수동 선택과 충돌 가능하니 trigger 범위를 최소화할 것.",
+    "_feature": "위임법령 three-tier 패널 + 위임입법 미비(gap) 탐지 모달"
+  },
+  {
+    "id": "DELEG-2",
+    "title": "미비 탐지: 위임 조항이 0건이어도 '위임 0건 중 모두 정상' / '미비 항목이 없습니다'로 표시돼 분석이 된 듯 오해",
+    "severity": "P1",
+    "what": "위임 패턴이 하나도 검출되지 않은 법령에서 미비 탐지를 돌리면, 요약 바에 '위임 0건 중 [모두 정상]'이라는 모순된 문구가 뜨고, 본문에는 초록 체크와 '미비 항목이 없습니다'가 표시된다. 사용자는 '도구가 전 조문을 검사했고 미비가 없다'고 받아들이지만, 실제로는 '검사할 위임 조항 자체를 못 찾은' 상태다. 안심해도 되는지/도구가 헛돈 건지 구분이 안 된다.",
+    "why": "totalClauses===0일 때도 missingCount·partialCount가 0이라 'fulfilled' 분기를 타 '모두 정상' 배지를 그린다(delegation-gap-modal.tsx:321-325). 빈 상태 문구도 showOnlyGaps 기준 '미비 항목이 없습니다'이고(368-374), 부연 설명 줄은 analysis.totalClauses>0 조건이라 0건일 땐 아예 안 나온다(375-379). 0건과 '전부 정상'이 같은 화면으로 수렴.",
+    "category": "empty-error",
+    "evidence": "components/delegation-gap-modal.tsx:321",
+    "fix_proposal": "totalClauses===0 케이스를 분리: 요약 바에서 0건이면 '모두 정상' 대신 '검출된 위임 조항 없음' 같은 중립 배지로, 본문 빈 상태는 '위임 조항을 찾지 못했습니다(규정/대통령령 등 위임 문구 미검출)'로 분기. '미비 0 = 안전'과 '검사 대상 0 = 미확인'을 시각적으로 구분. 문구는 법률 용어 톤 유지(영혼 없는 일반화 금지).",
+    "fix_files": [
+      "components/delegation-gap-modal.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 분기 추가만으로 기존 정상/미비 경로 영향 없음. 다만 '위임 조항을 찾지 못함'이 패턴 미검출(false negative)일 수도 있으므로 문구에 '자동 검출 기준' 뉘앙스를 남길 것.",
+    "_feature": "위임법령 three-tier 패널 + 위임입법 미비(gap) 탐지 모달"
+  },
+  {
+    "id": "F1",
+    "title": "법령 선택 다이얼로그: 검색 에러가 '결과 없음'과 똑같이 보이고 재시도 수단이 없음",
+    "severity": "P1",
+    "what": "위임미비 탐지·법령 타임머신 도구는 모두 이 다이얼로그의 검색을 통과해야 진입한다. /api/law-search가 일시적으로 5xx/네트워크 실패하면 화면에는 '검색 결과가 없습니다.'만 떠서, 사용자는 '그 법령이 없구나'로 오해하고 도구 자체를 포기한다. 재시도 버튼도 없어 입력을 지웠다 다시 쳐야 한다.",
+    "why": "catch 블록이 abort가 아니어도 무조건 setResults([])만 하고(law-selection-dialog.tsx:60-65) 별도 error 상태가 없다. 렌더는 isSearching / results.length>0 / searched(빈결과) 3분기뿐이라(law-selection-dialog.tsx:151-183) 에러를 '빈결과'로 흡수한다.",
+    "category": "empty-error",
+    "evidence": "components/law-selection-dialog.tsx:60-65, components/law-selection-dialog.tsx:175-178",
+    "fix_proposal": "useState<boolean>로 error 상태 추가. runSearch catch에서 AbortError가 아니면 setError(true), 성공 시 setError(false). 결과 렌더 분기에 error 우선 케이스를 넣어 '검색 중 오류가 발생했어요'와 같은 톤의 안내 + 동일 쿼리 재요청하는 '다시 시도' 버튼(기존 outline Button 스타일)을 노출. 빈결과 카피('검색 결과가 없습니다.')는 그대로 둔다.",
+    "fix_files": [
+      "components/law-selection-dialog.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 새 분기 추가로 기존 정상/빈결과 경로는 불변. 재시도 시 abortRef 재사용만 주의.",
+    "_feature": "법령 비교/참조 모달 (ComparisonModal · ReferenceModal · LawSelectionDialog)"
+  },
+  {
+    "id": "F2",
+    "title": "신·구법 대조 모달이 모바일에서 65vh 고정 + 상하 2분할이라 본문이 너무 좁다",
+    "severity": "P1",
+    "what": "모바일에서 비교 모달은 화면을 꽉 채우지 않고 높이 65vh로 고정되며, 그 안에서 구법/신법이 위아래로 각각 절반(h-1/2)을 차지한다. 제목+배지+컨트롤 2줄 헤더가 상단을 크게 먹어, 실제로 조문을 읽는 영역은 패널당 ~15~18vh 수준으로 매우 비좁아 스크롤만 반복하게 된다.",
+    "why": "DialogContent가 h-[65vh] 단일 고정(comparison-modal.tsx:303)이고 모바일은 flex-col + 각 패널 h-1/2(comparison-modal.tsx:528-529, 552). sm 이상은 좌우 그리드라 괜찮지만 모바일 세로 분할에서 가용 높이가 반으로 또 줄어든다.",
+    "category": "mobile",
+    "evidence": "components/comparison-modal.tsx:303, components/comparison-modal.tsx:528-529",
+    "fix_proposal": "DialogContent 높이를 모바일에서 키운다: h-[65vh] → 'h-[90vh] sm:h-[65vh]' (또는 모바일 풀스크린). 좌우 데스크톱 레이아웃은 sm: 분기로 그대로 유지. 시각/레이아웃 변경이므로 헤드리스 스샷 2~3안(90vh / 풀스크린 / 현행)으로 사용자 선택 권장.",
+    "fix_files": [
+      "components/comparison-modal.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "중간. 풀스크린화 시 iOS 주소창/동기 스크롤(comparison-modal.tsx:220-246) 높이 계산과 상호작용 검증 필요. 단순 vh 상향은 회귀 위험 낮음.",
+    "_feature": "법령 비교/참조 모달 (ComparisonModal · ReferenceModal · LawSelectionDialog)"
+  },
+  {
+    "id": "OB-1",
+    "title": "첫 페이지 검색 중 본문이 완전 공백 — 로딩 피드백 없음",
+    "severity": "P1",
+    "what": "검색 버튼을 눌러도 결과 영역에 아무 변화가 없다. 스피너/스켈레톤이 없고, 상단 입력칸이 비활성되고 버튼이 '취소'로 바뀌는 것이 유일한 신호다. law.go.kr 응답이 느린 모바일에서는 '눌렸나?' 싶은 공백 대기가 생긴다.",
+    "why": "진행 카드가 (isSearching || isLoadingMore) && progress 조건이라 progress가 있어야 뜨는데(view:511), progress는 loadRemainingPages의 onProgress에서만 채워진다. 첫 페이지 searchFirstPage는 onProgress를 호출하지 않고 hook은 시작 시 setProgress(null)(hooks/use-ordinance-benchmark.ts:52)로 비운다. 결과/빈/에러 블록은 모두 !isSearching 게이트(view:534,719,732)라 검색 중엔 본문에 아무것도 렌더되지 않는다.",
+    "category": "empty-error",
+    "evidence": "components/ordinance-benchmark/ordinance-benchmark-view.tsx:511",
+    "fix_proposal": "진행 카드 바로 옆에 progress가 아직 없는 첫 페이지 단계용 경량 로딩 카드를 추가: `{isSearching && !progress && (<Card className=\"p-4\"><span className=\"text-sm font-medium\"><Icon name=\"loader\" size={14} className=\"inline animate-spin mr-1.5\"/>검색 중...</span></Card>)}`. 기존 진행 카드 스타일을 그대로 재사용해 톤 유지. 스켈레톤 행으로 갈지 단순 스피너 카드로 갈지는 스샷 비교로 결정.",
+    "fix_files": [
+      "components/ordinance-benchmark/ordinance-benchmark-view.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "낮음. 표시 분기만 추가, 기존 로직 불변. 첫 페이지가 빠르면 깜빡임이 생길 수 있어 등장 트랜지션/최소 표시시간은 선택.",
+    "_feature": "조례(자치법규) 벤치마킹 — 전국 지자체 동일주제 조례 검색 + AI 비교 분석"
+  },
+  {
+    "id": "OB-2",
+    "title": "지역 전체 해제 시 메인 검색은 막히는데 추천칩은 우회 — 가드 불일치",
+    "severity": "P1",
+    "what": "사용자가 대상 지역을 모두 해제하면 '검색' 버튼이 비활성되지만 왜 막혔는지 안내가 없다. 동시에 바로 아래 추천 키워드 칩은 멀쩡히 눌리고, 누르면 전국 미필터 결과가 통째로 쏟아진다. 같은 화면에서 같은 동작이 한쪽은 금지, 한쪽은 허용이라 혼란스럽다.",
+    "why": "메인 버튼은 disabled={!inputValue.trim() || activeMetros.size === 0}(view:486)로 지역 0개를 막지만, 추천칩은 disabled={isSearching}(view:501)만 검사하고 onClick에서 search(kw)를 바로 호출한다. hook의 search는 activeMetros를 검사하지 않으며(hook:41-86), flatResults는 activeMetros.size===0이면 전국 결과를 그대로 반환(hook:203)해 지역 선택의 의미가 무너진다.",
+    "category": "logic",
+    "evidence": "components/ordinance-benchmark/ordinance-benchmark-view.tsx:486",
+    "fix_proposal": "두 경로를 일치시킨다: (1) 추천칩에도 동일 가드 추가 `disabled={isSearching || activeMetros.size === 0}`; (2) 메인 검색버튼이 지역 0개로 막혔을 때 버튼 하단/지역 헤더에 작은 힌트 1줄 노출(예: activeMetros.size===0일 때 '대상 지역을 1개 이상 선택하세요'). AI슬롭 아닌 짧은 안내 카피. 근본적으로는 0개 지역=전국 의도가 아니라면 hook:203의 '전부 반환' 분기도 재검토.",
+    "fix_files": [
+      "components/ordinance-benchmark/ordinance-benchmark-view.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 칩 disabled 추가와 안내 카피는 회귀 위험 작음. hook:203 의미 변경은 별도 판단 필요(기본 수도권이라 평소 0개는 드묾).",
+    "_feature": "조례(자치법규) 벤치마킹 — 전국 지자체 동일주제 조례 검색 + AI 비교 분석"
+  },
+  {
+    "id": "OB-3",
+    "title": "모바일에서 시행일·개정유형 컬럼이 통째로 사라짐 (스크롤로도 못 봄)",
+    "severity": "P1",
+    "what": "벤치마킹의 핵심 비교 신호인 '시행일'(어느 지자체가 최근 개정했나)과 '개정유형'이 모바일에서 아예 안 보인다. 가로 스크롤로 가려진 게 아니라 DOM에서 제거돼 접근 자체가 불가능하다. 모바일 비중이 큰 서비스에서 의사결정 정보가 통째로 빠진다.",
+    "why": "테이블 헤더/셀이 hidden sm:table-cell로 처리돼 sm 미만에서 렌더되지 않는다(view:605-606 헤더, view:630,633 셀). overflow-x-auto가 있어도 숨김 컬럼은 스크롤 대상이 아니다.",
+    "category": "mobile",
+    "evidence": "components/ordinance-benchmark/ordinance-benchmark-view.tsx:630",
+    "fix_proposal": "모바일에서 시행일을 조례명 셀 하단에 보조 라인으로 노출(예: 조례명 button 아래에 `<span className=\"sm:hidden text-[11px] text-muted-foreground tabular-nums\">{formatDate(...)}</span>`), 개정유형 배지도 동일하게 조례명 셀 안에 칩으로 합류. 컬럼을 다시 표시(스크롤 허용)할지, 셀 내부 스택으로 합칠지는 헤드리스 스샷 2~3안으로 선택. 위계는 조례명>시행일 순으로 강약 유지(다 약화 금지).",
+    "fix_files": [
+      "components/ordinance-benchmark/ordinance-benchmark-view.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "중간. 셀 레이아웃 변경이라 행 높이/정렬에 영향. 시각 검수 필요.",
+    "_feature": "조례(자치법규) 벤치마킹 — 전국 지자체 동일주제 조례 검색 + AI 비교 분석"
+  },
+  {
+    "id": "LV-1",
+    "title": "전체보기(full view)에서 스크롤해도 '현재 위치'가 추적되지 않음 — 사이드바 하이라이트·헤더 배지가 고정",
+    "severity": "P1",
+    "what": "긴 법령(예: 민법 900+조문)을 전체보기로 스크롤하며 읽을 때, 좌측 사이드바의 navy 하이라이트와 헤더의 '현재: 제N조' 배지, 본문 bookmark-check 아이콘이 마지막으로 클릭한 조문에 계속 멈춰 있다. 한참 스크롤해 내려가도 '지금 내가 어느 조문을 보고 있는지'가 어디에도 반영되지 않아 위치 감각을 잃는다.",
+    "why": "setActiveJo는 사이드바 클릭(law-viewer.tsx:501)·스와이프/키보드(use-law-viewer-navigation.ts)·selectedJo 동기화(law-viewer.tsx:323)에서만 호출된다. 전체보기 본문 스크롤(virtualized-full-article-view.tsx)에는 IntersectionObserver/scroll→setActiveJo가 전혀 없어 activeJo가 스크롤을 따라가지 않는다. 그 결과 activeJo에 의존하는 사이드바 active(virtualized-article-list.tsx:76)·헤더 배지(law-viewer-header.tsx:117)·현재 조문 아이콘(virtualized-full-article-view.tsx:471)이 모두 stale 상태가 된다.",
+    "category": "flow",
+    "evidence": "components/virtualized-full-article-view.tsx:327-355 (activeJo→scroll 단방향만 존재, scroll→activeJo 역방향 없음) / components/law-viewer.tsx:434-502 (setActiveJo는 클릭 경로뿐)",
+    "fix_proposal": "VirtualizedFullArticleView의 스크롤 컨테이너에 IntersectionObserver(또는 virtualizer.getVirtualItems()의 가장 위쪽 보이는 item)를 붙여, 뷰포트 상단을 지나는 조문의 jo를 디바운스(~150ms)로 상위에 콜백(onActiveJoChange)해 setActiveJo 호출. 단, 기존 activeJo→scroll effect(line 328)와의 무한 루프 방지를 위해 '프로그래matic 스크롤 중' 플래그(ref) 또는 출처 구분(클릭 vs 스크롤)을 두어 스크롤 기원 변경 시에는 재스크롤하지 않도록 가드.",
+    "fix_files": [
+      "components/virtualized-full-article-view.tsx",
+      "components/law-viewer.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "중간 — activeJo↔scroll 양방향이 되면서 점프 시 재측정/재스크롤 루프 재발 위험. 반드시 출처 가드 필요. 또한 위임법령/판례 데이터가 activeJo에 묶여 있어(use-law-viewer-three-tier 등) 스크롤마다 불필요한 데이터 fetch가 유발될 수 있어 디바운스/조건 필수.",
+    "_feature": "법령 뷰어 (law-viewer): 조문 탐색·사이드바 점프·가상스크롤·위임법령/판례 전환·모바일 바텀시트"
+  },
+  {
+    "id": "LV-2",
+    "title": "사이드바 점프가 고정 행높이(60px) 가정으로 계산돼 긴 법령에서 active 조문이 화면 밖에 안착",
+    "severity": "P1",
+    "what": "'민법 제839조의2'처럼 목록 하단의 조문을 검색해 들어오면, 좌측 조문목록이 해당(하이라이트된) 조문 위치로 점프해야 하는데 실제로는 한참 위쪽에 멈춰 active 조문이 보이지 않는다. 사용자는 자기가 어디 있는지 보려고 다시 스크롤해 찾아야 한다.",
+    "why": "VirtualizedArticleList의 점프 로직이 가상화 측정값을 쓰지 않고 'activeIndex * 60'(판례는 28) 하드코딩으로 scrollTop을 계산한다(virtualized-article-list.tsx:53). 그러나 같은 컴포넌트가 measureElement로 실제 높이를 측정하고(line 39), 제목이 있는 조문은 부제목 줄이 추가돼 실제 ~75~80px다(article-list-item.tsx:80-87). index가 클수록 60px와의 차이가 누적돼 수백~수천 px 어긋난다.",
+    "category": "logic",
+    "evidence": "components/virtualized-article-list.tsx:49-58 (scrollTop = activeIndex * (isPrecedent ? 28 : 60))",
+    "fix_proposal": "수동 scrollTop 계산을 제거하고 동일 컴포넌트가 이미 만든 virtualizer.scrollToIndex(activeIndex, { align: 'center' })를 사용. tanstack-virtual은 측정 후 재보정하므로 가변 높이에서도 정확히 안착. setTimeout(150ms) 가드는 컨테이너 높이 확보 목적이라 유지 가능.",
+    "fix_files": [
+      "components/virtualized-article-list.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음 — 컴포넌트 내부 virtualizer 사용으로 국소적. align 옵션만 취향(center/start) 결정 필요.",
+    "_feature": "법령 뷰어 (law-viewer): 조문 탐색·사이드바 점프·가상스크롤·위임법령/판례 전환·모바일 바텀시트"
+  },
+  {
+    "id": "PREC-1",
+    "title": "관련 심급 버튼을 껐다 다시 켜면 결과가 사라진다(빈손)",
+    "severity": "P1",
+    "what": "판례 전문에서 '관련 심급'을 한 번 열어 목록을 본 뒤 닫았다가 다시 열면, 분명 처음엔 떴던 심급 판례가 '관련 심급 판례가 없습니다'로 빈손 표시된다. 같은 화면·같은 판례인데 두 번째부터 안 나옴.",
+    "why": "토글 OFF 시 setRelatedCases([])로 비우지만 중복방지용 lastSearchedNameRef.current는 그대로 둠. 재토글 ON 시 effect가 lastSearchedNameRef===currentCaseName 가드(use-related-precedent-cases.ts:97-98)에 걸려 재요청을 스킵 → 비워진 상태 그대로 'relatedCases.length===0' 빈 메시지(law-viewer-related-cases.tsx:35)",
+    "category": "logic",
+    "evidence": "hooks/use-related-precedent-cases.ts:83-98",
+    "fix_proposal": "토글 OFF 분기(use-related-precedent-cases.ts:83-87)에서 setRelatedCases([]) 직후 lastSearchedNameRef.current = null 을 추가해, 재오픈 시 같은 사건명이라도 다시 fetch 되게 한다. (1줄 추가, 캐시 의미는 'OFF되면 무효'로 자연스러움)",
+    "fix_files": [
+      "hooks/use-related-precedent-cases.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 재오픈마다 1회 재검색 발생(이미 IndexedDB/네트워크 캐시 없음 — precedent-search는 메모리 캐시 미적용)이라 재오픈 시 소량 추가 호출. 무한루프는 showRelatedCases false 시 early-return으로 차단되어 없음.",
+    "_feature": "판례 (3경로): 직접 검색결과 리스트 → 전문 뷰어 / 법령뷰어 하단 관련판례 → 사이드패널 상세 / 판례 전문 → 관련 심급 네비"
+  },
+  {
+    "id": "PREC-2",
+    "title": "'결과 내 검색'이 현재 페이지 20건만 필터하는데 전체를 검색하는 것처럼 보임",
+    "severity": "P1",
+    "what": "긴 결과(예: 350건)에서 '결과 내 검색...'에 키워드를 치면 지금 보이는 페이지의 20건 안에서만 걸러진다. 다른 페이지에 있는 항목은 안 잡혀, 사용자는 '그 단어 결과가 거의 없다'고 오해한다. 0건이면 '검색 결과가 없습니다'까지 떠서 서버엔 350건이 있는데 전부 없는 것처럼 보임.",
+    "why": "filteredResults가 results(=현재 페이지 데이터)만 client-side filter(PrecedentResultList.tsx:54-59). 그런데 placeholder는 '결과 내 검색'이라 전체 범위를 암시하고, 빈손 메시지도 서버 0건과 필터 0건을 구분하지 않음(:144-147). 하단 페이지네이션은 여전히 totalCount 기준으로 모든 페이지 노출(:61,:164)되어 필터 중에도 'page 1 2 … 18'이 떠 모순.",
+    "category": "logic",
+    "evidence": "components/search-result-view/PrecedentResultList.tsx:54-61",
+    "fix_proposal": "두 가지 안전한 보완: (1) placeholder를 '이 페이지에서 찾기'로 바꿔 범위를 솔직히 표기, (2) filterKeyword가 있고 filteredResults.length===0일 때 '검색 결과가 없습니다' 대신 '이 페이지에 \"{filterKeyword}\" 일치 항목이 없습니다 — 다른 페이지를 확인하세요' 분기. 서버 빈결과(results.length===0)와 구분.",
+    "fix_files": [
+      "components/search-result-view/PrecedentResultList.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "낮음. 카피/분기만 변경, 기존 필터 동작 유지. 시각 변화 적음(빈상태 문구만).",
+    "_feature": "판례 (3경로): 직접 검색결과 리스트 → 전문 뷰어 / 법령뷰어 하단 관련판례 → 사이드패널 상세 / 판례 전문 → 관련 심급 네비"
+  },
+  {
+    "id": "PREC-3",
+    "title": "판례 페이지 2 이상이 다른 쿼리·필터로 재검색되어 결과가 어긋남",
+    "severity": "P1",
+    "what": "법원/사건번호로 좁혀 검색하거나 '관세 관련 판례'처럼 조사가 섞인 쿼리로 검색한 뒤 다음 페이지로 넘어가면, 1페이지와 다른(더 넓거나 다른) 결과 집합이 나올 수 있다. 사용자는 같은 검색의 연속 페이지를 기대하는데 필터가 풀린다.",
+    "why": "초기 검색은 정제된 searchQuery + court + caseNumber 파라미터로 호출(useUnifiedSearch.ts:203-208). 그러나 페이지 변경/페이지크기 변경 핸들러는 query=state.userQuery(원본 표시 쿼리, 정제 전)만 보내고 court·caseNumber를 누락(:622-626, :651-655). 라우트 정제 정규식(route.ts:25)과 client stripPrecedentKeywords(:180-181) 범위가 달라(예 '사례/검색/찾아'는 client만 제거) 1페이지와 2페이지의 실제 검색어가 달라질 수 있음.",
+    "category": "logic",
+    "evidence": "components/search-result-view/hooks/useSearchHandlers/useUnifiedSearch.ts:622-626",
+    "fix_proposal": "초기 검색 시 실제 사용한 searchQuery/court/caseNumber를 ref나 state에 보관하고, handlePrecedentPageChange·handlePrecedentPageSizeChange에서 userQuery 대신 그 보관값을 재사용. 최소 수정으로는 페이지 핸들러에 court/caseNumber도 함께 append.",
+    "fix_files": [
+      "components/search-result-view/hooks/useSearchHandlers/useUnifiedSearch.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "중간. 보관 state 추가 시 검색 리셋 흐름(clearSecondaryResults)과 동기화 필요. court/caseNumber만 append하는 최소안은 회귀 위험 낮음.",
+    "_feature": "판례 (3경로): 직접 검색결과 리스트 → 전문 뷰어 / 법령뷰어 하단 관련판례 → 사이드패널 상세 / 판례 전문 → 관련 심급 네비"
+  },
+  {
+    "id": "PREC-4",
+    "title": "'관련 심급'이 사건명 완전일치라 일반적 사건명에선 무관 판례를 심급으로 오표시",
+    "severity": "P1",
+    "what": "'손해배상(기)', '공유물분할' 같은 흔한 사건명 판례에서 '관련 심급'을 열면, 같은 사건의 1~3심이 아니라 사건명만 똑같은 전혀 다른 사건들이 '관련 심급'으로 줄줄이 뜬다(오답). 반대로 상급심에서 사건명 표기가 조금 달라지면(부기·괄호 차이) 진짜 같은 사건의 심급이 누락된다.",
+    "why": "심급 검색이 사건명(currentCaseName)으로 검색 후 p.name===currentCaseName 완전일치 + 본인 사건번호 제외만으로 필터(use-related-precedent-cases.ts:127-130). 사건번호 연속성/원심판결 참조 같은 진짜 심급 연결 신호를 안 봄. 1/2/3심 배지도 court 문자열 추정(related-cases.tsx:45-53)이라 데이터가 무관해도 그럴듯하게 라벨링됨.",
+    "category": "logic",
+    "evidence": "hooks/use-related-precedent-cases.ts:127-130",
+    "fix_proposal": "근본 해결(사건번호 stem/원심 참조 매칭)은 크므로, 안전한 단기 보완: 헤더 라벨을 '관련 심급' → '같은 사건명 판례'로 정직하게 바꾸고(law-viewer-related-cases.tsx:30), 동일 결과가 N건 이상이면 '사건명이 같은 판례입니다(같은 사건이 아닐 수 있음)' 안내 1줄. 기대치를 맞춰 오인 방지.",
+    "fix_files": [
+      "components/law-viewer/law-viewer-related-cases.tsx",
+      "hooks/use-related-precedent-cases.ts"
+    ],
+    "is_design_decision": true,
+    "risk": "중간. 라벨 변경은 안전하나, 필터 로직을 건드리면(예: 사건번호 stem 매칭) 진짜 심급까지 떨어뜨릴 회귀 위험. 우선 카피/안내만 권장.",
+    "_feature": "판례 (3경로): 직접 검색결과 리스트 → 전문 뷰어 / 법령뷰어 하단 관련판례 → 사이드패널 상세 / 판례 전문 → 관련 심급 네비"
+  },
+  {
+    "id": "PREC-5",
+    "title": "3경로 빈상태 문구가 제각각 + 직접검색 빈결과가 회복 액션 없는 막다른 길",
+    "severity": "P1",
+    "what": "판례 빈결과는 흔한데, 직접 검색 빈결과 화면은 아이콘+'검색 결과가 없습니다.'만 있고 '다시 검색/홈으로' 같은 다음 행동이 없다(바로 옆 lawData 없음 화면엔 버튼이 있는데 판례만 빠짐). 게다가 빈 메시지가 경로마다 '검색 결과가 없습니다.'/'관련 판례가 없습니다'/'관련 심급 판례가 없습니다'로 제각각이라 일관성이 떨어진다.",
+    "why": "PrecedentResultList 빈상태(PrecedentResultList.tsx:144-148)에 onBack/재검색 액션 미배치. 반면 같은 화면의 lawData 없음 분기는 '다시 검색'+'홈으로' 제공(index.tsx:608-619). 빈 문구도 precedent-section.tsx:81, law-viewer-related-cases.tsx:36와 서로 다름.",
+    "category": "empty-error",
+    "evidence": "components/search-result-view/PrecedentResultList.tsx:144-148",
+    "fix_proposal": "PrecedentResultList 빈상태에 이미 받는 onBack을 활용해 '다른 검색어로 다시 시도' 버튼(onClick=onBack) 1개 추가. 생기 유지 위해 문구는 '판례를 찾지 못했어요. 사건명·법령명·사건번호로 바꿔 보세요' 정도(영혼 없는 일반 카피 지양).",
+    "fix_files": [
+      "components/search-result-view/PrecedentResultList.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "낮음. 버튼 추가는 onBack 이미 존재. 시각 변화라 스샷 비교 권장.",
+    "_feature": "판례 (3경로): 직접 검색결과 리스트 → 전문 뷰어 / 법령뷰어 하단 관련판례 → 사이드패널 상세 / 판례 전문 → 관련 심급 네비"
+  },
+  {
+    "id": "FC-RAG-1",
+    "title": "中止 버튼이 부분 답변을 버리고 AI 화면 전체를 언마운트",
+    "severity": "P1",
+    "what": "스트리밍 중 사용자가 中止(정지)를 누르면, 그때까지 읽고 있던 부분 답변이 사라지고 AI 답변 화면 자체가 통째로 사라진다. ChatGPT처럼 '지금까지 생성된 답변은 남기고 멈춤'을 기대하지만, 화면이 빈/이전 상태로 튕긴다. 정지 버튼이 사실상 '이 답변 폐기' 버튼처럼 동작.",
+    "why": "abort 시 catch의 AbortError 분기가 actions.setIsAiMode(false)를 호출(useAiSearch.ts:319). isAiMode가 false가 되면 index.tsx:539의 `state.isAiMode` 렌더 조건이 거짓이 되어 AIAnswerContent가 언마운트됨. 동시에 streamBufferRef에 쌓인 부분 답변을 최종 content로 확정하지 않고 early return(line 320)해 버림.",
+    "category": "flow",
+    "evidence": "components/search-result-view/hooks/useSearchHandlers/useAiSearch.ts:315-321",
+    "fix_proposal": "AbortError 분기를 '사용자 직접 중지'와 '새 검색에 의한 supersede'로 구분. abortRef.current === controller(아직 활성=사용자 중지)일 때만: setIsSearching(false) + updateProgress('complete',100) + (streamBufferRef.current 있으면) setAiAnswerContent(streamBufferRef.current)로 부분 답변 확정, isAiMode는 유지(언마운트 금지). abortRef가 교체된 경우(새 검색)는 기존대로 아무 것도 하지 않고 return해 새 검색 상태를 덮어쓰지 않게 함. 즉 line 319의 setIsAiMode(false) 제거 + 활성 컨트롤러 가드 추가.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/hooks/useSearchHandlers/useAiSearch.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "부분 markdown이 토큰 중간에서 끊겨 LegalMarkdownRenderer가 일부 링크/표를 어색하게 렌더할 수 있음(ChatGPT도 동일하게 수용하는 수준). 가드 조건이 틀리면 새 검색 시 옛 답변이 잔류할 수 있어, abortRef 비교 조건을 정확히 둘 것.",
+    "_feature": "AI 법령검색 (FC-RAG) — SSE 스트리밍 검색/답변 UX"
+  },
+  {
+    "id": "FC-RAG-2",
+    "title": "답변 스트리밍 내내 프로그레스바가 75%에 고정(정체감)",
+    "severity": "P1",
+    "what": "가장 오래 걸리는 '답변 생성' 구간 동안 상단 프로그레스바가 정확히 75%에 멈춰 있고 타이머만 올라간다. 긴 법률 답변(체감 15~40초)에서 거의 다 온 것처럼 보이는데 바늘이 안 움직여 '멈춘 것 아닌가' 하는 정체감을 준다. 복잡 질의로 엔진이 85%까지 올렸다가 첫 토큰에서 75%로 역행하기도 함.",
+    "why": "answer_token 이벤트마다 updateProgress('streaming', 75)로 고정값을 재설정(useAiSearch.ts:433). 엔진은 turn별로 progress를 8→85까지 올리지만(gemini-engine.ts:546) 첫 토큰 순간 75로 하드 핀되고 이후 모든 토큰이 75를 재기록 → 스트리밍 전 구간 0 증가. 92(정리 중)·100(answer)에서만 갱신.",
+    "category": "perf",
+    "evidence": "components/search-result-view/hooks/useSearchHandlers/useAiSearch.ts:433",
+    "fix_proposal": "answer_token 핸들러에서 고정 75 대신 누적 토큰 길이로 75→90 사이를 점근적으로 진행: 예) updateProgress('streaming', Math.min(90, 75 + streamBufferRef.current.length / 60)). 또한 status 분기(useAiSearch.ts:368)에 단조 증가 가드(이전 progress보다 작으면 무시)를 두어 85→75, 5→3 같은 역행을 차단. 시각 요소(바 디자인) 변경 없음, 수치 산출만 수정.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/hooks/useSearchHandlers/useAiSearch.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "길이 기반 추정이라 매우 긴 답변은 90에 일찍 도달해 정체가 재현될 수 있으나 75 고정보다 항상 개선. 단조 가드는 stream_reset/complete의 0 리셋 경로를 예외 처리해야 함.",
+    "_feature": "AI 법령검색 (FC-RAG) — SSE 스트리밍 검색/답변 UX"
+  },
+  {
+    "id": "LV-ANNEX-1",
+    "title": "'별표 보기' 추천칩이 빈 모달(dead-end)로 직행 — 번호 없이 열려 영원히 아무것도 안 뜸",
+    "severity": "P0",
+    "what": "조문 본문에 별표가 언급돼 뜨는 '별표 보기' 칩을 누르면, 표 목록도 로딩도 버튼도 없는 빈 모달('별표 / PDF 원문을 확인하세요')만 뜬다. 사용자는 별표를 보려고 눌렀는데 닫는 것 말고 할 게 없다. 매번 100% 재현.",
+    "why": "law-viewer.tsx:617이 번호 없이 openAnnexModal('')를 호출하는데, annex-modal.tsx:191(if(!lawName||!annexNumber) return)과 :392(useEffect 가드 annexNumber &&)가 빈 문자열을 이중으로 차단해 fetchAnnexData가 아예 안 돈다. 그래서 '첫 별표 폴백'(annex-modal.tsx:293-297)에도 도달 못 하고 loadingState가 'idle'에 멈춰 마지막 else 빈 분기(:634)만 렌더된다.",
+    "category": "flow",
+    "evidence": "components/annex-modal.tsx:191, components/annex-modal.tsx:392, components/law-viewer.tsx:617, lib/article-suggestions.ts:74",
+    "fix_proposal": "의도(번호 없는 '별표 보기'='이 법령 별표 보여줘')를 살리는 두 안 — (A·최소복구) 두 가드를 lawName만으로 완화(annex-modal.tsx:191 → if(!lawName) return, :392 → isOpen && lawName)하면 fetchAnnexData가 돌아 기존 폴백(:293-297)이 해당 법령의 첫 별표를 띄운다. 단 별표가 여러 개인 법령에선 '엉뚱한 첫 별표'가 뜰 수 있으므로, (B·권장) 번호 없는 액션은 모달 대신 사이드바 별표 목록으로 유도하거나 모달에 간단한 목록 선택 UI 추가. A는 즉시 깨짐 해소, B는 올바른 UX. 임의 결정 금지 → 사용자 선택 필요.",
+    "fix_files": [
+      "components/annex-modal.tsx",
+      "components/law-viewer.tsx",
+      "lib/article-suggestions.ts"
+    ],
+    "is_design_decision": true,
+    "risk": "A안: 빈 annexNumber로 fetch가 돌면 캐시 키/매칭이 '첫 별표'로 귀결돼 다번호 법령에서 오해 소지. 또 idle→spinner 처리(LV-ANNEX-5)와 충돌하면 빈 번호가 무한 스피너가 될 수 있어 A안과 함께 적용 시 첫 별표 폴백 보장 필수.",
+    "_feature": "별표/별지 뷰어 (AnnexModal — 별표 링크/추천칩 클릭 → 모달 로딩 → PDF/HWPX 마크다운 변환 렌더)"
+  },
+  {
+    "id": "LV-ANNEX-2",
+    "title": "모바일에서 별표 모달의 모든 컨트롤(폰트·복사·다운로드·법제처원문·새로고침)이 숨겨짐",
+    "severity": "P1",
+    "what": "모바일 비중이 큰데, 마크다운이 정상 렌더된 별표 화면에서 폰트 크기 조절·복사·다운로드·법제처 원문 열기·새로고침이 전부 사라진다. 큰 표를 가로 스크롤로 겨우 보지만 글자 키우기/줄이기조차 못 하고, 원문(HWP/PDF) 다운로드도 막힌다(변환 성공 케이스 한정).",
+    "why": "헤더 컨트롤 그룹 5개가 모두 'hidden sm:flex'로 640px 미만에서 비표시. 변환이 '실패'해 폴백(hwp/원문 안내) 분기로 가면 그 안의 버튼은 보이는데, 정작 정상 읽기 화면(markdown)에서는 컨트롤이 0개가 되는 역설.",
+    "category": "mobile",
+    "evidence": "components/annex-modal.tsx:472, components/annex-modal.tsx:502, components/annex-modal.tsx:519, components/annex-modal.tsx:528",
+    "fix_proposal": "모바일에서 컨트롤을 완전히 숨기지 말고, 최소한 다운로드·법제처원문 2개는 노출하거나 헤더 우측에 오버플로(…) 메뉴/하단 액션바로 모아 제공. 폰트 조절은 모바일에서 핀치줌이 모달 내 제한적이므로 작은 A-/A+만이라도 유지. 시각/레이아웃 변경이라 헤드리스 스샷 2~3안(인라인 축소 아이콘 vs 오버플로 메뉴 vs 하단 바)으로 비교 권장.",
+    "fix_files": [
+      "components/annex-modal.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "좁은 모바일 헤더에 버튼을 더 넣으면 제목 truncate 영역이 줄어 법령명이 과도하게 잘릴 수 있음. 오버플로 메뉴 추가 시 Dialog 내 Popover z-index/포커스 트랩 점검 필요.",
+    "_feature": "별표/별지 뷰어 (AnnexModal — 별표 링크/추천칩 클릭 → 모달 로딩 → PDF/HWPX 마크다운 변환 렌더)"
+  },
+  {
+    "id": "F1",
+    "title": "해석례/재결례 0건 → 도메인 무관 '문제가 발생했거나' 제네릭 오류 화면으로 떨어짐",
+    "severity": "P1",
+    "what": "해석례·재결례는 빈결과가 잦은데, 0건이면 잠깐 뜨는 토스트 외에 화면은 '검색 결과를 표시할 수 없습니다 / 검색 중 문제가 발생했거나 결과가 없습니다'라는 오류처럼 보이는 제네릭 안내가 뜬다. 사용자는 '검색이 정상이고 0건'인지 '에러'인지 구분 못 하고, 어떤 도메인(해석례/재결례)에서 0건인지도 화면에 안 남는다. 모바일은 토스트를 놓치기 쉬워 더 혼란.",
+    "why": "index.tsx:573,579가 `interpretationResults/rulingResults !== null && length > 0`로 게이트해서, 0건(빈 배열)이면 전용 리스트 컴포넌트가 렌더되지 않고 :599 `!lawData` 제네릭 빈화면으로 폴백된다. InterpretationResultList/RulingResultList에는 빈상태 UI 자체가 없음(부모가 length>0일 때만 렌더하므로).",
+    "category": "empty-error",
+    "evidence": "components/search-result-view/index.tsx:573,579,599-607; components/search-result-view/hooks/useSearchHandlers/useUnifiedSearch.ts:424-433,509-518",
+    "fix_proposal": "index.tsx:573/579 게이트를 `!== null`(빈 배열도 렌더)로 바꾸고, InterpretationResultList/RulingResultList에 `results.length===0`일 때의 도메인 전용 빈상태(예: file-search 아이콘 + \"'{검색어}'에 대한 해석례가 없습니다\" + 'AI 검색으로 다시 시도' CTA)를 PrecedentResultList.tsx:144-148 패턴을 재사용해 추가. 제네릭 카피의 '문제가 발생했거나'는 진짜 에러(catch)일 때만 보이게 유지.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/index.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/SearchResultList.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "index.tsx 분기 조건 변경 시 로딩(:570)·precedent 분기와의 우선순위 회귀 주의. 빈상태 추가는 신규 UI라 스샷 비교 권장.",
+    "_feature": "행정규칙/해석례/심판례 (17 결정문 도메인) — 직접 검색 브라우즈 UI + AI 경로 도메인 표시"
+  },
+  {
+    "id": "F2",
+    "title": "해석례/재결례 결과가 항상 상위 20건으로 잘림 + 총건수 미표시 + 페이지네이션 없음",
+    "severity": "P1",
+    "what": "수백 건이 매칭돼도 첫 20건만 보이고 배지는 '20건'이라 마치 전부인 것처럼 오인된다. 21번째 이후로 가는 페이지네이션·표시개수 선택이 아예 없어, 원하는 해석례/재결례를 못 찾으면 막다른 길이다. 같은 화면의 판례·조례 리스트는 총건수+페이지네이션이 있어 더 차이가 도드라진다.",
+    "why": "handleInterpretationSearch/handleRulingSearch가 fetch 시 display/page를 안 넘겨 API 기본 20건만 받고(useUnifiedSearch.ts:415-418,503), 응답의 totalCount(route.ts:114, ruling route.ts:113)를 버린다. 리스트는 `{results.length}건`만 표시(SearchResultList.tsx:522-524,586-588)하고 페이지 변경 핸들러가 없다(handlePrecedent* 만 존재).",
+    "category": "logic",
+    "evidence": "components/search-result-view/hooks/useSearchHandlers/useUnifiedSearch.ts:415-418,503; components/search-result-view/SearchResultList.tsx:522-524,586-588; app/api/interpretation-search/route.ts:114",
+    "fix_proposal": "최소 수정: 핸들러가 totalCount를 state로 보존하고 리스트 배지를 '전체 N건 (상위 20건 표시)'로 바꿔 잘림을 명시. 더 나아가면 OrdinanceSearchResultList의 서버 페이지네이션 패턴(SearchResultList.tsx:283-419)을 그대로 이식해 display/page 핸들러 추가. 우선 totalCount 노출만으로도 오인 해소.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/hooks/useSearchHandlers/useUnifiedSearch.ts",
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/SearchResultList.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/hooks/useSearchState.ts"
+    ],
+    "is_design_decision": true,
+    "risk": "페이지네이션 전체 이식은 state/캐시(persistSearchCache) 구조 변경 동반 — 범위 큼. 배지 카피+totalCount만이면 저위험. 시각 변경이라 스샷 권장.",
+    "_feature": "행정규칙/해석례/심판례 (17 결정문 도메인) — 직접 검색 브라우즈 UI + AI 경로 도메인 표시"
+  },
+  {
+    "id": "F3",
+    "title": "해석례/재결례 클릭 시 예고 없이 외부 law.go.kr 새 탭으로 이탈 (인앱 전문 API는 있는데 미사용)",
+    "severity": "P1",
+    "what": "판례 결과는 인앱 뷰어(LawViewer)로 열리는데 해석례·재결례 카드는 탭하면 곧장 law.go.kr 새 탭으로 튄다. 카드에 외부 이동을 알리는 아이콘·표시가 전혀 없어(판례의 isExternalSource 배지와 대조) 사용자는 갑작스런 이탈에 당황하고, 모바일에선 무거운 외부 페이지로 빠져 뒤로가기·인용·집중모드 맥락을 모두 잃는다. 정작 인앱 전문 라우트(interpretation-text/tax-tribunal-text/customs-text)는 존재하지만 UI에서 아무도 호출하지 않는다.",
+    "why": "InterpretationResultList/RulingResultList가 카드를 `<a href target=_blank>`로 렌더(SearchResultList.tsx:531-535,594-598), 인앱 전문 표시 분기가 없음. 전문 API는 server tool(get_decision_text)용으로만 존재하고 직접 브라우즈 경로에 미연결.",
+    "category": "flow",
+    "evidence": "components/search-result-view/SearchResultList.tsx:531-535,594-598; app/api/interpretation-text/route.ts:22-93(전문 API 존재, UI 호출처 0건)",
+    "fix_proposal": "서지컬 최소안: 카드 우측에 external-link 아이콘 + aria-label(예: '새 탭에서 law.go.kr 열림')을 붙여 이탈을 예고(판례 카드 PrecedentResultList.tsx:324-333 배지 패턴 재사용). 중기안: interpretation-text 응답(질의요지/회답/이유)을 인앱 사이드패널/뷰어로 렌더해 판례와 동일한 인앱 전문 경험 제공(이미 라우트가 있어 백엔드 추가 불필요).",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-result-view/SearchResultList.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "인앱 전문 패널은 신규 컴포넌트·라우팅으로 범위 큼(별도 기능). 아이콘 추가는 저위험이나 카드 시각 변경이라 스샷 권장.",
+    "_feature": "행정규칙/해석례/심판례 (17 결정문 도메인) — 직접 검색 브라우즈 UI + AI 경로 도메인 표시"
+  },
+  {
+    "id": "TM-1",
+    "title": "모바일에서 개정 목록이 영영 안 열림 — '이력 N건' 토글이 죽은 버튼",
+    "severity": "P0",
+    "what": "모바일에서 한 기간에 개정이 여러 건이어도 최신 1건의 신구대조만 보이고, 하단 '이력 N건' 버튼을 눌러도 아무 일이 안 일어난다. 다른 개정으로 전환·탐색이 모바일에서 완전 불가. 버튼은 눌리는데 반응이 없어 고장처럼 느껴짐.",
+    "why": "개정 목록 사이드바는 className이 'hidden sm:flex'(time-machine-modal.tsx:374)라 모바일에서 display:none. 그런데 showHistory를 토글하는 유일한 인터랙션은 footer 버튼이고 그건 'sm:hidden'(:504)이라 모바일 전용. 즉 모바일 토글이 켜는 대상(사이드바)이 모바일에선 강제로 숨겨져 있어, 토글과 사이드바의 노출 breakpoint가 서로 반대(inverted)다. 모바일엔 개정 목록을 그릴 어떤 분기도 없음.",
+    "category": "mobile",
+    "evidence": "components/time-machine-modal.tsx:374",
+    "fix_proposal": "사이드바를 모바일에서 showHistory=true일 때 전체폭 패널/오버레이로 렌더하도록 분기. 예: 래퍼 className을 'hidden sm:flex'에서 showHistory 기반 조건부(모바일: showHistory면 'flex w-full', sm 이상: 'sm:flex sm:w-64')로 변경해 footer 토글이 실제로 목록을 띄우게 한다. 데스크톱(sm:) 동작은 그대로 유지.",
+    "fix_files": [
+      "components/time-machine-modal.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "래퍼 클래스 변경이 데스크톱 2열 레이아웃에 영향 줄 수 있음 — sm: prefix로 데스크톱 폭(w-64) 고정 보존 필요. 모바일 오버레이가 diff 위를 덮는 형태라 닫기 동선도 함께 확인.",
+    "_feature": "연혁/타임머신/개정이력 (법령 타임머신 모달 + 조문 개정이력)"
+  },
+  {
+    "id": "TM-2",
+    "title": "신구대조표 없는 개정(제정·타법개정) 선택 시 '에러' 화면으로 표시되고 직전 비교가 사라짐",
+    "severity": "P1",
+    "what": "사이드바에서 제정·타법개정 같은 개정을 고르면 빨간 경고 아이콘 + '다시 시도' 버튼의 에러 화면이 뜬다. 사실은 '이 개정은 신구대조표가 원래 없음'이라는 정상적 빈상태인데 고장처럼 보이고, 보고 있던 다른 개정의 비교 결과가 통째로 사라진다. '다시 시도'를 눌러도 같은 개정이 아니라 슬그머니 최신 개정으로 점프함.",
+    "why": "fetchRevisionDiff가 oldContent/newContent가 모두 비면 throw(time-machine-modal.tsx:115, :134)하고, handleRevisionSelect의 catch가 setError로 처리(:210-212) → 렌더에서 error 분기가 hasResult보다 우선이라 에러 전용 화면(:419-428)으로 전환. '다시 시도'는 handleSearch()를 호출해 날짜검색을 재실행하고 최신 개정으로 리셋(:424→:139,:190).",
+    "category": "empty-error",
+    "evidence": "components/time-machine-modal.tsx:134",
+    "fix_proposal": "빈 신구대조를 throw(에러)가 아니라 별도 info 상태로 처리. 예: 두 throw를 setNoDiff(true) 같은 정보 상태로 바꾸고, 렌더에서 noRevisions 분기(:430)와 유사한 차분한 안내('이 개정(타법개정)은 신구대조표가 제공되지 않습니다')를 보여주되 사이드바는 유지해 바로 다른 개정 선택 가능하게. '다시 시도' 대신 안내만.",
+    "fix_files": [
+      "components/time-machine-modal.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "새 상태 변수 추가 + handleSearch 초기화 분기에 리셋 1줄 추가 필요. 에러 vs 빈상태 분기 우선순위 점검.",
+    "_feature": "연혁/타임머신/개정이력 (법령 타임머신 모달 + 조문 개정이력)"
+  },
+  {
+    "id": "TM-3",
+    "title": "조문 개정이력 원문 iframe — 로딩 표시·오류 폴백·'새 창에서 열기'가 전무",
+    "severity": "P1",
+    "what": "조문 개정이력에서 한 항목을 누르면 law.go.kr 페이지를 iframe으로 띄우는데, 정부 사이트가 프레임 임베드를 막거나(X-Frame/CSP) 느릴 경우 빈 흰 박스만 남고 아무 안내도, 원문으로 빠져나갈 링크도 없다. 사용자는 '왜 안 뜨지' 상태로 막힘.",
+    "why": "revision-history.tsx:206-211 iframe에 onLoad 스피너도 onError 폴백도 없고, 모달 어디에도 articleLink를 새 창으로 여는 앵커가 없음. bg-white 박스(:205)만 남음.",
+    "category": "empty-error",
+    "evidence": "components/revision-history.tsx:206",
+    "fix_proposal": "iframe 위/아래에 selectedRevision.articleLink를 target=_blank로 여는 '새 창에서 원문 보기' 링크를 항상 노출(임베드 차단 시 탈출구). 가능하면 iframe onLoad로 로딩 스피너 해제 처리. 기존 다이얼로그 스타일(Button/Icon) 재사용.",
+    "fix_files": [
+      "components/revision-history.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "낮음. 링크/스피너 추가만으로 레이아웃 소폭 변동 — 헤더 높이 영향 확인.",
+    "_feature": "연혁/타임머신/개정이력 (법령 타임머신 모달 + 조문 개정이력)"
+  },
+  {
+    "id": "TM-4",
+    "title": "조문 개정이력 원문 모달 폭이 900px로 하드코딩 → 모바일에서 오버플로우",
+    "severity": "P1",
+    "what": "조문 개정이력 원문 모달이 화면 너비와 무관하게 900px로 고정돼, 375px 모바일에서 모달이 뷰포트를 크게 넘쳐 가로 잘림/스크롤이 발생하고 내용이 화면 밖으로 밀린다.",
+    "why": "revision-history.tsx:182 인라인 style={{ width: '900px', maxWidth: '900px' }}가 반응형 클래스를 덮어써 모바일에서도 900px 강제.",
+    "category": "mobile",
+    "evidence": "components/revision-history.tsx:182",
+    "fix_proposal": "인라인 고정폭을 반응형으로: style를 제거하거나 maxWidth만 남기고 className에 'w-[95vw] sm:w-[900px] sm:max-w-[900px]' 부여해 모바일은 95vw, 데스크톱은 900px 유지. iframe 높이도 모바일에서 과하지 않게 확인(h-[550px]).",
+    "fix_files": [
+      "components/revision-history.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "데스크톱 폭이 동일하게 유지되는지 스샷 확인 필요. Radix 중앙정렬과 95vw 조합 검증.",
+    "_feature": "연혁/타임머신/개정이력 (법령 타임머신 모달 + 조문 개정이력)"
+  },
+  {
+    "id": "TM-8",
+    "title": "'타임머신/시점 복원' 카피가 실제 기능(개정별 신구대조 비교)을 과약속",
+    "severity": "P1",
+    "what": "진입 메뉴 설명은 '특정 시점의 법령 복원 및 비교', 빈상태는 '해당 날짜에 유효했던 법령과 현행법의 차이를 비교'라고 해서 '그날의 법 전문을 복원해 본다'고 기대하게 만든다. 하지만 실제로는 그 기간 개정들의 공식 신구대조표를 한 건씩 보여줄 뿐, 시점 전문 복원도 누적 diff도 없어 기대와 어긋난다.",
+    "why": "메뉴 설명(law-viewer-analysis-menu.tsx:46)과 빈상태 카피(time-machine-modal.tsx:491-493)가 '복원/현행법과의 차이'를 약속하지만, 구현은 betweenRevisions 중 단일 개정의 oldAndNew 신구대조만 렌더(:190, oldnew-parser.tsx). 누적 비교/전문 복원 경로 없음.",
+    "category": "copy",
+    "evidence": "components/law-viewer/law-viewer-analysis-menu.tsx:46",
+    "fix_proposal": "카피를 실제 동작에 맞춰 정직하게: 메뉴 설명을 '시점별 개정 신구대조 비교'류로, 빈상태를 '기준일 이후 각 개정의 공식 신·구 조문 대조표를 시점순으로 살펴봅니다'처럼 조정. (영혼없는 일반화 대신 '신·구 조문 대조'라는 이 기능 고유의 강점을 또렷이.) 기능 자체를 바꾸지 말고 문구만 정렬.",
+    "fix_files": [
+      "components/law-viewer/law-viewer-analysis-menu.tsx",
+      "components/time-machine-modal.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 문구 변경만 — 카피 톤은 사용자 확인 권장(AI슬롭 회피).",
+    "_feature": "연혁/타임머신/개정이력 (법령 타임머신 모달 + 조문 개정이력)"
+  },
+  {
+    "id": "IMPACT-1",
+    "title": "영향 항목 행이 클릭 가능해 보이지만 실제로는 죽은 클릭 (onNavigate 미연결)",
+    "severity": "P1",
+    "what": "관계그래프 패널에서 '하향 영향/상향 영향/판례' 등으로 나온 영향 법령 행을 탭하면 hover 하이라이트만 뜨고 아무 일도 일어나지 않는다. 패널의 핵심 가치인 '영향받는 법령으로 드릴다운'이 통째로 작동 안 함.",
+    "why": "impact-analysis-panel.tsx:158-161에서 각 행은 <button>에 hover:bg-accent + onClick={()=>onNavigate?.(item.nodeId, item.article||undefined)}로 렌더되는데, 이 패널을 쓰는 유일한 호출부 law-viewer.tsx:812-819가 onNavigate prop을 전달하지 않는다(law-viewer 내 onNavigate는 line 509 스와이프 네비용 뿐). 따라서 onNavigate?.()는 항상 no-op.",
+    "category": "logic",
+    "evidence": "/Users/mong-e/workspace/lexdiff/components/law-viewer/impact-analysis-panel.tsx:158-161 + /Users/mong-e/workspace/lexdiff/components/law-viewer.tsx:812-819",
+    "fix_proposal": "law-viewer.tsx:813의 ImpactAnalysisPanel에 onNavigate를 연결한다. 이미 외부 법령을 여는 openExternalLawArticleModal(lawName, article)가 있으므로(law-viewer.tsx:179,301) 패널 행이 item.title(법령명)을 들고 있으니 onNavigate 시그니처에 title을 함께 넘기도록 ImpactItemRow를 (nodeId,article,title)로 확장하거나, 패널 내부에서 openExternalLawArticleModal에 해당하는 콜백을 받아 호출. 만약 cross-law 네비를 아직 붙일 수 없다면 최소한 행을 <button>+hover:bg-accent에서 비상호작용 요소(div, hover 제거)로 바꿔 '클릭되는 것처럼' 보이는 잘못된 어포던스를 제거.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/law-viewer.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/law-viewer/impact-analysis-panel.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "네비 연결 시 item.nodeId(MST)로 다른 법령을 여는 핸들러가 모든 노드 타입(판례/조례/행정규칙)에 대해 동작하지 않을 수 있음 → 타입별 분기 필요. 어포던스 제거만 하면 무위험.",
+    "_feature": "영향분석 / 관계그래프 (in-viewer ImpactAnalysisPanel + standalone ImpactTrackerView)"
+  },
+  {
+    "id": "IMPACT-2",
+    "title": "다중 법령 분석 시 일부 법령 검색 실패가 사용자에게 전혀 안 보임",
+    "severity": "P1",
+    "what": "트래커에 법령 2개 이상 입력 후 그중 하나가 오타거나 검색이 안 되면, 그 법령은 조용히 빠지고 결과에는 성공한 법령만 나온다. 사용자는 입력한 모든 법령이 분석된 줄 알지만 실제로는 일부가 누락된다. 신뢰도가 중요한 법령 도구에서 위험.",
+    "why": "engine.ts:91이 법령별 미발견 시 {type:'error', message:'\"X\" 검색 결과가 없습니다.', recoverable:true}를 yield하지만, use-impact-tracker.ts:156-160 case 'error'가 `if (!event.recoverable)`로만 처리해 recoverable:true 이벤트는 setError도 statusMessage도 갱신 없이 완전히 버린다. 이후 continue로 다음 법령 진행 → complete까지 가므로 실패 흔적이 0.",
+    "category": "empty-error",
+    "evidence": "/Users/mong-e/workspace/lexdiff/lib/impact-tracker/engine.ts:90-92 + /Users/mong-e/workspace/lexdiff/hooks/use-impact-tracker.ts:156-161",
+    "fix_proposal": "use-impact-tracker.ts의 case 'error'에서 recoverable 분기를 추가: recoverable이면 setError 대신 별도 warnings 상태(예: setWarnings(prev=>[...prev, event.message]))에 모아 결과 영역 상단에 '일부 법령을 찾지 못했습니다: X' 형태의 비차단 안내로 노출. 최소 수정으로는 recoverable 에러 메시지를 statusMessage에 잠깐 반영해 진행 로그에라도 남기기. (스택형 진행 UI에 이미 statusMessage 라인이 있으므로 자연스럽게 합류 가능 — impact-tracker-view.tsx:280-284)",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/hooks/use-impact-tracker.ts",
+      "/Users/mong-e/workspace/lexdiff/components/impact-tracker/impact-tracker-view.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "warnings 상태 추가는 격리된 변경이라 회귀 위험 낮음. 결과 카드 레이아웃 위에 안내 배너 추가 시 시각 변화는 소폭.",
+    "_feature": "영향분석 / 관계그래프 (in-viewer ImpactAnalysisPanel + standalone ImpactTrackerView)"
+  },
+  {
+    "id": "SR-1",
+    "title": "Cmd+K 모달: 즐겨찾기 6개 이상이면 키보드 화살표가 '안 보이는 항목'을 선택·실행",
+    "severity": "P1",
+    "what": "즐겨찾기를 6개 이상 둔 사용자가 Cmd+K에서 ↓를 계속 누르면, 6번째부터는 화면에 하이라이트가 사라지고(보이는 건 5개뿐) 그 상태에서 Enter를 치면 화면에 없는 즐겨찾기가 검색돼 버린다. '내가 뭘 고른 거지?' 하는 혼란.",
+    "why": "키보드 네비 총개수 totalItems는 favorites.length(전체)로 계산하는데(command-search-modal.tsx:139), 실제 렌더는 favorites.slice(0,5)로 5개만 그린다(:441). 인덱스 5~7은 시각적 대응 항목이 없는 dead zone이지만 Enter 분기(:162-163)는 favorites[favIndex]를 그대로 실행한다.",
+    "category": "logic",
+    "evidence": "components/command-search-modal.tsx:139,441,162",
+    "fix_proposal": "렌더와 동일하게 const displayedFavorites = favorites.slice(0,5)를 만들어 totalItems(:139)와 Enter 분기(:162-163), 렌더(:441)가 모두 같은 배열을 쓰도록 통일. 최근검색은 이미 displayedRecentSearches로 통일돼 있으니 즐겨찾기만 동일 패턴으로 맞추면 됨.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/command-search-modal.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "매우 낮음 — 슬라이스 변수 일원화. 6개 이상 즐겨찾기일 때만 동작이 바뀜(올바른 방향).",
+    "_feature": "통합검색 / Cmd+K 모달 / 자동완성 / 최근검색"
+  },
+  {
+    "id": "SR-2",
+    "title": "자동완성 에러를 잡아만 두고 화면엔 안 보여줌 — 실패 시 '먹통' 체감",
+    "severity": "P1",
+    "what": "자동완성 API가 실패(429 레이트리밋/네트워크 끊김)하면 Cmd+K 모달에서 '검색 중...' 스피너가 사라진 뒤 아무 안내도 없이 빈 화면. 사용자는 입력이 잘못됐는지, 서비스가 죽었는지 알 수 없어 같은 입력을 반복하게 됨.",
+    "why": "suggestionsError state를 set은 하지만(command-search-modal.tsx:85,93) 렌더 JSX(296-492) 어디에도 suggestionsError를 표시하는 분기가 없음. 코드 주석(:92 'UX-1: 사용자 피드백')은 피드백 의도를 밝혔지만 실제 출력이 누락된 상태. SearchBarDropdown(홈)에는 애초에 에러 state 자체가 없음.",
+    "category": "empty-error",
+    "evidence": "components/command-search-modal.tsx:65,85,93",
+    "fix_proposal": "기존 로딩 행(:298-303)과 동일한 스타일로 에러 행 하나 추가: {suggestionsError && searchQuery.trim() && (<div className='...text-destructive...'>{suggestionsError} · 잠시 후 다시 시도하세요</div>)}. 레이트리밋(429)일 땐 '잠시 후 다시'가 정확한 안내라 카피도 자연스러움.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/command-search-modal.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음 — 에러일 때만 나타나는 행 1개 추가. 정상 흐름 영향 없음.",
+    "_feature": "통합검색 / Cmd+K 모달 / 자동완성 / 최근검색"
+  },
+  {
+    "id": "SR-3",
+    "title": "모바일에선 AI 토글 버튼이 없는데, 온보딩 투어는 '왼쪽 뇌 아이콘을 누르세요'라고 빈 모서리를 가리킴",
+    "severity": "P1",
+    "what": "모바일 사용자는 AI 모드를 수동으로 켤 버튼이 화면에 없다(자동분류+선택 다이얼로그에만 의존). 게다가 첫 방문 온보딩 투어 2단계가 화면 좌상단 빈 구석에 스포트라이트를 띄우고 '왼쪽 뇌 아이콘을 누르시면 AI 검색으로 전환됩니다'라고 존재하지 않는 버튼을 설명해 신뢰를 깬다.",
+    "why": "AI 토글 버튼이 hidden sm:flex로 모바일에서 display:none(search-bar-home.tsx:93). 투어는 selector로 요소를 찾지만(onboarding-tour.tsx:97 통과) 숨김 요소의 getBoundingClientRect()는 0,0,0,0이라(:103) hasTarget=true인 채 좌상단(0,0)에 스포트라이트가 잡힘. 투어 step body(search-view.tsx:84-88)는 존재 가정.",
+    "category": "mobile",
+    "evidence": "components/search-bar-home.tsx:93",
+    "fix_proposal": "두 갈래 중 택1(스샷 비교 권장): (A) 투어 step에 모바일 조건을 둬 window.innerWidth<640이면 ai-toggle 단계를 tourSteps에서 제외(search-view.tsx:58 배열 구성 시 filter) — 작고 안전. (B) 모바일에도 AI 토글을 노출(예: 입력창 우측/검색 버튼 옆 작은 brain 아이콘) — 기능 동등성 확보지만 레이아웃 변경 큼. 우선 (A) 추천.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-view.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/search-bar-home.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "(A) 낮음 — 투어 단계만 조건부. (B) 중간 — 헤더/검색바 모바일 레이아웃 회귀 위험, 스샷 검증 필요.",
+    "_feature": "통합검색 / Cmd+K 모달 / 자동완성 / 최근검색"
+  },
+  {
+    "id": "SR-4",
+    "title": "자동완성 요청 취소가 없어 느린 망에서 옛 결과가 새 결과를 덮음",
+    "severity": "P1",
+    "what": "모바일 느린 망에서 빠르게 타이핑하면, 먼저 보낸 느린 요청이 나중에 도착해 최신 입력의 추천을 덮어쓴다. '관세'를 쳤는데 잠깐 '관'에 대한 추천이 다시 떴다가 깜빡이는 식의 어긋남이 발생.",
+    "why": "fetchSuggestions가 AbortController/요청ID 가드 없이 setSuggestions로 바로 덮어씀(useSearchBarState.ts:96-114, command-search-modal.tsx:73-98). 자동완성 라우트가 law.go.kr에 최대 6개 병렬 fetch + 각 3s 타임아웃(search-suggest/route.ts:325-338)이라 응답 순서가 쉽게 뒤집힘. 200ms debounce로는 in-flight 경합을 못 막음.",
+    "category": "perf",
+    "evidence": "components/search-bar/hooks/useSearchBarState.ts:96",
+    "fix_proposal": "fetchSuggestions에 AbortController 추가 — 호출마다 controller 생성, 이전 controller.abort(), fetch에 signal 전달, AbortError는 무시. 또는 최소한 latestQueryRef로 'q===현재 query'일 때만 setSuggestions. 두 fetch 경로(state 훅 + 커맨드 모달) 동일 패턴 적용.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/components/search-bar/hooks/useSearchBarState.ts",
+      "/Users/mong-e/workspace/lexdiff/components/command-search-modal.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음 — abort 시 catch에서 무시 처리만 추가하면 됨. finally의 setIsLoading은 마지막 요청 기준 정리 주의.",
+    "_feature": "통합검색 / Cmd+K 모달 / 자동완성 / 최근검색"
+  },
+  {
+    "id": "FAV-1",
+    "title": "로그인 사용자의 즐겨찾기 동기화 실패가 완전히 무음 — 별이 채워졌다 사라지고 이유 없음",
+    "severity": "P1",
+    "what": "로그인 상태에서 별을 눌러 추가(또는 삭제)했는데 Supabase 쓰기가 실패하면, 화면은 낙관적으로 바뀐 직후 조용히 원상복구된다. 사용자는 별이 노랗게 찼다가 다시 비거나, 지운 항목이 슬그머니 되살아나는 걸 보지만 어떤 안내도 없다. 모바일 약전계/오프라인에서 자주 발생.",
+    "why": "favorites-store.ts addFavorite 롤백(:197-200)과 removeFavorite 롤백(:224-227)이 debugLogger.error만 남기고 사용자에게 토스트를 띄우지 않는다. 토글 핸들러의 try/catch(useBasicHandlers.ts:319-322)는 insert가 .then 비동기라 롤백 시점엔 이미 핸들러가 반환돼 잡지 못한다.",
+    "category": "empty-error",
+    "evidence": "lib/favorites-store.ts:197",
+    "fix_proposal": "store의 두 롤백 지점에서 window.dispatchEvent(new CustomEvent('favorites:error', { detail: { action: 'add'|'remove' } }))를 발생시키고, 항상 마운트돼 있는 FavoritesSync(favorites-sync.tsx)에서 이 이벤트를 listen해 useToast로 '즐겨찾기 저장에 실패했어요. 네트워크를 확인해 주세요'를 1회 표시. store가 React/toast를 직접 모르므로 이벤트 브리지가 가장 surgical. 카피는 영혼없는 'Error' 대신 행동 유도형으로.",
+    "fix_files": [
+      "lib/favorites-store.ts",
+      "components/favorites-sync.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 이벤트 리스너 cleanup(unmount 시 removeEventListener) 누락 주의. 롤백이 잦은 케이스에서 토스트 중복 가능 → action별 1회 디바운스 고려",
+    "_feature": "즐겨찾기 (Favorites) — 조문/판례 저장, 게스트 localStorage ↔ 로그인 Supabase 동기화, 헤더/플로팅헤더/유저메뉴/커맨드검색/다이얼로그 노출"
+  },
+  {
+    "id": "FAV-2",
+    "title": "목록에서 삭제가 즉시·영구이고 undo 없음 + 모바일 터치타깃이 작고 이동 영역에 붙어 있어 오탭 위험",
+    "severity": "P1",
+    "what": "즐겨찾기 다이얼로그/패널에서 항목을 지우면 확인도 실행취소도 없이 바로 사라진다. 휴지통 버튼이 작고(다이얼로그 32px, 패널 24px) 행 전체(클릭 시 해당 법령으로 이동+다이얼로그 닫힘) 우측 끝에 붙어 있어, 모바일에서 오탭하면 한쪽은 소중한 저장 법령이 복구 불가로 삭제되고 다른 쪽은 갑자기 화면이 전환된다.",
+    "why": "favorites-dialog.tsx:116-123 휴지통(h-8 w-8)·favorites-panel.tsx:153-160 휴지통(h-6 w-6)이 44px 권장 터치타깃 미만이고, 같은 행 onClick(:89 handleSelectAndClose=이동+닫힘) 바로 옆에 위치. removeFavorite(favorites-store.ts:210)는 즉시 splice만 하고 되돌릴 경로가 없다.",
+    "category": "flow",
+    "evidence": "components/favorites-dialog.tsx:116",
+    "fix_proposal": "handleRemove에서 삭제 전 항목 객체를 보관하고, 삭제 후 useToast로 '삭제됨 · 실행취소' 액션 토스트를 띄워 누르면 favoritesStore.addFavorite로 복원(또는 store에 restore 헬퍼 추가). 더불어 휴지통 버튼에 모바일 히트영역 확보(최소 40px, 예: 패딩/min-h-10 min-w-10 또는 행에서 살짝 분리). undo 추가는 비주얼 무변경, 터치타깃 확대는 레이아웃 변경이라 스샷 비교 필요.",
+    "fix_files": [
+      "components/favorites-dialog.tsx",
+      "components/favorites-panel.tsx",
+      "lib/favorites-store.ts"
+    ],
+    "is_design_decision": true,
+    "risk": "낮음. addFavorite로 복원 시 새 id/createdAt가 생성돼 '추가 시각'이 갱신됨 → 복원은 보관한 원본 객체를 그대로 재삽입하는 store.restore를 쓰면 회피 가능. 터치타깃 확대가 인접 버튼 정렬을 흔들 수 있어 스샷 확인",
+    "_feature": "즐겨찾기 (Favorites) — 조문/판례 저장, 게스트 localStorage ↔ 로그인 Supabase 동기화, 헤더/플로팅헤더/유저메뉴/커맨드검색/다이얼로그 노출"
+  },
+  {
+    "id": "F1",
+    "title": "쿼터 초과 메시지에 내부 기능키(fc_rag/summarize/benchmark/impact)가 그대로 노출",
+    "severity": "P1",
+    "what": "무료 유저가 한도를 다 쓰면 '오늘 fc_rag 사용 한도(5)를 초과했습니다' 같은 영문 내부 키가 한국어 안내문 한가운데 그대로 보인다. 요약은 'summarize', 벤치마크는 'benchmark', 영향추적은 'impact'로 뜬다.",
+    "why": "api-auth.ts:100에서 message를 `오늘 ${feature} 사용 한도(${quota.limit})...`로 조합하는데 feature가 QuotaFeature enum 원본값(fc_rag 등)이라 라벨 변환 없이 그대로 들어감. 4개 소비처(useAiSearch.ts:243, ai-summary-dialog.tsx:73, ordinance-benchmark-view.tsx:299, use-impact-tracker.ts:251) 모두 body.message를 우선 사용하므로 전부 동일하게 샘.",
+    "category": "copy",
+    "evidence": "lib/api-auth.ts:100",
+    "fix_proposal": "api-auth.ts에 user-menu.tsx:35의 FEATURE_LABELS와 동일한 매핑(fc_rag→'AI 검색' 등)을 한 곳에 두고 message에서 라벨을 사용. 예: `오늘 'AI 검색' 무료 한도(5/5)를 다 쓰셨어요...`. 단일 수정으로 4개 기능 전부 해결.",
+    "fix_files": [
+      "lib/api-auth.ts",
+      "lib/quota.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "낮음. 문구만 변경, 분기 로직 무변경. 기존 클라이언트 fallback 문구는 그대로라 회귀 없음.",
+    "_feature": "설정/약관/개인정보/quota/auth (로그인·로그아웃, AI 게이트, 쿼터 피드백, 동의 게이트, 법적 문서 접근, BYOK 키)"
+  },
+  {
+    "id": "F2",
+    "title": "로그인 유저가 쿼터 소진 시 'API 키 등록' 안내만 있고 등록할 UI가 없음 (막다른 CTA)",
+    "severity": "P1",
+    "what": "한도 초과 메시지가 '본인 API 키를 등록하면 무제한입니다'라고 안내하지만, 로그인 사용자에게는 그 키를 등록할 화면이 어디에도 없다. 사용자 메뉴에도 'API 키' 항목이 없고, 설정 페이지도 없다. 안내를 따르려 해도 길이 끊긴다.",
+    "why": "BYOK 키 입력 UI는 ai-gate-dialog.tsx 안에만 존재하는데, 이 게이트는 use-ai-gate.ts:50-57에서 '미로그인 && BYOK없음'일 때만 열린다. 로그인 유저는 requireAuth가 즉시 통과시켜 게이트가 절대 안 뜸. 게다가 별도로 만들어둔 components/settings/api-key-input.tsx는 코드베이스 어디에서도 import되지 않는 데드코드(grep 결과 정의부만 존재). 결국 로그인+쿼터소진 유저의 키 등록 경로가 0개.",
+    "category": "flow",
+    "evidence": "hooks/use-ai-gate.ts:50",
+    "fix_proposal": "이미 만들어져 방치된 api-key-input.tsx를 PrivacySettingsDialog(user-menu의 '개인정보 설정')나 user-menu 드롭다운에 한 항목으로 노출하거나, 429 답변 영역에 '내 Gemini 키 등록' 버튼을 추가해 로그인 상태에서도 ai-gate-dialog(또는 키 입력만)를 열 수 있게 한다. 데드 컴포넌트 재활용이라 신규 UI 비용 최소.",
+    "fix_files": [
+      "components/user-menu.tsx",
+      "components/legal/privacy-settings-dialog.tsx",
+      "components/settings/api-key-input.tsx"
+    ],
+    "is_design_decision": true,
+    "risk": "중간. 메뉴/모달에 항목 추가는 레이아웃 변경이라 스샷 비교 필요. 키 입력 노출 위치 선택지 2~3안 제시 권장.",
+    "_feature": "설정/약관/개인정보/quota/auth (로그인·로그아웃, AI 게이트, 쿼터 피드백, 동의 게이트, 법적 문서 접근, BYOK 키)"
+  },
+  {
+    "id": "F3",
+    "title": "게이트에서 BYOK 키를 등록해도 원래 하려던 검색이 이어서 실행되지 않음",
+    "severity": "P1",
+    "what": "게스트가 AI 검색을 누르면 게이트가 뜨고, 거기서 Google 로그인 대신 본인 API 키를 입력·저장하면 다이얼로그만 닫히고 끝. 방금 입력했던 질문은 사라지고 'AI 검색은 로그인이 필요해요' 폴백 화면에 그대로 남는다. 사용자는 처음부터 다시 검색해야 한다.",
+    "why": "ai-gate-dialog.tsx:52-62 handleSaveKey가 키 저장 후 onClose()만 호출. onClose=use-ai-gate.ts:59-62 handleClose는 pendingAction을 실행하지 않고 null로 폐기. 인증 후 재실행은 두 경로뿐인데(① page.tsx:120-131 OAuth 리로드 복원=gateUser 로그인 조건, ② use-ai-gate.ts:33-40 user 세팅 시 pendingAction 실행), BYOK는 리로드도 없고 user도 안 생겨 둘 다 미발동. sessionStorage의 pending-ai-query는 남지만 읽는 주체가 없음.",
+    "category": "flow",
+    "evidence": "components/ai-gate-dialog.tsx:61",
+    "fix_proposal": "handleSaveKey에서 onClose 직전에 '인증 성공 continuation'을 호출하도록 배선. AiGateProvider가 onAuthenticated 콜백을 내려주고, useAiGate가 pendingAction 실행 + (검색의 경우) page.tsx의 pending-query 복원 로직을 트리거. 최소안: 키 저장 직후 sessionStorage의 pending-ai-query를 읽어 재검색 디스패치.",
+    "fix_files": [
+      "components/ai-gate-dialog.tsx",
+      "components/ai-gate-provider.tsx",
+      "hooks/use-ai-gate.ts"
+    ],
+    "is_design_decision": false,
+    "risk": "중간. 인증 continuation 배선 변경이라 OAuth 경로와의 중복 실행(이중 검색) 방지 주의 필요. pendingRestoredRef 같은 가드 재사용 권장.",
+    "_feature": "설정/약관/개인정보/quota/auth (로그인·로그아웃, AI 게이트, 쿼터 피드백, 동의 게이트, 법적 문서 접근, BYOK 키)"
+  },
+  {
+    "id": "VH-1",
+    "title": "판례 재조회가 사건번호를 '법령명'으로 검색 → 결과없음/오동작 (재조회 핵심 기능 깨짐)",
+    "severity": "P0",
+    "what": "최근조회에서 판례 항목을 누르면 그 판례가 다시 열리지 않고 '검색 결과 없음'(또는 AI에게 물어보기 다이얼로그)이 뜬다. 법령은 잘 열려서 정상처럼 보이지만 판례는 항상 실패한다.",
+    "why": "toReviewQuery가 판례를 {lawName: caseNumber}로만 반환(viewing-history-store.ts:117-120)하고 classification을 안 붙인다. store 주석(:113-114)은 '통합검색이 classify해 판례로 분기'한다고 가정하지만, 실제 재조회 진입점 두 곳 모두 classify를 안 한다 — 홈은 page.tsx:256 handleSearch가 classification을 받지도 않고, Cmd+K는 handleSearchDispatch(index.tsx:398)가 query.classification undefined라 else로 빠져 useBasicHandlers.ts:27-30 평문 법령검색(handleSearchInternal)을 돈다. 결국 사건번호 문자열을 법령명으로 조회 → 매칭 실패.",
+    "category": "flow",
+    "evidence": "/Users/mong-e/workspace/lexdiff/lib/viewing-history-store.ts:117-120",
+    "fix_proposal": "재조회 쿼리에 분류를 실어 보내거나(권장은 정밀복원), 최소한 깨짐을 막기. 레코드에 precedentId가 이미 있으므로(useUnifiedSearch.ts:339) 가장 정밀한 surgical 수정은 판례 재조회 시 사건번호 재검색 대신 precedentId로 상세를 바로 여는 것 — onReview를 카테고리별로 분기해 판례는 precedentId 기반 상세 오픈 콜백으로 라우팅(추가 클릭 0). 차선(최소 변경): toReviewQuery가 판례에 대해 classification(searchType:'precedent', entities.caseNumber)을 함께 반환하고, page.tsx:256 handleSearch가 query.classification을 saveSearchResult에 보존하도록(현재 시그니처가 누락) 한다. 그러면 index.tsx:329 복원 분기와 handleSearchDispatch:399가 이미 precedent 핸들러로 라우팅한다.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/lib/viewing-history-store.ts",
+      "/Users/mong-e/workspace/lexdiff/app/page.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/command-search-modal.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/search-view.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "검색 라우팅/캐시 저장 흐름을 건드리므로 일반 법령/AI 검색 경로 회귀 위험 중간. page.tsx handleSearch 시그니처에 classification 추가 시 다른 호출부(favorite/pending) 영향 점검 필요.",
+    "_feature": "조회기록 (Viewing History) — 홈 + Cmd+K 통합검색 모달의 \"최근 조회\" 패널, 본 법령/조례/판례 재조회"
+  },
+  {
+    "id": "VH-2",
+    "title": "조례 재조회가 ordinanceSeq를 버리고 조례명으로 재검색 → 정확한 그 조례로 못 돌아감",
+    "severity": "P1",
+    "what": "최근조회에서 조례를 누르면 봤던 그 조례 본문이 바로 안 열리고 조례명 검색(또는 법령 검색)으로 빠진다. 같은 이름의 지자체 조례가 여럿이면 또 골라야 하고, 최악엔 다른 모드로 샌다.",
+    "why": "레코드는 ordinanceSeq(정밀 식별자)를 저장(ordinance-benchmark-view.tsx:164)하지만 toReviewQuery가 조례에 대해 {lawName: title}만 반환(viewing-history-store.ts:121)하며 ordinanceSeq를 폐기한다. classification도 없어 VH-1과 동일하게 평문 법령/이름 검색 경로로 진입(index.tsx:340) — 원래 조회한 ordinanceSeq로의 정밀 복원 경로가 끊겨 있다.",
+    "category": "flow",
+    "evidence": "/Users/mong-e/workspace/lexdiff/lib/viewing-history-store.ts:121",
+    "fix_proposal": "조례는 저장된 ordinanceSeq로 동일 조례 본문을 바로 재오픈하도록 onReview를 분기(레코드의 ordinanceSeq 사용). 정밀복원이 부담되면 최소한 재검색이 조례 모드로 가도록 classification(조례)을 부여하거나, 조례 항목 클릭 시 ordinance-benchmark-view의 본문 로드 경로(/api/ordin?ordinSeq=)를 재사용.",
+    "fix_files": [
+      "/Users/mong-e/workspace/lexdiff/lib/viewing-history-store.ts",
+      "/Users/mong-e/workspace/lexdiff/components/command-search-modal.tsx",
+      "/Users/mong-e/workspace/lexdiff/components/search-view.tsx"
+    ],
+    "is_design_decision": false,
+    "risk": "조례 재오픈 경로 신설 시 통합검색 흐름과의 연결부 회귀 위험 중간. 정밀복원 콜백 plumbing 필요.",
+    "_feature": "조회기록 (Viewing History) — 홈 + Cmd+K 통합검색 모달의 \"최근 조회\" 패널, 본 법령/조례/판례 재조회"
+  }
+]
