@@ -33,61 +33,15 @@ export function PrivacySettingsDialog({ open, onClose }: PrivacySettingsDialogPr
   const { apiKey, saveKey, clearKey } = useApiKey()
   const [consent, setConsent] = useState<ConsentData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    setMessage(null)
     fetch('/api/privacy/consent')
       .then(async (r) => (r.ok ? r.json() : null))
       .then((d) => setConsent(d?.consent || null))
       .finally(() => setLoading(false))
   }, [open])
-
-  const toggleOptIn = async () => {
-    if (!consent) return
-    setSaving(true)
-    setMessage(null)
-    try {
-      const res = await fetch('/api/privacy/consent', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          agreeTerms: true,
-          agreePrivacy: true,
-          aiLoggingOptIn: !consent.ai_logging_opt_in,
-        }),
-      })
-      if (res.ok) {
-        setConsent({ ...consent, ai_logging_opt_in: !consent.ai_logging_opt_in })
-        setMessage('저장되었습니다.')
-      } else {
-        setMessage('저장에 실패했습니다.')
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const deleteLogs = async () => {
-    if (!confirm('지금까지 수집된 AI 질의 로그를 모두 삭제합니다. 계속하시겠습니까?')) return
-    setDeleting(true)
-    setMessage(null)
-    try {
-      const res = await fetch('/api/privacy/delete-logs', { method: 'POST' })
-      if (res.ok) {
-        const j = await res.json()
-        setMessage(`${j.deleted ?? 0}건의 로그가 삭제되었습니다.`)
-      } else {
-        setMessage('삭제에 실패했습니다.')
-      }
-    } finally {
-      setDeleting(false)
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -119,39 +73,23 @@ export function PrivacySettingsDialog({ open, onClose }: PrivacySettingsDialogPr
         ) : (
           <div className="space-y-4 py-2">
             <section className="p-4 rounded-lg border border-border bg-card">
-              <h3 className="font-semibold text-sm mb-1.5">AI 검색 로그 수집</h3>
-              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                검색 품질 개선을 위해 AI 질의 내용과 답변을 30일간 익명화하여 저장합니다.
-                민감정보는 저장 전 자동으로 마스킹 처리됩니다.
+              <h3 className="font-semibold text-sm mb-1.5">AI 검색 데이터 처리</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                AI 검색 시 질의·답변 <strong className="text-foreground font-medium">원문은 저장하지 않습니다.</strong>{' '}
+                품질 개선을 위해 쿼리 유형·응답 시간·인용 법령 ID 같은 집계 신호(본문 제외)만 익명 저장되며,
+                개인 식별 정보가 없어 별도 동의 없이 수집되고 90일 후 자동 삭제됩니다.
               </p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs">
-                  현재 상태:{' '}
-                  <strong className={consent?.ai_logging_opt_in ? 'text-emerald-600' : 'text-muted-foreground'}>
-                    {consent?.ai_logging_opt_in ? '동의함' : '동의 안 함'}
-                  </strong>
-                </span>
-                <Button onClick={toggleOptIn} disabled={saving || !consent} variant="outline" size="sm">
-                  {consent?.ai_logging_opt_in ? '동의 철회' : '동의하기'}
-                </Button>
-              </div>
             </section>
 
             <section className="p-4 rounded-lg border border-border bg-card">
-              <h3 className="font-semibold text-sm mb-1.5">내 AI 질의 로그 삭제</h3>
-              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                지금까지 수집된 본인의 AI 질의 로그를 즉시 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+              <h3 className="font-semibold text-sm mb-1.5">내 데이터 삭제</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                답변 하단의 ‘별로·개선요청’ 피드백을 누른 경우에만 해당 질문·답변이 품질 개선용으로 저장됩니다.
+                삭제를 원하시면 개인정보 보호책임자{' '}
+                <a href="mailto:ryuseungin@naver.com" className="text-brand-navy dark:text-brand-gold underline underline-offset-2">ryuseungin@naver.com</a>
+                {' '}으로 요청해 주세요.
               </p>
-              <Button onClick={deleteLogs} disabled={deleting} variant="destructive" size="sm">
-                {deleting ? '삭제 중...' : '전체 삭제'}
-              </Button>
             </section>
-
-            {message && (
-              <div className="p-2.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-700 dark:text-emerald-300">
-                {message}
-              </div>
-            )}
 
             {consent && (
               <section className="pt-2 text-[11px] text-muted-foreground space-y-0.5">

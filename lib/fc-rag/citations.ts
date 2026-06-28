@@ -364,23 +364,48 @@ export function parseCitationsFromAnswer(answer: string): FCRAGCitation[] {
   const citations: FCRAGCitation[] = []
   const seen = new Set<string>()
 
-  // 「법령명」 제N조 패턴
+  const push = (lawName: string, articleNumber: string, idx: number) => {
+    const key = `${lawName}:${articleNumber}`
+    if (seen.has(key)) return
+    seen.add(key)
+    citations.push({
+      lawName,
+      articleNumber,
+      chunkText: answer.slice(Math.max(0, idx), Math.min(answer.length, idx + 300)),
+      source: 'claude-cli',
+    })
+  }
+
+  // 1) 「법령명」 제N조 — 조문 인용
   const lawArticlePattern = /「([^」]+)」\s*제(\d+)조(?:의(\d+))?(?:의(\d+))?/g
   for (const m of answer.matchAll(lawArticlePattern)) {
-    const lawName = m[1]
     const articleNum = m[4] ? `제${m[2]}조의${m[3]}의${m[4]}`
       : m[3] ? `제${m[2]}조의${m[3]}`
       : `제${m[2]}조`
-    const key = `${lawName}:${articleNum}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      const idx = m.index ?? 0
-      citations.push({
-        lawName,
-        articleNumber: articleNum,
-        chunkText: answer.slice(Math.max(0, idx), Math.min(answer.length, idx + 300)),
-        source: 'claude-cli',
-      })
+    push(m[1], articleNum, m.index ?? 0)
+  }
+
+  // 2) 「법령명」 … 별표/별지/서식 — 조문이 아닌 별표가 근거인 답변(수수료·과태료·서식 등) 인용 인식.
+  //    낫표 법령명과 같은 줄에서 근접한 별표 토큰을 부착. "[별표 2]"·"별표 제3호"·"별지 서식" 변형 허용.
+  //    이 패턴이 없으면 별표 근거 답변이 citation 0개 → 거짓 "일반 지식 기반" 으로 떨어짐(신뢰도 자폭).
+  const lawAnnexPattern = /「([^」]+)」[^「\n]{0,40}?\[?\s*(별표|별지|서식)\s*(?:제)?\s*(\d+)?/g
+  for (const m of answer.matchAll(lawAnnexPattern)) {
+    const label = m[3] ? `${m[2]} ${m[3]}` : m[2]
+    push(m[1], label, m.index ?? 0)
+  }
+
+  // 3) '## 근거 법령' 섹션 내 「법령명」 단독 — 조문/별표를 못 붙였어도 명시된 근거 법령은 인정.
+  //    casual 한 본문 언급의 오탐을 막기 위해 근거 섹션으로 범위를 한정하고, 법령형 접미사로 끝나는 낫표만.
+  const lawSuffix = /(?:법|법률|시행령|시행규칙|규칙|조례|규정|예규|고시|훈령|지침|헌법|협약|조약)$/
+  const groundsMatch = answer.match(/##\s*근거\s*법령([\s\S]*?)(?=\n##\s|$)/)
+  if (groundsMatch) {
+    const sectionIdx = groundsMatch.index ?? 0
+    for (const m of groundsMatch[1].matchAll(/「([^」]+)」/g)) {
+      const lawName = m[1].trim()
+      if (seen.has(`${lawName}:법령`) || !lawSuffix.test(lawName)) continue
+      // 이미 조문/별표로 잡힌 법령이면 중복 인용하지 않음.
+      if (citations.some((c) => c.lawName === lawName)) continue
+      push(lawName, '법령', sectionIdx + (m.index ?? 0))
     }
   }
 

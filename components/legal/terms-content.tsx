@@ -35,7 +35,10 @@ export function TermsContent() {
           <ul className="list-disc pl-5 space-y-1.5 marker:text-muted-foreground">
             <li>법제처 공개 API 기반 법령/판례/해석례 조회</li>
             <li>법령 개정 이력 비교 및 조문 변경 분석</li>
-            <li>AI 기반 법령 질의응답 (FC-RAG)</li>
+            <li>
+              AI 기반 법령 질의응답 (FC-RAG) — 기본 엔진 Themis(Anthropic Claude 기반) 및
+              Google Gemini 모델을 활용하며, 본인 API 키 등록 시 Google Gemini로 직접 처리됩니다.
+            </li>
             <li>사용자별 즐겨찾기 및 검색 이력 관리</li>
           </ul>
         </section>

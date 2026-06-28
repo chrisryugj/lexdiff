@@ -72,6 +72,7 @@ export async function* executeRelayRAGStream(
     const dec = new TextDecoder()
     let buf = ''
     let sawAnswer = false
+    let successfulTools = 0 // 신뢰도 산정용 — 릴레이는 tool 결과 본문이 없어 도구 호출 수를 grounding 신호로 사용
 
     for (;;) {
       const { done, value } = await reader.read()
@@ -106,11 +107,12 @@ export async function* executeRelayRAGStream(
           }
           case 'tool_result': {
             const name = String(ev.name)
+            successfulTools++
             yield { type: 'tool_result', name, displayName: TOOL_DISPLAY_NAMES[name] || name, success: true, summary: ev.bytes ? `${ev.bytes}B 수신` : '완료' }
             break
           }
           case 'rate_limit':
-            yield { type: 'status', message: '구독 사용량 확인 중...', progress: 5 }
+            yield { type: 'status', message: '법령 엔진 준비 중...', progress: 5 }
             break
           case 'error':
             throw new Error(String(ev.message || 'relay error'))
@@ -118,8 +120,15 @@ export async function* executeRelayRAGStream(
             if (ev.error) throw new Error(`relay: ${String(ev.error)}`)
             const answer = String(ev.answer || '')
             const citations = parseCitationsFromAnswer(answer)
+            // 릴레이는 tool 결과 본문이 없어 텍스트·도구 신호로 신뢰도 추정.
+            // 인용이 있고 '## 근거 법령' 섹션 + 충분한 도구 조회까지 갖추면 high,
+            // 인용·근거섹션 중 하나라도 있으면 medium, 둘 다 없으면 low.
+            // (별표 근거 답변이 '인용 0' 으로 떨어져 거짓 '일반 지식' 배너가 뜨던 문제 해소)
+            const hasGroundsSection = /##\s*근거\s*법령/.test(answer)
             const confidenceLevel: 'high' | 'medium' | 'low' =
-              citations.length >= 2 ? 'high' : citations.length >= 1 ? 'medium' : 'low'
+              citations.length >= 1 && hasGroundsSection && successfulTools >= 2 ? 'high'
+              : citations.length >= 1 || hasGroundsSection ? 'medium'
+              : 'low'
             sawAnswer = true
             yield {
               type: 'answer',

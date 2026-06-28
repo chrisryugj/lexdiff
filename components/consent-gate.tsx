@@ -17,7 +17,8 @@ import { LegalDocDialog, type LegalDoc } from '@/components/legal/legal-doc-dial
 /**
  * 로그인 사용자 대상 동의 게이트.
  * - 최초 로그인 또는 약관/방침 버전 bump 시 모달 표시
- * - 필수 동의 2개(이용약관, 개인정보처리방침) + 선택 1개(AI 로그 수집)
+ * - 필수 동의 2개(이용약관, 개인정보처리방침)
+ *   (AI 텔레메트리는 본문 미저장·집계만이라 방침상 별도 동의 대상이 아님 — 선택 동의 항목 제거됨)
  * - 레이아웃에 마운트되어 backgound에서 GET /api/privacy/consent 로 상태 확인
  */
 export function ConsentGate() {
@@ -26,7 +27,6 @@ export function ConsentGate() {
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeAll, setAgreeAll] = useState(false)
-  const [aiLoggingOptIn, setAiLoggingOptIn] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [docOpen, setDocOpen] = useState<LegalDoc | null>(null)
 
@@ -56,7 +56,6 @@ export function ConsentGate() {
     setAgreeAll(v)
     setAgreeTerms(v)
     setAgreePrivacy(v)
-    setAiLoggingOptIn(v)
   }
 
   const onSubmit = async () => {
@@ -69,7 +68,6 @@ export function ConsentGate() {
         body: JSON.stringify({
           agreeTerms: true,
           agreePrivacy: true,
-          aiLoggingOptIn,
         }),
       })
       if (res.ok) setOpen(false)
@@ -143,18 +141,10 @@ export function ConsentGate() {
             </span>
           </label>
 
-          <label className="flex items-start gap-2 px-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={aiLoggingOptIn}
-              onChange={(e) => setAiLoggingOptIn(e.target.checked)}
-              className="h-4 w-4 mt-0.5"
-            />
-            <span className="text-sm flex-1 text-muted-foreground">
-              <span className="text-muted-foreground">[선택]</span> AI 검색 품질 개선을 위한 질의 로그
-              수집·이용 동의 (30일 보관, 익명화 저장, 언제든 철회 가능)
-            </span>
-          </label>
+          <p className="px-3 pt-1 text-xs leading-relaxed text-muted-foreground">
+            AI 검색 시 질의·답변 <span className="font-medium text-foreground">원문은 저장하지 않습니다.</span>{' '}
+            품질 개선용 집계 신호(본문 제외)만 익명 처리되며, 자세한 내용은 개인정보처리방침에서 확인하실 수 있어요.
+          </p>
         </div>
 
         <DialogFooter>

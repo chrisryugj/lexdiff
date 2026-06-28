@@ -110,6 +110,9 @@ export function ApiKeyInput({ apiKey, onSave, onClear, variant = "default" }: Ap
               내 키를 등록하면 일일 검색 제한 없이 사용할 수 있습니다.
               키는 이 탭에서만 유지됩니다.
             </p>
+            <p className="text-[11px] text-muted-foreground/80 mt-1.5 leading-relaxed">
+              본인 키 사용 시 질의는 기본 엔진(Themis)을 거치지 않고 <span className="font-medium text-foreground/80">Google Gemini로 직접 전송</span>됩니다.
+            </p>
           </div>
 
           {apiKey ? (

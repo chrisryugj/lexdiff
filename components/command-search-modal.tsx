@@ -454,6 +454,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                   <Icon name="clock" className="h-3.5 w-3.5" />
                   <span>최근 검색</span>
                 </div>
+                <div className="space-y-1">
                 {recentSearches.slice(0, 5).map((query, idx) => {
                   const globalIndex = suggestions.length + idx
                   const isSelected = selectedIndex === globalIndex
@@ -462,7 +463,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                     <div
                       key={idx}
                       className={cn(
-                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors group border",
+                        "w-full flex items-center justify-between p-2 rounded-md transition-colors group border",
                         isSelected
                           ? "bg-accent border-primary/40"
                           : "border-transparent hover:bg-muted hover:border-border"
@@ -488,6 +489,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                     </div>
                   )
                 })}
+                </div>
               </div>
             </div>
           )}

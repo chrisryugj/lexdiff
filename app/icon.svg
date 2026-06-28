@@ -1,4 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#1e293b"/>
-  <text x="50" y="70" font-family="Arial" font-size="60" fill="#60a5fa" text-anchor="middle" font-weight="bold">L</text>
+  <rect width="100" height="100" rx="22" fill="#0b1c2c"/>
+  <g fill="#9a6500" opacity="0.55">
+    <rect x="40" y="28" width="12" height="46" rx="4"/>
+    <rect x="40" y="62" width="33" height="12" rx="4"/>
+  </g>
+  <g fill="#d8944d">
+    <rect x="33" y="24" width="13" height="48" rx="4.5"/>
+    <rect x="33" y="59" width="35" height="13" rx="4.5"/>
+  </g>
 </svg>
