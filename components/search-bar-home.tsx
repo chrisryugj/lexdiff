@@ -90,7 +90,8 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
             data-tour="ai-toggle"
             onClick={() => actions.setForceAiMode(!forceAiMode)}
             className={cn(
-              "h-16 w-16 self-start !rounded-none border-r border-gray-300 dark:border-gray-700 transition-colors hidden sm:flex",
+              // self-stretch + min-h-16: 행 높이(=textarea)에 맞춰 채움 — h-16 고정 시 textarea가 더 커서 버튼 하단에 배경 갭 노출됨
+              "min-h-16 w-16 self-stretch !rounded-none border-r border-gray-300 dark:border-gray-700 transition-colors hidden sm:flex",
               forceAiMode ? "bg-brand-navy text-white hover:bg-brand-navy/90 dark:text-background" : "text-gray-500 hover:text-brand-navy hover:bg-gray-100 dark:hover:bg-gray-800"
             )}
             title={forceAiMode ? "일반 검색으로 전환" : "AI 모드로 전환"}
@@ -158,7 +159,8 @@ export function SearchBarHome({ onSearch, isLoading, searchMode = 'basic' }: Sea
             disabled={isLoading || !query.trim()}
             aria-label="검색"
             className={cn(
-              "h-16 w-16 shrink-0 self-start px-0 sm:w-auto sm:px-8 !rounded-none text-lg font-bold transition-all",
+              // self-stretch + min-h-16: 행 높이에 맞춰 채움 — h-16 고정 시 textarea가 더 커서 버튼 하단에 배경 갭이 보였음(라이트·다크 공통)
+              "min-h-16 w-16 shrink-0 self-stretch px-0 sm:w-auto sm:px-8 !rounded-none text-lg font-bold transition-all",
               "bg-brand-navy hover:bg-brand-navy/90 text-white dark:text-background"
             )}
           >
