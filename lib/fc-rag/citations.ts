@@ -409,5 +409,44 @@ export function parseCitationsFromAnswer(answer: string): FCRAGCitation[] {
     }
   }
 
+  // 4) 「법령명」 없이 별표·제N조만 근거로 제시된 비결정적 출력 복구.
+  //    실패 모드: 모델이 "별표 [제목] 제N조 관련 (시행…)"을 낫표 법령명 없이 써서 1~3 패턴이
+  //    모두 못 잡음 → citation 0 → 거짓 "일반 지식" 배너 + 별표만 링크(법령명/제N조 링크 누락).
+  //    해결: 본문 어딘가에 등장한 「법령명」 중 그 토큰 직전(가장 가까운 앞쪽)의 것을 부착.
+  const lawPositions: Array<{ name: string; idx: number }> = []
+  for (const m of answer.matchAll(/「([^」]+)」/g)) {
+    const nm = m[1].trim()
+    if (lawSuffix.test(nm)) lawPositions.push({ name: nm, idx: m.index ?? 0 })
+  }
+  if (lawPositions.length > 0) {
+    const nearestLaw = (idx: number): string | null => {
+      let best: string | null = null
+      for (const p of lawPositions) {
+        if (p.idx <= idx) best = p.name
+        else break
+      }
+      return best
+    }
+    // (a) "별표 [N] … 제N조 관련" — '관련'으로 끝나는 표준 별표 인용구. 별표 + 근거조문 둘 다 부착.
+    for (const m of answer.matchAll(/별표\s*(?:제)?\s*(\d+)?[^\n「」]{0,50}?제(\d+)조(?:의(\d+))?\s*관련/g)) {
+      const law = nearestLaw(m.index ?? 0)
+      if (!law) continue
+      push(law, m[1] ? `별표 ${m[1]}` : '별표', m.index ?? 0)
+      push(law, m[3] ? `제${m[2]}조의${m[3]}` : `제${m[2]}조`, m.index ?? 0)
+    }
+    // (b) '근거 법령' 섹션의 bare 별표 / bare 제N조 (낫표 없이 나열된 항목) — 가장 가까운 앞쪽 법령 부착.
+    if (groundsMatch) {
+      const base = groundsMatch.index ?? 0
+      for (const m of groundsMatch[1].matchAll(/\[?\s*별표\s*(?:제)?\s*(\d+)?/g)) {
+        const law = nearestLaw(base + (m.index ?? 0))
+        if (law) push(law, m[1] ? `별표 ${m[1]}` : '별표', base + (m.index ?? 0))
+      }
+      for (const m of groundsMatch[1].matchAll(/제(\d+)조(?:의(\d+))?/g)) {
+        const law = nearestLaw(base + (m.index ?? 0))
+        if (law) push(law, m[2] ? `제${m[1]}조의${m[2]}` : `제${m[1]}조`, base + (m.index ?? 0))
+      }
+    }
+  }
+
   return citations
 }

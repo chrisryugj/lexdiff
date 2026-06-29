@@ -749,7 +749,9 @@ export function AIAnswerContent({
                                 key="ai-stream-plain"
                                 className="whitespace-pre-wrap break-words transition-opacity duration-150"
                             >
-                                {displayedContent}
+                                {/* 스트리밍/타이핑 plain-text 단계에서 줄머리 blockquote 기호(> )를 숨김.
+                                    완료 후 LegalMarkdownRenderer 는 원본으로 blockquote 스타일링하므로 무영향. */}
+                                {displayedContent.replace(/^[ \t]*>[ \t]?/gm, '')}
                                 {isTyping && (
                                     <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1 align-middle" />
                                 )}
