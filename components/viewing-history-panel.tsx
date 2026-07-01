@@ -183,7 +183,7 @@ export function ViewingHistoryPanel({
             {(maxItems ? filtered.slice(0, maxItems) : filtered).map((rec) => (
               <div
                 key={rec.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/50 p-2 transition-colors hover:bg-card"
+                className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-card/50 p-2 transition-colors hover:bg-card"
               >
                 <button
                   onClick={() => onReview(rec)}

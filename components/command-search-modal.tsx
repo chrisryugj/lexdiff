@@ -308,7 +308,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-[calc(100%-2rem)] sm:max-w-2xl p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl sm:rounded-xl top-[12vh] translate-y-0"
+        className="max-w-[calc(100%-2rem)] sm:max-w-2xl p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl sm:rounded-xl top-[8vh] translate-y-0 flex flex-col max-h-[85vh]"
         showCloseButton={true}
       >
         {/* 접근성을 위한 숨겨진 타이틀 */}
@@ -317,7 +317,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         </VisuallyHidden.Root>
 
         {/* 검색 입력 영역 - X 버튼 공간 확보 */}
-        <div className="flex items-center gap-3 pl-4 pr-12 py-4 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-3 pl-4 pr-12 py-4 border-b border-border bg-muted/30 shrink-0">
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
             <Icon name="search" className="h-5 w-5 text-primary" />
           </div>
@@ -341,8 +341,8 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           />
         </div>
 
-        {/* 검색 제안 영역 */}
-        <div className="bg-background">
+        {/* 검색 제안 영역 — 단일 통합 스크롤(모달 높이 초과 시 여기서만 스크롤) */}
+        <div className="bg-background flex-1 overflow-y-auto min-h-0">
           {/* 로딩 표시 */}
           {isLoadingSuggestions && searchQuery.trim() && (
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground border-b border-border">
@@ -361,7 +361,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
           {/* 실시간 추천 (법령 + AI) - 독립 스크롤 영역 */}
           {suggestions.length > 0 && (
-            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+            <div className="border-b border-border">
               <div className="p-2">
                 {/* 법령 추천 */}
                 {suggestions.filter(s => s.type === 'law').length > 0 && (
@@ -448,7 +448,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
 
           {/* 최근 검색 - 독립 스크롤 영역 (5개만 표시) */}
           {recentSearches.length > 0 && (
-            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+            <div className="border-b border-border">
               <div className="p-2">
                 <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                   <Icon name="clock" className="h-3.5 w-3.5" />
@@ -494,9 +494,9 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
             </div>
           )}
 
-          {/* 즐겨찾기 - 독립 스크롤 영역 */}
+          {/* 즐겨찾기 */}
           {favorites.length > 0 && (
-            <div className="max-h-[200px] overflow-y-auto">
+            <div className="border-b border-border">
               <div className="p-2">
                 <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                   <Icon name="star" className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
@@ -538,7 +538,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           {/* 최근 조회 이력 — 본 항목 재조회 (5개 제한 + 독립 스크롤).
               embedded: Card chrome 없이 형제 섹션과 동일한 평평한 sticky 헤더로 렌더(부유/중첩 방지) */}
           {(historyCount > 0 || historyHydrating) && (
-            <div className="max-h-[200px] overflow-y-auto border-b border-border">
+            <div className="border-b border-border">
               <div className="p-2">
                 <ViewingHistoryPanel
                   embedded
@@ -566,7 +566,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         </div>
 
         {/* 하단 힌트 */}
-        <div className="border-t border-border px-4 py-3 bg-muted/30">
+        <div className="border-t border-border px-4 py-3 bg-muted/30 shrink-0">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-foreground font-mono text-[10px]">Enter</kbd>

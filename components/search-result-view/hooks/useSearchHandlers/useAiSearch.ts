@@ -392,6 +392,7 @@ export function useAiSearch(deps: HandlerDeps) {
             name: event.name,
             displayName: event.displayName,
             query: event.query,
+            args: (event as { args?: Record<string, unknown> }).args,
             timestamp: Date.now(),
           })
           break

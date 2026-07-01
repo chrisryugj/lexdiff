@@ -281,6 +281,7 @@ export interface ToolCallLogEntry {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
+  args?: Record<string, unknown>
 }
 
 // ============================================================

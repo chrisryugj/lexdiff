@@ -4,12 +4,23 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Icon } from "@/components/ui/icon"
 import type { ToolCallLogEntry } from "@/components/search-result-view/types"
 
+/** tool_call args → "여권법 시행령 · 제39조" 형태 요약 (실제 조회 대상 노출) */
+function summarizeArgs(args?: Record<string, unknown>): string {
+    if (!args) return ''
+    const a = args as Record<string, unknown>
+    const primary = a.lawName ?? a.query ?? a.task ?? a.domain
+    const detail = a.jo ?? (a.annexNo ? `별표 ${a.annexNo}` : a.bylSeq ? '별표' : (a.mode ?? undefined))
+    const parts = [primary, detail].filter((v) => v != null && v !== '').map(String)
+    return parts.slice(0, 2).join(' · ')
+}
+
 /** call/result 페어링 → 완료/진행 중 단계 목록 (사고 단계 포함) */
 function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
     const steps: Array<{
         name: string
         displayName: string
         query?: string
+        args?: Record<string, unknown>
         status: 'completed' | 'in-progress'
         durationMs?: number
         success?: boolean
@@ -46,6 +57,7 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
                 name: call.name || '',
                 displayName: call.displayName,
                 query: call.query,
+                args: call.args,
                 status: 'completed',
                 durationMs: (matchResult.timestamp! - call.timestamp!),
                 success: matchResult.success,
@@ -83,6 +95,7 @@ function buildSteps(logs: ToolCallLogEntry[], isStreaming = true) {
                 name: call.name || '',
                 displayName: call.displayName,
                 query: call.query,
+                args: call.args,
                 status: isStreaming ? 'in-progress' : 'completed',
                 statusMessages: msgs,
             })
@@ -155,6 +168,9 @@ export function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: To
                                 : 'font-medium text-gray-800 dark:text-gray-200'
                         }`}>
                             {step.displayName}
+                            {!step.isThinking && summarizeArgs(step.args) && (
+                                <span className="font-normal text-gray-400 dark:text-gray-500"> · {summarizeArgs(step.args)}</span>
+                            )}
                         </span>
                         {step.status === 'completed' && step.durationMs != null ? (
                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 shrink-0 ${
