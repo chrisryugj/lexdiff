@@ -174,8 +174,8 @@ importers:
         specifier: ^3.5.1
         version: 3.5.1(pdfjs-dist@5.5.207)
       korean-law-mcp:
-        specifier: ^4.4.2
-        version: 4.4.2
+        specifier: ^4.4.4
+        version: 4.4.4
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -3337,8 +3337,8 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.4.2:
-    resolution: {integrity: sha512-/j04ezF2Abp/2zHSPjudFN6g3xFhpDuCMyTwPS9QV6PQF8rnA9HbNMSzCRb0lTsnz4cim+F6asYRzYqjxskyqg==}
+  korean-law-mcp@4.4.4:
+    resolution: {integrity: sha512-8AgMWW8VJs2pFkIu+bXVJRcWsbBcbBehvZHQkT8T26EDADsJ/dkGLUC5o7Vp3bwJ2oeQ23N0IVEO3X/NeDuHBw==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -4517,6 +4517,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
   zustand@5.0.8:
     resolution: {integrity: sha512-gyPKpIaxY9XcO2vSMrLbiER7QMAMGOQZVRdJ6Zi782jkbzZygq5GI9nG8g+sMgitRtndwaBSl7uiqC49o1SSiw==}
     engines: {node: '>=12.20.0'}
@@ -5167,6 +5170,28 @@ snapshots:
       raw-body: 3.0.2
       zod: 3.25.76
       zod-to-json-schema: 3.25.1(zod@3.25.76)
+    transitivePeerDependencies:
+      - supports-color
+
+  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+    dependencies:
+      '@hono/node-server': 1.19.13(hono@4.12.12)
+      ajv: 8.18.0
+      ajv-formats: 3.0.1(ajv@8.18.0)
+      content-type: 1.0.5
+      cors: 2.8.5
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 8.3.2(express@5.2.1)
+      hono: 4.12.12
+      jose: 6.2.2
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.1(zod@4.4.3)
     transitivePeerDependencies:
       - supports-color
 
@@ -7623,16 +7648,16 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  korean-law-mcp@4.4.2:
+  korean-law-mcp@4.4.4:
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       '@xmldom/xmldom': 0.9.9
       commander: 14.0.3
       dotenv: 17.4.1
       express: 5.2.1
       kordoc: 3.5.1(pdfjs-dist@5.5.207)
       pdfjs-dist: 5.5.207
-      zod: 3.25.76
+      zod: 4.4.3
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - puppeteer-core
@@ -9122,11 +9147,17 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
+  zod-to-json-schema@3.25.1(zod@4.4.3):
+    dependencies:
+      zod: 4.4.3
+
   zod-validation-error@4.0.2(zod@3.25.76):
     dependencies:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zod@4.4.3: {}
 
   zustand@5.0.8(@types/react@19.2.2)(immer@10.2.0)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)):
     optionalDependencies:
