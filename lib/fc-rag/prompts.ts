@@ -128,6 +128,7 @@ const DOMAIN_TOOL_HINTS: Partial<Record<LegalDomain, string>> = {
   education: '- 교육 도메인: chain_law_system 또는 chain_full_research 로 교육기본법+초중등교육법 등 법체계 수집.',
   finance: '- 금융 도메인: chain_full_research 또는 chain_dispute_prep 로 자본시장법+금소법 등 수집.',
   military: '- 병역 도메인: chain_law_system 또는 chain_full_research 로 병역법+군인사법 등 법체계 수집.',
+  civil_service: '- 민원·증명 도메인(여권/주민등록/가족관계/운전면허 등): 발급 수수료·금액은 시행령/시행규칙 [별표]에 표로 규정된 경우가 많음 → get_annexes 로 확인. 별표에 없으면 소관 고시(공단/기관) 가능성 명시.',
 }
 
 // ─── 특수 결정문 도메인 키워드 감지 ───
@@ -294,6 +295,7 @@ export function buildStaticSystemPrompt(isGemini?: boolean): string {
 9. search_ai_law 결과 불충분하면 get_batch_articles로 핵심 조문 원문 추가 조회.
 10. 처벌 기준·수치·금액은 조문 원문을 확인한 후에만 답변.
 11. 조문에 '별표 N'이 언급되면 get_annexes로 반드시 조회.
+12. **금액·수수료·요금·과태료·과징금·단가·기준·한도 질의**(질의 유형과 무관): 구체적 액수는 조문 본문이 아니라 [별표]에 표로 규정된 경우가 대부분임. 관련 시행령/시행규칙의 별표를 get_annexes로 조회해 실제 금액을 확인할 것. **별표 번호가 불확실하면 lawName 만으로 호출해 별표 목록을 먼저 받은 뒤, 목록에서 해당 별표를 골라 재조회**할 것 (번호를 추측해 헛조회하지 말 것). 조회한 별표가 질의와 무관하면 목록의 다른 별표를 확인하고, 그래도 없으면 소관 고시(공단/기관) 가능성을 명시.
 ${isGemini ? `
 ## 🔴 Gemini Fallback 추가 제약 (최우선)
 - 도구 결과에 **정확히 포함된 조문번호와 법령명만** 답변에 인용할 것. 추론으로 유추한 조문번호를 절대 생성하지 마라.

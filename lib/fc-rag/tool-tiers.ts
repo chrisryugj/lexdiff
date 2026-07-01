@@ -94,7 +94,7 @@ export function detectContextNeeds(query: string): string[] {
   if (/위임|시행령|시행규칙|3단|체계/.test(query)) needs.push('structural')
   if (/개정|변경|이력|역사|신구|대조|바뀐/.test(query)) needs.push('historical')
   if (/조례|자치법규|지방/.test(query) || /[가-힣]+[시도군구]\s/.test(query)) needs.push('ordinance')
-  if (/별표|서식|부표|급여표|수당표|세율표|가액|금액.?기준|한도|상한|범위표|기준표/.test(query)) needs.push('annex')
+  if (/별표|서식|부표|급여표|수당표|세율표|가액|금액.?기준|한도|상한|범위표|기준표|수수료|과태료|과징금|부담금|사용료|점용료|이용료|단가/.test(query)) needs.push('annex')
   return needs
 }
 
