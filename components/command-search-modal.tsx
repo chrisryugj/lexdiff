@@ -362,11 +362,11 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           {/* 실시간 추천 (법령 + AI) - 독립 스크롤 영역 */}
           {suggestions.length > 0 && (
             <div className="border-b border-border">
-              <div className="p-2">
+              <div className="px-2 py-1.5">
                 {/* 법령 추천 */}
                 {suggestions.filter(s => s.type === 'law').length > 0 && (
                   <>
-                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                    <div className="flex items-center gap-2 px-3 pt-1.5 pb-1 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                       <Icon name="scale" className="h-3.5 w-3.5 text-amber-500" />
                       <span>법령</span>
                     </div>
@@ -381,7 +381,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                             key={`law-${index}`}
                             onClick={() => handleSearch(suggestion.text)}
                             className={cn(
-                              "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                              "w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-left group border",
                               isSelected
                                 ? "bg-accent border-primary/40"
                                 : "border-transparent hover:bg-muted hover:border-border"
@@ -405,9 +405,9 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                 {suggestions.filter(s => s.type === 'ai').length > 0 && (
                   <>
                     {suggestions.filter(s => s.type === 'law').length > 0 && (
-                      <div className="border-t border-border my-2" />
+                      <div className="border-t border-border my-1.5" />
                     )}
-                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+                    <div className="flex items-center gap-2 px-3 pt-1.5 pb-1 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                       <Icon name="sparkles" className="h-3.5 w-3.5 text-primary" />
                       <span>AI 질문</span>
                     </div>
@@ -423,7 +423,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                             key={`ai-${index}`}
                             onClick={() => handleSearch(suggestion.text)}
                             className={cn(
-                              "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                              "w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-left group border",
                               isSelected
                                 ? "bg-primary/10 dark:bg-primary/10 border-primary/40"
                                 : "border-transparent hover:bg-primary/5 dark:hover:bg-primary/5 hover:border-primary/20"
@@ -449,12 +449,12 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           {/* 최근 검색 - 독립 스크롤 영역 (5개만 표시) */}
           {recentSearches.length > 0 && (
             <div className="border-b border-border">
-              <div className="p-2">
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+              <div className="px-2 py-1.5">
+                <div className="flex items-center gap-2 px-3 pt-1.5 pb-1 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                   <Icon name="clock" className="h-3.5 w-3.5" />
                   <span>최근 검색</span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                 {recentSearches.slice(0, 5).map((query, idx) => {
                   const globalIndex = suggestions.length + idx
                   const isSelected = selectedIndex === globalIndex
@@ -463,7 +463,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                     <div
                       key={idx}
                       className={cn(
-                        "w-full flex items-center justify-between p-2 rounded-md transition-colors group border",
+                        "w-full flex items-center justify-between gap-1 pl-3 pr-1.5 py-1 rounded-md transition-colors group border",
                         isSelected
                           ? "bg-accent border-primary/40"
                           : "border-transparent hover:bg-muted hover:border-border"
@@ -480,11 +480,11 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                         onClick={(e) => handleRemoveRecent(e, query)}
                         aria-label={`${query} 최근 검색에서 삭제`}
                         className={cn(
-                          "h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground transition-all flex-shrink-0 ml-1",
+                          "h-8 w-8 sm:h-7 sm:w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground transition-all flex-shrink-0",
                           isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                         )}
                       >
-                        <Icon name="x" className="h-4 w-4" />
+                        <Icon name="x" className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   )
@@ -497,14 +497,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
           {/* 즐겨찾기 */}
           {favorites.length > 0 && (
             <div className="border-b border-border">
-              <div className="p-2">
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
+              <div className="px-2 py-1.5">
+                <div className="flex items-center gap-2 px-3 pt-1.5 pb-1 text-xs text-muted-foreground font-semibold sticky top-0 bg-background z-10">
                   <Icon name="star" className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
                   <span>즐겨찾기</span>
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {favorites.length}
                   </Badge>
                 </div>
+                <div className="space-y-0.5">
                 {favorites.slice(0, 5).map((fav, idx) => {
                   const globalIndex = suggestions.length + recentSearches.slice(0, 5).length + idx
                   const isSelected = selectedIndex === globalIndex
@@ -514,15 +515,15 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                       key={`${fav.lawTitle}-${fav.jo}`}
                       onClick={() => handleFavoriteClick(fav)}
                       className={cn(
-                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left group border",
+                        "w-full flex items-center justify-between px-3 py-1.5 rounded-md transition-colors text-left group border",
                         isSelected
                           ? "bg-accent border-primary/40"
                           : "border-transparent hover:bg-muted hover:border-border"
                       )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate text-foreground">{fav.lawTitle}</div>
-                        <div className="text-xs text-muted-foreground">{formatJO(fav.jo)}</div>
+                      <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                        <span className="text-sm font-medium truncate text-foreground">{fav.lawTitle}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{formatJO(fav.jo)}</span>
                       </div>
                       <Icon name="arrow-right" className={cn(
                         "h-4 w-4 text-muted-foreground transition-all flex-shrink-0 ml-2",
@@ -531,6 +532,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
                     </button>
                   )
                 })}
+                </div>
               </div>
             </div>
           )}
@@ -539,7 +541,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
               embedded: Card chrome 없이 형제 섹션과 동일한 평평한 sticky 헤더로 렌더(부유/중첩 방지) */}
           {(historyCount > 0 || historyHydrating) && (
             <div className="border-b border-border">
-              <div className="p-2">
+              <div className="px-2 py-1.5">
                 <ViewingHistoryPanel
                   embedded
                   hideWhenEmpty={false}
@@ -566,7 +568,7 @@ export function CommandSearchModal({ isOpen, onClose, onSearch, isAiMode = false
         </div>
 
         {/* 하단 힌트 */}
-        <div className="border-t border-border px-4 py-3 bg-muted/30 shrink-0">
+        <div className="border-t border-border px-4 py-2 bg-muted/30 shrink-0">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-foreground font-mono text-[10px]">Enter</kbd>

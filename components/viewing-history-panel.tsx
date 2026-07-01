@@ -83,7 +83,7 @@ export function ViewingHistoryPanel({
 
   // 임베드 모드: 형제 섹션과 동일한 평평한 sticky 헤더 (필터/전체삭제 없음)
   const headerNode = embedded ? (
-    <div className="sticky top-0 z-10 flex items-center gap-2 bg-background px-3 py-2 text-xs font-semibold text-muted-foreground">
+    <div className="sticky top-0 z-10 flex items-center gap-2 bg-background px-3 pt-1.5 pb-1 text-xs font-semibold text-muted-foreground">
       <Icon name="clock" className="h-3.5 w-3.5" />
       <span>최근 조회</span>
       {records.length > 0 && (
@@ -143,9 +143,9 @@ export function ViewingHistoryPanel({
 
       {records.length === 0 ? (
         hydrating ? (
-          <div className="space-y-1" aria-hidden="true">
+          <div className="space-y-0.5" aria-hidden="true">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-11 animate-pulse rounded-md bg-muted/50" />
+              <div key={i} className={`${embedded ? "h-9" : "h-11"} animate-pulse rounded-md bg-muted/50`} />
             ))}
           </div>
         ) : (
@@ -179,11 +179,16 @@ export function ViewingHistoryPanel({
           </div>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {(maxItems ? filtered.slice(0, maxItems) : filtered).map((rec) => (
               <div
                 key={rec.id}
-                className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-card/50 p-2 transition-colors hover:bg-card"
+                className={
+                  embedded
+                    // 임베드(검색 모달): 형제 섹션(최근 검색 등)과 동일한 플랫 hover 행
+                    ? "group flex w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent py-1 pl-3 pr-1.5 transition-colors hover:border-border hover:bg-muted"
+                    : "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-card/50 p-2 transition-colors hover:bg-card"
+                }
               >
                 <button
                   onClick={() => onReview(rec)}
@@ -205,10 +210,14 @@ export function ViewingHistoryPanel({
                     variant="ghost"
                     size="sm"
                     onClick={() => viewingHistoryStore.removeRecord(rec.id)}
-                    className="h-9 w-9 p-0"
+                    className={
+                      embedded
+                        ? "h-8 w-8 sm:h-7 sm:w-7 p-0 text-muted-foreground hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                        : "h-9 w-9 p-0"
+                    }
                     aria-label={`${rec.title} 삭제`}
                   >
-                    <Icon name="x" className="h-4 w-4" />
+                    <Icon name="x" className={embedded ? "h-3.5 w-3.5" : "h-4 w-4"} />
                   </Button>
                 </div>
               </div>
