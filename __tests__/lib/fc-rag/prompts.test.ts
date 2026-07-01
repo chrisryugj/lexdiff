@@ -102,4 +102,39 @@ describe('buildSystemPrompt', () => {
       expect(prompt).not.toContain('절대 필수')
     })
   })
+
+  describe('PromptBuildOptions — 웹 방식 재설계 (relay 경로 전용)', () => {
+    test('universalFormat: SPECIALIST 구조 대신 범용 구조 + 파서 하드 제약(근거 법령) 유지', () => {
+      const prompt = buildSystemPrompt('moderate', 'scope', '여권 발급 수수료 얼마야?', undefined, { universalFormat: true })
+      expect(prompt).toContain('## 결론')
+      expect(prompt).toContain('## 근거 법령')
+      expect(prompt).not.toContain('## 시뮬레이션') // scope SPECIALIST 구조 미포함
+    })
+
+    test('autonomousTools: 조회 전략 지시 제거, 별표 공용원칙만 유지', () => {
+      const prompt = buildSystemPrompt('moderate', 'scope', '여권 발급 수수료 얼마야?', undefined, { universalFormat: true, autonomousTools: true })
+      expect(prompt).not.toContain('chain_full_research')
+      expect(prompt).not.toContain('도구 예산')
+      expect(prompt).not.toContain('질의 도메인 힌트')
+      expect(prompt).toContain('별표 목록을 먼저')
+      expect(prompt).toContain('도구를 최소 1회 이상 호출')
+    })
+
+    test('autonomousTools: 결정문 도메인 강제 지시 제거 (기본 모드엔 존재)', () => {
+      const q = '개인정보보호위원회 과징금 처분 사례가 궁금해'
+      expect(buildSystemPrompt('moderate', 'definition', q, undefined, { autonomousTools: true }))
+        .not.toContain('결정문 도메인 강제 지시')
+      expect(buildSystemPrompt('moderate', 'definition', q)).toContain('결정문 도메인 강제 지시')
+    })
+
+    // 약칭 해석 힌트(aliasBlock)는 자율 모드에서도 유지되나, vitest.setup.ts가
+    // search-normalizer를 전역 mock(detectAliasesInQuery→[])하므로 여기선 검증 불가.
+
+    test('opts 미지정 시 기존 동작 완전 불변 (Gemini/Hermes 경로 보호)', () => {
+      const prompt = buildSystemPrompt('moderate', 'scope', '여권 발급 수수료 얼마야?')
+      expect(prompt).toContain('## 시뮬레이션')
+      expect(prompt).toContain('chain_full_research')
+      expect(prompt).toContain('도구 예산')
+    })
+  })
 })
