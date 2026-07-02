@@ -13,19 +13,48 @@ export interface ResolvedLaw {
   kind: string  // 법률, 대통령령, 총리령·부령
 }
 
+/** "관세법 [현행]" / "관세법 ⚠️[연혁-과거버전]" → 상태 라벨 제거 */
+function stripStatusLabel(name: string): string {
+  return name.replace(/\s*(?:⚠️\s*)?\[[^\]]*\]\s*$/, '').trim()
+}
+
 /**
- * executeTool('search_law') 압축 결과에서 법령 정보 추출
+ * executeTool('search_law') 결과에서 법령 정보 추출
  *
- * 포맷: `1. 건축법 (MST:273437, 법률)`
+ * korean-law-mcp v4.2+ 원본 포맷 (compressSearchResult 는 이 포맷과 미매칭이라 원문 통과):
+ * ```
+ * 1. 관세법 [현행]
+ *    - 법령ID: 001556
+ *    - MST: 280363
+ *    - 공포일: 20251223 / 시행일: 20260701
+ *    - 구분: 법률
+ * ```
+ * 구 압축 포맷 `1. 건축법 (MST:273437, 법률)` 도 폴백으로 지원.
+ * ⚠️[연혁-과거버전] 항목은 제외 — 영향 분석은 현행 법령 기준.
  */
 export function parseSearchResult(text: string): ResolvedLaw[] {
   const results: ResolvedLaw[] = []
-  const regex = /\d+\.\s+(.+?)\s+\(MST:(\d+),\s*(\S+)\)/g
+
+  const rawRegex = /\d+\.\s+(.+)\n\s*- 법령ID:\s*\S*\n\s*- MST:\s*(\d+)\n\s*- 공포일:[^\n]*\n\s*- 구분:\s*(\S+)/g
   let m
-  while ((m = regex.exec(text)) !== null) {
+  while ((m = rawRegex.exec(text)) !== null) {
+    if (m[1].includes('연혁-과거버전')) continue
     results.push({
-      lawName: m[1].trim(),
+      lawName: stripStatusLabel(m[1]),
       lawId: m[2],  // MST를 lawId로 사용
+      mst: m[2],
+      kind: m[3],
+    })
+  }
+  if (results.length > 0) return results
+
+  // 폴백: 압축 포맷
+  const compactRegex = /\d+\.\s+(.+?)\s+\(MST:(\d+),\s*(\S+)\)/g
+  while ((m = compactRegex.exec(text)) !== null) {
+    if (m[1].includes('연혁-과거버전')) continue
+    results.push({
+      lawName: stripStatusLabel(m[1]),
+      lawId: m[2],
       mst: m[2],
       kind: m[3],
     })
@@ -64,11 +93,19 @@ export interface OldNewPair {
 /**
  * compare_old_new 텍스트에서 조문별 신구법 텍스트 추출
  *
- * 포맷:
+ * korean-law-mcp v4.4 포맷:
  * ```
- * ━━━━━━━━━━━━━━━━━━━━━━
- * 조문 1
- * ━━━━━━━━━━━━━━━━━━━━━━
+ * 법령명: 관세법
+ * 개정구분: 일부개정
+ * 신법 공포일: 20251223
+ *
+ * ---
+ * 신구법 대조
+ * ---
+ *
+ * ---
+ * 제38조
+ * ---
  *
  * [개정 전]
  * 제38조(신고납부) ① ...
@@ -76,6 +113,7 @@ export interface OldNewPair {
  * [개정 후]
  * 제38조(신고납부) ① ...
  * ```
+ * 신설/삭제는 `[개정 전] (신설)` / `[개정 후] (삭제)` 로 같은 줄에 표기됨.
  */
 export function parseCompareOldNew(text: string): {
   lawName: string
@@ -88,22 +126,30 @@ export function parseCompareOldNew(text: string): {
   const lawName = lawNameMatch?.[1]?.trim() ?? ''
   const revisionType = revTypeMatch?.[1]?.trim() ?? '일부개정'
 
+  // truncateForContext 꼬리 마커 제거 (마지막 블록에 섞여 들어가는 것 방지)
+  const body = text.replace(/\n+\.\.\. \(결과가 너무 길어 일부만 표시\)\s*$/, '')
+
   const pairs: OldNewPair[] = []
 
-  // [개정 전] / [개정 후] 블록 쌍 추출
-  const blockRegex = /\[개정 전\]\n([\s\S]*?)\n\n\[개정 후\]\n([\s\S]*?)(?=\n━|$)/g
-  let bm
+  // 구분선(---/━━━)으로 섹션 분리 → "제n조" 라벨 섹션 다음이 본문 블록
+  const sections = body.split(/\n(?:-{3,}|━{3,})\n/)
   let lastJoDisplay = ''
-  while ((bm = blockRegex.exec(text)) !== null) {
-    const oldText = bm[1].trim()
-    const newText = bm[2].trim()
+  for (let i = 0; i < sections.length - 1; i++) {
+    const label = sections[i].trim()
+    if (!/^(?:제\d+조(?:의\d+)?|조문\s*\d+)/.test(label)) continue
 
-    // 조문번호를 텍스트 첫 줄에서 추출 → 없으면 직전 조문 상속
-    const joMatch = (newText || oldText).match(/^(?:<[^>]+>\s*)*?(제\d+조(?:의\d+)?)/)
-    if (joMatch) {
-      lastJoDisplay = joMatch[1]
-    }
-    const joDisplay = lastJoDisplay || `조문${pairs.length + 1}`
+    const block = sections[i + 1]
+    const om = block.match(/\[개정 전\][^\S\n]*(?:\((신설)\))?\n?([\s\S]*?)(?=\n*\[개정 후\]|$)/)
+    const nm = block.match(/\[개정 후\][^\S\n]*(?:\((삭제)\))?\n?([\s\S]*)$/)
+    if (!om && !nm) continue
+
+    const oldText = om && !om[1] ? om[2].trim() : ''
+    const newText = nm && !nm[1] ? nm[2].trim() : ''
+
+    // 항·호 단위 파편은 라벨이 "조문 N" — 직전 조문번호 상속 (동일 조문으로 dedupe됨)
+    const joMatch = label.match(/제\d+조(?:의\d+)?/)
+    if (joMatch) lastJoDisplay = joMatch[0]
+    const joDisplay = joMatch?.[0] || lastJoDisplay || `조문${pairs.length + 1}`
 
     pairs.push({ joDisplay, oldText, newText })
   }
@@ -143,49 +189,41 @@ export function buildChangesFromOldNew(
 /**
  * get_three_tier 텍스트에서 조문별 하위법령 의존성 추출
  *
- * 포맷:
+ * korean-law-mcp v4.4 포맷:
  * ```
- * ━━━━━━━━━━━━━━━━━━━━━━
+ * ---
  * 제38조 신고납부
- * ━━━━━━━━━━━━━━━━━━━━━━
+ * ---
  *
- * 📜 시행령 관세법시행령 제52조 (신고 방식)
- * 📋 시행규칙 관세법시행규칙 제71조 (신고 서식)
+ * [시행령] 관세법 시행령 제32조 (신고 방식)
+ * 위임 내용...
+ * [시행규칙] 관세법 시행규칙 제8조 (신고 서식)
  * ```
  */
 export function parseThreeTierResult(text: string): Map<string, DownstreamImpact[]> {
   const result = new Map<string, DownstreamImpact[]>()
 
-  // 조문 블록 분리: ━━ 구분선 → 조문번호 → 내용
-  const sections = text.split(/━{10,}/)
+  // 구분선(---/━━━)으로 섹션 분리 → "제n조 제목" 라벨 섹션 다음이 위임 내용
+  const sections = text.split(/\n?(?:-{3,}|━{3,})\n/)
 
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i].trim()
-    if (!section) continue
-
-    // 조문 헤더: "제38조 신고납부" 또는 "제38조"
-    const headerMatch = section.match(/^(제\d+조(?:의\d+)?)\s*/)
+  for (let i = 0; i < sections.length - 1; i++) {
+    const headerMatch = sections[i].trim().match(/^(제\d+조(?:의\d+)?)\s*/)
     if (!headerMatch) continue
 
     const joDisplay = headerMatch[1]
     const impacts: DownstreamImpact[] = []
 
-    // 다음 섹션에서 위임법령 파싱
-    const contentSection = sections[i + 1] || ''
-
-    // 📜 시행령, 📋 시행규칙 파싱
-    const delegationRegex = /(📜|📋|📑)\s*(시행령|시행규칙|행정규칙)\s+(\S+)\s+(제\d+조(?:의\d+)?)?/g
+    // "[시행령] 법령명 제n조 (제목)" 라인 파싱 (제n조/제목은 선택적)
+    const lineRegex = /^\[(시행령|시행규칙|행정규칙)\]\s+(.+)$/gm
     let dm
-    while ((dm = delegationRegex.exec(contentSection)) !== null) {
-      const typeMap: Record<string, DownstreamImpact['type']> = {
-        '시행령': '시행령',
-        '시행규칙': '시행규칙',
-        '행정규칙': '행정규칙',
-      }
+    while ((dm = lineRegex.exec(sections[i + 1])) !== null) {
+      const rest = dm[2].trim()
+      // 마지막 "제n조" 를 조문번호로 분리 (법령명 자체에 제n조가 포함될 수 있어 greedy)
+      const joSplit = rest.match(/^(.+)\s+(제\d+조(?:의\d+)?)(?:\s+\(.*\))?$/)
       impacts.push({
-        type: typeMap[dm[2]] || '시행령',
-        lawName: dm[3],
-        joDisplay: dm[4] || undefined,
+        type: dm[1] as DownstreamImpact['type'],
+        lawName: (joSplit ? joSplit[1] : rest.replace(/\s*\([^)]*\)\s*$/, '')).trim(),
+        joDisplay: joSplit?.[2],
       })
     }
 
