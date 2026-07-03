@@ -270,7 +270,7 @@ export interface RagAnswer {
 
 export interface ToolCallLogEntry {
   id: string
-  type: 'call' | 'result' | 'status' | 'token_usage' | 'source'
+  type: 'call' | 'result' | 'status' | 'token_usage' | 'source' | 'error' | 'cache' | 'quota'
   name?: string
   displayName: string
   query?: string
@@ -282,6 +282,14 @@ export interface ToolCallLogEntry {
   outputTokens?: number
   totalTokens?: number
   args?: Record<string, unknown>
+  // type: 'error' — 재시도 가능 여부 (서버 error 이벤트의 retryable)
+  retryable?: boolean
+  // type: 'cache' — 캐시 답변 생성 시각 (서버 캐시처럼 모르면 undefined)
+  cachedAt?: number
+  // type: 'quota' — 오늘 사용량/한도 (BYOK면 byok=true, 수치 없음)
+  quotaCurrent?: number
+  quotaLimit?: number
+  byok?: boolean
 }
 
 // ============================================================

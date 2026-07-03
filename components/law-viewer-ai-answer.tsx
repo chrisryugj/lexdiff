@@ -46,6 +46,38 @@ const LiveStreamTimer = memo(function LiveStreamTimer({
 
 const DEFAULT_FONT_SIZE = 15
 
+/** 스트리밍 라이브 마크다운용 스로틀 — ms 간격으로만 값 갱신 (0이면 즉시) */
+function useThrottledValue<T>(value: T, ms: number): T {
+    const [throttled, setThrottled] = useState(value)
+    const lastRef = useRef(0)
+    useEffect(() => {
+        if (ms <= 0) {
+            setThrottled(value)
+            return
+        }
+        const wait = lastRef.current + ms - Date.now()
+        if (wait <= 0) {
+            lastRef.current = Date.now()
+            setThrottled(value)
+            return
+        }
+        const t = setTimeout(() => {
+            lastRef.current = Date.now()
+            setThrottled(value)
+        }, wait)
+        return () => clearTimeout(t)
+    }, [value, ms])
+    return throttled
+}
+
+/** 캐시 배지용 상대 시각: "방금 전" / "N분 전" / "N시간 전" */
+function formatRelativeTime(ts: number): string {
+    const diffMin = Math.floor((Date.now() - ts) / 60_000)
+    if (diffMin < 1) return '방금 전'
+    if (diffMin < 60) return `${diffMin}분 전`
+    return `${Math.floor(diffMin / 60)}시간 전`
+}
+
 // ── Module-scope typeConfigs (only uses constants) ──
 const typeConfigs: Record<string, { icon: IconType, label: string, bgColor: string, borderColor: string, textColor: string }> = {
     definition: { icon: ICON_REGISTRY['circle-help'], label: '개념/정의', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', textColor: 'text-cyan-500' },
@@ -146,7 +178,7 @@ function FontControls({ fontSize, setFontSize, onRefresh, aiAnswerContent }: Fon
     return (
         <>
             {onRefresh && (
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10" onClick={onRefresh} title="캐시 무시 새로고침 (개발용)">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={onRefresh} title="답변 새로 생성 (캐시 무시)">
                     <Icon name="refresh-cw" size={16} />
                 </Button>
             )}
@@ -280,6 +312,10 @@ export function AIAnswerContent({
     const [displayedContent, setDisplayedContent] = useState('')
     const [isTyping, setIsTyping] = useState(false)
 
+    // 라이브 마크다운: 스트리밍/타이핑 중엔 150ms 스로틀, 완료 시 즉시 최종본
+    const throttledContent = useThrottledValue(displayedContent, 150)
+    const liveContent = (isStreaming || isTyping) ? throttledContent : displayedContent
+
     // follow-up 입력
     const [followUpInput, setFollowUpInput] = useState('')
 
@@ -366,11 +402,29 @@ export function AIAnswerContent({
         })
     }
 
+    // 스트리밍으로 본문을 이미 표시했는지 — 완료 시 재타이핑(전체 리플레이) 방지
+    const wasStreamedRef = useRef(false)
+
     useEffect(() => {
         // ★ aiAnswerContent가 비워지면(재조회/새 쿼리) displayedContent도 즉시 리셋
         //   이게 없으면 타이핑 이펙트용 로컬 state가 옛 답변을 계속 렌더함
         if (!aiAnswerContent) {
             setDisplayedContent('')
+            setIsTyping(false)
+            wasStreamedRef.current = false
+            return
+        }
+        if (isStreaming) {
+            // 실시간 토큰 스트리밍(릴레이 answer_delta): 서버가 보내는 텍스트를 그대로 표시.
+            // (기존엔 이 분기가 없어 스트리밍 중 본문이 빈 채로 있다가 완료 후 재타이핑됐음)
+            wasStreamedRef.current = true
+            setIsTyping(false)
+            setDisplayedContent(aiAnswerContent)
+            return
+        }
+        if (wasStreamedRef.current) {
+            // 스트리밍으로 이미 다 보여준 답변 — 최종본(서두 제거·인용 반영)으로 교체만
+            setDisplayedContent(aiAnswerContent)
             setIsTyping(false)
             return
         }
@@ -415,6 +469,8 @@ export function AIAnswerContent({
     const searchStats = useMemo(() => {
         if (isStreaming || toolCallLogs.length === 0) return null
         const calls = toolCallLogs.filter(l => l.type === 'call')
+        // 도구 호출이 전혀 없으면(캐시 즉답 등) "완료 0.0s · 0회" 요약 바가 무의미 → 숨김
+        if (calls.length === 0) return null
         const toolNames = new Map<string, number>()
         calls.forEach(l => {
             const name = l.displayName || l.name || 'unknown'
@@ -432,6 +488,29 @@ export function AIAnswerContent({
         }
     }, [isStreaming, toolCallLogs])
 
+    // 캐시 히트 배지 (클라 IndexedDB / 서버 Upstash 양쪽)
+    const cacheInfo = useMemo(() => {
+        const log = toolCallLogs.find(l => l.type === 'cache')
+        if (!log) return null
+        return { cachedAt: log.cachedAt }
+    }, [toolCallLogs])
+
+    // 오늘 쿼터 (스트림 시작 시 서버가 1회 emit)
+    const quotaInfo = useMemo(() => {
+        const log = toolCallLogs.find(l => l.type === 'quota')
+        if (!log || log.byok) return null
+        if (typeof log.quotaCurrent !== 'number' || typeof log.quotaLimit !== 'number') return null
+        return { current: log.quotaCurrent, limit: log.quotaLimit }
+    }, [toolCallLogs])
+
+    // 종료 후 에러 상태 — 답변이 없으면 에러 카드로 표시 (마지막 error 로그 기준)
+    const errorInfo = useMemo(() => {
+        if (isStreaming) return null
+        const log = [...toolCallLogs].reverse().find(l => l.type === 'error')
+        if (!log) return null
+        return { message: log.message || log.displayName, retryable: log.retryable !== false }
+    }, [isStreaming, toolCallLogs])
+
     return (
         <div className="w-full max-w-full min-w-0 overflow-hidden">
             {/* 헤더 - 모바일 3줄 / PC 2줄 */}
@@ -445,6 +524,16 @@ export function AIAnswerContent({
                     </Badge>
                     {/* 신뢰도 배지 - RAG 배지 바로 옆 */}
                     <ConfidenceBadge aiCitations={aiCitations} />
+                    {/* 캐시 히트 배지 — 저장된 답변을 즉시 표시했음을 투명하게 */}
+                    {cacheInfo && !isStreaming && (
+                        <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border/40 bg-muted/40 text-[11px] text-muted-foreground cursor-help"
+                            title={`이전에 생성한 답변을 즉시 표시했습니다.${cacheInfo.cachedAt ? ` (${formatRelativeTime(cacheInfo.cachedAt)} 생성)` : ''} 새로고침 아이콘으로 다시 생성할 수 있어요.`}
+                        >
+                            <Icon name="database" size={11} />
+                            저장된 답변{cacheInfo.cachedAt ? ` · ${formatRelativeTime(cacheInfo.cachedAt)}` : ''}
+                        </span>
+                    )}
                     {/* 검색 통계 아이콘 (완료 후 표시, hover 시 상세) */}
                     {searchStats && streamElapsed > 0 && (
                         <div className="relative group flex-shrink-0">
@@ -487,6 +576,12 @@ export function AIAnswerContent({
                                         <div className="flex items-center justify-between gap-4">
                                             <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="bar-chart" size={12} />토큰</span>
                                             <span className="font-medium tabular-nums">{searchStats.totalTokens.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    {quotaInfo && (
+                                        <div className="flex items-center justify-between gap-4">
+                                            <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="zap" size={12} />오늘 질의</span>
+                                            <span className="font-medium tabular-nums">{quotaInfo.current}/{quotaInfo.limit}회</span>
                                         </div>
                                     )}
                                     {searchStats.toolBreakdown.length > 0 && (
@@ -706,35 +801,70 @@ export function AIAnswerContent({
 
                 {/* ✅ Phase 7: 답변 내용이 없을 때 (스트리밍 완료 후에도 없을 때) */}
                 {!aiAnswerContent && !isStreaming && (
-                    <>
-                        {/* 신뢰도 낮음 배너 */}
-                        <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
-                            <div className="flex items-center gap-2 text-red-500 text-sm">
-                                <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
-                                <span>인용 조문 없음 - 법령 데이터베이스에서 관련 조문을 찾지 못함</span>
-                            </div>
-                        </div>
-
-                        {/* 오류 메시지 */}
-                        <div className="flex flex-col items-center gap-4 max-w-md mx-auto text-center py-6">
-                            <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                <Icon name="alert-triangle" size={28} className="text-amber-500" />
+                    errorInfo ? (
+                        /* 에러 카드 — 서버/네트워크 오류를 명확히 알리고 원클릭 재시도 제공 */
+                        <div className="flex flex-col items-center gap-4 max-w-md mx-auto text-center py-8">
+                            <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
+                                <Icon name="alert-circle" size={28} className="text-red-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-base font-medium text-foreground">검색 결과를 찾지 못했습니다</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    법령 데이터베이스에서 관련 조문을 찾을 수 없었습니다.
-                                    다른 검색어로 다시 시도해 주세요.
+                                <h3 className="text-base font-medium text-foreground">AI 답변을 생성하지 못했습니다</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed break-words">
+                                    {errorInfo.message}
                                 </p>
                             </div>
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                {onRefresh && errorInfo.retryable && (
+                                    <Button size="sm" className="gap-1.5" onClick={onRefresh}>
+                                        <Icon name="refresh-cw" size={14} />
+                                        다시 시도
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5 text-muted-foreground"
+                                    onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(userQuery)}`, '_blank')}
+                                >
+                                    <Icon name="external-link" size={14} />
+                                    웹에서 검색
+                                </Button>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground/50">
+                                문제가 계속되면 질문을 조금 바꿔서 시도해 보세요.
+                            </p>
                         </div>
-                    </>
+                    ) : (
+                        <>
+                            {/* 신뢰도 낮음 배너 */}
+                            <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-md">
+                                <div className="flex items-center gap-2 text-red-500 text-sm">
+                                    <Icon name="alert-triangle" size={16} className="flex-shrink-0" />
+                                    <span>인용 조문 없음 - 법령 데이터베이스에서 관련 조문을 찾지 못함</span>
+                                </div>
+                            </div>
+
+                            {/* 오류 메시지 */}
+                            <div className="flex flex-col items-center gap-4 max-w-md mx-auto text-center py-6">
+                                <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center">
+                                    <Icon name="alert-triangle" size={28} className="text-amber-500" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-base font-medium text-foreground">검색 결과를 찾지 못했습니다</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        법령 데이터베이스에서 관련 조문을 찾을 수 없었습니다.
+                                        다른 검색어로 다시 시도해 주세요.
+                                    </p>
+                                </div>
+                            </div>
+                        </>
+                    )
                 )}
 
-                {/* 답변 내용 렌더링
-                    P1-AI-5: 스트리밍/타이핑 중에는 plain text(공백 보존),
-                    완료 후에만 LegalMarkdownRenderer 호출 — 반토막 토큰의 markdown 파싱 에러/링크 깨짐 방지
-                    P1-1: 두 렌더러 wrapper에 동일 leading 클래스 + 짧은 fade로 전환 점프 완화 */}
+                {/* 답변 내용 렌더링 — 라이브 마크다운
+                    스트리밍/타이핑 중에도 LegalMarkdownRenderer로 렌더하되 150ms 스로틀로 파싱 비용 제한.
+                    (기존 P1-AI-5의 plain-text 방식은 완료 시점에 서식이 확 바뀌는 점프가 커서 교체.
+                     remark는 반토막 마크다운에도 파싱 에러 없이 관용적으로 렌더함) */}
                 {displayedContent && (
                     <div
                         role="region"
@@ -744,30 +874,16 @@ export function AIAnswerContent({
                         style={{ fontSize: `${fontSize}px` }}
                         className="animate-in fade-in duration-200 leading-relaxed text-foreground"
                     >
-                        {(isStreaming || isTyping) ? (
-                            <div
-                                key="ai-stream-plain"
-                                className="whitespace-pre-wrap break-words transition-opacity duration-150"
-                            >
-                                {/* 스트리밍/타이핑 plain-text 단계에서 줄머리 blockquote 기호(> )를 숨김.
-                                    완료 후 LegalMarkdownRenderer 는 원본으로 blockquote 스타일링하므로 무영향. */}
-                                {displayedContent.replace(/^[ \t]*>[ \t]?/gm, '')}
-                                {isTyping && (
-                                    <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1 align-middle" />
-                                )}
-                            </div>
-                        ) : (
-                            <div
-                                key="ai-stream-markdown"
-                                className="transition-opacity duration-150"
-                            >
-                                <LegalMarkdownRenderer
-                                    content={displayedContent}
-                                    onLawClick={onLawClick}
-                                    onAnnexClick={handleAnnexClick}
-                                />
-                            </div>
-                        )}
+                        <div key="ai-stream-markdown" className="transition-opacity duration-150">
+                            <LegalMarkdownRenderer
+                                content={liveContent}
+                                onLawClick={onLawClick}
+                                onAnnexClick={handleAnnexClick}
+                            />
+                            {(isStreaming || isTyping) && (
+                                <span className="inline-block w-1 h-5 bg-primary animate-pulse ml-1 align-middle" />
+                            )}
+                        </div>
                     </div>
                 )}
 

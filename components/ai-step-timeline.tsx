@@ -187,7 +187,9 @@ export function AiStepTimeline({ toolCallLogs, isStreaming }: { toolCallLogs: To
                             <AiStepTimer />
                         ) : null}
                     </div>
-                    {step.status === 'in-progress' && isStreaming && lastStatusMessage && !step.isThinking && (
+                    {/* 진행 중 단계 하위 텍스트 — 도구 단계뿐 아니라 "AI 분석 중"(thinking) 구간에도
+                        릴레이 narration(모델의 실제 진행 멘트)이 status로 흘러오므로 함께 표시 */}
+                    {step.status === 'in-progress' && isStreaming && lastStatusMessage && (
                         <div className="ml-[27px] text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                             {lastStatusMessage}
                         </div>

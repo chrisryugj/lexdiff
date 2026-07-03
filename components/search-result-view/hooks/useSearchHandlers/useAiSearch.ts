@@ -17,11 +17,12 @@ import type { ToolCallLogEntry } from "../../types"
 type AiQueryType = 'definition' | 'requirement' | 'procedure' | 'comparison' | 'application' | 'consequence' | 'scope' | 'exemption'
 
 export function useAiSearch(deps: HandlerDeps) {
-  const { state, actions, toast } = deps
+  const { state, actions } = deps
   const abortRef = useRef<AbortController | null>(null)
   const streamBufferRef = useRef<string>('')  // 스트리밍 토큰 누적 버퍼
   const answerReceivedRef = useRef(false)  // answer 이벤트 수신 여부
   const answerTokenStartedRef = useRef(false)  // 첫 answer_token 수신 여부
+  const errorLoggedRef = useRef(false)  // error 로그 중복 방지 (서버 error 이벤트 vs answer 미수신 안전장치)
   const lastProgressRef = useRef(0)  // FC-RAG-2: 진행률 단조증가 가드용 (역행 차단)
   const logIdCounterRef = useRef(0)  // React concurrent/StrictMode 안전한 카운터
 
@@ -103,6 +104,7 @@ export function useAiSearch(deps: HandlerDeps) {
     streamBufferRef.current = ''
     answerReceivedRef.current = false
     answerTokenStartedRef.current = false
+    errorLoggedRef.current = false
     lastProgressRef.current = 5
 
     // 이전 검색 진행 중이면 abort
@@ -138,8 +140,14 @@ export function useAiSearch(deps: HandlerDeps) {
       actions.setSearchMode('rag')
       actions.updateProgress('analyzing', 50)
 
-      // 캐시 로딩 피드백 (너무 즉시 표시되면 UX 어색)
-      await new Promise(r => setTimeout(r, 250))
+      // 캐시 배지("저장된 답변 · N분 전")용 로그 — 즉시 표시하고 출처를 배지로 밝힌다
+      actions.addToolCallLog({
+        id: `log-${++logIdCounterRef.current}`,
+        type: 'cache',
+        displayName: '저장된 답변',
+        timestamp: Date.now(),
+        cachedAt: cached.cachedAt,
+      })
 
       const relatedLaws = extractRelatedLaws(cached.response)
       actions.setAiAnswerContent(cached.response)
@@ -303,11 +311,21 @@ export function useAiSearch(deps: HandlerDeps) {
         } catch { /* ignore */ }
       }
 
-      // 안전장치: 스트림 종료 시 answer 미수신 → 에러 상태 표시
+      // 안전장치: 스트림 종료 시 answer 미수신 → 에러 카드 표시 (가짜 답변 텍스트 대신)
       if (!answerReceivedRef.current) {
         debugLogger.error(`[AI ${elapsed()}] SSE 스트림 종료 - answer 이벤트 미수신`, { events: eventCount, chunks: chunkCount, lastType: lastEventType })
-        actions.setAiAnswerContent('죄송합니다. AI 엔진 응답을 받지 못했습니다. 다시 시도해 주세요.')
-        actions.setAiConfidenceLevel('low')
+        actions.setAiAnswerContent('')
+        if (!errorLoggedRef.current) {
+          errorLoggedRef.current = true
+          actions.addToolCallLog({
+            id: `log-${++logIdCounterRef.current}`,
+            type: 'error',
+            displayName: 'AI 엔진 응답을 받지 못했습니다',
+            message: 'AI 엔진 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.',
+            retryable: true,
+            timestamp: Date.now(),
+          })
+        }
       }
 
       // 안전장치: 스트림 종료 시 isSearching 무조건 해제
@@ -327,14 +345,20 @@ export function useAiSearch(deps: HandlerDeps) {
       debugLogger.error(`[AI ${elapsed()}] FC-RAG SSE 오류`, { error, events: eventCount, chunks: chunkCount, lastType: lastEventType })
       actions.setIsSearching(false)
       actions.updateProgress('complete', 0)
-      // isAiMode 유지하고 에러 메시지 표시 (isAiMode=false로 하면 빈 lawData 상태의 깨진 UI 노출)
-      actions.setAiAnswerContent('죄송합니다. AI 검색 중 오류가 발생했습니다. 다시 시도해 주세요.')
-      actions.setAiConfidenceLevel('low')
-      toast({
-        title: "AI 검색 실패",
-        description: error instanceof Error ? error.message : "AI 답변을 가져오는 데 실패했습니다.",
-        variant: "destructive"
-      })
+      // isAiMode 유지 + 에러 카드 표시 (isAiMode=false로 하면 빈 lawData 상태의 깨진 UI 노출.
+      // 가짜 답변 텍스트 대신 error 로그 → AIAnswerContent가 재시도 버튼 포함 에러 카드 렌더)
+      actions.setAiAnswerContent('')
+      if (!errorLoggedRef.current) {
+        errorLoggedRef.current = true
+        actions.addToolCallLog({
+          id: `log-${++logIdCounterRef.current}`,
+          type: 'error',
+          displayName: 'AI 검색 중 오류가 발생했습니다',
+          message: error instanceof Error ? error.message : 'AI 답변을 가져오는 데 실패했습니다.',
+          retryable: true,
+          timestamp: Date.now(),
+        })
+      }
     }
 
     // ── SSE 이벤트 핸들러 ──
@@ -348,6 +372,7 @@ export function useAiSearch(deps: HandlerDeps) {
         streamBufferRef.current = ''
         answerTokenStartedRef.current = false
         answerReceivedRef.current = false
+        errorLoggedRef.current = false
         lastProgressRef.current = 0  // FC-RAG-2: retry/fallback 시 진행률 리셋 (단조 가드 예외)
         actions.setAiAnswerContent('')
         actions.clearToolCallLogs()
@@ -447,6 +472,15 @@ export function useAiSearch(deps: HandlerDeps) {
         }
         case 'answer': {
           const data = event.data
+          // 서버측 캐시 히트(Upstash answer-cache) — 캐시 배지 표시용
+          if (data.fromCache) {
+            actions.addToolCallLog({
+              id: `log-${++logIdCounterRef.current}`,
+              type: 'cache',
+              displayName: '저장된 답변',
+              timestamp: Date.now(),
+            })
+          }
           // Bridge에서 이미 extractAnswerFromJson 처리됨 — 중복 추출 불필요
           const processedContent = (data.answer || '').replace(/\^/g, ' ')
           const searchFailed = false // Gemini RAG에서는 별도 실패 감지 불필요
@@ -533,12 +567,27 @@ export function useAiSearch(deps: HandlerDeps) {
         }
         case 'error': {
           debugLogger.error('FC-RAG 서버 오류', event.message)
+          errorLoggedRef.current = true
           actions.addToolCallLog({
             id: `log-${++logIdCounterRef.current}`,
-            type: 'status',
+            type: 'error',
             displayName: `오류: ${event.message}`,
             message: event.message,
+            retryable: event.retryable !== false,
             timestamp: Date.now(),
+          })
+          break
+        }
+        case 'quota_status': {
+          // 스트림 시작 시 서버가 1회 emit — 오늘 사용량/한도 표시용
+          actions.addToolCallLog({
+            id: `log-${++logIdCounterRef.current}`,
+            type: 'quota',
+            displayName: event.byok ? 'BYOK (무제한)' : `오늘 AI 질의 ${event.current}/${event.limit}회`,
+            timestamp: Date.now(),
+            quotaCurrent: typeof event.current === 'number' ? event.current : undefined,
+            quotaLimit: typeof event.limit === 'number' ? event.limit : undefined,
+            byok: Boolean(event.byok),
           })
           break
         }
@@ -588,7 +637,7 @@ export function useAiSearch(deps: HandlerDeps) {
     }
 
     // P1-AI-6: state.isSearching은 본문에서 사용되지 않으므로 deps에서 제거 (불필요한 재생성 방지)
-  }, [actions, toast, persistVerifiedCitations])
+  }, [actions, persistVerifiedCitations])
 
   /** 연속 대화 추가 질문 */
   const handleFollowUp = useCallback((followUpQuery: string) => {
