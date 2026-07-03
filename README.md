@@ -3,10 +3,10 @@
 **법령을 쉽게. AI로 똑똑하게. 공공 Legal AI의 시작.**
 
 [![Live](https://img.shields.io/badge/Live-lexdiff.gomdori.app-1a2b4c)](https://lexdiff.gomdori.app)
-[![Version](https://img.shields.io/badge/version-2.4.1--beta-b08d57)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.2--beta-b08d57)](CHANGELOG.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
-[![Gemini](https://img.shields.io/badge/AI-Gemini_3_Flash-4285F4?logo=google)](https://deepmind.google/technologies/gemini/)
+[![Themis](https://img.shields.io/badge/AI-Themis_(Claude)_+_Gemini-b08d57)](https://claude.ai)
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue)](LICENSE)
 
 > *구글링으로 30분, GPT로 환각, LexDiff로 30초 — 법령·판례 근거까지.*
@@ -25,7 +25,7 @@
 
 일상 언어로 법률을 질문하면 AI가 **법령 원문과 판례를 근거로** 답합니다. 단순 검색이 아닙니다.
 
-* **🧠 AI 법률 검색** — "퇴직금 못 받았는데 어떻게 해야 하나요?" → Gemini가 법제처 API에서 법령·판례를 직접 조회하고, 근거와 함께 실시간 스트리밍 답변. 후속 질문도 맥락을 기억합니다.
+* **🧠 AI 법률 검색** — "퇴직금 못 받았는데 어떻게 해야 하나요?" → 테미스 엔진(Claude)이 법제처 API에서 법령·판례를 직접 조회하고, 근거와 함께 실시간 스트리밍 답변. 단순 조문·판례 질의는 LLM 없이 즉시(fast-path), 후속 질문도 맥락을 기억합니다.
 * **⚡ 신구조문 비교** — 개정 전후 변경점을 색깔로 하이라이팅. AI가 "뭐가 바뀌었는지" 한 줄로 요약해줍니다.
 * **📋 3단 위임법령 비교** — 법률 → 시행령 → 시행규칙을 한 화면에서 나란히 대조. 위임 조항끼리 자동 연결.
 * **🔍 법령 영향 추적기** — 법이 바뀌면 어디까지 영향이 가는지 자동 분석. 상위법 → 시행령 → 시행규칙 → 관련 조례까지 연쇄 영향을 추적하고, AI가 심각도(위험/검토/참고)를 분류해줍니다.
@@ -105,6 +105,8 @@ pnpm dev                            # http://localhost:3000
 ```bash
 GEMINI_API_KEY=          # Google AI Studio (Gemini 3 Flash) — 필수
 GEMINI_ROUTER_API_KEY=   # S1 Router 전용 분리 키 (Gemini 3.1 Flash-Lite)
+RELAY_URL=               # 테미스 릴레이 주소 (선택 — 미설정 시 Gemini 단일 엔진)
+RELAY_TOKEN=             # 테미스 릴레이 Bearer 토큰
 LAW_OC=                  # 법제처 Open API 키 (무료)
 SUPABASE_URL=            # Supabase 프로젝트 URL
 SUPABASE_ANON_KEY=       # Supabase 익명 키 (쿼터 관리용)
@@ -148,13 +150,17 @@ LexDiff를 만들며 벡터 청크 RAG와 그래프 RAG를 모두 검토했지�
   ↓
 Google OAuth + Supabase 일일 쿼터 체크 (BYOK면 skip)
   ↓
-S1 Router (Gemini 3.1 Flash-Lite) — 20% 해시 롤아웃
+① Answer Cache (Upstash, 동일 질의 0.3s) → ② Fast Path (조문·판례·별표 패턴은 LLM 없이 직접 조회)
+  ↓ miss
+Pre-evidence (search_ai_law 1회 선조회 → 시스템프롬프트 주입)
   ↓
-Gemini 3 Flash — Function Calling RAG 루프 (멀티턴)
+테미스 릴레이 (구독 Claude Sonnet + korean-law MCP) — Primary
+  ↓ 실패/타임아웃/BYOK 시 폴백
+Gemini 3 Flash — Function Calling RAG 루프 (멀티턴, 46개 등록 도구)
   ↓ 도구 호출 (TypeScript 직접 import, MCP 래핑 없음)
 법제처 Open API + 17개 결정문 도메인 + Supabase 법령 그래프
   ↓
-실시간 SSE 스트리밍 (tool_call/tool_result/answer) → UI
+실시간 SSE 스트리밍 (tool_call/tool_result/answer_token) → UI
   ↓
 citation verify (15s) + confidence 판정 (4신호) + answer cache
 ```
@@ -163,12 +169,13 @@ citation verify (15s) + confidence 판정 (4신호) + answer cache
 |--------|------|
 | **프론트엔드** | React 19, Tailwind v4, shadcn/ui, Framer Motion |
 | **백엔드** | Next.js 16 (proxy.ts), Zod validation, SSE 스트리밍 |
-| **AI (primary)** | Gemini 3 Flash (Function Calling) — 46개 등록 도구 |
+| **AI (primary)** | 테미스 릴레이 — 구독 Claude Sonnet + korean-law MCP (맥미니, Tailscale Funnel) |
+| **AI (fallback/BYOK)** | Gemini 3 Flash (Function Calling) — 46개 등록 도구 |
 | **AI (router)** | Gemini 3.1 Flash-Lite (S1 쿼리 분류) |
 | **데이터** | 법제처 Open API, Supabase PostgreSQL, Upstash Redis, IndexedDB |
 | **테스트** | Vitest, 단위·통합·E2E |
 
-> **참고**: 내부적으로 Hermes Agent API(GPT-5.4) 경로도 구현되어 있으나, **베타에서는 의도적으로 비활성**(`DISABLE_HERMES=true`)되어 Gemini 단일 엔진으로 운영됩니다.
+> **참고**: 내부적으로 Hermes Agent API(GPT-5.4) 경로도 구현되어 있으나 **의도적으로 비활성**(`DISABLE_HERMES`)입니다. 릴레이 미설정(`RELAY_URL` 없음) 환경에서는 Gemini 단일 엔진으로 동작합니다.
 
 ---
 
@@ -191,7 +198,7 @@ important-docs/   아키텍처·RAG·시스템 현황 상세 문서
 ## 기술 스택
 
 Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS v4 · shadcn/ui · Radix UI ·
-**Gemini 3 Flash** · **Gemini 3.1 Flash-Lite** · Supabase · Upstash Redis ·
+**Claude Sonnet (테미스 릴레이)** · **Gemini 3 Flash** · **Gemini 3.1 Flash-Lite** · Supabase · Upstash Redis ·
 IndexedDB · Vitest · Framer Motion · Remotion
 
 ## 라이선스

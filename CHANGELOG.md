@@ -2,6 +2,24 @@
 
 LexDiff의 주요 변경사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)을 따르며, 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 사용합니다.
 
+## [2.4.2-beta] — 2026-07-03
+
+테미스(맥미니 구독 Claude 릴레이) 엔진 3단 최적화 + 프로덕션 리뷰 #4 (전 카테고리 검색·AI 기능 전수 점검).
+
+### ⚡ Performance — 테미스 엔진 3단 최적화
+- **평균 응답 34.6s → 20.5s** (6유형 벤치: 조문/벌칙/별표수수료/판례/비교/복합, 정확도 기대인용 10/10 유지). 릴레이 경로에 Gemini 경로에만 있던 가속 레이어를 엔진 대칭으로 수복(`lib/fc-rag/relay-engine.ts`):
+  - **Answer Cache 공유** — Upstash 캐시 조회/저장 (동일 질의 0.3s)
+  - **Fast Path** — 법명+조문·판례·해석례·행정규칙·별표 패턴은 LLM 없이 직접 도구 호출 (관세법 38조 24.6s→2.6s, 판례검색 39.2s→0.6s)
+  - **Pre-evidence** — simple/moderate 질의는 서버측 `search_ai_law` 1회(≤8s)를 시스템프롬프트에 주입 → `claude -p` 도구 왕복 제거·법령 오선택 감소 (비교질의 68.9s→24.0s, 첫토큰 56.4s→13.8s)
+- 클라이언트 `preEvidence`(조문 컨텍스트)가 릴레이 경로에서 유실되던 것 전달 복구, `conversationId` 대화 맥락 반영 (follow-up 정확도)
+- 벤치 하네스 신설: `scripts/bench-themis.mts`
+
+### 🔧 Fixed — 프로덕션 리뷰 #4
+- **홈 법령 통계 전부 0** — 법제처 통계페이지 fetch에 `Accept: text/html` 명시. undici 기본 Accept(`*/*`)면 응답이 ~15s 지연돼 타임아웃 → 헌법/법률/자치법규 카운트 전멸 (실측 15.1s→1.9s, `app/api/law-stats/route.ts`)
+- **조세심판·관세 상세 조회 무조건 404** — 법제처 실응답 최상위 키(`SpecialDeccService`/`CgmExpcService`)로 교정 (`app/api/tax-tribunal-text`, `app/api/customs-text`)
+- **신형 Google API 키(`AQ.…`) BYOK 등록 불가** — 서버 검증(`lib/api-auth.ts`)·입력 다이얼로그(`components/ai-gate-dialog.tsx`) 정규식에 신형 포맷 허용
+- **lint 0 복구** — 정의되지 않은 룰(`@next/next/no-img-element`) disable 주석 제거 (`components/user-menu.tsx`)
+
 ## [2.4.1-beta] — 2026-06-28
 
 프로덕션 리뷰 #2 후속(토스트 인프라·잔여 디자인·P2 폴리시) + #3(관련 판례 조회·Cmd+K 레이아웃) 마무리.
