@@ -13,7 +13,16 @@
  *           (릴레이 시스템프롬프트가 낫표 「」 형식으로 인용하도록 맞춰져 있음)
  */
 import type { FCRAGStreamEvent, RAGStreamOptions } from './engine-shared'
-import { inferComplexity, inferQueryType } from './engine-shared'
+import {
+  inferComplexity,
+  inferQueryType,
+  handleFastPath,
+  getConversationContext,
+  withTimeout,
+} from './engine-shared'
+import { executeTool } from './tool-adapter'
+import { summarizeToolResult } from './result-utils'
+import { getCachedAnswer, cacheAnswer } from './answer-cache'
 import { parseCitationsFromAnswer } from './citations'
 import { TOOL_DISPLAY_NAMES } from './tool-tiers'
 import { buildSystemPrompt } from './prompts'
@@ -54,17 +63,73 @@ export async function* executeRelayRAGStream(
   const url = process.env.RELAY_URL
   if (!url) throw new Error('RELAY_URL 미설정')
   const token = process.env.RELAY_TOKEN
+  const { signal, conversationId, preEvidence } = options || {}
+  const queryType = inferQueryType(query)
+  const complexity = inferComplexity(query)
+
+  // ── 1) Answer Cache (Gemini 경로와 동일 캐시 공유 — 동일 질의 즉시 응답) ──
+  const cacheOpts = { conversationId, hasPreEvidence: !!preEvidence }
+  const cached = await getCachedAnswer(query, cacheOpts)
+  if (cached) {
+    yield { type: 'status', message: '캐시된 답변 반환 중...', progress: 95 }
+    yield { type: 'answer', data: { ...cached, fromCache: true } }
+    return
+  }
+
+  // ── 2) Fast Path: 단순 패턴(법명+조문/판례·해석례·행정규칙 검색/별표)은 LLM 없이 직접 도구 호출 ──
+  // 릴레이 도입 전 Gemini 경로에 있던 <3s 응답을 회복 (claude -p 콜드스타트 우회).
+  if (!preEvidence) {
+    const fastPathGen = handleFastPath(query, queryType, signal)
+    let fastPathNext = await fastPathGen.next()
+    while (!fastPathNext.done) {
+      const ev = fastPathNext.value
+      yield ev
+      if (ev.type === 'answer' && ev.data) {
+        void cacheAnswer(query, ev.data, cacheOpts).catch(() => {})
+      }
+      fastPathNext = await fastPathGen.next()
+    }
+    if (fastPathNext.value === true) return
+  }
+
+  // ── 3) Pre-evidence: LLM 도구 왕복(턴당 수 초×2~3회)을 서버측 1회 검색으로 선치환 ──
+  // simple/moderate 질의는 search_ai_law 결과를 시스템프롬프트에 주입 →
+  // 모델이 추가 조회 없이(또는 최소 보강만으로) 즉시 답변 — 첫 토큰·총 시간 단축 + 법령 오선택 감소.
+  // complex는 다조문·다도구 조회가 본질이라 모델 자율(기존 웹 방식)에 맡긴다.
+  let evidence = preEvidence
+  if (!evidence && complexity !== 'complex') {
+    yield { type: 'status', message: '관련 법령 사전 검색 중...', progress: 6 }
+    try {
+      const pre = await withTimeout(executeTool('search_ai_law', { query }, signal), 8_000, 'search_ai_law(pre)')
+      if (!pre.isError && pre.result.length > 200) {
+        yield { type: 'tool_call', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], query }
+        yield { type: 'tool_result', name: 'search_ai_law', displayName: TOOL_DISPLAY_NAMES['search_ai_law'], success: true, summary: summarizeToolResult('search_ai_law', pre) }
+        evidence = pre.result.slice(0, 8_000)
+      }
+    } catch {
+      // 사전 검색 실패는 무시 — 릴레이 모델이 도구로 직접 조회
+    }
+  }
+
+  // ── 대화 컨텍스트 (follow-up 질의) ──
+  const prevContext = await getConversationContext(conversationId)
 
   // lexdiff 구조화 답변 프롬프트(형식·현행성)를 빌드해 릴레이에 넘긴다.
   // 웹 방식 재설계(claude.ai 웹+MCP 차용): 강한 모델(Sonnet)이라
   //  - universalFormat: queryType별 SPECIALIST 구조 대신 범용 출력 형식 (오분류 시 부적합 구조 강제 엣지케이스 제거)
   //  - autonomousTools: 조회 전략(도구 우선순위/예산/도메인 힌트)을 모델+MCP 자율에 위임
   // Gemini 경로(BYOK·폴백)는 기존 SPECIALIST+전략 프롬프트 유지.
+  const evidenceBlock = evidence
+    ? `\n\n## 📎 사전 조회 결과 (korean-law MCP로 방금 조회한 최신 1차 출처)\n` +
+      `아래 데이터로 충분하면 **추가 도구 호출 없이 즉시** 답하라. 원문 확인·별표·판례 등 부족한 부분만 도구로 보강하라.\n` +
+      `조문 번호·시행일·법령명은 아래 데이터의 값을 그대로 사용한다.\n\n${evidence}`
+    : ''
+  const contextBlock = prevContext ? `\n\n## 이전 대화 맥락\n${prevContext}` : ''
   const systemPrompt =
-    buildSystemPrompt(inferComplexity(query), inferQueryType(query), query, undefined, {
+    buildSystemPrompt(complexity, queryType, query, undefined, {
       universalFormat: true,
       autonomousTools: true,
-    }) + RELAY_RULES
+    }) + RELAY_RULES + contextBlock + evidenceBlock
 
   const ac = new AbortController()
   const onAbort = () => ac.abort()
@@ -156,16 +221,15 @@ export async function* executeRelayRAGStream(
               : citations.length >= 1 || hasGroundsSection ? 'medium'
               : 'low'
             sawAnswer = true
-            yield {
-              type: 'answer',
-              data: {
-                answer,
-                citations,
-                confidenceLevel,
-                complexity: inferComplexity(query),
-                queryType: inferQueryType(query),
-              },
+            const answerData = {
+              answer,
+              citations,
+              confidenceLevel,
+              complexity,
+              queryType,
             }
+            void cacheAnswer(query, answerData, cacheOpts).catch(() => {})
+            yield { type: 'answer', data: answerData }
             break
           }
           // narration 등 기타 이벤트는 무시(중간 진행멘트는 답변에 미포함)

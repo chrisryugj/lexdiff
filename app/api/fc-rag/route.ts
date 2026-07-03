@@ -396,6 +396,7 @@ export async function POST(request: NextRequest) {
             for await (const event of executeRelayRAGStream(query, {
               signal: combinedSignal,
               conversationId,
+              preEvidence,
             })) {
               if (event.type === "error") throw new Error(event.message)
               if (event.type === "answer") {
