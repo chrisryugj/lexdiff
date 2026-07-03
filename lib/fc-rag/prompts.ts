@@ -212,7 +212,8 @@ export function detectDecisionDomains(query: string): Array<{ domain: string; la
 
 /**
  * 완전히 정적인 시스템 프롬프트 (Gemini Context Cache 대상).
- * (isGemini, opts.autonomousTools) 값에만 의존 — 같은 조합이면 매번 동일한 문자열.
+ * (isGemini, opts.autonomousTools, opts.hasPreEvidence) 값에만 의존 — 같은 조합이면 매번 동일한 문자열.
+ * Gemini 경로는 hasPreEvidence를 넘기지 않으므로 context cache 무결 (relay/claude 전용 축).
  *
  * autonomousTools(웹 방식, relay 경로): "무엇을 어떤 순서로 조회하라"는 전략 지시
  * (도구 예산/chain/중복금지/개별도구 우선순위)를 제거하고 모델 자율에 위임.
@@ -223,10 +224,15 @@ export function buildStaticSystemPrompt(isGemini?: boolean, opts?: PromptBuildOp
   const autonomous = opts?.autonomousTools === true
 
   const toolMandateBlock = autonomous
-    ? `## 💀 도구 호출 필수 (NON-NEGOTIABLE)
+    ? (opts?.hasPreEvidence
+      ? `## 💀 도구 근거 필수 (NON-NEGOTIABLE)
+- **모든 답변은 도구 조회 결과에 근거해서만 작성**할 수 있다. 아래 [사전 조회 결과]는 시스템이 방금 korean-law MCP로 조회한 것이므로 **도구 근거로 간주**한다 — 그것으로 충분하면 추가 도구 호출 없이 즉시 답변하라.
+- 사전 조회 결과가 질문에 불충분하면(원문 확인·별표·판례 등) 부족한 부분만 도구로 보강 조회할 것.
+- 도구 근거(사전 조회 포함) 없이 학습 데이터만으로 생성된 답변은 검증 불가능한 환각으로 간주되어 전면 거부된다.`
+      : `## 💀 도구 호출 필수 (NON-NEGOTIABLE)
 - **모든 답변은 도구를 최소 1회 이상 호출한 후에만 작성**할 수 있다. 도구 호출 없이 직접 답변하는 것은 절대 금지.
 - 질의가 영문/외국어/모호/비법률적으로 보여도, 반드시 도구로 먼저 조회한 후 결과에 근거해 답변할 것.
-- 도구 호출 없이 생성된 답변은 검증 불가능한 환각으로 간주되어 전면 거부된다.`
+- 도구 호출 없이 생성된 답변은 검증 불가능한 환각으로 간주되어 전면 거부된다.`)
     : `## 💀 도구 호출 필수 (NON-NEGOTIABLE)
 - **모든 답변은 도구를 최소 1회 이상 호출한 후에만 작성** 할 수 있다. 도구 호출 없이 직접 답변하는 것은 절대 금지.
 - 질의가 영문/외국어/모호/비법률적으로 보여도, 반드시 search_ai_law 또는 적절한 도구를 먼저 호출한 후 결과에 근거해 답변할 것.
@@ -346,6 +352,13 @@ export interface PromptBuildOptions {
   universalFormat?: boolean
   /** 조회 전략 지시(도구 우선순위/예산/도메인·결정문 힌트) 제거 — 모델 자율 위임 */
   autonomousTools?: boolean
+  /**
+   * 시스템이 사전 조회한 근거([사전 조회 결과])가 프롬프트에 주입됨.
+   * 도구 강제(NON-NEGOTIABLE) 문구를 "사전 근거로 충분하면 추가 호출 생략 가능"으로
+   * 조건화 — "도구 없이는 답변 금지" ↔ "즉시 답하라"(pre-evidence) 모순 제거 (M3).
+   * ⚠️ Gemini 경로에서는 사용 금지: static prompt가 갈라져 context cache가 깨짐.
+   */
+  hasPreEvidence?: boolean
 }
 
 /**

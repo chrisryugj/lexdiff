@@ -317,6 +317,15 @@ export function getMaxClaudeTurns(complexity: QueryComplexity): number {
 // ─── Fast Path 공통 (Claude/Gemini 공유) ───
 
 /**
+ * fast-path 답변 래핑 — LLM 답변과 동일한 출력 계약(첫 ## 헤딩 시작)을 지키고,
+ * 원문 덤프임을 사용자에게 투명하게 알린다. 이전엔 도구 원문을 answer로 그대로
+ * 반환해 질의에 따라 정돈된 답 ↔ API 덤프가 들쭉날쭉했음 (H3).
+ */
+function formatFastPathAnswer(title: string, raw: string): string {
+  return `## ${title}\n\n*질의 패턴이 명확해 법제처 데이터를 직접 조회함 — AI 해석 없이 원문 그대로 표시.*\n\n---\n\n${raw}`
+}
+
+/**
  * Fast Path 처리. 단순 패턴은 LLM 없이 직접 도구 호출.
  * 처리됐으면 true, 아니면 false 반환.
  */
@@ -347,7 +356,7 @@ export async function* handleFastPath(
       yield {
         type: 'answer',
         data: {
-          answer: searchResult.result,
+          answer: formatFastPathAnswer(`${displayName} 결과`, searchResult.result),
           citations: buildCitations([searchResult]),
           confidenceLevel: 'medium',
           complexity: 'simple',
@@ -386,7 +395,7 @@ export async function* handleFastPath(
           yield {
             type: 'answer',
             data: {
-              answer: ordResult.result,
+              answer: formatFastPathAnswer('자치법규 원문 조회', ordResult.result),
               citations: buildCitations([searchResult, ordResult]),
               confidenceLevel: 'high',
               complexity: 'simple',
@@ -402,7 +411,7 @@ export async function* handleFastPath(
       yield {
         type: 'answer',
         data: {
-          answer: searchResult.result,
+          answer: formatFastPathAnswer('자치법규 검색 결과', searchResult.result),
           citations: buildCitations([searchResult]),
           confidenceLevel: 'medium',
           complexity: 'simple',
@@ -436,7 +445,7 @@ export async function* handleFastPath(
         yield {
           type: 'answer',
           data: {
-            answer: annexResult.result,
+            answer: formatFastPathAnswer('별표/서식 조회 결과', annexResult.result),
             citations: buildCitations([annexResult]),
             confidenceLevel: 'high',
             complexity: 'simple',
@@ -481,7 +490,7 @@ export async function* handleFastPath(
         yield {
           type: 'answer',
           data: {
-            answer: articlesResult.result,
+            answer: formatFastPathAnswer('조문 원문 조회', articlesResult.result),
             citations: buildCitations([articlesResult]),
             confidenceLevel: 'high',
             complexity: 'simple',
@@ -510,7 +519,9 @@ export const COMPLEXITY_THRESHOLDS = {
   MODERATE_SOURCE_TYPES: 1,      // >= 이 값
 } as const
 
-const COMPLEX_PATTERNS = /(?:하고|와\s*함께|판례|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
+// '하고' 단독 매칭 제거 (L1): "설립하고 싶어요" 같은 일상 연결어미까지 complex로 승격시켜
+// 불필요한 5턴·2000자 처리를 유발했음. 다중 의도 질의는 길이/sourceTypes 기준이 커버.
+const COMPLEX_PATTERNS = /(?:와\s*함께|과\s*함께|판례|전후\s*비교|비교해|변경.{0,5}판례|개정.{0,5}판례)/
 const MODERATE_PATTERNS = /(?:위임|시행령|시행규칙|해석례|유권해석|이력|변경|개정|바뀐|신구|대조|절차|방법|벌칙|처벌|과태료|벌금|영업정지|허가취소|감면|면제|비과세|특례|요건)/
 
 export function inferComplexity(query: string): QueryComplexity {
@@ -553,12 +564,23 @@ export function inferQueryType(query: string): LegalQueryType {
   if (/(?:얼마|금액|한도|상한|세율|별표|기준액).{0,8}(?:과태료|벌금|범칙금|과징금)/.test(query)) return 'scope'
   if (/(?:수당|사례금|강의료|보상비|급여).{0,8}(?:얼마|금액|한도|상한|기준액|별표)/.test(query)) return 'scope'
   if (/(?:얼마|금액|한도|상한|기준액|별표).{0,8}(?:수당|사례금|강의료|보상비|급여)/.test(query)) return 'scope'
+  // 처벌 수위·양형을 정도/금액으로 묻는 질의("처벌 얼마나 나오나요") → 원하는 건 수치 = scope.
+  // 순차 매칭에선 '처벌'이 consequence에 먼저 걸려 시뮬레이션(scope) 구조를 못 받던 오분류.
+  if (/(?:처벌|벌칙|제재|형량|징역).{0,10}(?:얼마|어느\s*정도|수위|몇\s*년|몇\s*개월|상한|최대)/.test(query)) return 'scope'
+  // 질문의 표적이 '요건'으로 명시된 질의("영업정지 요건은?", "환급 요건") → requirement.
+  // 순차 매칭에선 영업정지(consequence)·환급/신청(procedure)이 먼저 걸리던 오분류.
+  // 비교("요건 차이")는 comparison에, 면제·감면("감면 요건")은 exemption에 양보.
+  if (/(?:요건|자격|결격사유)(?:[은는이가을를]|\s*[?？]|\s*$)/.test(query)
+    && !/(?:차이|비교|vs|대비|장단점|구별|구분)/.test(query)
+    && !/(?:면제|감면|특례|비과세|영세율|감경)/.test(query)) return 'requirement'
 
   const patterns: [RegExp, LegalQueryType][] = [
     [/(?:면제|감면|특례|예외|비과세|영세율|감경)/,                     'exemption'],
+    // comparison을 consequence/procedure보다 앞에 — "등록 요건 차이", "처벌 비교"처럼
+    // 비교 의도 질의가 등록(procedure)·처벌(consequence) 단어에 선점당하던 오분류 수정 (M2)
+    [/(?:비교|차이|구별|구분|다른\s*점|vs|대비|장단점)/,               'comparison'],
     [/(?:벌칙|과태료|처벌|위반|제재|벌금|징역|형사|영업정지|허가취소|과징금|불이익)/, 'consequence'],
     [/(?:절차|방법|신청|신고|등록|제출|처리|납부|환급|경정청구|어떻게|순서|과정|단계)/, 'procedure'],
-    [/(?:비교|차이|구별|구분|다른\s*점|vs|대비|장단점)/,               'comparison'],
     [/(?:요건|조건|자격|충족|해당.*경우|갖추|필요.*서류|하려면)/,        'requirement'],
     [/(?:범위|적용.*범위|해당.*대상|포함|제외.*범위|얼마|세율|금액|기한|산정|계산|수당|사례금|강의료|한도|상한|기준액)/, 'scope'],
     [/(?:정의|뜻|의미|개념|무엇|이란\??$)/,                           'definition'],

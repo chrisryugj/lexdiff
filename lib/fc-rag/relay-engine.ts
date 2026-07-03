@@ -23,7 +23,7 @@ import {
 import { executeTool } from './tool-adapter'
 import { summarizeToolResult } from './result-utils'
 import { getCachedAnswer, cacheAnswer } from './answer-cache'
-import { parseCitationsFromAnswer } from './citations'
+import { parseCitationsFromAnswer, calcAnswerConfidence } from './citations'
 import { TOOL_DISPLAY_NAMES } from './tool-tiers'
 import { buildSystemPrompt } from './prompts'
 
@@ -36,7 +36,7 @@ const RELAY_TIMEOUT_MS = 120_000
 const RELAY_RULES = `
 
 ## 🔧 도구 환경
-- 사용 가능한 도구는 korean-law MCP(대한민국 법제처 1차 출처)다. 각 도구의 용도는 도구 설명을 따르고, 무엇을 어떤 순서로 조회할지는 질문에 맞게 스스로 판단하라.
+- 사용 가능한 도구는 korean-law MCP(대한민국 법제처 1차 출처)다. 각 도구의 용도는 도구 설명을 따른다.
 
 ## ⛔ 답변 출력 규칙 (내부 메모 노출 금지 — 매우 중요)
 - 답변 본문은 **반드시 첫 \`##\` 헤딩(예 \`## 결론\`)으로 시작**한다. 헤딩 앞에 어떤 문장도 두지 마라.
@@ -129,6 +129,8 @@ export async function* executeRelayRAGStream(
     buildSystemPrompt(complexity, queryType, query, undefined, {
       universalFormat: true,
       autonomousTools: true,
+      // pre-evidence 주입 시 도구강제 문구를 조건화 — "도구 없이 답변 금지" ↔ "즉시 답하라" 모순 제거 (M3)
+      hasPreEvidence: !!evidence,
     }) + RELAY_RULES + contextBlock + evidenceBlock
 
   const ac = new AbortController()
@@ -193,7 +195,22 @@ export async function* executeRelayRAGStream(
           case 'tool_result': {
             const name = String(ev.name)
             successfulTools++
-            yield { type: 'tool_result', name, displayName: TOOL_DISPLAY_NAMES[name] || name, success: true, summary: ev.bytes ? `${ev.bytes}B 수신` : '완료' }
+            const bytes = Number(ev.bytes) || 0
+            const sizeLabel = bytes >= 1024 ? `${(bytes / 1024).toFixed(1)}KB` : bytes > 0 ? `${bytes}B` : ''
+            yield { type: 'tool_result', name, displayName: TOOL_DISPLAY_NAMES[name] || name, success: true, summary: sizeLabel ? `${sizeLabel} 자료 수신` : '완료' }
+            break
+          }
+          case 'narration': {
+            // 모델이 도구 호출 사이에 흘리는 진행 멘트("여권법을 확인하겠습니다" 등).
+            // 답변에는 미포함하되 status로 매핑해 타임라인 하위 텍스트로 표출 — 대기 구간 투명화.
+            const raw = String(ev.text || '').trim()
+            if (raw) {
+              const firstLine = raw.split('\n').find((l) => l.trim()) || ''
+              const brief = firstLine.replace(/^#+\s*/, '').trim()
+              if (brief.length >= 4) {
+                yield { type: 'status', message: brief.length > 100 ? `${brief.slice(0, 100)}…` : brief, progress: 0 }
+              }
+            }
             break
           }
           case 'rate_limit':
@@ -210,16 +227,10 @@ export async function* executeRelayRAGStream(
             const hIdx = answer.search(/^##\s/m)
             if (hIdx > 0 && hIdx < 200) answer = answer.slice(hIdx).trimStart()
             const citations = parseCitationsFromAnswer(answer)
-            // 릴레이는 tool 결과 본문이 없어 텍스트·도구 신호로 신뢰도 추정.
-            // 신뢰도는 근거(citation·근거섹션) 기준 — 도구 호출 수에 의존하지 않는다.
-            // (도구예산으로 도구를 줄여도 인용·근거섹션이 충분하면 high. 이전 successfulTools>=2
-            //  조건은 도구예산과 충돌해, citation 3~4개로 근거 충분한 답을 medium으로 깎는 회귀를 유발했음.)
-            const hasGroundsSection = /##\s*근거\s*법령/.test(answer)
-            const confidenceLevel: 'high' | 'medium' | 'low' =
-              citations.length >= 2 && hasGroundsSection ? 'high'
-              : citations.length >= 1 && (hasGroundsSection || successfulTools >= 2) ? 'high'
-              : citations.length >= 1 || hasGroundsSection ? 'medium'
-              : 'low'
+            // 신뢰도: 텍스트 경로 공용 함수(calcAnswerConfidence)로 산정 — gemini의
+            // calcConfidenceDetailed와 동일 철학·임계. pre-evidence를 evidence 1로 세어
+            // 도구예산 훅이 도구를 깎아도 근거 충분한 답이 강등되지 않게 유지.
+            const confidenceLevel = calcAnswerConfidence(answer, citations, successfulTools + (evidence ? 1 : 0))
             sawAnswer = true
             const answerData = {
               answer,
@@ -232,7 +243,7 @@ export async function* executeRelayRAGStream(
             yield { type: 'answer', data: answerData }
             break
           }
-          // narration 등 기타 이벤트는 무시(중간 진행멘트는 답변에 미포함)
+          // 기타 이벤트는 무시
         }
       }
     }

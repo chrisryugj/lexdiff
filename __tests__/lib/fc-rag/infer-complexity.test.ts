@@ -49,4 +49,14 @@ describe('inferComplexity (M6)', () => {
   test('시행령 키워드 → moderate', () => {
     expect(inferComplexity('시행령 확인')).toBe('moderate')
   })
+
+  test('일상 연결어미 "하고"는 complex로 승격하지 않음 (L1)', () => {
+    // 이전엔 COMPLEX_PATTERNS의 bare '하고'가 "설립하고 싶어요"까지 complex로 승격
+    expect(inferComplexity('회사를 설립하고 싶어요')).not.toBe('complex')
+    expect(inferComplexity('이혼하고 싶은데 어떻게 하나요')).not.toBe('complex')
+  })
+
+  test('"~와 함께" 다중 의도는 여전히 complex', () => {
+    expect(inferComplexity('벌칙 조항과 함께 절차도 알려줘')).toBe('complex')
+  })
 })

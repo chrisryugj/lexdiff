@@ -63,7 +63,9 @@ describe('executeClaudeRAGStream', () => {
     expect(answerEvent).toBeDefined()
     if (answerEvent && answerEvent.type === 'answer') {
       expect(answerEvent.data.answer).toContain('제38조')
-      expect(answerEvent.data.confidenceLevel).toBe('high')
+      // H1: 'high' 하드코딩 제거 — calcAnswerConfidence 산정.
+      // 이 목 답변은 200자 미만이라 hard floor에 걸려 low (calcConfidenceDetailed와 동일 기준).
+      expect(answerEvent.data.confidenceLevel).toBe('low')
     }
   })
 

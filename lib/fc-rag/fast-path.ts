@@ -27,7 +27,7 @@ const KNOWN_MST_MAX = 5000
 
 export interface LawEntry { name: string; mst: string }
 
-export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'ordinance_search' | 'annex_resolve' | 'term_search' | 'law_system' | 'none'
+export type FastPathType = 'article_hit' | 'article_resolve' | 'precedent_search' | 'interpretation_search' | 'admin_rule_search' | 'ordinance_search' | 'annex_resolve' | 'none'
 
 interface FastPathDetection {
   type: FastPathType
@@ -141,17 +141,9 @@ export function detectFastPath(query: string): FastPathDetection {
     return { type: 'annex_resolve', lawName, searchQuery: `${lawName} ${annexLabel}` }
   }
 
-  // ── 패턴 5: 용어 정의 ("XX란?", "XX 뜻") ──
-  const termMatch = query.match(/^(.{2,20})(?:이란|란|의\s*(?:뜻|의미|개념|정의))[\s?]*$/)
-  if (termMatch && !/법|령|조례|규칙/.test(termMatch[1])) {
-    return { type: 'term_search', searchQuery: termMatch[1].trim(), toolName: 'search_legal_terms' }
-  }
-
-  // ── 패턴 6: 법체계/위임법령 조회 ──
-  const lawSystemMatch = query.match(/^(.+?법)\s*(?:시행령|시행규칙|하위법령|법체계|위임법령|3단비교)[\s?]*$/)
-  if (lawSystemMatch && !/비교|개정|판례/.test(query)) {
-    return { type: 'law_system', lawName: lawSystemMatch[1].trim(), searchQuery: lawSystemMatch[1].trim(), toolName: 'chain_law_system' }
-  }
+  // (구 패턴 5·6: term_search/law_system — handleFastPath에 처리 분기가 없어 항상
+  //  full pipeline로 떨어지던 죽은 감지 로직이라 제거. 용어 정의·법체계 질의는 LLM 경로가
+  //  설명을 붙여 답하는 편이 낫다는 판단. 부활 시 handleFastPath 분기까지 함께 구현할 것.)
 
   // ── 패턴 8: 법명+조문번호 ──
   // 복잡한 키워드가 있으면 full pipeline으로

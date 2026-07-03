@@ -7,7 +7,7 @@
 import { executeTool } from './tool-adapter'
 import { buildSystemPrompt } from './prompts'
 import { TOOL_DISPLAY_NAMES } from './tool-tiers'
-import { parseCitationsFromAnswer } from './citations'
+import { parseCitationsFromAnswer, calcAnswerConfidence } from './citations'
 import { summarizeToolResult, getToolCallQuery } from './result-utils'
 import { callAnthropicStream, type DirectMessage } from './hermes-client'
 import {
@@ -127,7 +127,8 @@ export async function* executeClaudeRAGStream(
   }
 
   // ── Full Pipeline: Hermes Gateway SSE로 실시간 tool_call/tool_result 추적 ──
-  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false)
+  // universalFormat: 3개 엔진(relay/gemini/claude) 출력 구조 통일 (M1) — 오분류 시 부적합 구조 강제 제거.
+  const systemPrompt = buildSystemPrompt(complexity, queryType, query, false, { universalFormat: true })
 
   yield { type: 'status', message: 'AI가 법령을 검색하고 있습니다...', progress: 15 }
 
@@ -158,6 +159,7 @@ export async function* executeClaudeRAGStream(
 
     const messages: DirectMessage[] = [{ role: 'user', content: userContent }]
     let toolCount = 0
+    let successToolCount = 0 // 신뢰도 산정용 — 성공한 도구 결과 수
 
     for await (const event of callAnthropicStream(systemPrompt, messages, { signal, maxTurns })) {
       if (signal?.aborted) {
@@ -178,6 +180,7 @@ export async function* executeClaudeRAGStream(
         }
       } else if (event.type === 'tool_result') {
         if (!TOOL_DISPLAY_NAMES[event.name]) continue
+        if (!event.isError) successToolCount++
         const summary = summarizeToolResult(event.name, {
           name: event.name, result: event.content, isError: event.isError,
         })
@@ -215,12 +218,15 @@ export async function* executeClaudeRAGStream(
         yield { type: 'status', message: '답변을 정리하고 있습니다...', progress: 92 }
         await storeConversation(conversationId, query, answer)
 
+        // 신뢰도: 'high' 하드코딩 제거 — 텍스트 경로 공용 함수로 산정 (relay와 동일 기준).
+        // pre-evidence(collectedEvidence)는 evidence 신호 1로 근사.
+        const claudeCitations = parseCitationsFromAnswer(answer)
         yield {
           type: 'answer',
           data: {
             answer,
-            citations: parseCitationsFromAnswer(answer),
-            confidenceLevel: 'high' as const,
+            citations: claudeCitations,
+            confidenceLevel: calcAnswerConfidence(answer, claudeCitations, successToolCount + (collectedEvidence ? 1 : 0)),
             complexity,
             queryType,
             isTruncated: event.stopReason === 'max_tokens',

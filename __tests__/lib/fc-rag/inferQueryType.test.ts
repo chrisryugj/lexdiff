@@ -85,6 +85,30 @@ describe('inferQueryType', () => {
     })
   })
 
+  describe('복합 의도 오버라이드 (M2 오분류 수정)', () => {
+    test('consequence 단어(영업정지) + 요건 표적 → requirement', () => {
+      expect(inferQueryType('영업정지 처분을 받으려면 어떤 요건이 필요한가요?')).toBe('requirement')
+    })
+    test('procedure 단어(환급) + 요건 표적 → requirement', () => {
+      expect(inferQueryType('부가가치세 환급 요건은?')).toBe('requirement')
+    })
+    test('procedure 단어(신청) + 요건 표적 → requirement', () => {
+      expect(inferQueryType('육아휴직 급여 신청 방법과 요건')).toBe('requirement')
+    })
+    test('요건 + 비교 의도 → comparison에 양보', () => {
+      expect(inferQueryType('일반건설업과 전문건설업 등록 요건 차이')).toBe('comparison')
+    })
+    test('감면 요건 → exemption 유지 (기존 우선순위 보존)', () => {
+      expect(inferQueryType('취득세 감면 요건')).toBe('exemption')
+    })
+    test('처벌 + 수위/정도 질의 → scope', () => {
+      expect(inferQueryType('음주운전 처벌 얼마나 나오나요?')).toBe('scope')
+    })
+    test('처벌 + 부과 여부 질의는 consequence 유지', () => {
+      expect(inferQueryType('무단횡단하면 처벌 받나요')).toBe('consequence')
+    })
+  })
+
   describe('범용 표현 fallback', () => {
     test('"알려줘"만 → definition', () => {
       expect(inferQueryType('관세법 알려줘')).toBe('definition')

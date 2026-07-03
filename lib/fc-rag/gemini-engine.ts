@@ -492,7 +492,10 @@ export async function* executeGeminiRAGStream(
   // 같은 isGemini 값이면 매 호출마다 systemInstruction 문자열이 identical → Gemini 2.5+ implicit
   // caching (min 1,024 tokens, 90% 할인) 자동 발동.
   const systemPrompt = buildStaticSystemPrompt(true /* isGemini */)
-  const dynamicHeader = buildDynamicHeader(complexity, queryType, query)
+  // universalFormat: SPECIALIST[queryType] 구조 강제 대신 범용 출력 형식 — relay 경로와 통일 (M1).
+  // queryType 오분류 시 부적합 구조(요건 질문에 "## 구제 방법" 등)가 폴백에서만 재현되던 이원화 제거.
+  // 도구 전략·도메인 힌트는 그대로 유지 (autonomousTools 미적용).
+  const dynamicHeader = buildDynamicHeader(complexity, queryType, query, { universalFormat: true })
   const ai = new GoogleGenAI({ apiKey: effectiveKey })
   const selectedTools = new Set(selectToolsForQuery(query))
   const toolDeclarations = getToolDeclarations().filter(d => selectedTools.has(d.name!))

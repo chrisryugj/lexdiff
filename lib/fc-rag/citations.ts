@@ -328,6 +328,46 @@ export function calcConfidence(
 }
 
 /**
+ * 텍스트 전용 경로(relay/claude) 공용 신뢰도 산정.
+ *
+ * relay·claude는 도구 결과 **본문**이 없어 calcConfidenceDetailed(toolResults 필요)를
+ * 못 쓴다. 이전에는 relay 인라인 로직(관대)·claude 'high' 하드코딩(무산정)으로 경로마다
+ * 같은 답변에 다른 신뢰도가 붙는 3원화 문제가 있었음. 이 함수가 텍스트 경로의 단일 기준.
+ *
+ * calcConfidenceDetailed와 동일한 철학·임계(70/45, 200자 하드플로어)를 쓰되,
+ * evidence는 도구 본문 대신 "관측된 성공 도구 수 + 사전조회(pre-evidence) 유무"로 근사.
+ * relay는 도구예산 훅이 도구를 깎아도 pre-evidence가 1로 잡혀, 인용·근거섹션이 충분한
+ * 답변이 medium으로 강등되는 회귀(2026-06-30 측정)를 만들지 않는다.
+ *
+ * @param evidenceCount 성공한 도구 호출 수 + (pre-evidence 있으면 +1)
+ */
+export function calcAnswerConfidence(
+  answerText: string,
+  citations: FCRAGCitation[],
+  evidenceCount: number,
+): 'high' | 'medium' | 'low' {
+  const citCount = citations.length
+  const ansLen = answerText.length
+  const hasGroundsSection = /##\s*근거\s*법령/.test(answerText)
+
+  // CORRECTNESS (0-50): 인용 존재·다양성 + 근거 섹션
+  const citBase = citCount >= 1 ? 25 : 0
+  const citTier = Math.min(citCount, 3) * 5
+  const citBonus = citCount >= 5 ? 5 : 0
+  const structure = hasGroundsSection ? 5 : 0
+  // GROUNDEDNESS (0-30): 근거 신호가 하나라도 관측됐는가 (본문 없이 개수만 근사)
+  const evidence = evidenceCount >= 1 ? 20 + Math.min(evidenceCount, 5) * 2 : 0
+  // COMPLETENESS (0-20): 답변 완결성 — 약한 신호
+  const length = ansLen >= 800 ? 20 : ansLen >= 400 ? 15 : ansLen >= 200 ? 10 : 0
+
+  let score = citBase + citTier + citBonus + structure + evidence + length
+  // HARD FLOOR: calcConfidenceDetailed와 동일 — 200자 미만은 medium 이상 불가
+  if (ansLen < 200) score = Math.min(score, 40)
+
+  return score >= 70 ? 'high' : score >= 45 ? 'medium' : 'low'
+}
+
+/**
  * 답변 텍스트에서 「법령명」 제N조 패턴으로 citation 추출.
  * Claude CLI가 도구를 직접 호출하므로 tool result 없이 텍스트 기반으로 파싱.
  */
@@ -383,6 +423,21 @@ export function parseCitationsFromAnswer(answer: string): FCRAGCitation[] {
       : m[3] ? `제${m[2]}조의${m[3]}`
       : `제${m[2]}조`
     push(m[1], articleNum, m.index ?? 0)
+  }
+
+  // 1b) 낫표 없는 bare 법령명 제N조 — "도로교통법 제44조", "여권법 시행령 제10조".
+  //     모델이 낫표를 빠뜨리면 패턴1이 전부 놓쳐 citation 0개 → 거짓 "일반 지식 기반" 배너
+  //     + 신뢰도 low 오탐 (quality-evaluator CITATION_PATTERN은 bare를 인정해 두 모듈 판정이
+  //     상반되던 정합성 버그). 대명사형(동법/이 법/같은 법 등)은 법령명이 아니므로 제외.
+  const bareLawArticlePattern = /(?:^|[^「\w가-힣])([가-힣A-Za-z0-9·]{2,30}(?:법|법률)(?:\s*시행령|\s*시행규칙)?)\s*제(\d+)조(?:의(\d+))?(?:의(\d+))?/g
+  const PRONOUN_LAW = /^(?:동법|본법|이법|같은법|해당법|위법|그법|현행법|관계법|관련법)$/
+  for (const m of answer.matchAll(bareLawArticlePattern)) {
+    const lawName = m[1].trim()
+    if (PRONOUN_LAW.test(lawName.replace(/\s+/g, ''))) continue
+    const articleNum = m[4] ? `제${m[2]}조의${m[3]}의${m[4]}`
+      : m[3] ? `제${m[2]}조의${m[3]}`
+      : `제${m[2]}조`
+    push(lawName, articleNum, m.index ?? 0)
   }
 
   // 2) 「법령명」 … 별표/별지/서식 — 조문이 아닌 별표가 근거인 답변(수수료·과태료·서식 등) 인용 인식.

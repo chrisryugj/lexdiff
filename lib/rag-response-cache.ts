@@ -166,6 +166,7 @@ export async function getCachedResponse(query: string): Promise<{
   citations: any[]
   confidenceLevel: string
   queryType?: string
+  cachedAt: number
 } | null> {
   try {
     const db = await openDB()
@@ -203,7 +204,8 @@ export async function getCachedResponse(query: string): Promise<{
           response: cached.response,
           citations: cached.citations,
           confidenceLevel: cached.confidenceLevel,
-          queryType: cached.queryType
+          queryType: cached.queryType,
+          cachedAt: cached.timestamp
         })
       }
 
