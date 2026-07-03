@@ -3,7 +3,7 @@
 **법령을 쉽게. AI로 똑똑하게. 공공 Legal AI의 시작.**
 
 [![Live](https://img.shields.io/badge/Live-lexdiff.gomdori.app-1a2b4c)](https://lexdiff.gomdori.app)
-[![Version](https://img.shields.io/badge/version-2.4.2--beta-b08d57)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.0--beta-b08d57)](CHANGELOG.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Themis](https://img.shields.io/badge/AI-Themis_(Claude)_+_Gemini-b08d57)](https://claude.ai)

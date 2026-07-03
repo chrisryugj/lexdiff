@@ -2,6 +2,31 @@
 
 LexDiff의 주요 변경사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)을 따르며, 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 사용합니다.
 
+## [2.5.0-beta] — 2026-07-03
+
+AI질의 UX 대개편 + 엔진(프롬프트·분류기·신뢰도) 개편. 라이브 벤치 2회 회귀 검증(avg 19.9s/22.4s, 기대인용 10/10) + headless Chrome 실기기 UX 검증 완료.
+
+### ✨ Added — AI질의 UX
+- **라이브 마크다운 스트리밍** — 답변 토큰을 실시간 마크다운으로 렌더 (150ms 스로틀). 스트리밍 토큰이 화면에 안 보이던 버그 수정(타이핑 useEffect isStreaming 분기 부재)
+- **진행 타임라인 narration** — 릴레이가 도구 호출 사이에 흘리는 진행 멘트를 "AI 분석 중" 하위 텍스트로 표출 (대기 구간 투명화, 100자 트렁케이션)
+- **에러카드 + 다시 시도** — 엔진 실패 시 가짜 답변 대신 에러카드·재시도·웹검색 버튼
+- **캐시 배지** — 동일 질의 재검색 시 "저장된 답변 · N분 전" 배지 + 재생성 아이콘 (클라이언트 IndexedDB)
+- **쿼터 표시** — 완료 후 통계 hover 팝업에 "오늘 AI 질의 N/M회" (BYOK는 무제한 표기)
+- **tool_result 인간화** — 도구 결과를 "N KB 자료 수신" 형태로 표시
+
+### 🔄 Changed — 엔진
+- **신뢰도 단일화** — relay/claude 텍스트 경로를 `calcAnswerConfidence`로 통일 (gemini `calcConfidenceDetailed`와 동일 철학·임계 70/45·200자 플로어), claude 'high' 하드코딩 제거
+- **인용 파서 bare 법령명 지원** — 낫표(「」) 없는 법령명·시행령·규칙도 인용으로 인정 (대명사형 제외)
+- **3엔진 universalFormat 통일** — SPECIALIST[queryType] 폐기 (오분류 시 부적합 구조 강제 문제)
+- **fast-path 답변 래핑** — 직결 조회 답변도 `## 조문 원문 조회` 헤딩 구조로 통일
+- **inferQueryType 정비** — 요건→requirement·처벌+금액→scope 오버라이드, comparison 우선순위 재배열, '하고' 과탐 제거, term_search/law_system 데드코드 제거
+- **hasPreEvidence 프롬프트 모순 해소** — pre-evidence 주입 시 도구 강제 지침과 즉답 지침이 충돌하던 것 조건화
+
+### 🧹 Maintenance
+- kordoc 3.5.1 → 3.10.1 (별표 HWP/HWPX/PDF 변환 라이브 회귀 확인, breaking change 없음)
+- `components/ai-search-loading/` 데드코드 제거
+- 문서 현행화: CLAUDE.md LLM 구성표, 05-RAG_ARCHITECTURE
+
 ## [2.4.2-beta] — 2026-07-03
 
 테미스(맥미니 구독 Claude 릴레이) 엔진 3단 최적화 + 프로덕션 리뷰 #4 (전 카테고리 검색·AI 기능 전수 점검).
