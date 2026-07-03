@@ -17,25 +17,27 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
 │  2-Tier AI 라우팅                            │
 │                                             │
 │  ┌────────────────────────────────────────┐ │
-│  │ 1순위: Hermes Gateway (GPT-5.4)        │ │
-│  │   HTTP fetch + SSE                     │ │
-│  │   POST /v1/chat/completions            │ │
-│  │   (OpenAI-compatible, stream:true)     │ │
-│  │   로컬: http://127.0.0.1:8642          │ │
-│  │   Vercel: CF Worker → Quick Tunnel     │ │
-│  │           → Hermes (동일 경로)          │ │
-│  │   ※ Codex OAuth + MCP는 Hermes가 관리  │ │
+│  │ 1순위: 테미스(Themis) 맥미니 릴레이      │ │
+│  │   relay-engine.ts → RELAY_URL          │ │
+│  │   POST /law/query (SSE)                │ │
+│  │   구독 Claude Sonnet + korean-law MCP  │ │
+│  │   Tailscale Funnel 공개주소             │ │
+│  │   ※ MCP는 릴레이(claude -p)가 관리      │ │
+│  │   ※ 캐시→fast-path→pre-evidence 3단    │ │
 │  └──────────┬─────────────────────────────┘ │
-│             │ 실패 시                        │
+│             │ 실패/타임아웃/BYOK 시           │
 │  ┌──────────▼─────────────────────────────┐ │
 │  │ 2순위: Gemini FC-RAG                   │ │
 │  │   (gemini-3-flash-preview)             │ │
 │  │   Function Calling + MCP 도구 직접호출  │ │
 │  └────────────────────────────────────────┘ │
+│                                             │
+│  (구 1순위 Hermes GPT-5.4는 DISABLE_HERMES  │
+│   로 기본 비활성 — claude-engine.ts 잔존)    │
 └─────────────────────────────────────────────┘
     ↓
 [korean-law-mcp tools] 법제처 API 실시간 호출
-    ↑ Primary 경로에서는 Hermes가 자식 프로세스로 직접 관리
+    ↑ Primary(릴레이) 경로에서는 릴레이 서버가 MCP stdio로 직접 관리
     ↑ Gemini 폴백 경로에서는 lexdiff가 tool-adapter로 직접 호출
     ↓
 [SSE Stream] status → tool_call → tool_result → answer → citation_verification
@@ -51,18 +53,23 @@ User Query: "관세법 제38조에서 말하는 수입이란?"
 
 ```typescript
 type FCRAGStreamEvent =
-  | { type: 'status'; message: string; progress: number }
-  | { type: 'tool_call'; name: string; displayName: string; query?: string }
+  | { type: 'status'; message: string; progress: number }      // 진행 상태 + relay narration(모델 진행멘트)도 status로 매핑됨
+  | { type: 'tool_call'; name: string; displayName: string; query?: string; args?: Record<string, unknown> }
   | { type: 'tool_result'; name: string; displayName: string; success: boolean; summary: string }
   | { type: 'token_usage'; inputTokens: number; outputTokens: number; totalTokens: number }
-  | { type: 'answer'; data: FCRAGResult }
-  | { type: 'answer_token'; data: { text: string } }           // Bridge 스트리밍 토큰
+  | { type: 'answer'; data: FCRAGResult }                      // data.fromCache=true면 서버 캐시 히트 (UI 캐시 배지)
+  | { type: 'answer_token'; data: { text: string } }           // relay answer_delta 스트리밍 토큰
   | { type: 'citation_verification'; citations: VerifiedCitation[] }
-  | { type: 'source'; source: 'hermes' | 'gemini' }
+  | { type: 'source'; source: 'relay' | 'gemini' }
   | { type: 'error'; message: string }
+
+// route.ts가 추가로 emit하는 이벤트 (엔진 밖):
+//  { type: 'quota_status'; feature; current; limit; resetAt; byok }  // 스트림 시작 시 1회 — UI 쿼터 표시
+//  { type: 'stream_reset'; reason: 'retry' | 'fallback' }            // 재시도/폴백 시 클라 버퍼·로그 초기화
+//  { type: 'error'; message; retryable }                             // 터미널 에러 — UI 에러 카드 + 재시도 버튼
 ```
 
-**`answer_token`**: Hermes Gateway SSE 경로(로컬/Vercel 동일)에서 발생. Hermes의 OpenAI-호환 `delta.content` 청크를 그대로 토큰 단위로 전달하여 타이핑 효과 구현. Gemini 경로는 최종 answer만 전송.
+**`answer_token`**: relay 경로에서 발생 — 릴레이의 `answer_delta`(content_block_delta)를 토큰 단위로 전달해 실시간 스트리밍 표시. Gemini 경로는 최종 answer만 전송(클라이언트 타이핑 효과로 표시).
 
 ### 2. SSE Buffer Handling (CRITICAL)
 
@@ -111,18 +118,21 @@ engine.ts: preEvidence 있으면 fast-path 스킵
 **도메인 자동 감지** (`lib/fc-rag/tool-tiers.ts`):
 - 16개 도메인: tax, customs, labor, privacy, competition, constitutional, admin, public_servant, housing, environment, construction, civil_service, medical, education, finance, military, general
 
-### 5. 질의 유형별 프롬프트
+### 5. 질의 유형(queryType)과 답변 구조
 
-| 유형 | 예시 | 답변 구조 |
-|------|------|-----------|
-| `definition` | "수입이란?" | 결론 → 본문 → 조문 → 혼동 개념 → 근거법 |
-| `requirement` | "신청 자격은?" | 결론 → 결격사유 → 필수항목 → 가점항목 → 실무팁 |
-| `procedure` | "신청 절차는?" | 결론(로드맵) → 단계별 → 주의사항 |
-| `comparison` | "A vs B?" | 결론 → 비교표 → 상황별 추천 |
-| `application` | "적용되나?" | 결론(yes/no+신뢰도) → 요건 체크 → 보충 |
-| `consequence` | "위반하면?" | 결론(벌칙) → 구제수단 → 세부사항 |
-| `scope` | "얼마나?" | 결론 → 산출 근거 → 시뮬레이션 2건 |
-| `exemption` | "면제되나?" | 결론 → 자격 체크 → 신청 방법 |
+- **답변 구조는 3개 엔진(relay/gemini/claude) 모두 `UNIVERSAL_INSTRUCTIONS`(범용 형식)** 사용:
+  `## 결론` → `## 주요 내용`(내용에 맞는 형식 자율 선택) → `## 근거 법령`.
+  queryType별 SPECIALIST 구조 강제는 오분류 시 부적합 구조(요건 질문에 "## 구제 방법" 등)를
+  만들어 폐기 (prompts.ts의 SPECIALIST_INSTRUCTIONS는 하위호환용 잔존).
+- **queryType은 여전히 분류함** (`inferQueryType`, engine-shared.ts) — UI 배지 표시·텔레메트리·
+  fast-path·복합의도 오버라이드(요건→requirement, 처벌+얼마→scope 등)에 사용.
+
+| 유형 | 예시 | 유형 | 예시 |
+|------|------|------|------|
+| `definition` | "수입이란?" | `application` | "적용되나?" |
+| `requirement` | "신청 자격은?" | `consequence` | "위반하면?" |
+| `procedure` | "신청 절차는?" | `scope` | "얼마나?" |
+| `comparison` | "A vs B?" | `exemption` | "면제되나?" |
 
 ### 6. 인용 검증 시스템
 

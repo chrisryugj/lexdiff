@@ -6,13 +6,13 @@
 ## 🔴 LLM 구성 (중요)
 | 역할 | LLM | 경로 |
 |------|-----|------|
-| **Primary** | **GPT-5.4 (Hermes Agent API)** | route.ts → claude-engine.ts `executeClaudeRAGStream()` → `hermes-client.ts` `callAnthropicStream()` → Hermes API |
-| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (Hermes 불능 시) |
+| **Primary** | **테미스(Themis) — 맥미니 릴레이 (구독 Claude Sonnet + korean-law MCP)** | route.ts → relay-engine.ts `executeRelayRAGStream()` → `RELAY_URL`(Tailscale Funnel) `/law/query` SSE |
+| Fallback | Gemini Flash | route.ts → engine.ts `executeGeminiRAGStream()` (relay 실패/타임아웃/BYOK 시) |
+| 비활성 | GPT-5.4 (Hermes Agent API) | claude-engine.ts — `DISABLE_HERMES` 기본 비활성 (2026-04-13, 60s 타임아웃 이슈) |
 
-- **Hermes Agent API** (OpenAI-compatible) — GPT-5.4 + Codex OAuth
-  - 로컬: `http://127.0.0.1:8642` 직접 호출
-  - Vercel: `HERMES_API_URL` (CF Worker → Quick Tunnel → Hermes API) 경유
-  - korean-law-mcp 는 Hermes가 자식 프로세스로 관리 (lexdiff는 MCP 프로토콜 모름)
+- **릴레이(테미스)**: 맥미니 `~/workspace/lexdiff-relay` (launchd `com.lexdiff.relay`). Vercel `RELAY_URL`/`RELAY_TOKEN`은 sensitive — `vercel env pull` 시 빈값으로 옴 (꺼진 게 아님)
+- 신뢰도 산정: relay/claude(텍스트 경로)는 `calcAnswerConfidence`, gemini는 `calcConfidenceDetailed` — 동일 철학·임계(70/45, 200자 플로어)
+- 3개 엔진 모두 `universalFormat`(범용 출력 구조) 사용 — SPECIALIST[queryType]는 미사용(오분류 시 부적합 구조 강제 문제로 폐기)
 - **Gemini 경로**: lexdiff가 `korean-law-mcp/tools/*` 핸들러를 **TypeScript 직접 import** (MCP X).
   - 등록 도구 수: **46개** — [tool-registry.ts](lib/fc-rag/tool-registry.ts)
   - 핵심 도구 2개로 17개 결정문 도메인 통합: `search_decisions(domain)` / `get_decision_text(domain, id)`
