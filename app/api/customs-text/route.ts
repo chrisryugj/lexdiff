@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
       throw new Error("JSON 파싱 실패")
     }
 
-    const service = data?.KcsCgmExpcService || data?.kcsCgmExpcService
+    // 응답 최상위 키는 CgmExpcService (2026-07-03 실측) — 구 키도 방어적 유지
+    const service = data?.CgmExpcService || data?.KcsCgmExpcService || data?.kcsCgmExpcService
     if (!service) {
       return NextResponse.json(
         { error: "관세청 해석을 찾을 수 없습니다" },

@@ -13,9 +13,10 @@ export interface AiAuthContext {
 
 /**
  * BYOK 키(Gemini) 포맷 — 다른 문자열이 오면 우회 악용 차단 차원에서 거부.
+ * 구형(AIzaSy…) + 신형 Google Cloud API 키(AQ.…) 두 포맷 허용.
  * 참고: 실제 키 유효성은 Gemini 호출 단계에서 검증된다 (여기선 shape만).
  */
-const GEMINI_KEY_RE = /^AIzaSy[A-Za-z0-9_-]{33}$/
+const GEMINI_KEY_RE = /^(AIzaSy[A-Za-z0-9_-]{33}|AQ\.[A-Za-z0-9_-]{30,120})$/
 
 function readByokHeader(request: NextRequest): string | null {
   // HTTP 헤더는 case-insensitive이지만 명시적으로 한 번만 읽어 단일 진실 소스 유지.

@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       throw new Error("JSON 파싱 실패")
     }
 
-    // 응답 구조 확인 (TtSpecialDeccService 또는 다른 키)
-    const service = data?.TtSpecialDeccService || data?.ttSpecialDeccService
+    // 응답 최상위 키는 SpecialDeccService (2026-07-03 실측) — 구 키도 방어적 유지
+    const service = data?.SpecialDeccService || data?.TtSpecialDeccService || data?.ttSpecialDeccService
     if (!service) {
       return NextResponse.json(
         { error: "재결례를 찾을 수 없습니다" },

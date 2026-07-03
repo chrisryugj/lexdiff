@@ -26,11 +26,12 @@ interface LawStats {
  */
 async function fetchFromStatisticsPage(): Promise<Partial<LawStats> | null> {
   try {
+    // Accept 미지정(undici 기본 */*) 시 법제처가 응답을 ~15s 지연시켜 타임아웃 → 통계 전부 0 (2026-07-03 실측).
     const res = await fetchWithTimeout(
       "https://www.law.go.kr/lawStatistics.do?menuId=13&subMenuId=557",
       {
         next: { revalidate: 86400 },
-        headers: { "User-Agent": "Mozilla/5.0 LexDiff/1.0" },
+        headers: { "User-Agent": "Mozilla/5.0 LexDiff/1.0", Accept: "text/html" },
       }
     )
     if (!res.ok) return null

@@ -114,7 +114,6 @@ export function UserMenu({ onLoginClick, onFavoriteSelect, onAllFavoritesClick }
         >
           <span className="absolute inset-0 rounded-full ring-1 ring-border group-hover:ring-brand-gold/60 group-hover:shadow-[0_0_0_3px_rgba(191,149,63,0.12)] transition-all duration-200 pointer-events-none" />
           {avatarUrl && !avatarFailed ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl}
               alt={name}
@@ -136,7 +135,6 @@ export function UserMenu({ onLoginClick, onFavoriteSelect, onAllFavoritesClick }
           <div className="flex items-center gap-3">
             <div className="relative">
               {avatarUrl && !avatarFailed ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatarUrl}
                   alt={name}

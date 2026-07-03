@@ -51,7 +51,7 @@ export function AiGateDialog({ open, onClose }: AiGateDialogProps) {
 
   const handleSaveKey = () => {
     const trimmed = keyInput.trim()
-    if (!/^AIzaSy[A-Za-z0-9_-]{33}$/.test(trimmed)) {
+    if (!/^(AIzaSy[A-Za-z0-9_-]{33}|AQ\.[A-Za-z0-9_-]{30,120})$/.test(trimmed)) {
       setError('Gemini API 키 형식이 올바르지 않습니다.')
       return
     }
