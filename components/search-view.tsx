@@ -392,6 +392,10 @@ export function SearchView({
         storageKey="lexdiff-home-tour-v1"
         autoStart
         runKey={tourRunKey}
+        onEnd={() => {
+          // 투어가 끝나면 바로 검색을 시작할 수 있게 검색창 포커스
+          document.querySelector<HTMLTextAreaElement>('[data-tour="search-input"] textarea')?.focus()
+        }}
       />
       <AiGateDialog
         open={loginDialogOpen}

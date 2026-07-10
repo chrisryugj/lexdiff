@@ -616,6 +616,10 @@ function SearchResultViewComponent({
               onBack={handlers.handleReset}
             />
           ) : !state.lawData ? (
+            state.showNoResultDialog || state.showChoiceDialog ? (
+              /* 안내 다이얼로그 표시 중 — 배경은 중립 유지 (에러 화면 겹침 방지) */
+              <div className="py-24" aria-hidden="true" />
+            ) : (
             /* 검색 결과 없음 - 홈으로 복귀 안내 */
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
               <Icon name="search" className="h-16 w-16 text-muted-foreground/40 mb-4" />
@@ -641,6 +645,7 @@ function SearchResultViewComponent({
                 </button>
               </div>
             </div>
+            )
           ) : (
             /* 법령 뷰어 — 단일 인스턴스 (이중 마운트 제거: API 호출/useEffect 2배→1배) */
             <div className="space-y-2 sm:space-y-4">

@@ -13,6 +13,7 @@ import { debugLogger } from "@/lib/debug-logger"
 import { sanitizeForRender } from "@/lib/sanitize-html-render"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useFocusTopmostDialog } from "@/hooks/use-focus-topmost-dialog"
+import { useDialogBackGuard } from "@/hooks/use-dialog-back-guard"
 
 interface ComparisonModalProps {
   isOpen: boolean
@@ -24,6 +25,8 @@ interface ComparisonModalProps {
 }
 
 export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, lawTitle, lawId, mst, targetJo }: ComparisonModalProps) {
+  // 브라우저 뒤로가기 시 뷰어 이탈 대신 모달만 닫기
+  useDialogBackGuard(isOpen, onClose)
   const [isLoading, setIsLoading] = useState(false)
   const [comparison, setComparison] = useState<OldNewComparison | null>(null)
   const [error, setError] = useState<string | null>(null)

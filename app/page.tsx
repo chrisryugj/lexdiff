@@ -73,6 +73,12 @@ export default function Home() {
   const [impactKey, setImpactKey] = useState(0) // 진입 시마다 증가 → 리마운트로 초기화
   const [benchmarkKeyword, setBenchmarkKeyword] = useState('')
 
+  // popstate 핸들러(deps: [])에서 현재 뷰 상태를 읽기 위한 ref — 모달 back-guard pop 시 동일 뷰 리마운트 방지
+  const viewModeRef = useRef(viewMode)
+  viewModeRef.current = viewMode
+  const searchIdRef = useRef(searchId)
+  searchIdRef.current = searchId
+
   // 홈 도구 카드 → 법령 선택 다이얼로그 + 모달
   const [lawSelectionDialog, setLawSelectionDialog] = useState<{
     isOpen: boolean
@@ -238,6 +244,8 @@ export default function Home() {
         setPrecedentId(state.precedentId)
         setSearchMode(state.searchMode || 'basic')
       } else if (state.viewMode === 'search-result' && state.searchId) {
+        // 모달 back-guard pop 등 동일 뷰로의 복귀면 리마운트 생략 (뷰어 상태 보존)
+        if (viewModeRef.current === 'search-result' && searchIdRef.current === state.searchId) return
         // 판례 상세 / 조례 상세 → 뒤로가기 → 검색 결과 리스트
         setViewMode('search-result')
         setSearchId(state.searchId)

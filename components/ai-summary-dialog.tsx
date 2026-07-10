@@ -12,6 +12,7 @@ import { RevisionLineDiff } from "@/components/legal/revision-line-diff"
 import { formatDate } from "@/lib/revision-parser"
 import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { useApiKey } from "@/hooks/use-api-key"
+import { useDialogBackGuard } from "@/hooks/use-dialog-back-guard"
 
 interface AISummaryDialogProps {
   isOpen: boolean
@@ -53,6 +54,8 @@ export function AISummaryDialog({
   isPrecedent = false,
   lawId,
 }: AISummaryDialogProps) {
+  // 브라우저 뒤로가기 시 뷰어 이탈 대신 다이얼로그만 닫기
+  useDialogBackGuard(isOpen, onClose)
   const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

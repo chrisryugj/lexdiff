@@ -24,6 +24,8 @@ interface OnboardingTourProps {
   /** 외부에서 강제로 시작할 때 사용. 0보다 큰 값으로 증가시킬 것 */
   runKey?: number
   onComplete?: () => void
+  /** 완주·스킵 무관하게 투어가 끝날 때 호출 */
+  onEnd?: () => void
 }
 
 interface Rect {
@@ -45,6 +47,7 @@ export function OnboardingTour({
   autoStart = true,
   runKey = 0,
   onComplete,
+  onEnd,
 }: OnboardingTourProps) {
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
@@ -152,8 +155,9 @@ export function OnboardingTour({
         localStorage.setItem(storageKey, "done")
       } catch {}
       if (completed) onComplete?.()
+      onEnd?.()
     },
-    [storageKey, onComplete]
+    [storageKey, onComplete, onEnd]
   )
 
   const goNext = useCallback(() => {
