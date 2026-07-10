@@ -5,11 +5,12 @@
  * Body: { keyword: string, ordinances: Array<{ orgShortName, orgName, ordinanceName, ordinanceSeq }> }
  * Response: { comparisonTable: string, highlights: string }
  *
- * OpenClaw(미니PC) 우선 → Gemini 폴백
+ * LLM: Gemini standard(재시도 3회) → lite 폴백
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { AI_CONFIG } from '@/lib/ai-config'
+import { normalizeMarkdownTable } from '@/lib/markdown-table-normalizer'
 import { safeErrorResponse } from '@/lib/api-error'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { requireAiAuth, refundAiQuota, type AiAuthContext } from '@/lib/api-auth'
@@ -103,7 +104,10 @@ ${ordinanceList}
 ## 출력 형식
 JSON 객체의 두 필드를 채우세요 (각 필드는 마크다운 문자열):
 
-- **comparisonTable**: 마크다운 표 하나. 첫 행은 헤더 \`| 비교 항목 | ${safeTexts.map(t => t.orgName).join(' | ')} |\`, 이후 각 행은 비교 축별로 지자체 규정 내용을 요약(해당 규정이 없으면 "미규정"). 표 이외의 텍스트나 헤딩은 넣지 마세요.
+- **comparisonTable**: 마크다운 표 하나. 반드시 아래 3가지 규칙을 지키세요:
+  1. 첫 행은 헤더 \`| 비교 항목 | ${safeTexts.map(t => t.orgName).join(' | ')} |\`, **둘째 행은 구분행** \`|${safeTexts.map(() => '---').join('|')}|---|\`.
+  2. 각 행은 물리적으로 한 줄 — 셀 안에 줄바꿈(\\n)을 절대 넣지 마세요. 여러 항목은 쉼표나 " / "로 이어 쓰세요.
+  3. 셀 내용에 파이프 문자 \`|\`를 넣지 마세요 (필요하면 "/"로 대체). 해당 규정이 없으면 "미규정". 표 이외의 텍스트나 헤딩은 넣지 마세요.
 - **highlights**: 하이픈 \`- \`으로 시작하는 flat bullet 목록(3~5개). 지자체명만 \`**볼드**\` 처리하고, 어느 지자체가 더 상세하거나 선진적인지 포함하세요.`
 }
 
@@ -247,6 +251,8 @@ export async function POST(request: NextRequest) {
 
     try {
       const result = await callGemini(prompt, authCtx)
+      // LLM이 표 규칙(구분행·한 줄 행)을 어겨도 렌더 가능하게 복구
+      result.comparisonTable = normalizeMarkdownTable(result.comparisonTable)
       succeeded = true
       return NextResponse.json(result)
     } catch (err: unknown) {

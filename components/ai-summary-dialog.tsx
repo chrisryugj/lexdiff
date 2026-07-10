@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +10,7 @@ import { CopyButton } from "@/components/ui/copy-button"
 import { LegalMarkdownRenderer } from "@/components/legal-markdown-renderer"
 import { RevisionLineDiff } from "@/components/legal/revision-line-diff"
 import { formatDate } from "@/lib/revision-parser"
+import { parseOldNewXML } from "@/lib/oldnew-parser"
 import { useApiKey } from "@/hooks/use-api-key"
 
 interface AISummaryDialogProps {
@@ -22,6 +23,22 @@ interface AISummaryDialogProps {
   effectiveDate?: string
   prevEffectiveDate?: string  // 직전(구법) 시행일 — 비교 기준 표시
   isPrecedent?: boolean  // 판례 요약 모드
+  lawId?: string  // 개정 연혁 조회용 — 있으면 비교 시점 선택 가능
+}
+
+interface RevisionEntry {
+  mst: string
+  efYd: string   // 시행일자 YYYYMMDD
+  ancYd: string  // 공포일자
+  rrCls: string  // 제개정 구분 (일부개정/전부개정/타법개정 …)
+}
+
+// 선택한 개정 시점의 신·구 대조 데이터
+interface RevisionComparison {
+  oldContent: string
+  newContent: string
+  prevEffectiveDate?: string
+  effectiveDate?: string
 }
 
 export function AISummaryDialog({
@@ -34,12 +51,67 @@ export function AISummaryDialog({
   effectiveDate,
   prevEffectiveDate,
   isPrecedent = false,
+  lawId,
 }: AISummaryDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("small")
   const { apiKey } = useApiKey()
+
+  // ── 비교 시점 선택 (개정 연혁 기반) ──
+  const [revisions, setRevisions] = useState<RevisionEntry[]>([])
+  const [selectedMst, setSelectedMst] = useState<string>("latest")
+  const [revisionOverride, setRevisionOverride] = useState<RevisionComparison | null>(null)
+  const [loadingRevision, setLoadingRevision] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen || isPrecedent) return
+    const params = lawId ? `lawId=${encodeURIComponent(lawId)}` : `lawName=${encodeURIComponent(lawTitle)}`
+    fetch(`/api/law-history?${params}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.histories?.length) setRevisions(data.histories)
+      })
+      .catch(() => { /* 연혁 조회 실패 시 기본(최신) 비교만 제공 */ })
+  }, [isOpen, isPrecedent, lawId, lawTitle])
+
+  const handleRevisionChange = async (mst: string) => {
+    setSelectedMst(mst)
+    setSummary(null)
+    setError(null)
+    if (mst === "latest") {
+      setRevisionOverride(null)
+      return
+    }
+    setLoadingRevision(true)
+    try {
+      const res = await fetch(`/api/oldnew?mst=${encodeURIComponent(mst)}`)
+      if (!res.ok) throw new Error("해당 개정 시점의 신·구 대조 데이터를 불러오지 못했습니다.")
+      const comparison = parseOldNewXML(await res.text())
+      if (!comparison.oldVersion.content && !comparison.newVersion.content) {
+        throw new Error("해당 개정에는 신·구 대조표가 제공되지 않습니다.")
+      }
+      setRevisionOverride({
+        oldContent: comparison.oldVersion.content,
+        newContent: comparison.newVersion.content,
+        prevEffectiveDate: comparison.oldVersion.effectiveDate,
+        effectiveDate: comparison.newVersion.effectiveDate,
+      })
+    } catch (err) {
+      setRevisionOverride(null)
+      setSelectedMst("latest")
+      setError(err instanceof Error ? err.message : "개정 비교 데이터 조회 실패")
+    } finally {
+      setLoadingRevision(false)
+    }
+  }
+
+  // 실제 비교/요약에 쓰이는 값 — 개정 시점을 고르면 그 시점의 신·구 쌍으로 대체
+  const effOldContent = revisionOverride?.oldContent ?? oldContent
+  const effNewContent = revisionOverride?.newContent ?? newContent
+  const effPrevDate = revisionOverride?.prevEffectiveDate ?? prevEffectiveDate
+  const effDate = revisionOverride?.effectiveDate ?? effectiveDate
 
   const generateSummary = async () => {
     setIsLoading(true)
@@ -58,9 +130,9 @@ export function AISummaryDialog({
         body: JSON.stringify({
           lawTitle,
           joNum,
-          oldContent,
-          newContent,
-          effectiveDate,
+          oldContent: effOldContent,
+          newContent: effNewContent,
+          effectiveDate: effDate,
           isPrecedent,
         }),
       })
@@ -159,29 +231,49 @@ export function AISummaryDialog({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
-          {/* 비교 기준 배지 — 무엇과 무엇을 비교하는지 명시 (변경요약 모드) */}
+          {/* 비교 기준 배지 + 개정 시점 선택 (변경요약 모드) */}
           {!isPrecedent && (
             <div className="flex items-center gap-1.5 flex-wrap text-xs">
               <span className="text-muted-foreground mr-0.5">비교 기준</span>
               <Badge variant="outline" className="px-2 py-0.5 font-normal">
-                {prevEffectiveDate ? formatDate(prevEffectiveDate) : "직전"} 시행본
+                {effPrevDate ? formatDate(effPrevDate) : "직전"} 시행본
               </Badge>
               <Icon name="arrow-right" className="h-3 w-3 text-muted-foreground" />
               <Badge variant="outline" className="px-2 py-0.5 font-normal border-primary/40 text-foreground">
-                {effectiveDate ? formatDate(effectiveDate) : "선택"} 시행본
+                {effDate ? formatDate(effDate) : "선택"} 시행본
               </Badge>
+              {revisions.length > 0 && (
+                <span className="ml-auto flex items-center gap-1.5">
+                  <Icon name="history" className="h-3.5 w-3.5 text-muted-foreground" />
+                  <select
+                    className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                    value={selectedMst}
+                    onChange={(e) => handleRevisionChange(e.target.value)}
+                    disabled={loadingRevision}
+                    aria-label="비교할 개정 시점 선택"
+                  >
+                    <option value="latest">최신 개정 (기본)</option>
+                    {revisions.map((rev) => (
+                      <option key={rev.mst} value={rev.mst}>
+                        {formatDate(rev.efYd)} 시행 · {rev.rrCls}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingRevision && <Icon name="loader" className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </span>
+              )}
             </div>
           )}
 
           {/* 결정론 신·구 diff — 원문에서 자동 추출, AI 무관 (사실 레이어) */}
-          {!isPrecedent && oldContent && newContent && (
+          {!isPrecedent && effOldContent && effNewContent && (
             <section>
               <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5 text-foreground">
                 <Icon name="file-text" className="h-4 w-4 text-muted-foreground" />
                 신·구 조문 비교
                 <span className="text-[11px] font-normal text-muted-foreground">자동 추출 · 원문 기준</span>
               </h3>
-              <RevisionLineDiff oldContent={oldContent} newContent={newContent} />
+              <RevisionLineDiff oldContent={effOldContent} newContent={effNewContent} />
             </section>
           )}
 

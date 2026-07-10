@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
 import { safeErrorResponse } from "@/lib/api-error"
 import { normalizeLawSearchText, resolveLawAlias } from "@/lib/search-normalizer"
+import { scoreLawNameMatch, stripLawSuffix } from "@/lib/law-name-match"
 import { validate, searchQuerySchema, createErrorResponse } from "@/lib/api-validation"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { parseLawSearchXml, isHtmlErrorPage } from "@/lib/xml-parser-helper"
@@ -55,6 +56,71 @@ function mergeXmlResponses(responses: string[]): string {
 <키워드>${keywordMatch?.[1] || ''}</키워드>
 <totalCnt>${totalMatch?.[1] || allLaws.length}</totalCnt>
 ${allLaws.join('\n')}
+</LawSearch>`
+}
+
+/** XML 응답에서 totalCnt 추출 */
+function extractTotalCnt(xml: string): number {
+  const m = xml.match(/<totalCnt>(\d+)<\/totalCnt>/)
+  return m ? parseInt(m[1], 10) : 0
+}
+
+/**
+ * 비공식 약칭 폴백 검색.
+ * 법령명 검색 0건 시 어미(법/시행령 등)를 뗀 몸통으로 재검색한 뒤,
+ * 원본 입력과의 이름/공식약칭 유사도로 후보를 걸러 재정렬한 XML을 반환.
+ * 예: "인공지능법"(비공식) → "인공지능" 재검색 → 약칭 "인공지능기본법" 매칭 1순위.
+ */
+async function stemFallbackSearch(originalQuery: string): Promise<string | null> {
+  const stem = stripLawSuffix(originalQuery)
+  if (stem.length < 2 || stem === originalQuery.replace(/\s+/g, '').toLowerCase()) return null
+
+  const params = new URLSearchParams({
+    OC,
+    type: "XML",
+    target: "law",
+    query: stem,
+    display: "50",
+  })
+  const response = await fetchWithTimeout(`${LAW_API_BASE}?${params.toString()}`, { cache: "no-store" })
+  if (!response.ok) return null
+
+  const xml = await response.text()
+  if (isHtmlErrorPage(xml) || extractTotalCnt(xml) === 0) return null
+
+  // <law> 블록 단위로 점수화 — 필드 손실 없이 원본 블록을 재배열
+  const blocks = xml.match(/<law\s[^>]*>[\s\S]*?<\/law>/g) || []
+  const extractField = (block: string, tag: string): string => {
+    const m = block.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`))
+    return m ? m[1].trim() : ''
+  }
+
+  const scored = blocks
+    .map((block) => ({
+      block,
+      score: scoreLawNameMatch(
+        originalQuery,
+        extractField(block, '법령명한글'),
+        extractField(block, '법령약칭명')
+      ),
+    }))
+    .filter((b) => b.score > 0)
+    .sort((a, b) => b.score - a.score)
+
+  if (scored.length === 0) return null
+
+  debugLogger.success("약칭 폴백 검색 성공", {
+    originalQuery,
+    stem,
+    matched: scored.length,
+    top: extractField(scored[0].block, '법령명한글'),
+  })
+
+  return `<?xml version="1.0" encoding="UTF-8"?><LawSearch>
+<target>law</target>
+<키워드>${originalQuery}</키워드>
+<totalCnt>${scored.length}</totalCnt>
+${scored.map((s) => s.block).join('\n')}
 </LawSearch>`
 }
 
@@ -181,7 +247,13 @@ export async function GET(request: Request) {
       }
 
       // 응답 병합
-      const mergedXml = responses.length > 1 ? mergeXmlResponses(responses) : firstText
+      let mergedXml = responses.length > 1 ? mergeXmlResponses(responses) : firstText
+
+      // 0건이면 비공식 약칭 폴백 (예: "인공지능법" → 약칭 "인공지능기본법")
+      if (totalCnt === 0) {
+        const fallbackXml = await stemFallbackSearch(query)
+        if (fallbackXml) mergedXml = fallbackXml
+      }
 
       debugLogger.success("법령 검색 완료 (짧은 검색어)", {
         totalCnt,
@@ -223,7 +295,13 @@ export async function GET(request: Request) {
       throw new Error(`API 응답 오류: ${response.status}`)
     }
 
-    const text = await response.text()
+    let text = await response.text()
+
+    // 0건이면 비공식 약칭 폴백 (예: "인공지능법" → 약칭 "인공지능기본법")
+    if (extractTotalCnt(text) === 0) {
+      const fallbackXml = await stemFallbackSearch(query)
+      if (fallbackXml) text = fallbackXml
+    }
 
     debugLogger.success("법령 검색 완료", { length: text.length })
 

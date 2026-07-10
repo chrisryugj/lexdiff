@@ -470,13 +470,15 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           if (!primaryXml && lr.xml) primaryXml = lr.xml
         }
 
-        // 원본 쿼리 매칭 결과를 상위에 배치
+        // 원본 쿼리 관련도순 정렬 — 이름/공식약칭 유사도 우선, 키워드 포함은 보조
+        const { scoreLawNameMatch } = await import('@/lib/law-name-match')
         const originalKeywords = lawName.split(/\s+/).filter((w: string) => w.length >= 2)
-        results.sort((a, b) => {
-          const aMatch = originalKeywords.some(kw => a.lawName.includes(kw)) ? 1 : 0
-          const bMatch = originalKeywords.some(kw => b.lawName.includes(kw)) ? 1 : 0
-          return bMatch - aMatch
-        })
+        const relevanceOf = (r: LawSearchResult) => {
+          const nameScore = scoreLawNameMatch(lawName, r.lawName, r.lawNameAbbreviation)
+          const kwScore = originalKeywords.filter(kw => r.lawName.includes(kw)).length
+          return nameScore + kwScore
+        }
+        results.sort((a, b) => relevanceOf(b) - relevanceOf(a))
 
         const xmlText = primaryXml
         actions.updateProgress('parsing', 70)
@@ -499,7 +501,11 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
         }
 
         const normalizedLawName = normalizeLawSearchText(lawName).replace(/\s+/g, "")
-        const exactMatches = results.filter((r) => r.lawName.replace(/\s+/g, "") === normalizedLawName)
+        // 정식명 또는 공식 약칭 완전일치 (예: "인공지능기본법" 입력 → 정식명이 긴 기본법)
+        const exactMatches = results.filter((r) =>
+          r.lawName.replace(/\s+/g, "") === normalizedLawName ||
+          (r.lawNameAbbreviation && r.lawNameAbbreviation.replace(/\s+/g, "") === normalizedLawName)
+        )
 
         let exactMatch = exactMatches.length > 0
           ? exactMatches.reduce((shortest, current) => current.lawName.length < shortest.lawName.length ? current : shortest)
@@ -509,7 +515,15 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           const { findMostSimilar } = await import('@/lib/text-similarity')
           const mainLawResults = results.filter((r) => !r.lawName.includes("시행령") && !r.lawName.includes("시행규칙"))
           const minSimilarity = normalizedLawName.length <= 2 ? 0.85 : 0.6
-          const bestMatch = findMostSimilar(normalizedLawName, mainLawResults, (r) => r.lawName.replace(/\s+/g, ""), minSimilarity)
+          // 공식 약칭 우선 유사 매칭 (예: "인공지능법" ≈ 약칭 "인공지능기본법"), 없으면 정식명
+          const bestMatch =
+            findMostSimilar(
+              normalizedLawName,
+              mainLawResults.filter((r) => r.lawNameAbbreviation),
+              (r) => (r.lawNameAbbreviation || "").replace(/\s+/g, ""),
+              minSimilarity
+            ) ||
+            findMostSimilar(normalizedLawName, mainLawResults, (r) => r.lawName.replace(/\s+/g, ""), minSimilarity)
 
           if (bestMatch) {
             exactMatch = bestMatch.item

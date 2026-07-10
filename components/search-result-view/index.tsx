@@ -717,6 +717,7 @@ function SearchResultViewComponent({
               effectiveDate={state.summaryDialog.effectiveDate}
               prevEffectiveDate={state.summaryDialog.prevEffectiveDate}
               isPrecedent={state.summaryDialog.isPrecedent}
+              lawId={state.lawData.meta.lawId}
             />
           )}
 

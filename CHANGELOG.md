@@ -2,6 +2,23 @@
 
 LexDiff의 주요 변경사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)을 따르며, 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 사용합니다.
 
+## [2.5.1-beta] — 2026-07-10
+
+프로덕션 리뷰 #5 — 검색 매칭·조례비교·전체뷰 판례 3대 버그 수리 + 개정 시점 선택 비교 신설. headless Chrome 실기기 검증(약칭 검색→조문 직행, 판례 라이브 패널 스크롤 갱신, 개정 시점 diff 교체) + vitest 743/743.
+
+### ✨ Added
+- **개정 시점 선택 비교** — AI 변경 요약 다이얼로그에 개정 연혁 셀렉터 추가. `law-history`(연혁 목록) + `oldnew?mst=`(해당 개정의 신·구대조)를 연결해 **임의 개정 시점의 신·구 diff와 AI 해설**을 볼 수 있음. 기존엔 최신 개정 1쌍으로 고정 (`ai-summary-dialog.tsx`)
+- **전체 조문뷰 라이브 판례 패널** — 법령 전문 보기에서 판례 버튼이 먹통이던 문제 해결. 데이터·스크롤 추적(`fullview-active-jo`)은 이미 있었으나 렌더 마운트 지점이 없었음 → 우측 리사이즈 패널로 마운트, **본문 스크롤 시 화면 상단 조문 기준으로 판례 목록·헤더가 실시간 갱신** (`law-viewer-main-content.tsx`)
+- **비공식 약칭 동적 해소** — "인공지능법"(공식 약칭은 "인공지능기본법") 같은 미등록 약칭 검색이 0건→무관 목록으로 빠지던 문제 해결. 법령명 검색 0건 시 어미(법/시행령…) 제거 후 재검색 → 이름·공식약칭 부분수열 점수로 필터·재정렬 (`lib/law-name-match.ts`, law-search·search-suggest 라우트 공용). "인공지능법 30조" → 인공지능기본법 제30조 직행
+- **검색 결과 관련도 정렬** — 동의어 확장 결과의 이진(포함/미포함) 정렬을 이름·약칭 유사도 점수 정렬로 교체 — 무관 법령이 상위에 섞이던 문제 완화 (`useBasicSearch.ts`)
+
+### 🐛 Fixed
+- **조례비교 표 깨짐** — 프롬프트에 GFM 구분행(`|---|`) 지시 누락 + 셀 내 개행·파이프 무방어가 원인. 프롬프트에 표 3원칙 명시 + 서버측 `normalizeMarkdownTable` 후처리(구분행 삽입·잘린 행 병합·코드펜스 제거·열 수 정합)로 2중 방어 (`benchmark-analyze/route.ts`, `lib/markdown-table-normalizer.ts`)
+- **자동완성 노이즈** — ① 조문 패턴("도로교통법 44조") 입력 시 동의어 법령에까지 "제44조"를 붙여 제안하던 것 중단 ② "음주운전 방법은?" 같은 기계식 AI 질문 템플릿을 의미 안전한 2종(이란?/관련 법령은?)으로 교체 ③ 약칭 폴백 결과가 AI 질문보다 아래로 깔리던 스코어 보정 (`search-suggest/route.ts`)
+
+### 📝 Docs
+- README 2.5.1 현행화 (베타 안내 v2.4.0 잔재 수정, 신기능 3종, BYOK 신형 키 형식), benchmark-analyze 헤더의 사문화된 "OpenClaw 우선" 주석 정정, 17-SYSTEM_CURRENT_STATE LLM 구성 현행화, 시연 시나리오 `demo/JUDGE_DEMO_SCENARIO.md` 신설
+
 ## [2.5.0-beta] — 2026-07-03
 
 AI질의 UX 대개편 + 엔진(프롬프트·분류기·신뢰도) 개편. 라이브 벤치 2회 회귀 검증(avg 19.9s/22.4s, 기대인용 10/10) + headless Chrome 실기기 UX 검증 완료.

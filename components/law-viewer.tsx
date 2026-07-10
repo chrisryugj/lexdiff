@@ -745,6 +745,7 @@ function LawViewerComponent({
     handleViewDetail: handleViewPrecedentDetail,
     expandPanel: expandPrecedentPanel,
     collapsePanel: collapsePrecedentPanel,
+    closePanel: () => setShowPrecedents(false),
   }), [showPrecedents, precedentViewMode, precedentPanelSize, precedents, precedentTotalCount, loadingPrecedents, precedentsError, selectedPrecedent, loadingPrecedentDetail])
 
   return (

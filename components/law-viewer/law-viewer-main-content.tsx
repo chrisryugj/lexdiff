@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/icon"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { VirtualizedFullArticleView } from "@/components/virtualized-full-article-view"
 import { DelegationPanel } from "@/components/law-viewer-delegation-panel/index"
-import { PrecedentDetailPanel } from "@/components/precedent-section"
+import { PrecedentSection, PrecedentDetailPanel } from "@/components/precedent-section"
 import { AIAnswerContent } from "@/components/law-viewer-ai-answer"
 import { AISearchErrorBoundary } from "@/components/error-boundary"
 import { LawViewerSingleArticle } from "./law-viewer-single-article"
@@ -72,6 +72,7 @@ interface PrecedentProps {
   handleViewDetail: (precedent: PrecedentSearchResult) => void
   expandPanel: () => void
   collapsePanel: () => void
+  closePanel: () => void
 }
 
 interface FontProps {
@@ -229,29 +230,101 @@ export function LawViewerMainContent({
       )
     }
 
-    return (
-      <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full" ref={contentRef}>
-          <div ref={swipeRef}>
-            <VirtualizedFullArticleView
-              articles={actualArticles}
-              preambles={preambles}
-              activeJo={activeJo}
-              fontSize={fontSize}
-              lawTitle={meta.lawTitle}
-              lawId={meta.lawId}
-              mst={meta.mst}
-              effectiveDate={meta.effectiveDate}
-              onContentClick={handleContentClick}
-              articleRefs={articleRefs}
-              scrollParentRef={contentRef}
-              isOrdinance={isOrdinance}
-              isPrecedent={isPrecedent}
-            />
-          </div>
-        </ScrollArea>
-      </div>
+    const fullArticleView = (
+      <ScrollArea className="h-full" ref={contentRef}>
+        <div ref={swipeRef}>
+          <VirtualizedFullArticleView
+            articles={actualArticles}
+            preambles={preambles}
+            activeJo={activeJo}
+            fontSize={fontSize}
+            lawTitle={meta.lawTitle}
+            lawId={meta.lawId}
+            mst={meta.mst}
+            effectiveDate={meta.effectiveDate}
+            onContentClick={handleContentClick}
+            articleRefs={articleRefs}
+            scrollParentRef={contentRef}
+            isOrdinance={isOrdinance}
+            isPrecedent={isPrecedent}
+          />
+        </div>
+      </ScrollArea>
     )
+
+    // 전문 + 판례 사이드 패널: 스크롤 위치의 활성 조문을 따라 판례가 실시간 갱신됨
+    if (precedentProps.showPrecedents && !isPrecedent && !isOrdinance) {
+      return (
+        <div className="flex-1 min-h-0">
+          <PanelGroup direction="horizontal" className="h-full">
+            <Panel defaultSize={100 - precedentProps.panelSize} minSize={30}>
+              {fullArticleView}
+            </Panel>
+
+            <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
+
+            <Panel
+              defaultSize={precedentProps.panelSize}
+              minSize={25}
+              maxSize={60}
+              onResize={(size) => precedentProps.setPanelSize(size)}
+            >
+              <div className="h-full border-l border-border bg-muted/10 flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b border-border">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon name="scale" size={16} className="text-brand-navy shrink-0" />
+                    <h3 className="font-semibold text-sm truncate">
+                      {activeJo ? `${formatSimpleJo(activeJo)} 관련 판례` : "관련 판례"}
+                    </h3>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={precedentProps.closePanel}
+                    className="h-7 px-2 shrink-0"
+                  >
+                    <Icon name="x" size={14} className="mr-1" />
+                    닫기
+                  </Button>
+                </div>
+                <p className="px-3 py-1.5 text-[11px] text-muted-foreground border-b border-border/50">
+                  본문을 스크롤하면 화면 상단 조문 기준으로 판례가 갱신됩니다
+                </p>
+
+                <div className="flex-1 min-h-0">
+                  {precedentProps.selectedPrecedent || precedentProps.loadingDetail ? (
+                    <PrecedentDetailPanel
+                      detail={precedentProps.selectedPrecedent}
+                      loading={precedentProps.loadingDetail}
+                      onClose={precedentProps.collapsePanel}
+                      onContentClick={handleContentClick as (e: React.MouseEvent) => void}
+                      onViewPrecedent={precedentProps.handleViewDetail}
+                    />
+                  ) : (
+                    <ScrollArea className="h-full">
+                      <PrecedentSection
+                        precedents={precedentProps.precedents}
+                        totalCount={precedentProps.totalCount}
+                        loading={precedentProps.loading}
+                        error={precedentProps.error}
+                        selectedPrecedent={precedentProps.selectedPrecedent}
+                        loadingDetail={precedentProps.loadingDetail}
+                        viewMode="side"
+                        onViewDetail={precedentProps.handleViewDetail}
+                        onExpand={precedentProps.expandPanel}
+                        onCollapse={precedentProps.closePanel}
+                      />
+                    </ScrollArea>
+                  )}
+                </div>
+              </div>
+            </Panel>
+          </PanelGroup>
+        </div>
+      )
+    }
+
+    return <div className="flex-1 min-h-0">{fullArticleView}</div>
   }
 
   // 단문 조회 모드 - 조문 없음 또는 로딩 중

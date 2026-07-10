@@ -4,6 +4,7 @@ export interface LawSearchResult {
   lawId?: string
   mst?: string
   lawName: string
+  lawNameAbbreviation?: string
   lawType: string
   promulgationDate?: string
   effectiveDate?: string
@@ -44,6 +45,7 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
       const rawLawId = law.querySelector("법령ID")?.textContent?.trim()
       const mst = law.querySelector("법령일련번호")?.textContent?.trim()
       const lawName = law.querySelector("법령명한글")?.textContent || ""
+      const lawNameAbbreviation = law.querySelector("법령약칭명")?.textContent?.trim() || undefined
       const lawType = law.querySelector("법령구분명")?.textContent || ""
       const rawPromulgationDate = law.querySelector("공포일자")?.textContent || ""
       const rawEffectiveDate = law.querySelector("시행일자")?.textContent || ""
@@ -57,6 +59,7 @@ export function parseLawSearchXML(xmlText: string): LawSearchResult[] {
           lawId: normalizedLawId,
           mst,
           lawName,
+          lawNameAbbreviation,
           lawType,
           promulgationDate,
           effectiveDate,

@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { expandQuery } from '@/lib/query-expansion'
 import { containsLocalGovName, extractLocalGovName } from '@/src/domain/patterns/OrdinancePattern'
 import { getClientIP } from '@/lib/get-client-ip'
+import { scoreLawNameMatch, stripLawSuffix } from '@/lib/law-name-match'
 
 const LAW_API_BASE = "https://www.law.go.kr/DRF/lawSearch.do"
 const OC = process.env.LAW_OC || ""
@@ -131,45 +132,49 @@ function getPostposition(word: string): string {
   return hasFinalConsonant ? '이란' : '란'
 }
 
-// 법제처 API에서 법령명 검색
-async function searchLawNames(query: string): Promise<Array<{ name: string; category: string }>> {
+// 법제처 법령명 검색 1회 호출 → { 법령명, 약칭, 구분 } 목록
+async function fetchLawNamesOnce(query: string): Promise<Array<{ name: string; abbreviation?: string; category: string }>> {
+  const url = `${LAW_API_BASE}?OC=${OC}&target=law&type=XML&query=${encodeURIComponent(query)}&display=10`
+  const response = await fetch(url, {
+    next: { revalidate: 300 }, // 5분 캐시
+    signal: AbortSignal.timeout(3000) // 3초 타임아웃
+  })
+
+  if (!response.ok) return []
+
+  const xml = await response.text()
+  // <law> 블록 단위로 파싱해 법령명·약칭·구분을 짝지어 추출
+  const blocks = xml.match(/<law\s[^>]*>[\s\S]*?<\/law>/g) || []
+  const extractField = (block: string, tag: string): string => {
+    const m = block.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`))
+    return m ? m[1].trim() : ''
+  }
+
+  return blocks
+    .map((block) => ({
+      name: extractField(block, '법령명한글'),
+      abbreviation: extractField(block, '법령약칭명') || undefined,
+      category: extractField(block, '법령구분') || '법령',
+    }))
+    .filter((r) => r.name)
+}
+
+// 법제처 API에서 법령명 검색 (0건이면 비공식 약칭 폴백: "인공지능법" → "인공지능" 재검색 후 유사도 필터)
+async function searchLawNames(query: string): Promise<Array<{ name: string; abbreviation?: string; category: string }>> {
   if (!OC || query.length < 2) return []
 
   try {
-    const url = `${LAW_API_BASE}?OC=${OC}&target=law&type=XML&query=${encodeURIComponent(query)}&display=10`
-    const response = await fetch(url, {
-      next: { revalidate: 300 }, // 5분 캐시
-      signal: AbortSignal.timeout(3000) // 3초 타임아웃
-    })
+    const results = await fetchLawNamesOnce(query)
+    if (results.length > 0) return results
 
-    if (!response.ok) return []
+    const stem = stripLawSuffix(query)
+    if (stem.length < 2 || stem === query.replace(/\s+/g, '').toLowerCase()) return []
 
-    const xml = await response.text()
-    const results: Array<{ name: string; category: string }> = []
-
-    // XML에서 법령명 추출: <법령명한글>...</법령명한글>
-    const lawNameRegex = /<법령명한글>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령명한글>/g
-    const lawTypeRegex = /<법령구분>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/법령구분>/g
-
-    const names: string[] = []
-    const types: string[] = []
-
-    let match
-    while ((match = lawNameRegex.exec(xml)) !== null) {
-      names.push(match[1].trim())
-    }
-    while ((match = lawTypeRegex.exec(xml)) !== null) {
-      types.push(match[1].trim())
-    }
-
-    for (let i = 0; i < names.length; i++) {
-      results.push({
-        name: names[i],
-        category: types[i] || '법령'
-      })
-    }
-
-    return results
+    const fallback = await fetchLawNamesOnce(stem)
+    return fallback
+      .map((r) => ({ ...r, score: scoreLawNameMatch(query, r.name, r.abbreviation) }))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
   } catch {
     // 타임아웃 또는 네트워크 에러 - 조용히 실패
     return []
@@ -177,7 +182,7 @@ async function searchLawNames(query: string): Promise<Array<{ name: string; cate
 }
 
 // 자치법규(조례/규칙) 검색
-async function searchOrdinances(query: string): Promise<Array<{ name: string; category: string }>> {
+async function searchOrdinances(query: string): Promise<Array<{ name: string; abbreviation?: string; category: string }>> {
   if (!OC || query.length < 2) return []
 
   try {
@@ -222,15 +227,14 @@ async function searchOrdinances(query: string): Promise<Array<{ name: string; ca
 }
 
 // 일반적인 질문 패턴 생성
+// 어떤 키워드에도 의미가 성립하는 안전한 패턴만 사용
+// ("음주운전 방법은?" 같은 기계식 조합 방지)
 function generateAiQuestions(keyword: string): string[] {
   const postposition = getPostposition(keyword)
-  const patterns = [
+  return [
     `${keyword}${postposition}?`,
-    `${keyword} 요건은?`,
-    `${keyword} 절차는?`,
-    `${keyword} 방법은?`,
+    `${keyword} 관련 법령은?`,
   ]
-  return patterns
 }
 
 interface Suggestion {
@@ -316,10 +320,14 @@ export async function GET(request: NextRequest) {
     const isOrdinanceQuery = scope === 'all' || /조례|규칙|자치법규/.test(query) || containsLocalGovName(query)
 
     // 동의어 확장: 원본 + 상위 2개 동의어 병렬 호출 (응답 시간 제약)
+    // 조문 패턴("도로교통법 44조")이면 확장 스킵 — 이미 특정 법령을 지목한 입력에
+    // 동의어 법령의 "제44조"를 제안하면 전혀 다른 조문이라 노이즈가 됨
     const expansion = expandQuery(searchQuery)
-    const expandedQueries = expansion.allExpanded
-      .filter(e => e !== searchQuery && e.length >= 2)
-      .slice(0, 2) // 최대 2개 추가 (3초 타임아웃 내 처리)
+    const expandedQueries = articleMatch
+      ? []
+      : expansion.allExpanded
+          .filter(e => e !== searchQuery && e.length >= 2)
+          .slice(0, 2) // 최대 2개 추가 (3초 타임아웃 내 처리)
 
     // 병렬 검색: 원본 + 확장 쿼리 (법령 + 조례)
     const lawSearches = [
@@ -361,9 +369,18 @@ export async function GET(request: NextRequest) {
     // 지자체명 쿼리일 때: 법령 결과는 점수 대폭 하향 (조례가 우선)
     const lawScorePenalty = localGovName ? 200 : 0
     for (const law of dedupLaw) {
-      const matchIndex = law.name.toLowerCase().indexOf(queryLower)
-      const startsWithQuery = law.name.toLowerCase().startsWith(queryLower)
+      // 정식명과 공식 약칭 중 더 잘 맞는 쪽으로 매칭 (약칭 폴백 결과 포함)
+      const nameLower = law.name.toLowerCase()
+      const abbrLower = (law.abbreviation || '').toLowerCase()
+      const indices = [nameLower.indexOf(queryLower), abbrLower ? abbrLower.indexOf(queryLower) : -1].filter(i => i >= 0)
+      const matchIndex = indices.length > 0 ? Math.min(...indices) : -1
+      const startsWithQuery = nameLower.startsWith(queryLower) || (!!abbrLower && abbrLower.startsWith(queryLower))
       let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0) - lawScorePenalty
+      // 부분문자열로 안 잡히는 비공식 약칭("인공지능법"→인공지능기본법)은 유사도로 보정
+      if (matchIndex < 0) {
+        const nameScore = scoreLawNameMatch(query, law.name, law.abbreviation)
+        if (nameScore > 0) score = Math.max(score, 90 + Math.round(nameScore / 100)) - lawScorePenalty
+      }
       let suggestionText = law.name
 
       // 조문 패턴 감지 시: "법령명 + 제X조" 형태로 제안

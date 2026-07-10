@@ -1,4 +1,7 @@
-# LexDiff 프로젝트 현황 분석 (2026-03-21 기준)
+# LexDiff 프로젝트 현황 분석 (2026-07-10 기준, v2.5.1-beta)
+
+> ⚠️ **LLM 구성은 이 문서보다 [CLAUDE.md](../CLAUDE.md)가 항상 우선.** 현행:
+> Primary = **테미스(Themis) 릴레이** (맥미니, 구독 Claude Sonnet + korean-law MCP, `RELAY_URL` Tailscale Funnel) → 폴백 = **Gemini 3 Flash** (Function Calling, BYOK 시 직행) → Hermes(GPT-5.4)는 **기본 비활성**(`DISABLE_HERMES`, 60s 타임아웃 이슈 2026-04-13). 아래 본문 중 "Claude CLI subprocess / Hermes 2-Tier" 서술은 2026-03 시점 기록임.
 
 한국 법령 비교 + AI 검색 시스템 — 법제처 API + FC-RAG (Function Calling RAG)
 
@@ -21,7 +24,7 @@
          │                │                  │
          ▼                ▼                  ▼
   ┌──────────────────────────────────────────────────┐
-  │              Next.js 16 API Routes (41개)         │
+  │              Next.js 16 API Routes (47개)         │
   │  law-search, eflaw, fc-rag, summarize,           │
   │  precedent-*, interpretation-*, ordin-*,         │
   │  three-tier, oldnew, impact-tracker 등            │
@@ -46,9 +49,10 @@
 |------|------|
 | **프레임워크** | Next.js 16 (App Router) |
 | **UI** | React 19, TypeScript 5, Tailwind v4, shadcn/ui |
-| **AI (1순위)** | Claude Sonnet 4.6 — CLI subprocess (로컬) / Bridge 프록시 (Vercel) |
-| **AI (2순위/폴백)** | Gemini 3-Flash-Preview (Function Calling) |
-| **AI (요약)** | Hermes Gateway `callGateway()` (GPT-5.4) / Gemini 2.5-Flash-Lite (폴백) |
+| **AI (1순위)** | 테미스(Themis) 릴레이 — 구독 Claude Sonnet + korean-law MCP (맥미니, `RELAY_URL`) |
+| **AI (2순위/폴백·BYOK)** | Gemini 3-Flash-Preview (Function Calling, 46개 등록 도구) |
+| **AI (요약·조례비교·영향분석)** | Gemini (standard→lite 폴백) |
+| **AI (비활성)** | Hermes Gateway (GPT-5.4) — `DISABLE_HERMES` 기본 비활성 |
 | **법령 도구** | korean-law-mcp (Function Calling 기반) |
 | **법령 데이터** | 법제처 Open API (law.go.kr/DRF/) |
 | **클라이언트 캐시** | IndexedDB (판례), localStorage (API 응답, 즐겨찾기) |
@@ -159,7 +163,7 @@
 
 ---
 
-## 5. API 라우트 전체 목록 (41개)
+## 5. API 라우트 전체 목록 (47개 — 2026-07 기준, 목록은 app/api/ 디렉토리가 정본)
 
 ### 법령 검색/조회
 | 라우트 | 용도 |

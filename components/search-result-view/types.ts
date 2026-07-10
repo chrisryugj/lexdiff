@@ -17,6 +17,7 @@ export interface LawSearchResult {
   lawId?: string
   mst?: string
   lawName: string
+  lawNameAbbreviation?: string
   lawType: string
   promulgationDate?: string
   effectiveDate?: string
