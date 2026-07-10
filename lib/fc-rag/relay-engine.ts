@@ -18,6 +18,7 @@ import {
   inferQueryType,
   handleFastPath,
   getConversationContext,
+  storeConversation,
   withTimeout,
 } from './engine-shared'
 import { executeTool } from './tool-adapter'
@@ -240,6 +241,9 @@ export async function* executeRelayRAGStream(
               queryType,
             }
             void cacheAnswer(query, answerData, cacheOpts).catch(() => {})
+            // follow-up 맥락 저장 — gemini/claude 경로엔 있었으나 relay에만 누락돼
+            // 로그인(테미스) 사용자의 이어지는 질문이 항상 맥락을 잃던 버그
+            void storeConversation(conversationId, query, answer).catch(() => {})
             yield { type: 'answer', data: answerData }
             break
           }

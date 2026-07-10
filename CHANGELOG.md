@@ -10,6 +10,7 @@ LexDiff의 주요 변경사항을 기록합니다. 형식은 [Keep a Changelog](
 - **모달에서 브라우저 뒤로가기 시 뷰어 전체 이탈** — 신·구법 대조표/AI 변경 요약 다이얼로그가 열린 상태에서 브라우저 뒤로가기를 누르면 모달만이 아니라 법령 뷰어 전체가 닫히고 홈으로 이탈하던 문제. 다이얼로그가 열릴 때 history에 가드 엔트리를 쌓고 popstate 시 다이얼로그만 닫는 최소 방어 적용(전면 URL 라우팅은 스코프 아님). 동일 뷰로의 가드 pop은 강제 리마운트를 생략해 뷰어 상태 보존 (`hooks/use-dialog-back-guard.ts` 신설, `comparison-modal.tsx`, `ai-summary-dialog.tsx`, `app/page.tsx`)
 - **오타/0건 검색 시 에러 화면·다이얼로그 겹침** — "법령을 찾을 수 없습니다" 안내 다이얼로그 뒤로 "검색 결과를 표시할 수 없습니다" 에러 화면이 함께 렌더되어 겹쳐 보이던 문제. 안내 다이얼로그 표시 중에는 배경을 중립 상태로 유지 (`search-result-view/index.tsx`)
 - **온보딩 투어 종료 후 검색창 미포커스** — 투어가 끝나도(완주·스킵 모두) 검색창에 포커스가 가지 않아 바로 타이핑할 수 없던 문제. `OnboardingTour`에 `onEnd` 훅 신설 후 검색창 포커스 연결 (`onboarding-tour.tsx`, `search-view.tsx`)
+- **테미스(릴레이) 경로 follow-up 맥락 유실 (심각)** — 로그인 사용자의 이어지는 질문("초범이면 감경되나?")이 직전 대화 맥락을 항상 잃고 무관한 법령으로 답하던 문제. `storeConversation` 호출이 gemini/claude 엔진에는 있었으나 **relay 엔진에만 누락**되어 있어 대화가 저장된 적이 없었음(`getConversationContext`는 항상 빈 값). 프로덕션 로그인 세션으로 API 실측해 발견, answer 완료 시 저장 추가 (`lib/fc-rag/relay-engine.ts`)
 
 ### 📝 Docs
 - **JUDGE_DEMO_SCENARIO 프로덕션 리허설 현행화** — 장면 5에 "전국 선택" 단계 보완(지역 기본값이 수도권이라 강릉시가 목록에 안 뜸), 장면 6 홈 카드명 "변경 영향 분석"으로 정정 + 기간 시작일 설정 단계·실측 결과(4건, 긴급3·참고1) 반영, 각 장면 실측 소요시간 갱신
