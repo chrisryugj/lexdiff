@@ -581,7 +581,8 @@ export function AIAnswerContent({
                                     {quotaInfo && (
                                         <div className="flex items-center justify-between gap-4">
                                             <span className="text-muted-foreground flex items-center gap-1.5"><Icon name="zap" size={12} />오늘 질의</span>
-                                            <span className="font-medium tabular-nums">{quotaInfo.current}/{quotaInfo.limit}회</span>
+                                            {/* limit<0 = 무제한 계정 — "10/-1회" 노출 방지 */}
+                                            <span className="font-medium tabular-nums">{quotaInfo.limit < 0 ? `${quotaInfo.current}회 (무제한)` : `${quotaInfo.current}/${quotaInfo.limit}회`}</span>
                                         </div>
                                     )}
                                     {searchStats.toolBreakdown.length > 0 && (
