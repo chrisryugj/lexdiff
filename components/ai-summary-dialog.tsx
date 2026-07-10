@@ -273,6 +273,12 @@ export function AISummaryDialog({
                 신·구 조문 비교
                 <span className="text-[11px] font-normal text-muted-foreground">자동 추출 · 원문 기준</span>
               </h3>
+              {joNum && !`${effOldContent}\n${effNewContent}`.includes(joNum.replace(/\s+/g, "")) && (
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                  <Icon name="info" className="h-3 w-3 shrink-0" />
+                  {joNum}은(는) 이 개정에서 직접 변경되지 않았습니다 — 아래는 같은 개정에서 변경된 조문입니다.
+                </p>
+              )}
               <RevisionLineDiff oldContent={effOldContent} newContent={effNewContent} />
             </section>
           )}

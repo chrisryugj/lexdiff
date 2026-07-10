@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
@@ -80,6 +81,16 @@ export function LawViewerSingleArticle({
   expandPrecedentPanel,
   collapsePrecedentPanel,
 }: LawViewerSingleArticleProps) {
+  // 판례 패널은 본문 아래에 열려 긴 조문에선 뷰포트 밖 — 열리는 순간 스크롤로 피드백
+  const precedentSectionRef = useRef<HTMLDivElement>(null)
+  const prevShowPrecedentsRef = useRef(showPrecedents)
+  useEffect(() => {
+    if (showPrecedents && !prevShowPrecedentsRef.current && precedentViewMode === "bottom") {
+      precedentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+    prevShowPrecedentsRef.current = showPrecedents
+  }, [showPrecedents, precedentViewMode])
+
   return (
     <div className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-3">
       {/* 헤더: 제목 + 배지 + 버튼들 */}
@@ -178,7 +189,7 @@ export function LawViewerSingleArticle({
 
       {/* 판례 섹션 */}
       {showPrecedents && precedentViewMode === "bottom" && handleViewPrecedentDetail && expandPrecedentPanel && collapsePrecedentPanel && (
-        <div className="mt-8">
+        <div ref={precedentSectionRef} className="mt-8">
           <PrecedentSection
             precedents={precedents}
             totalCount={precedentTotalCount}

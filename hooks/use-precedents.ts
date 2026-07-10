@@ -133,6 +133,9 @@ export function usePrecedents(
 
     return () => {
       abortControllerRef.current?.abort()
+      // abort된 요청은 결과 없이 사라지므로 동일쿼리 스킵 가드를 풀어야
+      // 재마운트(React StrictMode 등) 시 재요청이 가능하다
+      lastQueryRef.current = ""
     }
   }, [enabled, lawName, articleNumber, display])
 

@@ -220,14 +220,14 @@ export function ImpactTrackerView({
                 className="text-lg sm:text-xl font-bold text-brand-navy"
                 style={{ fontFamily: "'RIDIBatang', serif" }}
               >
-                법령 변경 영향 분석
+                {initialRequest?.mode === 'ordinance-sync' ? '조례 미반영 탐지' : '법령 변경 영향 분석'}
               </h2>
             </div>
           )}
 
           {/* 입력 폼 (분석 전) */}
           {!hasStarted && (
-            <ImpactTrackerInput onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
+            <ImpactTrackerInput onSubmit={handleSubmit} isAnalyzing={isAnalyzing} mode={initialRequest?.mode} />
           )}
 
           {/* 분석 진행/완료 스택형 프로그레스 */}

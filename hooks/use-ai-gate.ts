@@ -61,11 +61,22 @@ export function useAiGate() {
     setPendingAction(null)
   }, [])
 
+  // BYOK 키 저장 성공 — 로그인 성공과 동일하게 pending 액션을 이어서 실행
+  const handleKeySaved = useCallback(() => {
+    setShowGate(false)
+    if (pendingAction) {
+      const action = pendingAction
+      setPendingAction(null)
+      action()
+    }
+  }, [pendingAction])
+
   return {
     user,
     ready,
     showGate,
     requireAuth,
     handleClose,
+    handleKeySaved,
   }
 }

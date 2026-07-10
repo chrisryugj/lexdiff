@@ -8,6 +8,8 @@ import type { ImpactTrackerRequest } from '@/lib/impact-tracker/types'
 interface ImpactTrackerInputProps {
   onSubmit: (request: ImpactTrackerRequest) => void
   isAnalyzing: boolean
+  /** 'ordinance-sync' = 조례 미반영 탐지 진입 — 제목·설명을 그 목적에 맞게 표시 */
+  mode?: ImpactTrackerRequest['mode']
 }
 
 interface Suggestion {
@@ -52,7 +54,7 @@ function addToHistory(name: string) {
   saveHistory(history)
 }
 
-export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInputProps) {
+export function ImpactTrackerInput({ onSubmit, isAnalyzing, mode }: ImpactTrackerInputProps) {
   const [lawInput, setLawInput] = useState('')
   const [lawNames, setLawNames] = useState<string[]>([])
   const [dateFrom, setDateFrom] = useState(getDateMonthsAgo(3))
@@ -203,16 +205,18 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing }: ImpactTrackerInput
 
   const handleSubmit = () => {
     if (lawNames.length === 0) return
-    onSubmit({ lawNames, dateFrom, dateTo, ...(region.trim() ? { region: region.trim() } : {}) })
+    onSubmit({ lawNames, dateFrom, dateTo, ...(region.trim() ? { region: region.trim() } : {}), ...(mode ? { mode } : {}) })
   }
 
   return (
     <div className="bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 rounded-xl p-6 sm:p-8">
       <h3 className="text-xl font-bold text-brand-navy mb-2" style={{ fontFamily: "'RIDIBatang', serif" }}>
-        법령 변경 영향 분석
+        {mode === 'ordinance-sync' ? '조례 미반영 탐지' : '법령 변경 영향 분석'}
       </h3>
       <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-6">
-        법령·조례 개정이 하위법령 및 자치법규에 미치는 영향을 양방향으로 분석합니다.
+        {mode === 'ordinance-sync'
+          ? '상위법령이 개정됐는데 조례에 반영되지 않은 조항을 찾습니다. 상위법령명을 입력하세요.'
+          : '법령·조례 개정이 하위법령 및 자치법규에 미치는 영향을 양방향으로 분석합니다.'}
       </p>
 
       {/* 법령명 입력 + 자동완성 */}

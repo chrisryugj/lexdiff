@@ -208,7 +208,7 @@ export function LawViewerActionButtons({
                 <Icon name="file-text" size={14} className="sm:mr-1" />
               )}
               <span className="hidden sm:inline">{tierViewMode === "2-tier" ? "위임법령 닫기" : `위임법령${delegationButtonCount > 0 ? ` (${delegationButtonCount})` : ""}`}</span>
-              <span className="sm:hidden">{tierViewMode === "2-tier" ? "닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
+              <span className="sm:hidden">{tierViewMode === "2-tier" ? "위임 닫기" : `위임${delegationButtonCount > 0 ? `(${delegationButtonCount})` : ""}`}</span>
             </Button>
             {/* 판례 보기 버튼 */}
             <Button
@@ -220,7 +220,7 @@ export function LawViewerActionButtons({
             >
               <Icon name="scale" size={14} className="sm:mr-1" />
               <span className="hidden sm:inline">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? ` (${precedentTotalCount})` : ""}`}</span>
-              <span className="sm:hidden">{showPrecedents ? "닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
+              <span className="sm:hidden">{showPrecedents ? "판례 닫기" : `판례${precedentTotalCount > 0 ? `(${precedentTotalCount})` : ""}`}</span>
             </Button>
             {/* 분석 도구 드롭다운 */}
             <LawViewerAnalysisMenu

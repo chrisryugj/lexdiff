@@ -21,7 +21,7 @@ const AiGateDialog = dynamic(
  * 검색 화면이 pending query를 자동 재실행한다.
  */
 export function AiGateProvider({ children }: { children: ReactNode }) {
-  const { showGate, requireAuth, handleClose } = useAiGate()
+  const { showGate, requireAuth, handleClose, handleKeySaved } = useAiGate()
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -53,7 +53,7 @@ export function AiGateProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <AiGateDialog open={showGate} onClose={handleClose} />
+      <AiGateDialog open={showGate} onClose={handleClose} onKeySaved={handleKeySaved} />
     </>
   )
 }

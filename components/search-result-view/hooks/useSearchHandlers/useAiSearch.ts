@@ -244,7 +244,11 @@ export function useAiSearch(deps: HandlerDeps) {
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
         window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
-          detail: { query: fullQuery }
+          detail: {
+            query: fullQuery,
+            // BYOK 키 등록 직후 리로드 없이 같은 질의를 즉시 재실행 (로그인은 OAuth 리디렉션 복귀 경로가 처리)
+            onSuccess: () => { void handleAiSearch(fullQuery, undefined, skipCache, conversationId, preEvidence) },
+          }
         }))
         return
       }

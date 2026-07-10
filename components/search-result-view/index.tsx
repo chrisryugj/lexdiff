@@ -540,8 +540,13 @@ function SearchResultViewComponent({
             <AiAuthFallback
               userQuery={state.userQuery || state.searchQuery}
               onOpenGate={() => {
+                const gateQuery = state.userQuery || state.searchQuery
                 window.dispatchEvent(new CustomEvent('lexdiff:ai-gate-required', {
-                  detail: { query: state.userQuery || state.searchQuery }
+                  detail: {
+                    query: gateQuery,
+                    // BYOK 키 등록 시 리로드 없이 즉시 재실행 (로그인은 OAuth 복귀 경로가 처리)
+                    onSuccess: () => handlers.handleAiQuery(gateQuery),
+                  }
                 }))
               }}
               onBack={handlers.handleReset}

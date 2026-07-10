@@ -230,10 +230,25 @@ async function searchOrdinances(query: string): Promise<Array<{ name: string; ab
 // 어떤 키워드에도 의미가 성립하는 안전한 패턴만 사용
 // ("음주운전 방법은?" 같은 기계식 조합 방지)
 function generateAiQuestions(keyword: string): string[] {
-  const postposition = getPostposition(keyword)
+  const trimmed = keyword.replace(/\?+$/, '').trim()
+  // 이미 문장형 질문이면 그대로 질문으로 제안 ("…하나요란?" 같은 비문 방지)
+  if (keyword.trim().endsWith('?') || /(나요|가요|까요?|는가|은가|인가|는지|은지|을까|어떻게|어떡해|무엇|어디서|언제|왜)$/.test(trimmed)) {
+    return [
+      `${trimmed}?`,
+      `${trimmed} 관련 법령은?`,
+    ]
+  }
+  // 법령명+조문번호 조합엔 "30조란?" 대신 내용/판례형 질문
+  if (/제?\s*\d+\s*조(의\s*\d+)?$/.test(trimmed)) {
+    return [
+      `${trimmed} 내용은?`,
+      `${trimmed} 관련 판례는?`,
+    ]
+  }
+  const postposition = getPostposition(trimmed)
   return [
-    `${keyword}${postposition}?`,
-    `${keyword} 관련 법령은?`,
+    `${trimmed}${postposition}?`,
+    `${trimmed} 관련 법령은?`,
   ]
 }
 

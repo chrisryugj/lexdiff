@@ -11,9 +11,11 @@ import { LegalDocDialog, type LegalDoc } from '@/components/legal/legal-doc-dial
 interface AiGateDialogProps {
   open: boolean
   onClose: () => void
+  /** BYOK 키 저장 성공 시 — 로그인과 동일하게 pending 액션을 이어가야 한다 (없으면 onClose) */
+  onKeySaved?: () => void
 }
 
-export function AiGateDialog({ open, onClose }: AiGateDialogProps) {
+export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { apiKey, saveKey, clearKey } = useApiKey()
@@ -58,7 +60,8 @@ export function AiGateDialog({ open, onClose }: AiGateDialogProps) {
     saveKey(trimmed)
     setKeyInput('')
     setError(null)
-    onClose()
+    if (onKeySaved) onKeySaved()
+    else onClose()
   }
 
   return (
