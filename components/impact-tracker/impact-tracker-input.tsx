@@ -92,6 +92,12 @@ export function ImpactTrackerInput({ onSubmit, isAnalyzing, mode }: ImpactTracke
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // 언마운트 시 디바운스 타이머·진행 중 요청 정리 (300ms 내 화면 전환 시 유령 fetch 방지)
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    abortRef.current?.abort()
+  }, [])
+
   // 자동완성 fetch (디바운스 300ms)
   const fetchSuggestions = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)

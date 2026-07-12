@@ -198,9 +198,11 @@ export function useSearchBarHandlers({
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
+      if (totalItems === 0) return // 0 % 0 = NaN → selectedIndex 오염으로 Enter 무반응
       actions.setSelectedIndex((state.selectedIndex + 1) % totalItems)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      if (totalItems === 0) return
       actions.setSelectedIndex((state.selectedIndex - 1 + totalItems) % totalItems)
     } else if (e.key === 'Enter') {
       if (state.selectedIndex >= 0 && totalItems > 0) {

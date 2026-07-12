@@ -97,8 +97,13 @@ export async function* executeRelayRAGStream(
   // simple/moderate 질의는 search_ai_law 결과를 시스템프롬프트에 주입 →
   // 모델이 추가 조회 없이(또는 최소 보강만으로) 즉시 답변 — 첫 토큰·총 시간 단축 + 법령 오선택 감소.
   // complex는 다조문·다도구 조회가 본질이라 모델 자율(기존 웹 방식)에 맡긴다.
+  // ── 대화 컨텍스트 (follow-up 질의) — pre-evidence 판단에 선행 필요 ──
+  const prevContext = await getConversationContext(conversationId)
+
   let evidence = preEvidence
-  if (!evidence && complexity !== 'complex') {
+  // follow-up("허가 없이 하면?" 등 파편 질의)은 사전 검색이 무관 조문을 강주입할 수 있어 스킵 —
+  // 직전 대화 맥락 + 모델 자율 조회에 맡긴다
+  if (!evidence && complexity !== 'complex' && !prevContext) {
     yield { type: 'status', message: '관련 법령 사전 검색 중...', progress: 6 }
     try {
       const pre = await withTimeout(executeTool('search_ai_law', { query }, signal), 8_000, 'search_ai_law(pre)')
@@ -111,9 +116,6 @@ export async function* executeRelayRAGStream(
       // 사전 검색 실패는 무시 — 릴레이 모델이 도구로 직접 조회
     }
   }
-
-  // ── 대화 컨텍스트 (follow-up 질의) ──
-  const prevContext = await getConversationContext(conversationId)
 
   // lexdiff 구조화 답변 프롬프트(형식·현행성)를 빌드해 릴레이에 넘긴다.
   // 웹 방식 재설계(claude.ai 웹+MCP 차용): 강한 모델(Sonnet)이라
@@ -162,10 +164,18 @@ export async function* executeRelayRAGStream(
     let sawAnswer = false
     let successfulTools = 0 // 신뢰도 산정용 — 릴레이는 tool 결과 본문이 없어 도구 호출 수를 grounding 신호로 사용
 
-    for (;;) {
+    let streamDone = false
+    while (!streamDone) {
       const { done, value } = await reader.read()
-      if (done) break
-      buf += dec.decode(value, { stream: true })
+      if (done) {
+        streamDone = true
+        // 잔여 버퍼 처리 — 릴레이가 종단 \n\n 없이 스트림을 닫으면 마지막 done 블록이
+        // 버려져 완성된 답변을 두고도 '답변 미수신'→Gemini 폴백이 뜨던 결함
+        buf += dec.decode()
+        if (buf.trim()) buf += '\n\n'
+      } else {
+        buf += dec.decode(value, { stream: true })
+      }
       let idx: number
       while ((idx = buf.indexOf('\n\n')) >= 0) {
         const block = buf.slice(0, idx)

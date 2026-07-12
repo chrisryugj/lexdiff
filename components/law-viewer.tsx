@@ -402,6 +402,11 @@ function LawViewerComponent({
     if (!activeJo) {
       return
     }
+    // 전체보기: 개정이력 패널이 렌더되지 않고, 스크롤 정지마다 스쳐간 조문이
+    // 전부 fetch+조회이력으로 적재되는 낭비만 남는다 → 단문 뷰에서만 수행
+    if (isFullView) {
+      return
+    }
 
     fetchRevisionHistory(activeJo)
 
@@ -416,7 +421,7 @@ function LawViewerComponent({
         metadata: { article: activeArticleNumber },
       })
     })
-  }, [meta.lawId, activeJo, isOrdinance, isPrecedent])
+  }, [meta.lawId, activeJo, isOrdinance, isPrecedent, isFullView])
 
   // LV-1: 전체보기 본문 스크롤 → activeJo 역추적.
   // VirtualizedFullArticleView가 뷰포트 상단 조문을 CustomEvent로 알림(중간 컴포넌트

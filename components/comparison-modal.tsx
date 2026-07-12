@@ -480,7 +480,8 @@ export const ComparisonModal = memo(function ComparisonModal({ isOpen, onClose, 
                         <button
                           key={`${revision.date}-${index}`}
                           onClick={() => handleRevisionSelect(revision)}
-                          className={`w-full text-left p-3 rounded-md border transition-all ${
+                          disabled={isLoading}
+                          className={`w-full text-left p-3 rounded-md border transition-all disabled:opacity-60 disabled:pointer-events-none ${
                             isCurrent
                               ? 'bg-primary/10 border-primary/40 shadow-md'
                               : 'bg-card hover:bg-secondary border-border hover:border-primary/20'

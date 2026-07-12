@@ -100,6 +100,7 @@ export function useAiSearch(deps: HandlerDeps) {
     actions.clearToolCallLogs()
     actions.setFileSearchFailed(false)
     actions.setAiAuthRequired(false)
+    actions.setAiIsTruncated(false) // 이전 답변의 잘림 배지 잔존 방지
     actions.updateProgress('analyzing', 5)
     streamBufferRef.current = ''
     answerReceivedRef.current = false
@@ -154,6 +155,9 @@ export function useAiSearch(deps: HandlerDeps) {
       actions.setAiRelatedLaws(relatedLaws)
       actions.setAiCitations(cached.citations || [])
       actions.setAiQueryType((cached.queryType || 'application') as AiQueryType)
+      // 신뢰도 미복원 시 직전 질의의 'low'가 남아 정상 캐시 답변에 "참조 조문 부족" 배너가 뜬다
+      actions.setAiConfidenceLevel((cached.confidenceLevel || 'high') as 'high' | 'medium' | 'low')
+      actions.setAiIsTruncated(false)
       actions.setFileSearchFailed(false)
       const aiLawData: LawDataState = {
         meta: {
@@ -342,7 +346,8 @@ export function useAiSearch(deps: HandlerDeps) {
         debugLogger.info(`[AI ${elapsed()}] 검색 취소됨`, { events: eventCount, lastType: lastEventType })
         actions.setIsSearching(false)
         actions.updateProgress('complete', 0)
-        actions.setIsAiMode(false)
+        // isAiMode 유지 — false로 내리면 lawData가 AI 모드용 빈 껍데기(articles:[])라
+        // 빈 뷰어로 전환되고 이미 스트리밍된 부분 답변도 사라진다 (아래 에러 경로와 동일 이유)
         return
       }
 
@@ -587,7 +592,12 @@ export function useAiSearch(deps: HandlerDeps) {
           actions.addToolCallLog({
             id: `log-${++logIdCounterRef.current}`,
             type: 'quota',
-            displayName: event.byok ? 'BYOK (무제한)' : `오늘 AI 질의 ${event.current}/${event.limit}회`,
+            // limit -1(무제한 계정)·null 방어 — "10/-1회"·"10/null회" 표기 방지
+            displayName: event.byok
+              ? 'BYOK (무제한)'
+              : (typeof event.limit === 'number' && event.limit >= 0
+                  ? `오늘 AI 질의 ${event.current}/${event.limit}회`
+                  : `오늘 AI 질의 ${event.current}회 (무제한)`),
             timestamp: Date.now(),
             quotaCurrent: typeof event.current === 'number' ? event.current : undefined,
             quotaLimit: typeof event.limit === 'number' ? event.limit : undefined,
@@ -648,10 +658,12 @@ export function useAiSearch(deps: HandlerDeps) {
     // 현재 답변을 히스토리에 저장
     saveCurrentToHistory()
 
-    // conversationId 생성 (첫 follow-up 시)
+    // conversationId 생성 (첫 follow-up 시) — H-SEC2: 고엔트로피 UUID (handleAiSearch와 동일 규칙)
     let convId = state.conversationId
     if (!convId) {
-      convId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      convId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
       actions.setConversationId(convId)
     }
 

@@ -8,6 +8,7 @@
 import { GoogleGenAI, Type } from '@google/genai'
 import type { ClassificationInput, ClassificationResult, ImpactItem, ImpactSeverity } from './types'
 import { AI_CONFIG } from '@/lib/ai-config'
+import { sanitizeCredentials } from '@/lib/api-error'
 import { debugLogger } from '@/lib/debug-logger'
 import {
   buildClassificationQuery,
@@ -46,35 +47,46 @@ async function classifyWithGemini(
 
   try {
     const ai = new GoogleGenAI({ apiKey: key })
-    const response = await ai.models.generateContent({
-      model: AI_CONFIG.gemini.lite,
-      contents: query,
-      config: {
-        systemInstruction: buildClassificationSystemPrompt(),
-        temperature: 0.1,
-        // 구조화 출력: severity enum까지 강제 → '프롬프트 JSON 강제 + 정규식 파싱'의 취약성 제거.
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              jo: { type: Type.STRING },
-              severity: { type: Type.STRING, enum: ['critical', 'review', 'info'] },
-              reason: { type: Type.STRING },
+    let response: Awaited<ReturnType<typeof ai.models.generateContent>>
+    // preview 모델 단발 503에 전 항목이 rule-based("AI 미응답")로 떨어지는 것 방지 — 1회 재시도
+    for (let attempt = 0; ; attempt++) {
+      try {
+        response = await ai.models.generateContent({
+          model: AI_CONFIG.gemini.lite,
+          contents: query,
+          config: {
+            systemInstruction: buildClassificationSystemPrompt(),
+            temperature: 0.1,
+            // 구조화 출력: severity enum까지 강제 → '프롬프트 JSON 강제 + 정규식 파싱'의 취약성 제거.
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  jo: { type: Type.STRING },
+                  severity: { type: Type.STRING, enum: ['critical', 'review', 'info'] },
+                  reason: { type: Type.STRING },
+                },
+                required: ['jo', 'severity', 'reason'],
+              },
             },
-            required: ['jo', 'severity', 'reason'],
           },
-        },
-      },
-    })
+        })
+        break
+      } catch (e) {
+        if (attempt >= 1) throw e
+        await new Promise(r => setTimeout(r, 600))
+      }
+    }
     const text = response.text || ''
     return parseClassificationJSON(text) || []
   } catch (error) {
     debugLogger.error('[impact-tracker] classifyWithGemini failed', {
       model: AI_CONFIG.gemini.lite,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      // BYOK 키가 SDK 에러에 echo될 수 있어 새니타이즈 후 로깅
+      message: sanitizeCredentials(error instanceof Error ? error.message : String(error)),
+      stack: error instanceof Error && error.stack ? sanitizeCredentials(error.stack) : undefined,
     })
     return []
   }

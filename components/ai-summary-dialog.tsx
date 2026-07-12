@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -68,18 +68,28 @@ export function AISummaryDialog({
   const [revisionOverride, setRevisionOverride] = useState<RevisionComparison | null>(null)
   const [loadingRevision, setLoadingRevision] = useState(false)
 
+  // 요약 스트림 중단용 — 다이얼로그 닫힘·시점 변경 시 진행 중 스트림을 끊는다
+  const summaryAbortRef = useRef<AbortController | null>(null)
+  useEffect(() => () => { summaryAbortRef.current?.abort() }, [])
+
   useEffect(() => {
     if (!isOpen || isPrecedent) return
+    const ac = new AbortController()
     const params = lawId ? `lawId=${encodeURIComponent(lawId)}` : `lawName=${encodeURIComponent(lawTitle)}`
-    fetch(`/api/law-history?${params}`)
+    fetch(`/api/law-history?${params}`, { signal: ac.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.histories?.length) setRevisions(data.histories)
       })
       .catch(() => { /* 연혁 조회 실패 시 기본(최신) 비교만 제공 */ })
+    return () => ac.abort()
   }, [isOpen, isPrecedent, lawId, lawTitle])
 
   const handleRevisionChange = async (mst: string) => {
+    // 진행 중 요약 스트림 중단 — 미중단 시 이전 비교 기준 해설이 클로저 누적본으로 되살아나
+    // 새 diff와 다른 개정을 설명하는 화면이 된다
+    summaryAbortRef.current?.abort()
+    setIsLoading(false)
     setSelectedMst(mst)
     setSummary(null)
     setError(null)
@@ -121,6 +131,11 @@ export function AISummaryDialog({
     setError(null)
     setSummary(null)
 
+    // 다이얼로그 닫힘(언마운트) 시 스트림 중단 — 미연결 시 닫아도 서버 생성이 계속 소모됨
+    summaryAbortRef.current?.abort()
+    const ac = new AbortController()
+    summaryAbortRef.current = ac
+
     try {
       debugLogger.info("AI 요약 요청", { lawTitle, joNum })
 
@@ -130,6 +145,7 @@ export function AISummaryDialog({
       const response = await fetch("/api/summarize", {
         method: "POST",
         headers,
+        signal: ac.signal,
         body: JSON.stringify({
           lawTitle,
           joNum,
@@ -163,10 +179,17 @@ export function AISummaryDialog({
       let acc = ""
       let gotToken = false
 
-      for (;;) {
+      let streamDone = false
+      while (!streamDone) {
         const { done, value } = await reader.read()
-        if (done) break
-        buf += dec.decode(value, { stream: true })
+        if (done) {
+          streamDone = true
+          // 잔여 버퍼 처리 — 종단 \n\n 없이 닫히면 마지막 토큰 블록이 유실돼 요약 끝이 잘림
+          buf += dec.decode()
+          if (buf.trim()) buf += "\n\n"
+        } else {
+          buf += dec.decode(value, { stream: true })
+        }
         let idx: number
         while ((idx = buf.indexOf("\n\n")) >= 0) {
           const block = buf.slice(0, idx)
@@ -196,6 +219,7 @@ export function AISummaryDialog({
       if (!acc) throw new Error("AI 요약 생성 실패")
       debugLogger.success("AI 요약 생성 완료")
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return // 닫힘으로 인한 중단은 무시
       const errorMsg = err instanceof Error ? err.message : "알 수 없는 오류"
       setError(errorMsg)
       debugLogger.error("AI 요약 생성 실패", err)

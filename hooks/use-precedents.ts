@@ -73,6 +73,10 @@ export function usePrecedents(
     }
     abortControllerRef.current = new AbortController()
 
+    // 캐시 read(IndexedDB)는 abort 불가 — 조문 빠른 전환 시 이전 조문의 늦은 캐시 결과가
+    // 새 조문 상태를 덮거나, 구 요청 finally가 신 요청 스피너를 끄는 것을 클린업 플래그로 차단
+    let cancelled = false
+
     const fetchPrecedents = async () => {
       setLoading(true)
       setError(null)
@@ -80,6 +84,7 @@ export function usePrecedents(
       try {
         // 1. 캐시 확인
         const cached = await getPrecedentSearchCache(cacheKey)
+        if (cancelled) return
         if (cached) {
           setPrecedents(cached.precedents)
           setTotalCount(cached.totalCount)
@@ -104,6 +109,7 @@ export function usePrecedents(
         }
 
         const data = await response.json()
+        if (cancelled) return
 
         if (data.error) {
           throw new Error(data.error)
@@ -120,18 +126,20 @@ export function usePrecedents(
         if (err instanceof Error && err.name === "AbortError") {
           return // 취소된 요청은 무시
         }
+        if (cancelled) return
         debugLogger.error("[use-precedents] Error:", err)
         setError(err instanceof Error ? err.message : "판례 검색 실패")
         setPrecedents([])
         setTotalCount(0)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchPrecedents()
 
     return () => {
+      cancelled = true
       abortControllerRef.current?.abort()
       // abort된 요청은 결과 없이 사라지므로 동일쿼리 스킵 가드를 풀어야
       // 재마운트(React StrictMode 등) 시 재요청이 가능하다

@@ -366,6 +366,46 @@ function SearchResultViewComponent({
   }, [searchId, initialPrecedentId])
 
   // ============================================================
+  // 뒤로가기로 조례 상세 → 조례 목록 복원
+  // page.tsx는 동일 searchId 복귀를 리마운트 생략(모달 back-guard 상태 보존)하므로
+  // 여기서 popstate를 직접 듣고 상세를 닫아 목록을 복원한다. 모달 가드 엔트리는
+  // dialogGuard(+상세 위에서 열렸으면 hasOrdinanceDetail 복제)라 조건에 걸리지 않는다.
+  // ============================================================
+  const ordinanceDetailOpenRef = useRef(false)
+  ordinanceDetailOpenRef.current = Boolean(state.lawData?.isOrdinance && !state.ordinanceSelectionState)
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const s = e.state as { viewMode?: string; hasOrdinanceDetail?: boolean; dialogGuard?: boolean } | null
+      if (!s || s.dialogGuard || s.viewMode !== 'search-result' || s.hasOrdinanceDetail) return
+      if (!ordinanceDetailOpenRef.current) return
+      void (async () => {
+        // 상세 진입 시 목록 상태가 비워지므로(useBasicHandlers) IndexedDB 캐시에서 복원
+        // — 위 loadSearchResult의 '조례 검색 결과 복원' 블록과 동일 매핑
+        const { getSearchResult } = await import('@/lib/search-result-store')
+        const cached = await getSearchResult(searchId)
+        if (!cached?.ordinanceSelectionState || !ordinanceDetailOpenRef.current) return
+        const ordState = cached.ordinanceSelectionState
+        debugLogger.info('⬅️ 조례 상세 → 조례 목록 복원 (popstate)')
+        actions.setOrdinanceSelectionState({
+          results: ordState.results.map(o => ({
+            ordinSeq: o.자치법규ID,
+            ordinName: o.자치법규명,
+            ordinId: o.자치법규ID,
+            promulgationDate: o.공포일자,
+          })),
+          totalCount: ordState.results.length,
+          query: { lawName: ordState.query }
+        })
+        actions.setLawData(null)
+        actions.setMobileView("list")
+      })()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchId])
+
+  // ============================================================
   // 뒤로가기로 판례 상세 → 검색 결과 복원
   // ============================================================
   const prevInitialPrecedentIdRef = useRef<string | null | undefined>(initialPrecedentId)

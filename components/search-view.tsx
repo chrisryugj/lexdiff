@@ -160,7 +160,7 @@ export function SearchView({
   const handleHelpClick = () => { setHelpSheetOpen(true) }
 
   const handleLogoClick = () => {
-    window.history.pushState({}, "", "/")
+    // 홈에서만 렌더되는 컴포넌트 — 빈 state 엔트리를 쌓으면 뒤로가기 횟수만 늘어난다
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 

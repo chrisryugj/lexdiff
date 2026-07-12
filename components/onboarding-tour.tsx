@@ -161,12 +161,11 @@ export function OnboardingTour({
   )
 
   const goNext = useCallback(() => {
-    setIndex((i) => {
-      if (i < steps.length - 1) return i + 1
-      finish(true)
-      return i
-    })
-  }, [steps.length, finish])
+    // finish(부수효과)를 updater 안에서 호출하면 concurrent 렌더 폐기 시
+    // finishedRef만 남고 setOpen(false)가 유실돼 투어가 안 닫히는 상태가 가능
+    if (index < steps.length - 1) setIndex((i) => i + 1)
+    else finish(true)
+  }, [index, steps.length, finish])
 
   const goPrev = useCallback(() => {
     setIndex((i) => (i > 0 ? i - 1 : i))

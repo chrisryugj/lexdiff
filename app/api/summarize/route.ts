@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
 import { NextResponse, type NextRequest } from "next/server"
 import { debugLogger } from "@/lib/debug-logger"
+import { sanitizeCredentials } from "@/lib/api-error"
 import { AI_CONFIG } from "@/lib/ai-config"
 import { requireAiAuth, refundAiQuota, resolveGeminiKey } from "@/lib/api-auth"
 import {
@@ -174,8 +175,10 @@ export async function POST(request: NextRequest) {
         debugLogger.success("AI summary complete (Gemini stream)", { length: full.length })
       } catch (error) {
         errorCategory = categorizeError(error)
-        // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 원문은 서버 로그로만.
-        debugLogger.error("AI summary failed", error)
+        // Gemini 에러 객체에 사용자 API 키가 echo될 가능성 차단 — 새니타이즈 후 로깅.
+        debugLogger.error("AI summary failed", sanitizeCredentials(
+          error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error)
+        ))
         send({ type: "error", message: "AI 요약 생성 중 오류가 발생했습니다." })
       } finally {
         // Serverless에서 fire-and-forget은 잘린다 → close 전에 await로 보장 (실패는 swallow).

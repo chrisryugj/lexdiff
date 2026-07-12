@@ -56,6 +56,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // region은 조례 검색 쿼리·LLM 프롬프트로 유입 — lawNames와 동일하게 상한을 건다
+  if (region !== undefined && (typeof region !== 'string' || region.length === 0 || region.length > 50)) {
+    return Response.json(
+      { error: '지역명은 50자 이내 문자열만 허용됩니다.' },
+      { status: 400 },
+    )
+  }
+
   // 인증 + 기능별 쿼터 (BYOK 시 스킵). 응답 실패 시 finally에서 refund.
   const auth = await requireAiAuth(request, 'impact')
   if ('error' in auth) return auth.error

@@ -272,7 +272,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get('q')?.trim() || ''
   const queryLower = query.toLowerCase()
-  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20)
+  const parsedLimit = parseInt(searchParams.get('limit') || '10')
+  const limit = Math.min(Number.isNaN(parsedLimit) ? 10 : parsedLimit, 20) // NaN이면 slice(0,NaN)=[] 전량 유실
   const scope = searchParams.get('scope') || '' // 'all' = 항상 조례 포함, 'law-only' = 법령만
 
   if (!query || query.length < 1) {
@@ -392,8 +393,9 @@ export async function GET(request: NextRequest) {
       const startsWithQuery = nameLower.startsWith(queryLower) || (!!abbrLower && abbrLower.startsWith(queryLower))
       let score = 100 - (matchIndex >= 0 ? matchIndex : 50) + (startsWithQuery ? 50 : 0) - lawScorePenalty
       // 부분문자열로 안 잡히는 비공식 약칭("인공지능법"→인공지능기본법)은 유사도로 보정
+      // (조문 패턴이면 법령명만 — "인공지능법 30조" 원문은 부분수열 매칭이 항상 실패해 보정이 죽는다)
       if (matchIndex < 0) {
-        const nameScore = scoreLawNameMatch(query, law.name, law.abbreviation)
+        const nameScore = scoreLawNameMatch(searchQuery, law.name, law.abbreviation)
         if (nameScore > 0) score = Math.max(score, 90 + Math.round(nameScore / 100)) - lawScorePenalty
       }
       let suggestionText = law.name

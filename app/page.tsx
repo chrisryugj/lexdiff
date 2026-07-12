@@ -132,7 +132,7 @@ export default function Home() {
     try { sessionStorage.removeItem('lexdiff:pending-ai-query') } catch { /* ignore */ }
     debugLogger.info('🔁 OAuth 복귀 — pending AI query 재실행', { query: pending })
     setSearchMode('rag')
-    handleSearch({ lawName: pending })
+    handleSearch({ lawName: pending }, 'rag')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateReady, gateUser])
 
@@ -260,8 +260,9 @@ export default function Home() {
     }
   }, [])
 
-  // 검색 핸들러
-  const handleSearch = async (query: { lawName: string; article?: string; jo?: string }) => {
+  // 검색 핸들러 — modeOverride: setSearchMode 직후 같은 렌더에서 호출하는 경로(OAuth 복귀 등)는
+  // 클로저의 stale searchMode가 히스토리에 기록돼 F5/뒤로가기 시 잘못된 모드로 재실행된다
+  const handleSearch = async (query: { lawName: string; article?: string; jo?: string }, modeOverride?: 'basic' | 'rag') => {
     debugLogger.info('🔍 검색 시작', query)
 
     const newSearchId = generateSearchId()
@@ -284,7 +285,7 @@ export default function Home() {
       debugLogger.success('✅ 검색 ID 생성', { searchId: newSearchId })
 
       // History 추가 (검색 모드도 함께 저장)
-      pushSearchHistory(newSearchId, searchMode)
+      pushSearchHistory(newSearchId, modeOverride ?? searchMode)
 
       // 화면 전환 (프로그레스는 SearchResultView에서 관리)
       setSearchId(newSearchId)
