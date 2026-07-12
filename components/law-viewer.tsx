@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import { Card } from "@/components/ui/card"
 import type { LawArticle, LawMeta, RevisionHistoryItem } from "@/lib/law-types"
 import { extractArticleText } from "@/lib/law-xml-parser"
-import { buildJO, formatJO, formatSimpleJo as formatSimpleJoBase, type ParsedRelatedLaw } from "@/lib/law-parser"
+import { buildJO, formatJO, formatSimpleJo as formatSimpleJoBase, extractRelatedLaws, type ParsedRelatedLaw } from "@/lib/law-parser"
 
 // Dynamic import for ReferenceModal (reduce initial bundle)
 const ReferenceModal = dynamic(
@@ -182,11 +182,17 @@ function LawViewerComponent({
     openExternalLawArticleModal(lawName, article || '')
   }
 
-  // Citations를 ParsedRelatedLaw로 변환 후 relatedArticles와 병합
-  const mergedRelatedArticles = useMemo(
-    () => mergeCitationsWithRelated(aiCitations, relatedArticles),
-    [aiCitations, relatedArticles],
-  )
+  // Citations를 ParsedRelatedLaw로 변환 후 relatedArticles와 병합.
+  // 추가질의(follow-up) 시 aiCitations/relatedArticles가 새 턴으로 초기화되는데, 후속 답변은
+  // 대화 맥락만으로 답해 인용이 비는 경우가 많다 → 이전 턴(conversationHistory)의 인용·관련
+  // 법령까지 누적해 사이드바 리스트 증발을 방지 (현재 턴이 앞, 중복은 사이드바가 key로 병합)
+  const mergedRelatedArticles = useMemo(() => {
+    const current = mergeCitationsWithRelated(aiCitations, relatedArticles)
+    if (conversationHistory.length === 0) return current
+    const historyCitations = conversationHistory.flatMap(e => e.citations || [])
+    const historyRelated = conversationHistory.flatMap(e => extractRelatedLaws(e.answer))
+    return [...current, ...mergeCitationsWithRelated(historyCitations, historyRelated)]
+  }, [aiCitations, relatedArticles, conversationHistory])
 
   // Parse activeJo to extract article number for admin rules matching
   const activeArticleNumber = useMemo(() => {
