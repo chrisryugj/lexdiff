@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
 }
 
-const OG_IMAGE = "/og/lexdiff-kakao-og.png"
+const OG_IMAGE = "/og/lexdiff-og-diff.png"
 const OG_TITLE = "LexDiff — 법령 비교 · AI 법률 검색"
 const OG_DESC = "법제처 데이터 기반 법령·판례 조회와 신·구 조문 비교, AI 법률 질의응답."
 
