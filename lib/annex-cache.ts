@@ -9,7 +9,7 @@ import type { AnnexCacheEntry } from "./law-types"
 import { debugLogger } from "./debug-logger"
 
 const DB_NAME = "LexDiffAnnexCache"
-const DB_VERSION = 2  // v2: kordoc 파서 통합 후 캐시 무효화 (2026-04-02)
+const DB_VERSION = 3  // v3: kordoc 4.0.6 파서 대개선(캡션 중첩표·PDF 밴드 브리지) 반영 캐시 무효화 (2026-07-12)
 const ANNEX_STORE = "annexMarkdownCache"
 const CACHE_EXPIRY_DAYS = 30 // 별표는 변경 빈도가 낮으므로 30일
 // PERF-2: 무제한 누적 방지 (별표는 PDF/HWP 마크다운 — 수십 KB×무제한 폭증 우려)

@@ -171,11 +171,11 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
       kordoc:
-        specifier: ^3.10.1
-        version: 3.10.1(pdfjs-dist@5.5.207)
+        specifier: ^4.0.6
+        version: 4.0.6
       korean-law-mcp:
-        specifier: ^4.4.4
-        version: 4.4.4
+        specifier: ^4.7.2
+        version: 4.7.2
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -227,6 +227,9 @@ importers:
       zod-to-json-schema:
         specifier: ^3.25.1
         version: 3.25.1(zod@3.25.76)
+      zod4:
+        specifier: npm:zod@^4.4.3
+        version: zod@4.4.3
       zustand:
         specifier: ^5.0.8
         version: 5.0.8(@types/react@19.2.2)(immer@10.2.0)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
@@ -2391,11 +2394,6 @@ packages:
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
 
-  '@xmldom/xmldom@0.9.9':
-    resolution: {integrity: sha512-qycIHAucxy/LXAYIjmLmtQ8q9GPnMbnjG1KXhWm9o5sCr6pOYDATkMPiTNa6/v8eELyqOQ2FsEqeoFYmgv/gJg==}
-    engines: {node: '>=14.6'}
-    deprecated: this version has critical issues, please update to the latest version
-
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
@@ -3357,8 +3355,18 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.4.4:
-    resolution: {integrity: sha512-8AgMWW8VJs2pFkIu+bXVJRcWsbBcbBehvZHQkT8T26EDADsJ/dkGLUC5o7Vp3bwJ2oeQ23N0IVEO3X/NeDuHBw==}
+  kordoc@4.0.6:
+    resolution: {integrity: sha512-SCJAV7u6dieLH4pw/Fd/lj3THN9LiFJxD2mGSRLZzIGWZYR6k/F5nEDz6gQSLMR0EbldqegNuIiky2b6b8rWBg==}
+    engines: {node: '>=18'}
+    hasBin: true
+    peerDependencies:
+      puppeteer-core: '>=22.0.0'
+    peerDependenciesMeta:
+      puppeteer-core:
+        optional: true
+
+  korean-law-mcp@4.7.2:
+    resolution: {integrity: sha512-LJ594gW1eExZMfq4/9Ug1hY4L4QtD/ekIZDVnXuM7R4McdogUDdT3/tw7JFI6JfyNhRZIeAsdwzdMTNaXj3N0g==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -3837,6 +3845,10 @@ packages:
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
+
+  pdfjs-dist@4.10.38:
+    resolution: {integrity: sha512-/Y3fcFrXEAsMjJXeL9J8+ZG9U01LbuWaYypvDW2ycW1jL269L3js3DVBjDJ0Up9Np1uqDXsDrRihHANhZOlwdQ==}
+    engines: {node: '>=20'}
 
   pdfjs-dist@5.5.207:
     resolution: {integrity: sha512-WMqqw06w1vUt9ZfT0gOFhMf3wHsWhaCrxGrckGs5Cci6ybDW87IvPaOd2pnBwT6BJuP/CzXDZxjFgmSULLdsdw==}
@@ -6577,8 +6589,6 @@ snapshots:
 
   '@xmldom/xmldom@0.9.10': {}
 
-  '@xmldom/xmldom@0.9.9': {}
-
   accepts@2.0.0:
     dependencies:
       mime-types: 3.0.1
@@ -7696,10 +7706,29 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  korean-law-mcp@4.4.4:
+  kordoc@4.0.6:
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@xmldom/xmldom': 0.9.10
+      cfb: 1.2.2
+      commander: 13.1.0
+      jszip: 3.10.1
+      markdown-it: 14.3.0
+      zod: 3.25.76
+    optionalDependencies:
+      '@huggingface/transformers': 4.2.0
+      '@hyzyla/pdfium': 2.1.13
+      onnxruntime-node: 1.27.0
+      pdfjs-dist: 4.10.38
+      sharp: 0.34.5
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+
+  korean-law-mcp@4.7.2:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
-      '@xmldom/xmldom': 0.9.9
+      '@xmldom/xmldom': 0.9.10
       commander: 14.0.3
       dotenv: 17.4.1
       express: 5.2.1
@@ -8377,6 +8406,11 @@ snapshots:
   path-to-regexp@8.3.0: {}
 
   pathe@2.0.3: {}
+
+  pdfjs-dist@4.10.38:
+    optionalDependencies:
+      '@napi-rs/canvas': 0.1.97
+    optional: true
 
   pdfjs-dist@5.5.207:
     optionalDependencies:

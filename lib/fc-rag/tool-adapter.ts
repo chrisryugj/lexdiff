@@ -11,6 +11,7 @@
  */
 
 import { zodToJsonSchema } from 'zod-to-json-schema'
+import { toJSONSchema as zod4ToJsonSchema } from 'zod4'
 import type { FunctionDeclaration } from '@google/genai'
 import { TOOLS, apiClient } from './tool-registry'
 import {
@@ -20,6 +21,61 @@ import {
 } from './tool-cache'
 import { isDecisionGetTool } from './decision-domains'
 
+// ─── zod → JSON Schema 변환 ───
+
+/**
+ * korean-law-mcp 스키마는 zod4 인스턴스 — zod-to-json-schema(zod3 전용)는 zod4의
+ * _def 구조를 못 읽어 빈 properties를 반환한다(46개 도구 전부 파라미터 무명세로
+ * LLM에 전달되던 결함). zod4 스키마(_zod 마커 보유)는 zod4 네이티브 toJSONSchema로,
+ * zod3 스키마(테스트 mock 등)는 기존 라이브러리로 변환한다.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toRawJsonSchema(schema: unknown): Record<string, any> {
+  if (schema && typeof schema === 'object' && '_zod' in schema) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return zod4ToJsonSchema(schema as never, { io: 'input', unrepresentable: 'any' }) as Record<string, any>
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return zodToJsonSchema(schema as any, { target: 'openApi3' }) as Record<string, any>
+}
+
+/**
+ * Gemini Schema 서브셋으로 정제 — 지원 키만 통과시키고 type을 대문자 enum으로.
+ * ($schema·default·additionalProperties 등 미지원 키는 API 400을 유발할 수 있다)
+ */
+function sanitizeGeminiSchema(node: unknown): Record<string, unknown> | undefined {
+  if (!node || typeof node !== 'object') return undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const src = node as Record<string, any>
+  const out: Record<string, unknown> = {}
+  let type = src.type
+  if (Array.isArray(type)) {
+    // ["string","null"] 형태(nullable 유니온) → 단일 type + nullable
+    const nonNull = type.filter((t: string) => t !== 'null')
+    if (nonNull.length === 1) { type = nonNull[0]; out.nullable = true }
+    else type = undefined
+  }
+  if (typeof type === 'string') out.type = type.toUpperCase()
+  if (typeof src.description === 'string') out.description = src.description
+  if (Array.isArray(src.enum)) out.enum = src.enum
+  if (src.items) {
+    const items = sanitizeGeminiSchema(src.items)
+    if (items) out.items = items
+  }
+  if (src.properties && typeof src.properties === 'object') {
+    const props: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(src.properties)) {
+      const sv = sanitizeGeminiSchema(v)
+      if (sv) props[k] = sv
+    }
+    out.properties = props
+  }
+  if (Array.isArray(src.required) && src.required.length) out.required = src.required
+  // anyOf 등 미지원 조합으로 type이 비면 STRING으로 안전 폴백 (Gemini는 typeless 거부)
+  if (!out.type && !out.properties && !out.items && !out.enum) out.type = 'STRING'
+  return out
+}
+
 // ─── Gemini FunctionDeclaration 변환 ───
 
 let _cachedDeclarations: FunctionDeclaration[] | null = null
@@ -28,29 +84,19 @@ export function getToolDeclarations(): FunctionDeclaration[] {
   if (_cachedDeclarations) return _cachedDeclarations
 
   _cachedDeclarations = TOOLS.map(tool => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonSchema = zodToJsonSchema(tool.schema as any, { target: 'openApi3' })
+    const cleaned = sanitizeGeminiSchema(toRawJsonSchema(tool.schema)) || {}
+
+    // apiKey는 LLM이 사용할 필요 없는 내부 파라미터 — 토큰 절약을 위해 제거
+    const properties = { ...((cleaned.properties as Record<string, unknown>) || {}) }
+    delete properties.apiKey
+    const required = (Array.isArray(cleaned.required) ? cleaned.required as string[] : [])
+      .filter(k => k !== 'apiKey')
 
     const params: Record<string, unknown> = {
       type: 'OBJECT' as const,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: (jsonSchema as any).properties || {},
+      properties,
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((jsonSchema as any).required?.length) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      params.required = (jsonSchema as any).required
-    }
-
-    // apiKey는 LLM이 사용할 필요 없는 내부 파라미터 — 토큰 절약을 위해 제거
-    if (params.properties && typeof params.properties === 'object' && 'apiKey' in (params.properties as Record<string, unknown>)) {
-      const props = { ...(params.properties as Record<string, unknown>) }
-      delete props.apiKey
-      params.properties = props
-      if (Array.isArray(params.required)) {
-        params.required = (params.required as string[]).filter(k => k !== 'apiKey')
-      }
-    }
+    if (required.length) params.required = required
 
     return {
       name: tool.name,
@@ -80,14 +126,11 @@ export function getAnthropicToolDefinitions(): AnthropicTool[] {
   if (_cachedAnthropicTools) return _cachedAnthropicTools
 
   _cachedAnthropicTools = TOOLS.map(tool => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonSchema = zodToJsonSchema(tool.schema as any, { target: 'openApi3' })
+    const jsonSchema = toRawJsonSchema(tool.schema)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties = { ...((jsonSchema as any).properties || {}) }
+    const properties = { ...(jsonSchema.properties || {}) }
     delete properties.apiKey
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const required: string[] = ((jsonSchema as any).required || []).filter((k: string) => k !== 'apiKey')
+    const required: string[] = (jsonSchema.required || []).filter((k: string) => k !== 'apiKey')
 
     return {
       name: tool.name,

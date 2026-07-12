@@ -17,6 +17,8 @@ const { fakeHandler } = vi.hoisted(() => ({
 
 vi.mock('@/lib/fc-rag/tool-registry', async () => {
   const { z } = await import('zod')
+  // 실제 korean-law-mcp 스키마(zod4 인스턴스) — 선언 변환 회귀 방지용
+  const { SearchLawSchema } = await import('korean-law-mcp/tools/search')
   return {
     apiClient: { dummy: true },
     TOOLS: [
@@ -24,6 +26,12 @@ vi.mock('@/lib/fc-rag/tool-registry', async () => {
         name: 'fake_search',
         description: 'fake search tool',
         schema: z.object({ query: z.string() }),
+        handler: fakeHandler,
+      },
+      {
+        name: 'real_zod4_search',
+        description: 'korean-law-mcp 실스키마 (zod4)',
+        schema: SearchLawSchema,
         handler: fakeHandler,
       },
       {
@@ -60,7 +68,7 @@ vi.mock('@/lib/fc-rag/tool-cache', async () => {
   }
 })
 
-import { executeTool, executeToolsParallel } from '@/lib/fc-rag/tool-adapter'
+import { executeTool, executeToolsParallel, getToolDeclarations, getAnthropicToolDefinitions } from '@/lib/fc-rag/tool-adapter'
 import { apiCache } from '@/lib/fc-rag/tool-cache'
 
 beforeEach(() => {
@@ -178,6 +186,38 @@ describe('executeToolsParallel', () => {
     expect(results[0].isError).toBe(false)
     expect(results[1].isError).toBe(true)
     expect(results[2].isError).toBe(false)
+  })
+})
+
+describe('getToolDeclarations — zod4 스키마 변환 (빈 명세 회귀 방지)', () => {
+  // korean-law-mcp가 zod4로 간 뒤 zod-to-json-schema가 빈 properties를 반환해
+  // 46개 도구 전부 파라미터 무명세로 Gemini에 전달되던 결함의 회귀 가드.
+  it('zod4 실스키마 선언에 properties·description·required가 채워진다', () => {
+    const dec = getToolDeclarations().find(d => d.name === 'real_zod4_search')
+    expect(dec).toBeDefined()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params = dec!.parameters as any
+    expect(Object.keys(params.properties)).toContain('query')
+    expect(params.properties.query.type).toBe('STRING')
+    expect(params.properties.query.description).toBeTruthy()
+    expect(params.required).toContain('query')
+    // apiKey는 내부 파라미터 — 노출 금지
+    expect(params.properties.apiKey).toBeUndefined()
+  })
+
+  it('zod3 스키마(mock)도 폴백 경로로 변환된다', () => {
+    const dec = getToolDeclarations().find(d => d.name === 'fake_search')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params = dec!.parameters as any
+    expect(Object.keys(params.properties)).toContain('query')
+    expect(params.properties.query.type).toBe('STRING')
+  })
+
+  it('Anthropic 정의도 zod4 스키마에서 properties가 비지 않는다', () => {
+    const def = getAnthropicToolDefinitions().find(t => t.name === 'real_zod4_search')
+    expect(def).toBeDefined()
+    expect(Object.keys(def!.input_schema.properties)).toContain('query')
+    expect(def!.input_schema.properties.apiKey).toBeUndefined()
   })
 })
 

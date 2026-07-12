@@ -151,18 +151,25 @@ export function truncateForContext(text: string, toolName?: string, args?: unkno
 }
 
 export function compressSearchResult(text: string): string {
-  const headerMatch = text.match(/^검색 결과 \(총 \d+건\):/)
+  // 확장쿼리 병기 형태("(총 50건, 확장쿼리: ...)") 포함 매칭
+  const headerMatch = text.match(/^검색 결과 \(총 \d+건[^)\n]*\):/)
   const header = headerMatch ? headerMatch[0] + '\n\n' : ''
 
   const entries: string[] = []
-  const regex = /(\d+)\.\s+(.+?)\n\s+- 법령ID:\s*\S+\n\s+- MST:\s*(\d+)\n\s+- 공포일:\s*\S+\n\s+- 구분:\s*(\S+)/g
+  // 공포일 라인은 "/ 시행일: ..." 꼬리가 붙을 수 있어 관대 매칭 (strict \S+ 는 현행 포맷과 미매칭 → 압축 무력화)
+  const regex = /(\d+)\.\s+(.+?)\n\s+- 법령ID:\s*\S+\n\s+- MST:\s*(\d+)\n\s+- 공포일:[^\n]*\n\s+- 구분:\s*(\S+)/g
   let m
   while ((m = regex.exec(text)) !== null) {
     entries.push(`${m[1]}. ${m[2].trim()} (MST:${m[3]}, ${m[4]})`)
   }
 
   if (entries.length === 0) return text
-  return header + entries.join('\n')
+
+  // mcp 4.7+ 시행예정 병기(🔜 라인)는 신법 "법령 없음" 오판을 막는 정보 — 압축 시 보존
+  const upcomingLines = text.split('\n').filter(l => l.trimStart().startsWith('🔜'))
+  const upcoming = upcomingLines.length ? '\n\n' + upcomingLines.join('\n') : ''
+
+  return header + entries.join('\n') + upcoming
 }
 
 const TOP_AI_RESULTS = 7

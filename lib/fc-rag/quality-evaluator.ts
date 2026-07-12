@@ -113,7 +113,11 @@ export function evaluateResponseQuality(
   // ── 현행성 백스톱 ──
   // 도구 결과에 연혁/시행예정/구법령명 위험 마커가 있는데 답변이 현행성을 전혀 언급하지
   // 않으면 → 과거 본문을 현행처럼 단정한 의심. marginal 이하로 캡 + 경고(→캐시 저장 차단).
-  const toolText = toolResults.map(t => t.result).join('\n')
+  // mcp 4.7+ search_law가 현행 결과에 참고용으로 병기하는 🔜 시행예정 라인은 "위험 버전을
+  // 실제로 끌어온 것"이 아니므로 마커 스캔에서 제외 (미제외 시 개정 대기 법령 전반이 오탐).
+  const toolText = toolResults
+    .map(t => t.result.split('\n').filter(l => !l.trimStart().startsWith('🔜')).join('\n'))
+    .join('\n')
   if (CURRENCY_RISK_MARKER.test(toolText) && !CURRENCY_ACK_PATTERN.test(answerText)) {
     score = Math.min(score, 50)
     warnings.push('현행성 라벨 미반영 — 연혁/시행예정 버전을 현행으로 단정했을 가능성 (현행 여부 명시 권장)')
