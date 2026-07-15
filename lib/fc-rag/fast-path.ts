@@ -12,6 +12,8 @@
  * 5. 별표 조회 → search_law + get_annexes
  */
 
+import { scoreLawNameMatch } from '../law-name-match'
+
 // ─── KNOWN_MST 런타임 캐시 ───
 // search_law 호출 결과에서 자동 축적 (cacheMSTEntries).
 // 서버 프로세스 수명 동안 유지. 첫 호출 시에는 비어있어 search_law 먼저 돌음.
@@ -200,8 +202,8 @@ export function parseLawEntries(text: string): LawEntry[] {
 export function findBestMST(entries: LawEntry[], query: string): string | null {
   if (entries.length === 0) return null
 
-  // 1. 「법령명」 또는 ~법 패턴으로 정확 매칭
-  const nameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+법)/)
+  // 1. 「법령명」 또는 ~법/령/규칙 패턴으로 정확 매칭
+  const nameMatch = query.match(/「([^」]+)」/) || query.match(/([\w가-힣]+(?:법|령|규칙))/)
   const target = nameMatch?.[1]
   if (target) {
     const exact = entries.find(e => e.name === target)
@@ -228,7 +230,18 @@ export function findBestMST(entries: LawEntry[], query: string): string | null {
     }
   }
 
-  return entries[0].mst
+  // 3. 유사 매칭: 통칭 ≠ 정식명 케이스 ("인공지능법" ⊂ "인공지능 발전과 … 기본법")
+  if (target) {
+    const scored = entries
+      .map(e => ({ mst: e.mst, score: scoreLawNameMatch(target, e.name) }))
+      .sort((a, b) => b.score - a.score)
+    if (scored[0].score > 0) return scored[0].mst
+  }
+
+  // 매칭 신호가 전혀 없으면 null — 검색이 무관한 목록을 반환한 경우
+  // (예: "인공지능법" → 가나다순 50건) 첫 항목을 집으면 엉뚱한 법령이 fast path로
+  // 나가므로, null을 돌려 full pipeline(LLM)으로 폴백시킨다.
+  return null
 }
 
 // ─── 조례 검색 결과 파싱 유틸 ───
