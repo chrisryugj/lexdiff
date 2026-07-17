@@ -19,6 +19,11 @@
   <a href="https://lexdiff.gomdori.app"><strong>lexdiff.gomdori.app</strong></a>
 </p>
 
+<p align="center">
+  <a href="https://youtu.be/djAe6Pc-2RI"><img src="https://img.youtube.com/vi/djAe6Pc-2RI/mqdefault.jpg" width="320" alt="LexDiff 시연 영상" /></a><br/>
+  <b>▶ 시연 영상 보기</b>
+</p>
+
 ---
 
 ## 💡 LexDiff로 무엇을 할 수 있나요?
