@@ -3,7 +3,7 @@
 **법령을 쉽게. AI로 똑똑하게. 공공 Legal AI의 시작.**
 
 [![Live](https://img.shields.io/badge/Live-lexdiff.gomdori.app-1a2b4c)](https://lexdiff.gomdori.app)
-[![Version](https://img.shields.io/badge/version-2.5.2--beta-b08d57)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.3--beta-b08d57)](CHANGELOG.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Themis](https://img.shields.io/badge/AI-Themis_(Claude)_+_Gemini-b08d57)](https://claude.ai)
@@ -45,7 +45,7 @@
 
 ---
 
-## 🧪 베타 안내 (v2.5.2-beta)
+## 🧪 베타 안내 (v2.5.3-beta)
 
 LexDiff는 현재 **공개 베타**입니다. Google 계정 로그인 후 누구나 무료로 사용할 수 있습니다.
 
@@ -75,7 +75,7 @@ LexDiff는 현재 **공개 베타**입니다. Google 계정 로그인 후 누구
 
 - **수집 항목**: 질문 텍스트, AI 답변, 호출된 도구 목록, 응답 시간, confidence 점수, 에러 발생 여부
 - **수집하지 않는 항목**: Google 계정 정보, 이메일, 실명, BYOK API 키, 브라우저 핑거프린팅
-- **저장 위치**: `logs/fc-rag-queries.jsonl` (서버 로컬 + 관리자 대시보드)
+- **저장 위치**: `logs/fc-rag-traces.jsonl` (서버 로컬 + 관리자 대시보드)
 - **용도**: RAG 파이프라인 튜닝, 환각 탐지, 도구 호출 실패 원인 분석
 - **보존**: 베타 기간 중 무기한, 정식 출시 후 정책 재공지
 
@@ -142,7 +142,7 @@ LexDiff를 만들며 벡터 청크 RAG와 그래프 RAG를 모두 검토했지�
 - **항상 최신** — 법제처가 단일 진실 소스라 재인덱싱이 필요 없습니다
 - **현행성 가드** — 매 질의에 오늘 날짜를 주입하고, 도구 결과의 시행일자·`[현행]`/`[연혁]` 라벨·구(舊) 법령명을 대조해 개정·분법 전 법령으로 답하지 않습니다
 - **추적 가능한 근거** — citation verify가 답변을 실제 원문과 대조합니다
-- **Agentic 다단계 추론** — "판례 → 인용 법령 → 현행 조문" 체인을 LLM이 46개 도구로 직접 따라갑니다
+- **Agentic 다단계 추론** — "판례 → 인용 법령 → 현행 조문" 체인을 LLM이 49개 도구로 직접 따라갑니다
 
 > 적어도 법률 도메인에서는, RAG가 "검색엔진 + LLM"이기보다 **"법제처 API를 손에 든 법률 리서처"** 에 가까워야 한다고 생각합니다.
 
@@ -161,7 +161,7 @@ Pre-evidence (search_ai_law 1회 선조회 → 시스템프롬프트 주입)
   ↓
 테미스 릴레이 (구독 Claude Sonnet + korean-law MCP) — Primary
   ↓ 실패/타임아웃/BYOK 시 폴백
-Gemini 3 Flash — Function Calling RAG 루프 (멀티턴, 46개 등록 도구)
+Gemini 3 Flash — Function Calling RAG 루프 (멀티턴, 49개 등록 도구)
   ↓ 도구 호출 (TypeScript 직접 import, MCP 래핑 없음)
 법제처 Open API + 17개 결정문 도메인 + Supabase 법령 그래프
   ↓
@@ -175,7 +175,7 @@ citation verify (15s) + confidence 판정 (4신호) + answer cache
 | **프론트엔드** | React 19, Tailwind v4, shadcn/ui, Framer Motion |
 | **백엔드** | Next.js 16 (proxy.ts), Zod validation, SSE 스트리밍 |
 | **AI (primary)** | 테미스 릴레이 — 구독 Claude Sonnet + korean-law MCP (맥미니, Tailscale Funnel) |
-| **AI (fallback/BYOK)** | Gemini 3 Flash (Function Calling) — 46개 등록 도구 |
+| **AI (fallback/BYOK)** | Gemini 3 Flash (Function Calling) — 49개 등록 도구 |
 | **AI (router)** | Gemini 3.1 Flash-Lite (S1 쿼리 분류) |
 | **데이터** | 법제처 Open API, Supabase PostgreSQL, Upstash Redis, IndexedDB |
 | **테스트** | Vitest, 단위·통합·E2E |
@@ -190,7 +190,7 @@ citation verify (15s) + confidence 판정 (4신호) + answer cache
 app/api/          API 라우트 (법령, 판례, AI RAG, 비교...)
 components/       법령 뷰어, 검색, 모달, 판례 패널
 lib/              핵심 로직 (링크 생성, 법령 파서, FC-RAG 엔진)
-  fc-rag/         Function Calling RAG — tool-registry, engine, confidence
+  fc-rag/         Function Calling RAG — tool-registry, engine, engine-shared
   quota.ts        일일 쿼터 체크 (Supabase RPC)
   api-auth.ts     Google OAuth + 쿼터 게이트 + BYOK 분기
 hooks/            React 훅 (법령 뷰어, 검색, 판례)
