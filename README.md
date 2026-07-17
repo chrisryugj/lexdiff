@@ -12,16 +12,15 @@
 > *구글링으로 30분, GPT로 환각, LexDiff로 30초 — 법령·판례 근거까지.*
 
 <p align="center">
-  <img src="demo/out/lexdiff-demo.gif" alt="LexDiff Demo" width="720" />
+  <a href="https://youtu.be/djAe6Pc-2RI"><img src="docs/video-demo.jpg" alt="LexDiff 시연영상 — 영상 보기" width="820" /></a>
+</p>
+
+<p align="center">
+  <sub>▶ 클릭하면 유튜브에서 재생됩니다.</sub>
 </p>
 
 <p align="center">
   <a href="https://lexdiff.gomdori.app"><strong>lexdiff.gomdori.app</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://youtu.be/djAe6Pc-2RI"><img src="https://img.youtube.com/vi/djAe6Pc-2RI/mqdefault.jpg" width="320" alt="LexDiff 시연 영상" /></a><br/>
-  <b>▶ 시연 영상 보기</b>
 </p>
 
 ---
