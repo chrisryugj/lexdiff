@@ -174,8 +174,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6
       korean-law-mcp:
-        specifier: ^4.9.6
-        version: 4.9.6(@types/node@22.18.13)
+        specifier: ^4.10.0
+        version: 4.10.0(@types/node@22.18.13)
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -3504,8 +3504,8 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.9.6:
-    resolution: {integrity: sha512-U0aupIWxh8nPGrVvyRA3RyESWBfV32Eacajhfbe/RIukLiEJNXOEYS4r8TkGM4vxM4xIrpIYeiY85tD/Gbj9wA==}
+  korean-law-mcp@4.10.0:
+    resolution: {integrity: sha512-cqb34KdMKxNGSpU0EnoWnKrZL7hALVKX7ry1qbdTd8zdPoYU9o9NioEl6DiuFI/+zFUb+XpkTbCBje57WT2agA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -7978,7 +7978,7 @@ snapshots:
       - '@types/node'
       - supports-color
 
-  korean-law-mcp@4.9.6(@types/node@22.18.13):
+  korean-law-mcp@4.10.0(@types/node@22.18.13):
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       '@xmldom/xmldom': 0.9.10
