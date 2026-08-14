@@ -115,6 +115,11 @@
     "tsx": "^4.20.6",
     "tw-animate-css": "1.3.3",
     "typescript": "^5",
-    "vitest": "^4.0.15"
+    "vitest": "^4.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs@<7.5.5": ">=7.5.5"
+    }
   }
 }

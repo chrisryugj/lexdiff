@@ -111,7 +111,8 @@ export function ApiKeyInput({ apiKey, onSave, onClear, variant = "default" }: Ap
               키는 이 탭에서만 유지됩니다.
             </p>
             <p className="text-[11px] text-muted-foreground/80 mt-1.5 leading-relaxed">
-              본인 키 사용 시 질의는 기본 엔진(Themis)을 거치지 않고 <span className="font-medium text-foreground/80">Google Gemini로 직접 전송</span>됩니다.
+              본인 키 사용 시 질의는 기본 엔진(Themis) 대신 <span className="font-medium text-foreground/80">본인 키로 Google Gemini를 호출</span>합니다.
+              키는 LexDiff 서버를 경유해 Gemini로 전달되며, 서버에 저장되지 않습니다.
             </p>
           </div>
 

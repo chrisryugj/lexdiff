@@ -174,7 +174,7 @@ async function testBenchmarkAnalyze() {
     })
 
     // 직접 법제처 API로 조례 검색하여 2개 이상 확보
-    const OC = process.env.LAW_OC || 'ryuseungin'
+    const OC = process.env.LAW_OC
     const ordinSearchUrl = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=ordin&type=XML&query=${encodeURIComponent('주민자치회 설치 및 운영에 관한 조례')}&display=5`
     const ordinRes = await fetch(ordinSearchUrl, { signal: AbortSignal.timeout(10_000) })
 

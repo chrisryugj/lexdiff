@@ -18,9 +18,10 @@ describe('buildCspWithNonce (M2)', () => {
     expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/)
   })
 
-  it('style-src도 nonce 기반', () => {
-    expect(csp).toMatch(new RegExp(`style-src[^;]*'nonce-${nonce}'`))
-    expect(csp).not.toMatch(/style-src[^;]*unsafe-inline/)
+  it("style-src는 unsafe-inline 유지 (style 속성은 nonce 적용 불가 — React style={{}} 보호)", () => {
+    // nonce가 style-src에 있으면 브라우저가 unsafe-inline을 무시해 인라인 style 속성이 깨진다
+    expect(csp).not.toMatch(new RegExp(`style-src[^;]*'nonce-${nonce}'`))
+    expect(csp).toMatch(/style-src[^;]*'unsafe-inline'/)
   })
 
   it('strict-dynamic으로 번들 파생 script 허용', () => {

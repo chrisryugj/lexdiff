@@ -172,9 +172,9 @@ export async function GET(request: NextRequest) {
   const query = searchParams.get("query")
   const maxResults = Math.min(Math.max(parseInt(searchParams.get("maxResults") || "10", 10) || 10, 1), 100)
 
-  if (!query) {
+  if (!query || query.length > 200) {
     return NextResponse.json(
-      { error: "query 파라미터가 필요합니다" },
+      { error: "query 파라미터가 필요합니다 (200자 이하)" },
       { status: 400 }
     )
   }

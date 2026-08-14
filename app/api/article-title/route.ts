@@ -4,8 +4,11 @@ import { debugLogger } from "@/lib/debug-logger"
 
 /** Host header injection 방지: 신뢰 가능한 내부 origin 반환 */
 function getInternalOrigin(request: Request): string {
-  // Vercel 환경에서는 VERCEL_URL 사용, 그 외 request.url에서 추출
+  // Vercel 환경에서는 VERCEL_URL, 그 외에는 고정 base URL env 우선 —
+  // request.url은 리버스 프록시 뒤에서 Host 헤더로 재구성될 수 있어(SSRF) 최후 폴백으로만 사용
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL
+  if (base && /^https?:\/\//.test(base)) return base.replace(/\/$/, "")
   return new URL(request.url).origin
 }
 

@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 
     // 파일명: 클라이언트 지정 > 기본값
     let filename = customFilename
-      ? customFilename.replace(/[\\/:*?"<>|]/g, "") // 금지 문자 제거
+      ? customFilename.replace(/[\x00-\x1f\x7f\\/:*?"<>|]/g, "") // 금지 문자 + 제어문자(CRLF 헤더 주입) 제거
       : `annex-${flSeq}`
 
     // 확장자가 없으면 추가

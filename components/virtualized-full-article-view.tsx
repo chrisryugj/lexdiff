@@ -23,8 +23,9 @@ function getCachedArticleHtml(article: LawArticle, lawTitle: string): string {
   const key = `${lawTitle}|${article.jo}|${article.content?.length ?? 0}`
   const cached = articleHtmlCache.get(key)
   if (cached !== undefined) return cached
-  // 법제처 API 법령 본문 = 신뢰 소스. sanitize 생략으로 조당 ~30ms 절감.
-  const html = extractArticleText(article, false, lawTitle)
+  // sanitize 비용은 조당 1회만 — 결과를 캐시에 담으므로 재렌더에는 붙지 않는다.
+  // (같은 파일의 전문·부칙 렌더 경로와 동일한 방어선 유지)
+  const html = sanitizeForRender(extractArticleText(article, false, lawTitle))
   articleHtmlCache.set(key, html)
   if (articleHtmlCache.size > ARTICLE_HTML_CACHE_MAX) {
     const oldest = articleHtmlCache.keys().next().value

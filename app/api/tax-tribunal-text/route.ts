@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const id = searchParams.get("id")
 
-  if (!id) {
+  if (!id || !/^[A-Za-z0-9]{1,20}$/.test(id)) {
     return NextResponse.json(
       { error: "id 파라미터가 필요합니다 (특별행정심판재결례일련번호)" },
       { status: 400 }

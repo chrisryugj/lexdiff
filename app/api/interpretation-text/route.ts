@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const id = searchParams.get("id")
   const caseName = searchParams.get("caseName")
 
-  if (!id) {
+  if (!id || !/^[A-Za-z0-9]{1,20}$/.test(id)) {
     return NextResponse.json(
       { error: "id 파라미터가 필요합니다 (법령해석례일련번호)" },
       { status: 400 }

@@ -1,4 +1,8 @@
-const API_KEY = 'ryuseungin';
+const API_KEY = process.env.LAW_OC;
+if (!API_KEY) {
+  console.error('LAW_OC 환경변수가 필요합니다 (예: LAW_OC=xxx node scripts/test-eflaw.mjs)');
+  process.exit(1);
+}
 
 async function test() {
   console.log('Testing eflaw endpoint...\n');

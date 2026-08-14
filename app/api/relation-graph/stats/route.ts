@@ -29,9 +29,10 @@ export async function GET() {
       nodes: nodeResult.count ?? 0,
       edges: edgeResult.count ?? 0,
     })
-  } catch (error) {
+  } catch {
+    // CWE-209: 내부 에러 메시지(스키마/연결 정보)를 클라이언트에 노출하지 않는다
     return NextResponse.json(
-      { available: false, message: error instanceof Error ? error.message : "DB 조회 실패" },
+      { available: false, message: "DB 조회 실패" },
       { status: 500 },
     )
   }

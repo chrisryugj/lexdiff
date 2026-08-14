@@ -25,8 +25,8 @@ const MAX_LOGS = 5000
 // SSE 클라이언트들
 const clients = new Set()
 
-// CORS 허용
-app.use(cors())
+// CORS: 로컬 뷰어만 허용 (와일드카드면 방문한 임의 웹페이지가 dev 로그를 읽을 수 있음)
+app.use(cors({ origin: [`http://localhost:${LOG_SERVER_PORT}`, `http://127.0.0.1:${LOG_SERVER_PORT}`] }))
 
 // 정적 파일 제공 (HTML 로그 뷰어)
 app.use(express.static(join(__dirname, '../public')))
@@ -200,7 +200,8 @@ app.post('/api/monitor-port', express.json(), (req, res) => {
 /**
  * 서버 시작
  */
-app.listen(LOG_SERVER_PORT, () => {
+// 127.0.0.1 바인딩: LAN 전체에 dev 로그가 무인증 노출되지 않도록
+app.listen(LOG_SERVER_PORT, '127.0.0.1', () => {
   addLog('success', `로그 서버가 포트 ${LOG_SERVER_PORT}에서 시작되었습니다.`)
   addLog('info', `로그 뷰어: http://localhost:${LOG_SERVER_PORT}/log-viewer.html`)
 

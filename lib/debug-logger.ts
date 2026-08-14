@@ -8,18 +8,38 @@ export interface LogEntry {
   details?: unknown
 }
 
+// CWE-532: 로그에 실리는 URL의 API 크리덴셜(법제처 OC, Gemini key 등) 마스킹
+function maskSecrets(value: string): string {
+  return value
+    .replace(/([?&](?:OC|key|apiKey|api_key|token)=)[^&\s"']+/gi, "$1***")
+    .replace(/AIza[0-9A-Za-z_-]{30,}/g, "AIza***")
+}
+
+function maskValue(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return maskSecrets(value)
+  if (depth >= 3 || value === null || typeof value !== "object") return value
+  if (Array.isArray(value)) return value.map((v) => maskValue(v, depth + 1))
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = maskValue(v, depth + 1)
+  }
+  return out
+}
+
 class DebugLogger {
   private logs: LogEntry[] = []
   private listeners: Set<(logs: LogEntry[]) => void> = new Set()
   private maxLogs = 500
 
   log(level: LogLevel, message: string, details?: unknown) {
+    const safeMessage = maskSecrets(message)
+    const safeDetails = details === undefined ? undefined : maskValue(details)
     const entry: LogEntry = {
       id: `${Date.now()}-${Math.random()}`,
       timestamp: new Date(),
       level,
-      message,
-      details,
+      message: safeMessage,
+      details: safeDetails,
     }
 
     this.logs.unshift(entry)
@@ -27,7 +47,10 @@ class DebugLogger {
       this.logs = this.logs.slice(0, this.maxLogs)
     }
 
-    console.log(`[${level.toUpperCase()}] ${message}`, details || "")
+    // 프로덕션(Vercel Function 로그)에는 error/warning만 남긴다 — 크리덴셜 포함 URL 평문 기록 방지
+    if (process.env.NODE_ENV !== "production" || level === "error" || level === "warning") {
+      console.log(`[${level.toUpperCase()}] ${safeMessage}`, safeDetails ?? "")
+    }
     this.notifyListeners()
   }
 

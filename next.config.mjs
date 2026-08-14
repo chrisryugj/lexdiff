@@ -11,7 +11,7 @@ const nextConfig = {
   // 보안 헤더
   async headers() {
     // M2: LEXDIFF_CSP_NONCE=true 이면 middleware가 요청별 nonce CSP를 설정하므로
-    // 정적 CSP는 제외 (중복 설정 방지). 그 외 보안 헤더는 유지.
+    // 정적 CSP는 제외 (중복 설정 방지). 기본 off — 정적 프리렌더 페이지는 nonce 부착 불가(proxy.ts 참조).
     const cspNonceEnabled = process.env.LEXDIFF_CSP_NONCE === 'true'
 
     const baseHeaders = [

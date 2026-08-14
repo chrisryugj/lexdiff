@@ -13,6 +13,7 @@ import { debugLogger } from "@/lib/debug-logger"
 import { verifyAllCitations, type Citation, type VerifiedCitation } from "@/lib/citation-verifier"
 import { executeClaudeRAGStream, executeGeminiRAGStream, executeRelayRAGStream, type FCRAGCitation } from "@/lib/fc-rag/engine"
 import { requireAiAuth, refundAiQuota } from "@/lib/api-auth"
+import { sanitizeCredentials } from "@/lib/api-error"
 import { generateTraceId, traceLogger } from "@/lib/trace-logger"
 import { validate, ragRequestSchema, createErrorResponse } from "@/lib/api-validation"
 import {
@@ -141,7 +142,12 @@ export async function POST(request: NextRequest) {
     return createErrorResponse(validation.error, 400)
   }
 
-  const { query, conversationId, preEvidence } = validation.data
+  const { query, conversationId: rawConversationId, preEvidence: rawPreEvidence } = validation.data
+
+  // 프롬프트 인젝션 완화: 클라이언트 제공 preEvidence의 펜스·특수토큰 무력화 (summarize와 동일 패턴)
+  const preEvidence = rawPreEvidence
+    ? rawPreEvidence.replace(/"""/g, '"').replace(/```/g, "")
+    : undefined
 
   // Supabase 사용자 인증 + 기능별 쿼터 (BYOK 시 스킵)
   // 주의: 이 시점에 이미 쿼터 1건이 사전 차감됨. 엔진이 응답을 주지 못하면
@@ -150,6 +156,12 @@ export async function POST(request: NextRequest) {
   if ('error' in auth) return auth.error
   const authCtx = auth.ctx
   const authedUserId = authCtx.userId
+
+  // IDOR 방지: 대화 스토어 키를 사용자로 스코프 — 타인의 conversationId를 알아도
+  // 그 대화 맥락을 읽거나 이어붙일 수 없다 (BYOK/익명은 별도 네임스페이스)
+  const conversationId = rawConversationId
+    ? `${authedUserId ?? "byok"}:${rawConversationId}`
+    : undefined
 
   const traceId = generateTraceId()
   traceLogger.startTrace(traceId)
@@ -496,12 +508,13 @@ export async function POST(request: NextRequest) {
         sendAndLog({ type: 'source', source })
         finalSource = source
       } catch (error) {
-        const errMsg = error instanceof Error ? error.message : 'unknown'
+        // BYOK 키가 SDK 에러 메시지/스택에 echo될 수 있어 로그·트레이스 전 새니타이즈 (summarize와 동일 패턴)
+        const errMsg = sanitizeCredentials(error instanceof Error ? error.message : 'unknown')
         logErrorCategory = categorizeError(error)
         console.error('[fc-rag route] engine error:', errMsg)
         traceLogger.addEvent(traceId, 'error', {
           message: errMsg,
-          stack: error instanceof Error ? error.stack : undefined,
+          stack: error instanceof Error && error.stack ? sanitizeCredentials(error.stack) : undefined,
         })
         const friendly = classifyEngineError(errMsg)
         sendAndLog({

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { TERMS_VERSION, PRIVACY_VERSION } from '@/lib/privacy/consent-versions'
+import { debugLogger } from '@/lib/debug-logger'
 
 /**
  * GET  /api/privacy/consent — 현재 동의 상태 + 최신 버전 반환
@@ -66,7 +67,9 @@ export async function POST(request: NextRequest) {
   )
 
   if (error) {
-    return NextResponse.json({ error: 'db_error', message: error.message }, { status: 500 })
+    // CWE-209: DB 에러 상세는 서버 로그에만 남기고 클라이언트엔 일반 메시지
+    debugLogger.error('consent upsert failed', { message: error.message })
+    return NextResponse.json({ error: 'db_error', message: '동의 저장에 실패했습니다.' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

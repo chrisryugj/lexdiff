@@ -11,12 +11,39 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createSupabaseServiceClient } from "@/lib/supabase/server"
 import { sessionAnonHash, classifyUa } from "@/lib/ai-telemetry"
 import { debugLogger } from "@/lib/debug-logger"
+import { getClientIP } from "@/lib/get-client-ip"
 
 const VALID_TYPES = new Set(["good", "bad", "improve"])
 const MAX_BODY_LEN = 8000
 
+// 무인증 쓰기 엔드포인트 남용 방지: IP 기준 분당 5회 (search-suggest 패턴)
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX = 5
+const rateLimitMap = new Map<string, number[]>()
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const recent = (rateLimitMap.get(ip) || []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+  if (recent.length >= RATE_LIMIT_MAX) {
+    rateLimitMap.set(ip, recent)
+    return false
+  }
+  recent.push(now)
+  rateLimitMap.set(ip, recent)
+  if (rateLimitMap.size > 1000) {
+    const entries = Array.from(rateLimitMap.entries())
+    entries.sort((a, b) => Math.max(...a[1]) - Math.max(...b[1]))
+    for (const [k] of entries.slice(0, 500)) rateLimitMap.delete(k)
+  }
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request)
+    if (!checkRateLimit(ip || "unknown")) {
+      return NextResponse.json({ error: "rate limit exceeded" }, { status: 429 })
+    }
+
     const body = await request.json().catch(() => ({}))
     const feedbackType = String(body?.feedbackType || "")
 
@@ -30,7 +57,6 @@ export async function POST(request: NextRequest) {
       keepBody && typeof v === "string" && v.trim() ? v.slice(0, MAX_BODY_LEN) : null
 
     const ua = request.headers.get("user-agent")
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null
 
     const svc = createSupabaseServiceClient()
     await svc.from("ai_answer_feedback").insert({
@@ -39,7 +65,7 @@ export async function POST(request: NextRequest) {
       query_type: typeof body?.queryType === "string" ? body.queryType.slice(0, 32) : null,
       answer_id: typeof body?.answerId === "string" ? body.answerId.slice(0, 64) : null,
       conversation_id: typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : null,
-      session_anon: sessionAnonHash(null, ip),
+      session_anon: sessionAnonHash(null, ip === "127.0.0.1" || ip === "anonymous" ? null : ip),
       is_byok: Boolean(body?.isByok),
       ua_class: classifyUa(ua),
       query: clip(body?.query),

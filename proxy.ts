@@ -21,6 +21,8 @@ import { createServerClient } from '@supabase/ssr'
 
 // ─── CSP nonce ───
 
+// opt-in 유지: 정적 프리렌더 페이지는 빌드 시점 HTML에 nonce를 박을 수 없어(실측 0/36 부착)
+// 기본 on 시 strict-dynamic이 모든 스크립트를 차단 → 전 페이지 동적 렌더링 전환 후에만 켤 것
 const CSP_NONCE_FLAG = process.env.LEXDIFF_CSP_NONCE === 'true'
 
 function generateNonce(): string {
@@ -45,7 +47,9 @@ export function buildCspWithNonce(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://va.vercel-scripts.com https://vercel.live`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    // style 속성(React style={{}})은 nonce 적용이 불가능해 unsafe-inline 유지 —
+    // XSS 방어의 핵심은 script-src nonce이고 style-src는 위험도 낮음
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https://www.law.go.kr https://lh3.googleusercontent.com https://*.googleusercontent.com data: blob:",
     `connect-src 'self' https://www.law.go.kr https://generativelanguage.googleapis.com https://vitals.vercel-insights.com https://vercel.live${supabaseHost ? ` ${supabaseHost}` : ''}`,
     "frame-ancestors 'self'",
@@ -104,8 +108,10 @@ function applyCspNonce(request: NextRequest): NextResponse {
   const csp = buildCspWithNonce(nonce)
 
   // RSC가 읽을 수 있도록 request header에 nonce를 주입 (NextResponse.next 옵션)
+  // Next 공식 패턴: CSP를 request header에도 실어야 프레임워크 인라인 스크립트에 nonce가 붙는다
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', csp)
 
   const res = NextResponse.next({ request: { headers: requestHeaders } })
   // 응답 헤더에 동적 CSP 설정 (next.config.mjs의 정적 CSP를 덮어씀)
