@@ -26,6 +26,13 @@ const MIN_EXACT_LEN = 30
 // 0.05~0.10 수준. 어순/조사 paraphrase로 공통 의미를 유지하면 0.25~0.50.
 const JACCARD_THRESHOLD = 0.25
 
+// 원숫자(항 번호) 1~50. ⑮에서 멈추면 제16항 이상의 정규화가 무음 실패해 인용 대조가
+// 어긋난다(#103). 이식처 korean-law-mcp article-parser CIRCLED_DIGITS와 동일 범위 —
+// 두 저장소의 normalizeLegalText 출력이 같아야 이식 규칙(동작 동일)이 유지된다.
+const CIRCLED_DIGITS =
+  '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗㉘㉙㉚㉛㉜㉝㉞㉟㊱㊲㊳㊴㊵㊶㊷㊸㊹㊺㊻㊼㊽㊾㊿'
+const CIRCLED_RE = new RegExp(`[${CIRCLED_DIGITS}]`, 'g')
+
 /**
  * 법률 텍스트 정규화:
  *  - 원문자 ①②③ → (1)(2)(3)
@@ -39,10 +46,7 @@ export function normalizeLegalText(s: string): string {
   return s
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/\u00A0/g, ' ')
-    .replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g, (m) => {
-      const idx = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮'.indexOf(m)
-      return `(${idx + 1})`
-    })
+    .replace(CIRCLED_RE, (m) => `(${CIRCLED_DIGITS.indexOf(m) + 1})`)
     .replace(/[「『]/g, '')
     .replace(/[」』]/g, '')
     .replace(/[·•]/g, ' ')

@@ -9,6 +9,9 @@ describe('normalizeLegalText', () => {
   test('원문자 ①②③ → (1)(2)(3)', () => {
     expect(normalizeLegalText('①관세 ②면제')).toBe('(1)관세 (2)면제')
   })
+  test('원문자 ⑯ 이상도 변환 — ⑮ 정지 회귀 방지 (#103)', () => {
+    expect(normalizeLegalText('⑯보칙 ⑳벌칙 ㉑부칙 ㊿별표')).toBe('(16)보칙 (20)벌칙 (21)부칙 (50)별표')
+  })
   test('「」『』 제거', () => {
     expect(normalizeLegalText('「관세법」 제38조')).toBe('관세법 제38조')
   })
