@@ -22,6 +22,9 @@ import httpx
 import pandas as pd
 from dotenv import load_dotenv
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ragas_eval import API_HEADERS  # noqa: E402  (테스트 우회 헤더 단일 정본)
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env.local")
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -51,7 +54,7 @@ def call_fc_rag(base_url: str, query: str, timeout: float = 120.0) -> dict:
             url,
             json={"query": query},
             timeout=timeout,
-            headers={"Content-Type": "application/json"},
+            headers=API_HEADERS,
         ) as response:
             if response.status_code != 200:
                 result["error"] = f"HTTP {response.status_code}"

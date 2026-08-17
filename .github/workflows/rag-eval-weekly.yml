@@ -1,9 +1,18 @@
 name: RAG Eval (Weekly)
 
-# 매주 월요일 03:00 UTC (KST 12:00) 자동 실행 + 수동 트리거
+# 수동 트리거 전용 — 주간 cron은 뗐다 (2026-08-18).
+#
+# 이 평가는 GitHub 호스티드 러너에서 구조적으로 돌 수 없다:
+#   · Primary(테미스 relay)는 맥미니 Tailscale Funnel — 러너에서 도달 불가
+#   · LAW_OC는 법제처 IP 등록제 — 러너 IP는 미등록이라 법령 도구 호출이 실패
+#   · 이 레포에는 Actions 시크릿이 하나도 없어 GEMINI_API_KEY 폴백도 비어 있다
+# 그래서 2026-04-20 이후 18주 연속 실패했고, 알림만 울리고 아무도 안 봤다.
+#
+# 실제 평가는 맥미니에서 로컬로 돌린다 (relay·LAW_OC·Supabase가 다 되는 유일한 환경):
+#   ALLOW_TEST_AUTH=true pnpm dev
+#   python evaluation/run_weekly.py
+# 아래 preflight를 통과할 만큼 환경이 갖춰지면 그때 cron을 되살리면 된다.
 on:
-  schedule:
-    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       skip_ragas:
@@ -18,6 +27,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # LLM 키가 없으면 40문항 전부 "AI 엔진 사용 불가"를 받고 60분 뒤에야 죽는다.
+      # 5초 만에 이유를 말하고 끝낸다.
+      - name: Preflight — LLM 도달 가능한지 확인
+        run: |
+          if [ -z "${{ secrets.RELAY_URL }}" ] && [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "❌ RELAY_URL·GEMINI_API_KEY 둘 다 없음 — 이 러너에서는 평가할 LLM이 없다."
+            echo "   맥미니에서 로컬로 돌려라 (워크플로 상단 주석 참고)."
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,7 +75,13 @@ jobs:
           LAW_OC: ${{ secrets.LAW_OC }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           HERMES_API_URL: ${{ secrets.HERMES_API_URL }}
+          # Primary(테미스). 없으면 Gemini 폴백만 측정된다.
+          RELAY_URL: ${{ secrets.RELAY_URL }}
+          RELAY_TOKEN: ${{ secrets.RELAY_TOKEN }}
           NODE_ENV: production
+          # 평가 러너에는 Supabase 로그인 세션이 없다 — 이게 없으면 전 질문이 401로 떨어진다.
+          # 이 러너에서만 켜지고, 프로덕션 배포에는 설정되지 않는다.
+          ALLOW_TEST_AUTH: 'true'
 
       - name: Run weekly RAG evaluation
         id: eval

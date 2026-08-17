@@ -35,6 +35,11 @@ REPORT_PATH = BASE_DIR / "RAGAS_REPORT.md"
 
 API_URL = "http://localhost:3000/api/fc-rag"
 
+# 평가에는 로그인 세션이 없다. 서버를 ALLOW_TEST_AUTH=true 로 띄웠을 때만 이 헤더가 먹고,
+# 그때도 relay primary 경로를 그대로 탄다(BYOK 헤더로 우회하면 Gemini만 재게 되어 측정이 달라진다).
+# 프로덕션 배포에는 ALLOW_TEST_AUTH 가 없어 이 헤더는 아무 효력이 없다.
+API_HEADERS = {"Content-Type": "application/json", "x-test-bypass": "1"}
+
 
 def _normalize_question(item: dict) -> dict:
     """dataset_v2.json (query/ground_truth_answer/...) → 내부 포맷.
@@ -165,7 +170,7 @@ def collect_data(dataset_path: Path | None = None):
             resp = requests.post(
                 API_URL,
                 json={"query": q},
-                headers={"Content-Type": "application/json"},
+                headers=API_HEADERS,
                 timeout=120,
             )
             resp.raise_for_status()
@@ -264,7 +269,7 @@ def collect_data(dataset_path: Path | None = None):
                 resp2 = requests.post(
                     API_URL,
                     json={"query": q},
-                    headers={"Content-Type": "application/json"},
+                    headers=API_HEADERS,
                     timeout=120,
                 )
                 resp2.raise_for_status()

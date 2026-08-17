@@ -21,7 +21,18 @@ pip install -r requirements.txt
 ## 사전 조건
 
 1. `.env.local` 또는 `.env`에 `GOOGLE_API_KEY` 설정 (RAGAS가 Gemini를 평가용 LLM으로 사용)
-2. LexDiff 개발 서버 실행: `npm run dev`
+2. LexDiff 개발 서버를 **테스트 인증 우회를 켜고** 실행:
+
+   ```bash
+   ALLOW_TEST_AUTH=true npm run dev
+   ```
+
+   평가 스크립트에는 Supabase 로그인 세션이 없어서, 이걸 켜지 않으면 `/api/fc-rag`가
+   전 질문에 401을 준다. 우회는 `ALLOW_TEST_AUTH=true` + 프로덕션 배포가 아닐 때만
+   동작하므로 배포본에는 영향이 없다.
+
+3. 맥미니에서 돌려라 — Primary(테미스 relay)와 법제처 `LAW_OC`(IP 등록제)가
+   둘 다 되는 유일한 환경이다. 다른 곳에서는 Gemini 폴백만 측정되거나 도구 호출이 실패한다.
 
 ## 실행
 

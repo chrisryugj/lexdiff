@@ -57,6 +57,19 @@ export async function requireAiAuth(
     return { ctx: { userId: null, byokKey, isByok: true, quota: null, feature } }
   }
 
+  // 🧪 DEV/TEST 전용 우회 — CI의 주간 RAG 평가와 스트레스 테스트가 로그인 없이
+  // relay primary 경로(isByok=false → relay 우선)를 그대로 타도록 가짜 컨텍스트를 반환.
+  // 쿼터/BYOK 없음. 이중 잠금:
+  //   1) ALLOW_TEST_AUTH=true 를 명시해야 하고 (Vercel에 미설정 → 무력)
+  //   2) 그 값이 새어 들어가도 프로덕션 배포에서는 VERCEL_ENV 가 막는다.
+  if (
+    process.env.ALLOW_TEST_AUTH === 'true' &&
+    process.env.VERCEL_ENV !== 'production' &&
+    request.headers.get('x-test-bypass')
+  ) {
+    return { ctx: { userId: 'test-bypass', byokKey: null, isByok: false, quota: null, feature } }
+  }
+
   // Supabase 미설정 (로컬 dev 등) → 401로 graceful downgrade.
   // env 없을 때 createServerClient 가 throw 해서 500 으로 새는 것 방지.
   let supabase
