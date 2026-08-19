@@ -540,6 +540,18 @@ export function buildAdminRuleContentHTML(fullContent: AdminRuleContent, baseLaw
 }
 
 /**
+ * 법제처 행정규칙 본문의 `<img id="158658713"></img>` 는 참조 id 뿐이고 실제 이미지 URL이
+ * 없다. 그대로 두면 여는 태그만 소비되고 `</img>` 가 본문에 글자로 남는다.
+ * 이미지가 있었다는 사실은 남겨야 하므로 자리표시로 바꾼다(원문 링크에서 확인 가능).
+ */
+function stripImagePlaceholders(text: string): string {
+  return text
+    .replace(/<img\b[^>]*>\s*<\/img>/gi, '[그림]')
+    .replace(/<img\b[^>]*\/?>/gi, '[그림]')
+    .replace(/<\/img>/gi, '')
+}
+
+/**
  * 행정규칙 본문(AdminRuleContent)을 법령 뷰어가 쓰는 { meta, articles } 로 변환.
  *
  * 행정규칙 XML에는 법령처럼 조문코드가 없으므로 "제N조(의M)" 표기에서 코드를 만든다.
@@ -569,18 +581,20 @@ export function adminRuleToLawData(content: AdminRuleContent): { meta: LawMeta; 
       jo: code,
       joNum: matched ? display : article.number,
       title: article.title,
-      content: article.content.trim(),
+      content: stripImagePlaceholders(article.content.trim()),
       isPreamble: false,
     }
   })
 
   // 조문형식여부=N 인 행정규칙(제N조 없이 □/ㅇ 문단으로만 구성)은 조문이 하나도 안 잡힌다
-  // → 본문 전체를 단일 항목으로 넘겨야 빈 화면이 되지 않는다
+  // → 본문 전체를 단일 항목으로 넘겨야 빈 화면이 되지 않는다.
+  // jo 를 조문코드로 두면 formatSimpleJo 가 "제0조"라는 없는 조문번호를 만들어 내므로
+  // 코드가 아닌 라벨을 그대로 넣는다(6자리 숫자가 아니면 as-is 로 통과).
   if (articles.length === 0 && content.content.trim()) {
     articles.push({
-      jo: "000000",
+      jo: "본문",
       joNum: "본문",
-      content: content.content.trim(),
+      content: stripImagePlaceholders(content.content.trim()),
       isPreamble: false,
     })
   }
