@@ -2,7 +2,7 @@
  * useSearchHandlers 훅 통합 테스트
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useSearchHandlers } from '@/components/search-result-view/hooks/useSearchHandlers'
 import type { SearchState, SearchStateActions } from '@/components/search-result-view/hooks/useSearchState'
@@ -205,6 +205,16 @@ describe('useSearchHandlers', () => {
       addConversationEntry: vi.fn(),
       clearConversation: vi.fn(),
     }
+  })
+
+  // handleSearch/handleSearchChoice 는 void 반환이라 테스트가 완료를 기다릴 수 없다.
+  // 그 체인이 남긴 fetch 가 다음 테스트의 mock.calls 에 섞여 들어와, URL 을 검사하는
+  // 테스트(PREC-3·행정규칙)가 무작위로 실패했다 → 매크로태스크 한 바퀴 flush 후 리셋.
+  afterEach(async () => {
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    mockFetch.mockReset()
   })
 
   describe('handleSearch', () => {
