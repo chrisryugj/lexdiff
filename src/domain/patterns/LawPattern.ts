@@ -29,8 +29,11 @@ export const QUESTION_WORDS = /(무엇|어떻게|어떤|왜|언제|어디서|누
 // 순수 법령명 패턴 (고시/훈령/예규/지침은 행정규칙이므로 제외)
 export const PURE_LAW_NAME_PATTERN = /^[가-힣A-Za-z0-9·\s]+(?:법률\s*시행령|법률\s*시행규칙|법\s*시행령|법\s*시행규칙|특별법|기본법|법률|법|령|규칙|규정|조례|약관|협정)$/
 
-// 행정규칙명 패턴 (고시/훈령/예규/지침)
-export const ADMIN_RULE_NAME_PATTERN = /^[가-힣A-Za-z0-9·\s]+(?:고시|훈령|예규|지침)$/
+// 행정규칙명 패턴 (고시/훈령/예규/지침으로 끝남)
+// 허용 문자를 열거하지 않고 질문 부호만 배제한다. 법제처 admrul 목록 실측(1,282건)에서
+// 이름에 쓰이는 특수문자가 ( ) · ㆍ 「 」 , . - ~ / & ㎡ ㎒ ® … 로 열려 있어,
+// 화이트리스트로는 새 문자가 나올 때마다 조용히 누락된다(종전 408건 중 18건 미매칭).
+export const ADMIN_RULE_NAME_PATTERN = /^[^?？!！\n]{2,}(?:고시|훈령|예규|지침)$/
 
 // 일반 단어 제외 목록 (법령명으로 오인되기 쉬운 단어)
 export const EXCLUDED_WORDS = ['방법', '절차', '요건', '조건', '지침']
@@ -61,6 +64,12 @@ export function isAdminRuleName(text: string): boolean {
 
   // 시행규칙은 법령이므로 제외
   if (/시행규칙/.test(trimmed)) {
+    return false
+  }
+
+  // "어떤 고시", "무슨 지침이 있나" 같은 자연어 질문은 이름이 아니다.
+  // (실측 408건 중 의문사를 품은 행정규칙명은 0건이라 오배제 위험이 없다)
+  if (QUESTION_WORDS.test(trimmed)) {
     return false
   }
 
