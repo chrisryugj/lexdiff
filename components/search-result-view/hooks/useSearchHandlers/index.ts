@@ -46,7 +46,7 @@ export function useSearchHandlers({
   }
 
   // 1. 법령 본문 조회
-  const { fetchLawContent } = useFetchLawContent(deps)
+  const { fetchLawContent, fetchAdminRuleContent } = useFetchLawContent(deps)
 
   // 2. AI 검색 + 연속 대화
   const { handleAiSearch, handleFollowUp, handleNewConversation, stopAiSearch } = useAiSearch(deps)
@@ -205,6 +205,7 @@ export function useSearchHandlers({
   const basicHandlers = useBasicHandlers({
     ...deps,
     fetchLawContent,
+    fetchAdminRuleContent,
     handleSearchInternal,
   })
 

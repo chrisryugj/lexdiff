@@ -235,11 +235,14 @@ export function useBasicSearch(deps: UseBasicSearchDeps) {
           // AdminRuleListItem → LawSearchResult 매핑 (기존 선택 리스트 재사용)
           const results: LawSearchResult[] = adminRules.map(rule => ({
             lawId: rule.id,
-            lawMST: rule.serialNumber || rule.id,
+            mst: rule.serialNumber,
+            // 행정규칙 본문은 admrul API(ID=행정규칙일련번호)로만 조회된다 → 선택 시 eflaw로 새지 않게 표시
+            isAdminRule: true,
+            admRulSeq: rule.serialNumber || rule.id,
             lawName: rule.name,
             lawType: rule.type || '행정규칙',
             promulgationDate: rule.publishDate || '',
-            enforcementDate: rule.effectiveDate || '',
+            effectiveDate: rule.effectiveDate || '',
           }))
 
           actions.setLawSelectionState({ results, query: { lawName } })

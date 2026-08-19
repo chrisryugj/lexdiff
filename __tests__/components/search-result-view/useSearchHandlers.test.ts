@@ -546,4 +546,75 @@ describe('useSearchHandlers', () => {
       expect(urls.some((u) => u.includes('/api/ordin-search'))).toBe(false)
     })
   })
+  // 행정규칙(고시·훈령·예규 등)은 법령이 아니므로 eflaw가 아니라 admrul 본문 API로 조회해야 한다.
+  // (버그: 행정규칙 검색 결과를 선택하면 /api/eflaw?lawId=행정규칙ID → "일치하는 법령이 없습니다")
+  describe('handleLawSelect: 행정규칙', () => {
+    const ADMRUL_XML = '<?xml version="1.0" encoding="UTF-8"?><AdmRulService><행정규칙기본정보>'
+      + '<행정규칙일련번호>2100000271562</행정규칙일련번호>'
+      + '<행정규칙명><![CDATA[징수업무 처리에 관한 고시]]></행정규칙명>'
+      + '<행정규칙종류>고시</행정규칙종류><발령일자>20260102</발령일자><발령번호>2026-6</발령번호>'
+      + '<행정규칙ID>91153</행정규칙ID><소관부처명>관세청</소관부처명><시행일자>20260102</시행일자>'
+      + '</행정규칙기본정보>'
+      + '<조문내용><![CDATA[제1장  총칙]]></조문내용>'
+      + '<조문내용><![CDATA[제1조(목적) 이 고시는 「관세법」에 따른 징수업무의 처리절차를 규정함을 목적으로 한다.]]></조문내용>'
+      + '<조문내용><![CDATA[제2조(적용 범위) 이 고시는 다음 각 호의 업무에 적용한다.]]></조문내용>'
+      + '</AdmRulService>'
+
+    const adminRule = {
+      lawId: '91153',
+      mst: '2100000271562',
+      admRulSeq: '2100000271562',
+      isAdminRule: true,
+      lawName: '징수업무 처리에 관한 고시',
+      lawType: '고시',
+    }
+
+    const renderWithAdminRule = () => renderHook(() => useSearchHandlers({
+      state: {
+        ...mockState,
+        lawSelectionState: {
+          results: [adminRule],
+          query: { lawName: '징수업무 처리에 관한 고시' },
+        },
+      } as never,
+      actions: mockActions,
+      onBack: mockOnBack,
+    }))
+
+    it('/api/admrul로 본문 조회하고 /api/eflaw는 호출하지 않는다', async () => {
+      mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(ADMRUL_XML) })
+
+      const { result } = renderWithAdminRule()
+
+      await act(async () => {
+        await result.current.handleLawSelect(adminRule as never)
+      })
+
+      const urls = mockFetch.mock.calls.map((c) => c[0] as string)
+      expect(urls.some((u) => u.includes('/api/admrul?') && u.includes('ID=2100000271562'))).toBe(true)
+      expect(urls.some((u) => u.includes('/api/eflaw'))).toBe(false)
+    })
+
+    it('행정규칙 본문을 조문으로 변환해 lawData에 반영한다', async () => {
+      mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(ADMRUL_XML) })
+
+      const { result } = renderWithAdminRule()
+
+      await act(async () => {
+        await result.current.handleLawSelect(adminRule as never)
+      })
+
+      expect(mockActions.setLawData).toHaveBeenCalledWith(expect.objectContaining({
+        meta: expect.objectContaining({
+          lawTitle: '징수업무 처리에 관한 고시',
+          lawType: '고시',
+        }),
+        articles: expect.arrayContaining([
+          expect.objectContaining({ jo: '000100', joNum: '제1조', title: '목적' }),
+          expect.objectContaining({ jo: '000200', joNum: '제2조', title: '적용 범위' }),
+        ]),
+      }))
+      expect(mockActions.setLawSelectionState).toHaveBeenCalledWith(null)
+    })
+  })
 })

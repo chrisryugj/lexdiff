@@ -3,7 +3,8 @@
  */
 
 import { linkifyRefsB } from "./unified-link-generator"
-import { escapeHtml } from "./law-data-utils"
+import { escapeHtml, convertArticleNumberToCode } from "./law-data-utils"
+import type { LawMeta, LawArticle } from "./law-types"
 
 /** 정규식 특수문자 이스케이프 */
 function escapeRegExp(str: string): string {
@@ -26,6 +27,7 @@ export interface AdminRuleContent {
   name: string // 행정규칙명
   id: string // 행정규칙ID
   serialNumber?: string // 일련번호
+  type?: string // 행정규칙종류 (훈령/예규/고시/공고/지침/기타)
   department?: string // 소관부처
   publishDate?: string // 발령일자
   publishNumber?: string // 발령번호
@@ -100,6 +102,7 @@ export function parseAdminRuleContent(xmlText: string): AdminRuleContent | null 
   const name = infoNode.querySelector("행정규칙명")?.textContent?.trim() || ""
   const id = infoNode.querySelector("행정규칙ID")?.textContent?.trim() || ""
   const serialNumber = infoNode.querySelector("행정규칙일련번호")?.textContent?.trim()
+  const type = infoNode.querySelector("행정규칙종류")?.textContent?.trim()
   const department = infoNode.querySelector("소관부처명")?.textContent?.trim()
   const publishDate = infoNode.querySelector("발령일자")?.textContent?.trim()
   const publishNumber = infoNode.querySelector("발령번호")?.textContent?.trim()
@@ -130,6 +133,7 @@ export function parseAdminRuleContent(xmlText: string): AdminRuleContent | null 
     name,
     id,
     serialNumber,
+    type,
     department,
     publishDate,
     publishNumber,
@@ -533,4 +537,53 @@ export function buildAdminRuleContentHTML(fullContent: AdminRuleContent, baseLaw
   htmlParts.push(textParts.join(''))
 
   return htmlParts.join('')
+}
+
+/**
+ * 행정규칙 본문(AdminRuleContent)을 법령 뷰어가 쓰는 { meta, articles } 로 변환.
+ *
+ * 행정규칙 XML에는 법령처럼 조문코드가 없으므로 "제N조(의M)" 표기에서 코드를 만든다.
+ * 조문 패턴이 없는 항목(장/절 제목 등)은 parseAdminRuleContent 단계에서 이미 제외된다.
+ */
+export function adminRuleToLawData(content: AdminRuleContent): { meta: LawMeta; articles: LawArticle[] } {
+  const meta: LawMeta = {
+    lawId: content.id,
+    mst: content.serialNumber,
+    lawTitle: content.name,
+    lawType: content.type || "행정규칙",
+    latestEffectiveDate: content.effectiveDate,
+    effectiveDate: content.effectiveDate,
+    promulgationDate: content.publishDate,
+    promulgation: {
+      date: content.publishDate,
+      number: content.publishNumber,
+    },
+    fetchedAt: new Date().toISOString(),
+  }
+
+  const articles: LawArticle[] = content.articles.map((article) => {
+    const matched = article.number.match(/^제(\d+)조(?:의(\d+))?$/)
+    const { code, display } = convertArticleNumberToCode(matched?.[1] ?? "0", matched?.[2] ?? "0")
+
+    return {
+      jo: code,
+      joNum: matched ? display : article.number,
+      title: article.title,
+      content: article.content.trim(),
+      isPreamble: false,
+    }
+  })
+
+  // 조문형식여부=N 인 행정규칙(제N조 없이 □/ㅇ 문단으로만 구성)은 조문이 하나도 안 잡힌다
+  // → 본문 전체를 단일 항목으로 넘겨야 빈 화면이 되지 않는다
+  if (articles.length === 0 && content.content.trim()) {
+    articles.push({
+      jo: "000000",
+      joNum: "본문",
+      content: content.content.trim(),
+      isPreamble: false,
+    })
+  }
+
+  return { meta, articles }
 }

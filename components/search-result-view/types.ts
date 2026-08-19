@@ -21,6 +21,10 @@ export interface LawSearchResult {
   lawType: string
   promulgationDate?: string
   effectiveDate?: string
+  /** 행정규칙(고시·훈령·예규 등) 여부 — true면 eflaw가 아니라 admrul 본문 API로 조회 */
+  isAdminRule?: boolean
+  /** 행정규칙일련번호 (admrul 본문 조회용 ID) */
+  admRulSeq?: string
 }
 
 export interface OrdinanceSearchResult {

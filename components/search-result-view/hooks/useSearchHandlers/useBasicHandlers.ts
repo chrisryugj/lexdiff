@@ -15,11 +15,12 @@ import type { HandlerDeps, SearchQuery, LawSearchResult, OrdinanceSearchResult, 
 
 interface UseBasicHandlersDeps extends HandlerDeps {
   fetchLawContent: (selectedLaw: LawSearchResult, query: SearchQuery, skipCache?: boolean) => Promise<void>
+  fetchAdminRuleContent: (selectedLaw: LawSearchResult) => Promise<void>
   handleSearchInternal: (query: SearchQuery, signal?: AbortSignal, forcedMode?: 'law' | 'ai', skipCache?: boolean) => Promise<void>
 }
 
 export function useBasicHandlers(deps: UseBasicHandlersDeps) {
-  const { state, actions, toast, reportError, onBack, fetchLawContent, handleSearchInternal } = deps
+  const { state, actions, toast, reportError, onBack, fetchLawContent, fetchAdminRuleContent, handleSearchInternal } = deps
 
   // ============================================================
   // 검색 핸들러
@@ -60,23 +61,29 @@ export function useBasicHandlers(deps: UseBasicHandlersDeps) {
 
     actions.setIsSearching(true)
     try {
-      await fetchLawContent(law, {
-        lawName: state.lawSelectionState.query.lawName,
-        article: state.lawSelectionState.query.article,
-        jo: undefined,
-      })
+      // 행정규칙(고시·훈령·예규)은 법령 API로 조회되지 않는다 → admrul 본문 API로 분기
+      if (law.isAdminRule) {
+        await fetchAdminRuleContent(law)
+      } else {
+        await fetchLawContent(law, {
+          lawName: state.lawSelectionState.query.lawName,
+          article: state.lawSelectionState.query.article,
+          jo: undefined,
+        })
+      }
       actions.setLawSelectionState(null)
       actions.setRelatedSearches([])
       actions.setMobileView("content")
     } catch (error) {
-      debugLogger.error("법령 조회 실패", error)
-      toast({ title: "법령 조회 실패", description: error instanceof Error ? error.message : "법령 조회 중 오류가 발생했습니다.", variant: "destructive" })
+      const label = law.isAdminRule ? "행정규칙 조회 실패" : "법령 조회 실패"
+      debugLogger.error(label, error)
+      toast({ title: label, description: error instanceof Error ? error.message : "본문 조회 중 오류가 발생했습니다.", variant: "destructive" })
       // 에러 시 선택 목록으로 복귀 (lawSelectionState 유지하되 isSearching 해제)
       // → 사용자가 다른 법령을 선택하거나 취소할 수 있음
     } finally {
       actions.setIsSearching(false)
     }
-  }, [actions, state.lawSelectionState, fetchLawContent, toast])
+  }, [actions, state.lawSelectionState, fetchLawContent, fetchAdminRuleContent, toast])
 
   const handleOrdinanceSelect = useCallback(async (ordinance: OrdinanceSearchResult) => {
     if (!state.ordinanceSelectionState) return
