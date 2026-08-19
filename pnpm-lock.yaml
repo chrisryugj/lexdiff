@@ -177,8 +177,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6
       korean-law-mcp:
-        specifier: ^4.10.0
-        version: 4.10.0(@types/node@22.18.13)
+        specifier: ^4.12.0
+        version: 4.12.0(@types/node@22.18.13)
       motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -3495,8 +3495,8 @@ packages:
       puppeteer-core:
         optional: true
 
-  korean-law-mcp@4.10.0:
-    resolution: {integrity: sha512-cqb34KdMKxNGSpU0EnoWnKrZL7hALVKX7ry1qbdTd8zdPoYU9o9NioEl6DiuFI/+zFUb+XpkTbCBje57WT2agA==}
+  korean-law-mcp@4.12.0:
+    resolution: {integrity: sha512-idNZCIT7NYyBx87OB7PhxY+YjiqNo+EGaKtmPFwkN0cwMXPuxa8GV8xCzxIok/KmiRhW6EKrLIEQJnP1SPmS+Q==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -7959,7 +7959,7 @@ snapshots:
       - '@types/node'
       - supports-color
 
-  korean-law-mcp@4.10.0(@types/node@22.18.13):
+  korean-law-mcp@4.12.0(@types/node@22.18.13):
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       '@xmldom/xmldom': 0.9.10
@@ -7967,7 +7967,7 @@ snapshots:
       dotenv: 17.4.1
       express: 5.2.1
       kordoc: 4.7.2(@types/node@22.18.13)
-      pdfjs-dist: 5.5.207
+      pdfjs-dist: 4.10.38
       zod: 4.4.3
     transitivePeerDependencies:
       - '@cfworker/json-schema'
@@ -8645,7 +8645,6 @@ snapshots:
   pdfjs-dist@4.10.38:
     optionalDependencies:
       '@napi-rs/canvas': 0.1.97
-    optional: true
 
   pdfjs-dist@5.5.207:
     optionalDependencies:
