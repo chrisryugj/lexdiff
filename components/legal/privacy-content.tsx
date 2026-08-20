@@ -11,7 +11,12 @@ export function PrivacyContent() {
           LexDiff 개인정보처리방침
         </h1>
         <p className="text-xs text-muted-foreground">
-          버전 {PRIVACY_VERSION} · 시행일 2026-04-13
+          버전 {PRIVACY_VERSION} · 시행일 2026-04-13 · 최종 개정 2026-08-20
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          2026-08-20 개정: 보유기간 표에 답변 피드백 항목 추가, 국외 이전 요약에 AI 엔진
+          수탁자 보완, 접속기록·질의로그 관련 기재를 실제 처리 현황에 맞게 정정. 수집 항목·
+          이용 목적·수탁자가 새로 늘어난 변경은 없습니다.
         </p>
       </header>
 
@@ -74,7 +79,9 @@ export function PrivacyContent() {
                   <strong className="font-semibold text-foreground">AI 답변 피드백</strong>{' '}
                   — 답변 하단의 피드백 버튼(좋음/별로/개선요청)을 직접 누른 경우에만 1건 기록합니다.
                   ‘좋음’은 유형·엔진 등 메타데이터만 저장하며, <strong>‘별로·개선요청’ 선택 시에 한해</strong> 품질
-                  개선 목적으로 해당 질문·답변 본문을 함께 저장합니다. (상시 자동 수집이 아니며, 버튼을 누르지 않으면 저장되지 않습니다)
+                  개선 목적으로 해당 질문·답변 본문을 함께 저장합니다. 이때 본문은 저장 직전
+                  주민등록번호·연락처 등 식별정보가 자동 마스킹됩니다(제4항). (상시 자동 수집이
+                  아니며, 버튼을 누르지 않으면 저장되지 않습니다)
                 </li>
               </ul>
             </div>
@@ -127,8 +134,19 @@ export function PrivacyContent() {
                   </td>
                 </tr>
                 <tr>
+                  <td className="px-3 py-2">답변 피드백 (‘별로·개선요청’ 선택 시 질문·답변 본문 포함)</td>
+                  <td className="px-3 py-2">
+                    <strong className="font-semibold">180일</strong> 경과 후 자동 삭제
+                  </td>
+                </tr>
+                <tr>
                   <td className="px-3 py-2">접속 IP/User-Agent</td>
-                  <td className="px-3 py-2">3개월 (정보통신망법 제48조의2)</td>
+                  <td className="px-3 py-2">
+                    서비스 자체 데이터베이스에는 저장하지 않습니다. 남용 방지를 위한 일시적
+                    처리(메모리상 요청 빈도 계산)에만 쓰이고 요청 처리 후 폐기되며, 그 외에는
+                    호스팅 사업자(Vercel)의 접속 로그에만 기록되어 해당 사업자의 보관 정책을
+                    따릅니다.
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -141,15 +159,22 @@ export function PrivacyContent() {
           </h2>
           <ul className="list-disc pl-5 space-y-2 marker:text-muted-foreground">
             <li>
-              <strong className="font-semibold text-foreground">익명화</strong>: AI 질의 로그는
-              사용자 ID를 직접 저장하지 않고 HMAC-SHA256 해시로 변환하여 저장합니다. 별도의
-              솔트(salt)를 분리 관리하므로 데이터베이스 유출만으로는 특정 사용자를 역추적할 수
-              없습니다.
+              <strong className="font-semibold text-foreground">원문 미저장</strong>: AI 질의와
+              답변의 본문은 저장하지 않습니다. 품질 분석용 텔레메트리에는 분류 결과·길이 구간·
+              응답 시간 같은 집계 신호만 기록되며, 본문이 담기는 컬럼 자체가 없습니다.
             </li>
             <li>
-              <strong className="font-semibold text-foreground">PII 스크러빙</strong>: 저장 전
-              주민등록번호, 전화번호, 이메일, 계좌번호, IP 주소 등 식별 가능한 개인정보를
-              자동으로 마스킹합니다.
+              <strong className="font-semibold text-foreground">익명화</strong>: 텔레메트리와
+              피드백에 남는 세션 식별자는 사용자 ID를 직접 저장하지 않고 HMAC-SHA256 해시로
+              변환하며, 30분 단위로 값이 바뀌어 장기 추적에 쓸 수 없습니다. 별도의 솔트(salt)를
+              분리 관리하므로 데이터베이스 유출만으로는 특정 사용자를 역추적할 수 없습니다.
+            </li>
+            <li>
+              <strong className="font-semibold text-foreground">PII 스크러빙</strong>: 이용자가
+              ‘별로·개선요청’ 피드백을 눌러 질문·답변 본문이 보관되는 경우, 저장 직전에
+              주민등록번호, 외국인등록번호, 사업자·법인등록번호, 전화번호, 이메일, 계좌번호,
+              카드번호, IP 주소를 자동으로 마스킹합니다. 이용자가 실수로 입력한 민감정보가
+              그대로 쌓이지 않도록 하는 안전장치입니다.
             </li>
             <li>
               <strong className="font-semibold text-foreground">접근 통제</strong>: 모든 로그
@@ -292,9 +317,13 @@ export function PrivacyContent() {
               (ap-northeast-1, Tokyo). 회원 정보, 쿼터, AI 텔레메트리가 일본 리전에 저장됩니다.
             </li>
             <li>
-              <strong className="font-semibold text-foreground">AI 처리 — 미국</strong>: Google
-              Gemini API. 질의 처리를 위한 일시 전송이며, 답변 생성 후 Google측 저장 정책을 따릅니다
-              (Gemini API 기본: 24시간 내 로그 삭제).
+              <strong className="font-semibold text-foreground">AI 처리 — 미국</strong>: 이용자가
+              입력한 질의는 답변 생성을 위해 AI 모델 제공사로 일시 전송됩니다. 기본 엔진인
+              테미스(Themis)는 Anthropic PBC의 Claude 모델 API를, 폴백 경로 및 본인 키 등록 시에는
+              Google LLC의 Gemini API를 사용하며 두 곳 모두 미국에서 처리됩니다. 전송된 질의는
+              답변 생성 목적으로만 쓰이고 각 사업자의 API 데이터 정책을 따릅니다(Gemini API
+              기본: 24시간 내 로그 삭제). 서비스는 이 질의·답변 본문을 자체적으로 저장하지
+              않습니다.
             </li>
             <li>
               <strong className="font-semibold text-foreground">게이트웨이 — 글로벌 엣지</strong>:

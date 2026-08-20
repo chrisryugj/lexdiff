@@ -12,6 +12,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server"
 import { sessionAnonHash, classifyUa } from "@/lib/ai-telemetry"
 import { debugLogger } from "@/lib/debug-logger"
 import { getClientIP } from "@/lib/get-client-ip"
+import { scrubPII } from "@/lib/privacy/scrubber"
 
 const VALID_TYPES = new Set(["good", "bad", "improve"])
 const MAX_BODY_LEN = 8000
@@ -52,9 +53,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 부정(bad/improve)만 본문 보관. good 은 메타만.
+    // 보관하는 경우에도 저장 직전 PII 를 마스킹한다 — 법률 상담 특성상 사용자가
+    // 주민등록번호·연락처를 질문 본문에 그대로 적어 넣는 경우가 있다.
+    // (개인정보처리방침 제4항 "PII 스크러빙" 고지의 이행 지점)
     const keepBody = feedbackType === "bad" || feedbackType === "improve"
     const clip = (v: unknown): string | null =>
-      keepBody && typeof v === "string" && v.trim() ? v.slice(0, MAX_BODY_LEN) : null
+      keepBody && typeof v === "string" && v.trim()
+        ? scrubPII(v).scrubbed.slice(0, MAX_BODY_LEN)
+        : null
 
     const ua = request.headers.get("user-agent")
 
