@@ -11,7 +11,7 @@ import { debugLogger } from '../debug-logger'
 
 const IS_PROD = process.env.NODE_ENV === 'production'
 const HERMES_BASE = process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
-const HERMES_KEY = process.env.HERMES_API_KEY || (IS_PROD ? '' : 'lexdiff-hermes-local')
+const HERMES_KEY = process.env.HERMES_API_KEY || ''
 const HERMES_MODEL = process.env.HERMES_MODEL || 'hermes-agent'
 
 // 프로덕션 + 런타임(빌드 time 아님) 검증을 호출 시점에 수행
