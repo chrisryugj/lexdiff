@@ -10,6 +10,9 @@ import type { User } from '@supabase/supabase-js'
  * - Supabase 세션이 있으면 → 즉시 통과 (쿼터는 서버에서 차감)
  * - 세션 없으면 → 로그인 다이얼로그 띄우고 로그인 후 액션 재실행
  * - 본인 API 키(useApiKey)가 등록돼있으면 → 로그인 없이도 통과 (서버가 BYOK 헤더 감지)
+ *
+ * openGate는 위 통과 조건과 무관하게 다이얼로그를 연다. 로그인 사용자는 requireAuth가
+ * 항상 즉시 통과하므로 그 경로만으로는 API 키 등록 UI에 도달할 수 없기 때문이다.
  */
 export function useAiGate() {
   const [user, setUser] = useState<User | null>(null)
@@ -56,6 +59,12 @@ export function useAiGate() {
     setShowGate(true)
   }, [user, hasByokKey])
 
+  /** 통과 조건과 무관하게 게이트를 연다 — API 키 등록 등 명시적 진입용 */
+  const openGate = useCallback(() => {
+    setPendingAction(null)
+    setShowGate(true)
+  }, [])
+
   const handleClose = useCallback(() => {
     setShowGate(false)
     setPendingAction(null)
@@ -76,6 +85,7 @@ export function useAiGate() {
     ready,
     showGate,
     requireAuth,
+    openGate,
     handleClose,
     handleKeySaved,
   }

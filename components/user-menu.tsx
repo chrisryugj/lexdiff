@@ -260,6 +260,20 @@ export function UserMenu({ onLoginClick, onFavoriteSelect, onAllFavoritesClick }
         <DropdownMenuSeparator className="my-0" />
         <div className="p-1.5">
           <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault()
+              setMenuOpen(false)
+              // 로그인 사용자는 requireAuth가 항상 즉시 통과해 게이트가 안 열린다 → force로 직접 연다
+              window.dispatchEvent(
+                new CustomEvent('lexdiff:ai-gate-required', { detail: { force: true } })
+              )
+            }}
+            className="rounded-md px-3 py-2 text-[12px] cursor-pointer"
+          >
+            <Icon name="lock" size={13} className="mr-2" />
+            API 키 등록
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onSelect={(e) => { e.preventDefault(); setMenuOpen(false); setPrivacySettingsOpen(true) }}
             className="rounded-md px-3 py-2 text-[12px] cursor-pointer"
           >

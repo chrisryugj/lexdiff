@@ -11,11 +11,13 @@ import { LegalDocDialog, type LegalDoc } from '@/components/legal/legal-doc-dial
 interface AiGateDialogProps {
   open: boolean
   onClose: () => void
+  /** Google 로그인 상태 — 로그인한 사용자에게 로그인 버튼을 다시 권하지 않기 위해 */
+  isLoggedIn?: boolean
   /** BYOK 키 저장 성공 시 — 로그인과 동일하게 pending 액션을 이어가야 한다 (없으면 onClose) */
   onKeySaved?: () => void
 }
 
-export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
+export function AiGateDialog({ open, onClose, isLoggedIn = false, onKeySaved }: AiGateDialogProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { apiKey, saveKey, clearKey } = useApiKey()
@@ -73,12 +75,22 @@ export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
             AI 기능 사용
           </DialogTitle>
           <DialogDescription className="text-xs text-gray-500">
-            Google 계정으로 로그인하면 일일 무료 쿼터가 적용됩니다.
+            {isLoggedIn
+              ? '본인 Gemini API 키를 등록하면 쿼터 없이 무제한으로 사용합니다.'
+              : 'Google 로그인은 일일 무료 쿼터, 본인 Gemini API 키는 무제한입니다.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 space-y-3">
-          {/* Google 로그인 */}
+          {/* Google 로그인 — 이미 로그인했으면 상태만 표시 */}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
+              <Icon name="check-circle-2" size={14} className="text-blue-600 dark:text-blue-400" />
+              <span className="text-[11px] text-blue-700 dark:text-blue-300">
+                Google 로그인됨 — 일일 무료 쿼터 적용 중
+              </span>
+            </div>
+          ) : (
           <Button
             onClick={handleGoogleLogin}
             disabled={loading}
@@ -92,11 +104,14 @@ export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
             </svg>
             {loading ? '리다이렉트 중...' : 'Google로 로그인'}
           </Button>
+          )}
 
           {/* 구분선 */}
           <div className="flex items-center gap-2 py-1">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">또는</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              {isLoggedIn ? '추가로' : '또는'}
+            </span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -144,7 +159,8 @@ export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
                   저장
                 </Button>
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  키는 세션 스토리지에만 저장되며 서버로 전송되지 않습니다.
+                  키는 이 브라우저 탭에만 저장되며 서버로 전송되지 않습니다.
+                  <strong className="font-semibold">탭을 닫으면 지워지니</strong> 다음에 다시 등록해야 합니다.
                   <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-brand-gold hover:underline ml-1">
                     키 발급 →
                   </a>
@@ -152,6 +168,12 @@ export function AiGateDialog({ open, onClose, onKeySaved }: AiGateDialogProps) {
               </>
             )}
           </div>
+
+          <p className="text-[10px] text-muted-foreground leading-relaxed rounded-lg bg-muted/50 px-3 py-2">
+            Google 로그인과 API 키는 <strong className="font-semibold">함께 등록할 수 있습니다.</strong>{' '}
+            둘 다 있으면 API 키가 먼저 적용돼 쿼터를 쓰지 않습니다.
+            {isLoggedIn && ' 이 창은 계정 메뉴 → “API 키 등록”에서 언제든 다시 열 수 있습니다.'}
+          </p>
 
           {error && (
             <p className="text-xs text-red-500 text-center">{error}</p>
